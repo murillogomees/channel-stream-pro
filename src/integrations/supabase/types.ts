@@ -14,6 +14,160 @@ export type Database = {
   }
   public: {
     Tables: {
+      admins: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password_hash: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          password_hash: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password_hash?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      affiliate_clicks: {
+        Row: {
+          affiliate_id: string
+          clicked_at: string
+          id: string
+          ip_address: unknown | null
+          referrer: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          affiliate_id: string
+          clicked_at?: string
+          id?: string
+          ip_address?: unknown | null
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          affiliate_id?: string
+          clicked_at?: string
+          id?: string
+          ip_address?: unknown | null
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_clicks_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      affiliate_sales: {
+        Row: {
+          affiliate_id: string
+          commission_amount: number
+          commission_rate: number
+          created_at: string
+          id: string
+          order_value: number
+          paid_at: string | null
+          status: string
+        }
+        Insert: {
+          affiliate_id: string
+          commission_amount: number
+          commission_rate: number
+          created_at?: string
+          id?: string
+          order_value: number
+          paid_at?: string | null
+          status?: string
+        }
+        Update: {
+          affiliate_id?: string
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          id?: string
+          order_value?: number
+          paid_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_sales_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      affiliates: {
+        Row: {
+          affiliate_code: string
+          commission_rate: number
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password_hash: string
+          status: string
+          total_clicks: number
+          total_commission: number
+          total_paid: number
+          total_sales: number
+          updated_at: string
+        }
+        Insert: {
+          affiliate_code: string
+          commission_rate?: number
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          password_hash: string
+          status?: string
+          total_clicks?: number
+          total_commission?: number
+          total_paid?: number
+          total_sales?: number
+          updated_at?: string
+        }
+        Update: {
+          affiliate_code?: string
+          commission_rate?: number
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password_hash?: string
+          status?: string
+          total_clicks?: number
+          total_commission?: number
+          total_paid?: number
+          total_sales?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string | null
@@ -691,6 +845,80 @@ export type Database = {
           },
         ]
       }
+      m3u_lists: {
+        Row: {
+          created_at: string
+          file_size: number | null
+          file_url: string
+          filename: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_size?: number | null
+          file_url: string
+          filename: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_size?: number | null
+          file_url?: string
+          filename?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_lists_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mobile_sessions: {
+        Row: {
+          affiliate_code: string | null
+          created_at: string
+          device_id: string
+          expires_at: string
+          id: string
+          plan_selected: string | null
+          user_data: Json
+        }
+        Insert: {
+          affiliate_code?: string | null
+          created_at?: string
+          device_id: string
+          expires_at?: string
+          id?: string
+          plan_selected?: string | null
+          user_data?: Json
+        }
+        Update: {
+          affiliate_code?: string | null
+          created_at?: string
+          device_id?: string
+          expires_at?: string
+          id?: string
+          plan_selected?: string | null
+          user_data?: Json
+        }
+        Relationships: []
+      }
       nfeio_companies: {
         Row: {
           address: Json | null
@@ -1127,6 +1355,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      recommended_players: {
+        Row: {
+          created_at: string
+          description: string | null
+          download_links: Json
+          featured: boolean
+          icon_url: string | null
+          id: string
+          name: string
+          platforms: Json
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          download_links?: Json
+          featured?: boolean
+          icon_url?: string | null
+          id?: string
+          name: string
+          platforms?: Json
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          download_links?: Json
+          featured?: boolean
+          icon_url?: string | null
+          id?: string
+          name?: string
+          platforms?: Json
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       reconciliations: {
         Row: {
