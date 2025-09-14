@@ -18,6 +18,7 @@ const Navigation = () => {
     { name: "Início", href: "#home" },
     { name: "Planos", href: "#planos" },
     { name: "Canais", href: "#canais" },
+    { name: "Players", href: "/download-players" },
     { name: "Contato", href: "#contato" },
   ];
 

@@ -3,6 +3,7 @@ import HeroSection from "@/components/HeroSection";
 import PlansSection from "@/components/PlansSection";
 import ChannelsSection from "@/components/ChannelsSection";
 import MoviesSection from "@/components/MoviesSection";
+import ContactSection from "@/components/ContactSection";
 
 const Index = () => {
   return (
@@ -20,6 +21,9 @@ const Index = () => {
         </section>
         <section id="filmes">
           <MoviesSection />
+        </section>
+        <section id="contato">
+          <ContactSection />
         </section>
       </main>
     </div>
