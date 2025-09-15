@@ -27,16 +27,24 @@ const AdminLogin = () => {
 
       if (error) throw error;
 
-      // Verificar se é admin
+      // Verificar se é admin (por ID ou email)
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('*')
-        .eq('id', data.user.id)
+        .or(`id.eq.${data.user.id},email.eq.${data.user.email}`)
         .single();
 
       if (adminError || !adminData) {
         await supabase.auth.signOut();
         throw new Error('Acesso negado: usuário não é administrador');
+      }
+
+      // Se o admin existe mas não tem o ID do auth, atualizar
+      if (adminData && adminData.id !== data.user.id) {
+        await supabase
+          .from('admins')
+          .update({ id: data.user.id })
+          .eq('email', data.user.email);
       }
 
       toast({
