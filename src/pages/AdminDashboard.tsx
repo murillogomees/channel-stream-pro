@@ -22,19 +22,29 @@ const AdminDashboard = () => {
 
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!user || !user.email) {
       navigate('/admin/login');
       return;
     }
 
+    // Check if user is admin by email or id
     const { data: adminData } = await supabase
       .from('admins')
       .select('*')
-      .eq('id', user.id)
+      .or(`id.eq.${user.id},email.eq.${user.email}`)
       .single();
 
     if (!adminData) {
       navigate('/admin/login');
+      return;
+    }
+
+    // If admin exists but no auth id, update it
+    if (adminData && !adminData.id) {
+      await supabase
+        .from('admins')
+        .update({ id: user.id })
+        .eq('email', user.email);
     }
   };
 

@@ -1551,9 +1551,17 @@ export type Database = {
       }
     }
     Functions: {
+      current_email: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_company_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       normalize_document: {
         Args: { document: string }
