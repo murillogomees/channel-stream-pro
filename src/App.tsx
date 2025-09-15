@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminCustomize from "./pages/AdminCustomize";
+import AdminSettings from "./pages/AdminSettings";
 import AffiliateLogin from "./pages/AffiliateLogin";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import DownloadPlayers from "./pages/DownloadPlayers";
@@ -22,6 +24,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/customize" element={<AdminCustomize />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/affiliate/login" element={<AffiliateLogin />} />
           <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />

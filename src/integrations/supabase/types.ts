@@ -1436,6 +1436,33 @@ export type Database = {
           },
         ]
       }
+      site_configurations: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          section: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          section: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          section?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           created_at: string | null
