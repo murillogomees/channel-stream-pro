@@ -1,0 +1,191 @@
+{
+  "header": {
+    "logo": {
+      "text": "IPTV Premium",
+      "image": null
+    },
+    "navigation": [
+      { "id": "home", "label": "Início", "href": "#home" },
+      { "id": "planos", "label": "Planos", "href": "#planos" },
+      { "id": "canais", "label": "Canais", "href": "#canais" },
+      { "id": "filmes", "label": "Filmes & Séries", "href": "#filmes" },
+      { "id": "contato", "label": "Contato", "href": "#contato" }
+    ],
+    "ctaButton": {
+      "text": "Assinar Agora",
+      "href": "#planos"
+    }
+  },
+  "hero": {
+    "title": "IPTV Premium",
+    "subtitle": "A melhor experiência em entretenimento digital",
+    "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família.",
+    "backgroundImage": "/src/assets/hero-bg.jpg",
+    "ctaButtons": [
+      { "text": "Ver Planos", "href": "#planos", "variant": "default" },
+      { "text": "Teste Grátis", "href": "#contato", "variant": "outline" }
+    ],
+    "features": [
+      "Mais de 10.000 canais",
+      "Filmes e séries em HD/4K",
+      "Suporte 24/7",
+      "Sem contrato"
+    ]
+  },
+  "plans": {
+    "title": "Escolha seu Plano",
+    "subtitle": "Planos flexíveis para todos os perfis",
+    "items": [
+      {
+        "id": "basico",
+        "name": "Básico",
+        "price": "29.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 5.000 canais",
+          "Filmes e séries",
+          "Qualidade HD",
+          "2 telas simultâneas",
+          "Suporte por WhatsApp"
+        ],
+        "highlighted": false,
+        "ctaText": "Escolher Plano"
+      },
+      {
+        "id": "premium",
+        "name": "Premium",
+        "price": "49.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 10.000 canais",
+          "Filmes e séries 4K",
+          "Qualidade Ultra HD",
+          "4 telas simultâneas",
+          "Suporte prioritário",
+          "EPG completo"
+        ],
+        "highlighted": true,
+        "ctaText": "Mais Popular"
+      },
+      {
+        "id": "familia",
+        "name": "Família",
+        "price": "79.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 15.000 canais",
+          "Filmes e séries 4K",
+          "Qualidade Ultra HD",
+          "6 telas simultâneas",
+          "Suporte 24/7",
+          "EPG completo",
+          "Gravação de programas"
+        ],
+        "highlighted": false,
+        "ctaText": "Escolher Plano"
+      }
+    ]
+  },
+  "channels": {
+    "title": "Canais Disponíveis",
+    "subtitle": "Milhares de canais dos melhores conteúdos",
+    "categories": [
+      {
+        "name": "Esportes",
+        "icon": "Trophy",
+        "count": "50+",
+        "description": "ESPN, Fox Sports, SporTV e muito mais"
+      },
+      {
+        "name": "Filmes",
+        "icon": "Film",
+        "count": "100+",
+        "description": "HBO, Telecine, Netflix e canais premium"
+      },
+      {
+        "name": "Notícias",
+        "icon": "Newspaper",
+        "count": "30+",
+        "description": "Globo News, CNN, Band News e outros"
+      },
+      {
+        "name": "Infantil",
+        "icon": "Baby",
+        "count": "40+",
+        "description": "Disney, Cartoon Network, Nickelodeon"
+      },
+      {
+        "name": "Documentários",
+        "icon": "BookOpen",
+        "count": "25+",
+        "description": "Discovery, National Geographic, History"
+      },
+      {
+        "name": "Músicas",
+        "icon": "Music",
+        "count": "20+",
+        "description": "MTV, Music Box, canais de música"
+      }
+    ]
+  },
+  "movies": {
+    "title": "Filmes & Séries",
+    "subtitle": "Catálogo sempre atualizado",
+    "description": "Acesse milhares de filmes e séries dos principais estúdios e produtoras mundiais. Conteúdo sempre atualizado com os últimos lançamentos.",
+    "features": [
+      {
+        "icon": "Film",
+        "title": "Filmes em 4K",
+        "description": "Últimos lançamentos em ultra alta definição"
+      },
+      {
+        "icon": "Tv",
+        "title": "Séries Completas",
+        "description": "Temporadas completas das melhores séries"
+      },
+      {
+        "icon": "Star",
+        "title": "Conteúdo Premium",
+        "description": "HBO, Netflix, Amazon Prime e muito mais"
+      },
+      {
+        "icon": "RefreshCw",
+        "title": "Sempre Atualizado",
+        "description": "Novos conteúdos adicionados semanalmente"
+      }
+    ],
+    "stats": [
+      { "number": "10.000+", "label": "Filmes disponíveis" },
+      { "number": "2.000+", "label": "Séries completas" },
+      { "number": "100+", "label": "Novos títulos/mês" }
+    ]
+  },
+  "contact": {
+    "title": "Entre em Contato",
+    "subtitle": "Estamos aqui para ajudar você",
+    "info": {
+      "phone": "(11) 99999-9999",
+      "email": "contato@iptvpremium.com",
+      "whatsapp": "5511999999999",
+      "schedule": "Atendimento 24h por dia, 7 dias por semana"
+    },
+    "ctaText": "Falar no WhatsApp",
+    "description": "Nossa equipe está sempre disponível para esclarecer suas dúvidas e ajudar na escolha do melhor plano para você."
+  },
+  "theme": {
+    "colors": {
+      "primary": "142 76% 36%",
+      "secondary": "220 13% 15%",
+      "accent": "210 100% 60%",
+      "background": "220 13% 9%",
+      "foreground": "210 40% 98%"
+    },
+    "fonts": {
+      "primary": "Inter, sans-serif",
+      "heading": "Inter, sans-serif"
+    }
+  }
+}

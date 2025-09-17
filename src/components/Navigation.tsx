@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const { config } = useSiteConfig();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -13,14 +15,6 @@ const Navigation = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const navigationItems = [
-    { name: "Início", href: "#home" },
-    { name: "Planos", href: "#planos" },
-    { name: "Canais", href: "#canais" },
-    { name: "Players", href: "/download-players" },
-    { name: "Contato", href: "#contato" },
-  ];
 
   return (
     <nav className={`fixed top-0 w-full z-50 transition-smooth ${
@@ -34,30 +28,30 @@ const Navigation = () => {
               <Tv className="h-6 w-6 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-gradient-primary">
-              IPTV Premium
+              {config.header?.logo?.text || "IPTV Premium"}
             </span>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navigationItems.map((item) => (
+            {config.header?.navigation?.map((item) => (
               <a
-                key={item.name}
+                key={item.id}
                 href={item.href}
                 className="text-foreground hover:text-primary transition-smooth font-medium"
               >
-                {item.name}
+                {item.label}
               </a>
             ))}
           </div>
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => window.location.href = '#contato'}>
               <Phone className="h-4 w-4" />
               Contato
             </Button>
-            <Button variant="default" size="sm">
+            <Button variant="default" size="sm" onClick={() => window.open(`https://wa.me/${config.contact?.info?.whatsapp}`, '_blank')}>
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </Button>
@@ -80,14 +74,14 @@ const Navigation = () => {
         {isOpen && (
           <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-lg">
             <div className="py-4 space-y-4">
-              {navigationItems.map((item) => (
+              {config.header?.navigation?.map((item) => (
                 <a
-                  key={item.name}
+                  key={item.id}
                   href={item.href}
                   className="block px-4 py-2 text-foreground hover:text-primary hover:bg-secondary rounded-lg transition-smooth"
                   onClick={() => setIsOpen(false)}
                 >
-                  {item.name}
+                  {item.label}
                 </a>
               ))}
               <div className="px-4 pt-4 space-y-2">

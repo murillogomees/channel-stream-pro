@@ -1,14 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
 import heroBackground from "@/assets/hero-bg.jpg";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const HeroSection = () => {
+  const { config } = useSiteConfig();
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img
-          src={heroBackground}
+          src={config.hero?.backgroundImage || heroBackground}
           alt="IPTV Premium Streaming Background"
           className="w-full h-full object-cover opacity-20"
         />
@@ -20,45 +22,54 @@ const HeroSection = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Main Headline */}
           <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-            Tenha todos os{" "}
-            <span className="text-gradient-primary">canais</span>,{" "}
-            <span className="text-gradient-accent">filmes</span> e{" "}
-            <span className="text-gradient-primary">séries</span>
-            <br />
-            na palma da sua mão!
+            {config.hero?.title || "Tenha todos os canais, filmes e séries na palma da sua mão!"}
           </h1>
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Mais de <strong className="text-gradient-primary">10.000 canais</strong> em Full HD e 4K,
-            sem travamentos, com suporte 24/7 e acesso global.
+            {config.hero?.description || "Mais de 10.000 canais em Full HD e 4K, sem travamentos, com suporte 24/7 e acesso global."}
           </p>
 
           {/* Key Benefits */}
           <div className="flex flex-wrap justify-center gap-6 my-8">
-            {[
-              { icon: CheckCircle, text: "10.000+ Canais" },
-              { icon: Play, text: "Full HD & 4K" },
-              { icon: Smartphone, text: "Multi Dispositivos" },
-              { icon: Monitor, text: "Sem Travamentos" },
-            ].map((benefit, index) => (
+            {(config.hero?.features || [
+              "Mais de 10.000 canais",
+              "Filmes e séries em HD/4K", 
+              "Suporte 24/7",
+              "Sem contrato"
+            ]).map((feature, index) => (
               <div key={index} className="flex items-center gap-2 bg-gradient-card px-4 py-2 rounded-lg shadow-card">
-                <benefit.icon className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium">{benefit.text}</span>
+                <CheckCircle className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium">{feature}</span>
               </div>
             ))}
           </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
-            <Button variant="hero" size="xl" className="min-w-64">
-              <Play className="h-6 w-6" />
-              Assine Agora
-            </Button>
-            <Button variant="cta" size="xl" className="min-w-64">
-              <Tv className="h-6 w-6" />
-              Teste Grátis 24h
-            </Button>
+            {config.hero?.ctaButtons?.map((button, index) => (
+              <Button 
+                key={index}
+                variant={button.variant === "default" ? "hero" : "cta"} 
+                size="xl" 
+                className="min-w-64"
+                onClick={() => window.location.href = button.href}
+              >
+                {index === 0 ? <Play className="h-6 w-6" /> : <Tv className="h-6 w-6" />}
+                {button.text}
+              </Button>
+            )) || (
+              <>
+                <Button variant="hero" size="xl" className="min-w-64">
+                  <Play className="h-6 w-6" />
+                  Assine Agora
+                </Button>
+                <Button variant="cta" size="xl" className="min-w-64">
+                  <Tv className="h-6 w-6" />
+                  Teste Grátis 24h
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Trust Indicators */}

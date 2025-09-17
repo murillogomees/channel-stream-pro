@@ -1,65 +1,29 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Settings, LogOut, Palette, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
 const AdminDashboard = () => {
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email) {
+    const isAuthenticated = localStorage.getItem('adminAuth');
+    if (!isAuthenticated) {
       navigate('/admin/login');
-      return;
     }
+  }, [navigate]);
 
-    // Check if user is admin by email or id
-    const { data: adminData } = await supabase
-      .from('admins')
-      .select('*')
-      .or(`id.eq.${user.id},email.eq.${user.email}`)
-      .single();
-
-    if (!adminData) {
-      navigate('/admin/login');
-      return;
-    }
-
-    // If admin exists but no auth id, update it
-    if (adminData && !adminData.id) {
-      await supabase
-        .from('admins')
-        .update({ id: user.id })
-        .eq('email', user.email);
-    }
-
-    setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    localStorage.removeItem('adminAuth');
+    toast({
+      title: "Logout realizado",
+      description: "Você foi desconectado com sucesso.",
+    });
     navigate('/admin/login');
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,30 +62,6 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* System Settings */}
-          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-                onClick={() => navigate('/admin/settings')}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-primary" />
-                Configurações
-              </CardTitle>
-              <CardDescription>
-                Configurações gerais do sistema e administração
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <Settings className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Configurações do Sistema</p>
-                  <p className="text-sm text-muted-foreground">
-                    Gerencie administradores e configurações avançadas
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Quick Stats */}

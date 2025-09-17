@@ -1,84 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Crown, Star, Zap } from "lucide-react";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const PlansSection = () => {
-  const plans = [
-    {
-      name: "Mensal",
-      price: "R$ 29,90",
-      period: "/mês",
-      icon: Zap,
-      description: "Perfeito para testar nosso serviço",
-      features: [
-        "10.000+ Canais",
-        "Filmes e Séries",
-        "Qualidade Full HD",
-        "2 Telas simultâneas",
-        "Suporte 24/7",
-        "EPG (Guia de programação)",
-      ],
-      popular: false,
-      ctaText: "Escolher Plano",
-    },
-    {
-      name: "Trimestral",
-      price: "R$ 69,90",
-      period: "/3 meses",
-      icon: Star,
-      description: "Economia de 22% - Mais popular",
-      features: [
-        "10.000+ Canais",
-        "Filmes e Séries",
-        "Qualidade Full HD + 4K",
-        "3 Telas simultâneas",
-        "Suporte 24/7",
-        "EPG (Guia de programação)",
-        "Acesso a conteúdo adulto",
-      ],
-      popular: true,
-      ctaText: "Mais Popular",
-    },
-    {
-      name: "Semestral",
-      price: "R$ 119,90",
-      period: "/6 meses",
-      icon: Crown,
-      description: "Economia de 33% - Melhor custo-benefício",
-      features: [
-        "10.000+ Canais",
-        "Filmes e Séries",
-        "Qualidade Full HD + 4K",
-        "4 Telas simultâneas",
-        "Suporte 24/7 prioritário",
-        "EPG (Guia de programação)",
-        "Acesso a conteúdo adulto",
-        "Download offline",
-      ],
-      popular: false,
-      ctaText: "Melhor Oferta",
-    },
-    {
-      name: "Anual",
-      price: "R$ 199,90",
-      period: "/ano",
-      icon: Crown,
-      description: "Economia de 44% - Máximo valor",
-      features: [
-        "10.000+ Canais",
-        "Filmes e Séries",
-        "Qualidade Full HD + 4K",
-        "5 Telas simultâneas",
-        "Suporte 24/7 VIP",
-        "EPG (Guia de programação)",
-        "Acesso a conteúdo adulto",
-        "Download offline",
-        "Conteúdo exclusivo",
-      ],
-      popular: false,
-      ctaText: "Máxima Economia",
-    },
-  ];
+  const { config } = useSiteConfig();
+  
+  const iconMap = {
+    "Zap": Zap,
+    "Star": Star,
+    "Crown": Crown
+  };
+
+  const plans = config.plans?.items || [];
 
   return (
     <section className="py-20 px-6 bg-gradient-to-b from-background to-card">
@@ -86,30 +20,27 @@ const PlansSection = () => {
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Escolha o{" "}
-            <span className="text-gradient-primary">plano ideal</span>{" "}
-            para você
+            {config.plans?.title || "Escolha o plano ideal para você"}
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Todos os planos incluem teste grátis de 24 horas.
-            Cancele quando quiser, sem burocracia.
+            {config.plans?.subtitle || "Todos os planos incluem teste grátis de 24 horas. Cancele quando quiser, sem burocracia."}
           </p>
         </div>
 
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => {
-            const IconComponent = plan.icon;
+            const IconComponent = Star; // Default icon
             return (
               <Card
                 key={index}
                 className={`relative bg-gradient-card border-2 transition-smooth hover:scale-[1.02] hover:shadow-elevated ${
-                  plan.popular
+                  plan.highlighted
                     ? "border-primary shadow-glow"
                     : "border-border hover:border-primary/40"
                 }`}
               >
-                {plan.popular && (
+                {plan.highlighted && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <div className="bg-gradient-primary px-6 py-2 rounded-full text-sm font-bold text-primary-foreground shadow-glow">
                       Mais Popular
@@ -120,10 +51,10 @@ const PlansSection = () => {
                 <CardHeader className="text-center pb-4">
                   <div className="flex justify-center mb-4">
                     <div className={`p-3 rounded-full ${
-                      plan.popular ? "bg-gradient-primary shadow-glow" : "bg-secondary"
+                      plan.highlighted ? "bg-gradient-primary shadow-glow" : "bg-secondary"
                     }`}>
                       <IconComponent className={`h-8 w-8 ${
-                        plan.popular ? "text-primary-foreground" : "text-primary"
+                        plan.highlighted ? "text-primary-foreground" : "text-primary"
                       }`} />
                     </div>
                   </div>
@@ -131,11 +62,10 @@ const PlansSection = () => {
                   <div className="space-y-1">
                     <div className="flex items-center justify-center gap-1">
                       <span className="text-3xl font-bold text-gradient-primary">
-                        {plan.price}
+                        {plan.currency}{plan.price}
                       </span>
                       <span className="text-muted-foreground">{plan.period}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{plan.description}</p>
                   </div>
                 </CardHeader>
 
@@ -152,7 +82,7 @@ const PlansSection = () => {
 
                   {/* CTA Button */}
                   <Button
-                    variant={plan.popular ? "hero" : "premium"}
+                    variant={plan.highlighted ? "hero" : "default"}
                     size="default"
                     className="w-full"
                   >

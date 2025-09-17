@@ -1,39 +1,36 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Phone, Mail, MapPin, Clock, Headphones } from "lucide-react";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const ContactSection = () => {
+  const { config } = useSiteConfig();
+  
   const contactMethods = [
     {
       icon: MessageCircle,
       title: "WhatsApp",
       description: "Resposta em até 5 minutos",
       action: "Chamar no WhatsApp",
-      href: "https://wa.me/5511999999999",
+      href: `https://wa.me/${config.contact?.info?.whatsapp || '5511999999999'}`,
       featured: true,
     },
     {
       icon: Phone,
       title: "Telefone",
       description: "Atendimento 24/7",
-      action: "(11) 9999-9999",
-      href: "tel:+5511999999999",
+      action: config.contact?.info?.phone || "(11) 9999-9999",
+      href: `tel:${config.contact?.info?.phone || '+5511999999999'}`,
       featured: false,
     },
     {
       icon: Mail,
       title: "Email",
       description: "Resposta em até 2 horas",
-      action: "contato@iptv.com",
-      href: "mailto:contato@iptv.com",
+      action: config.contact?.info?.email || "contato@iptv.com",
+      href: `mailto:${config.contact?.info?.email || 'contato@iptv.com'}`,
       featured: false,
     },
-  ];
-
-  const businessHours = [
-    { day: "Segunda a Sexta", hours: "08:00 - 22:00" },
-    { day: "Sábado", hours: "09:00 - 18:00" },
-    { day: "Domingo", hours: "10:00 - 16:00" },
   ];
 
   return (
@@ -41,10 +38,10 @@ const ContactSection = () => {
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gradient-primary mb-4">
-            Entre em Contato
+            {config.contact?.title || "Entre em Contato"}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Nossa equipe está sempre pronta para ajudar você. Escolha o canal que preferir para falar conosco.
+            {config.contact?.description || "Nossa equipe está sempre pronta para ajudar você. Escolha o canal que preferir para falar conosco."}
           </p>
         </div>
 
@@ -98,12 +95,10 @@ const ContactSection = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {businessHours.map((schedule) => (
-                  <div key={schedule.day} className="flex justify-between items-center">
-                    <span className="text-foreground font-medium">{schedule.day}</span>
-                    <span className="text-muted-foreground">{schedule.hours}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between items-center">
+                  <span className="text-foreground font-medium">Atendimento:</span>
+                  <span className="text-muted-foreground">{config.contact?.info?.schedule || "24h por dia, 7 dias por semana"}</span>
+                </div>
               </div>
             </CardContent>
           </Card>

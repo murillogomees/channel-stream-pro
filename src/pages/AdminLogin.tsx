@@ -5,8 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, User, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+// Simple admin credentials for demo
+const ADMIN_CREDENTIALS = {
+  email: "admin@iptv.com",
+  password: "admin123"
+};
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -19,49 +24,23 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      // Verificar se é admin (por ID ou email)
-      const { data: adminData, error: adminError } = await supabase
-        .from('admins')
-        .select('*')
-        .or(`id.eq.${data.user.id},email.eq.${data.user.email}`)
-        .single();
-
-      if (adminError || !adminData) {
-        await supabase.auth.signOut();
-        throw new Error('Acesso negado: usuário não é administrador');
-      }
-
-      // Se o admin existe mas não tem o ID do auth, atualizar
-      if (adminData && adminData.id !== data.user.id) {
-        await supabase
-          .from('admins')
-          .update({ id: data.user.id })
-          .eq('email', data.user.email);
-      }
-
+    // Simple credential check
+    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      localStorage.setItem('adminAuth', 'true');
       toast({
         title: "Login realizado com sucesso",
-        description: `Bem-vindo, ${adminData.name}!`,
+        description: "Bem-vindo ao painel administrativo!",
       });
-
       navigate('/admin/dashboard');
-    } catch (error: any) {
+    } else {
       toast({
         title: "Erro no login",
-        description: error.message,
+        description: "Email ou senha incorretos",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   };
 
   return (
@@ -117,6 +96,11 @@ const AdminLogin = () => {
               {loading ? "Entrando..." : "Entrar no Sistema"}
             </Button>
           </form>
+          <div className="mt-4 p-3 bg-muted/20 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              <strong>Demo:</strong> admin@iptv.com / admin123
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
