@@ -41,7 +41,7 @@ const AdminDashboard = () => {
           <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
                 onClick={() => navigate('/admin/customize')}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 md:grid-6">
                 <Palette className="h-5 w-5 text-primary" />
                 Personalizar Site
               </CardTitle>
@@ -49,7 +49,7 @@ const AdminDashboard = () => {
                 Edite cores, fontes, logotipos, textos e todos os elementos visuais da página inicial
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="md:grid-6">
               <div className="flex items-center gap-4">
                 <Edit3 className="h-8 w-8 text-muted-foreground" />
                 <div>
