@@ -36,7 +36,7 @@ const AdminDashboard = () => {
           </Button>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6">
           {/* Site Customization */}
           <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
                 onClick={() => navigate('/admin/customize')}>
