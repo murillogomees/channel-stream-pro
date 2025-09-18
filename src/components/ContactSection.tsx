@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Phone, Mail, MapPin, Clock, Headphones } from "lucide-react";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useSettings } from "@/hooks/useSettings";
 
 const ContactSection = () => {
-  const { config } = useSiteConfig();
+  const { settings } = useSettings();
   
   const contactMethods = [
     {
@@ -12,23 +12,23 @@ const ContactSection = () => {
       title: "WhatsApp",
       description: "Resposta em até 5 minutos",
       action: "Chamar no WhatsApp",
-      href: `https://wa.me/${config.contact?.info?.whatsapp || '5511999999999'}`,
+      href: `https://wa.me/${settings.contact.info.whatsapp}`,
       featured: true,
     },
     {
       icon: Phone,
       title: "Telefone",
       description: "Atendimento 24/7",
-      action: config.contact?.info?.phone || "(11) 9999-9999",
-      href: `tel:${config.contact?.info?.phone || '+5511999999999'}`,
+      action: settings.contact.info.phone,
+      href: `tel:${settings.contact.info.phone}`,
       featured: false,
     },
     {
       icon: Mail,
       title: "Email",
       description: "Resposta em até 2 horas",
-      action: config.contact?.info?.email || "contato@iptv.com",
-      href: `mailto:${config.contact?.info?.email || 'contato@iptv.com'}`,
+      action: settings.contact.info.email,
+      href: `mailto:${settings.contact.info.email}`,
       featured: false,
     },
   ];
@@ -38,10 +38,10 @@ const ContactSection = () => {
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gradient-primary mb-4">
-            {config.contact?.title || "Entre em Contato"}
+            {settings.contact.title}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {config.contact?.description || "Nossa equipe está sempre pronta para ajudar você. Escolha o canal que preferir para falar conosco."}
+            {settings.contact.description}
           </p>
         </div>
 
@@ -97,7 +97,7 @@ const ContactSection = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-foreground font-medium">Atendimento:</span>
-                  <span className="text-muted-foreground">{config.contact?.info?.schedule || "24h por dia, 7 dias por semana"}</span>
+                  <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
                 </div>
               </div>
             </CardContent>

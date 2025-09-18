@@ -1,0 +1,382 @@
+{
+  "version": "1.0.0",
+  "lock": true,
+  "allowOverrides": false,
+  "theme": {
+    "colors": {
+      "primary": "142 76% 36%",
+      "onPrimary": "210 40% 98%",
+      "secondary": "220 13% 15%", 
+      "onSecondary": "210 40% 98%",
+      "accent": "210 100% 60%",
+      "onAccent": "210 40% 98%",
+      "background": "220 13% 9%",
+      "onBackground": "210 40% 98%",
+      "surface": "220 13% 15%",
+      "onSurface": "210 40% 98%",
+      "muted": "220 13% 50%",
+      "onMuted": "210 40% 98%",
+      "success": "120 60% 50%",
+      "onSuccess": "210 40% 98%",
+      "error": "0 60% 50%",
+      "onError": "210 40% 98%"
+    },
+    "gradients": {
+      "primary": "linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%))",
+      "hero": "linear-gradient(135deg, hsl(220 13% 9%) 0%, hsl(220 13% 15%) 100%)",
+      "card": "linear-gradient(135deg, hsl(220 13% 15%) 0%, hsl(220 13% 20%) 100%)"
+    }
+  },
+  "typography": {
+    "fontFamily": "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "h1": {
+      "mobile": "2rem",
+      "tablet": "2.5rem", 
+      "desktop": "3.5rem",
+      "weight": 700,
+      "lineHeight": 1.1,
+      "letterSpacing": "-0.02em"
+    },
+    "h2": {
+      "mobile": "1.75rem",
+      "tablet": "2rem",
+      "desktop": "2.5rem", 
+      "weight": 600,
+      "lineHeight": 1.2,
+      "letterSpacing": "-0.01em"
+    },
+    "h3": {
+      "mobile": "1.5rem",
+      "tablet": "1.75rem",
+      "desktop": "2rem",
+      "weight": 600,
+      "lineHeight": 1.3
+    },
+    "body": {
+      "size": "1rem",
+      "lineHeight": 1.5,
+      "weight": 400
+    },
+    "caption": {
+      "size": "0.875rem",
+      "lineHeight": 1.4,
+      "weight": 400
+    }
+  },
+  "assets": {
+    "logo": "/src/assets/hero-bg.jpg",
+    "heroImage": "/src/assets/hero-bg.jpg",
+    "fallback": "/placeholder.svg"
+  },
+  "icons": {
+    "play": "Play",
+    "tv": "Tv",
+    "film": "Film",
+    "trophy": "Trophy",
+    "newspaper": "Newspaper", 
+    "baby": "Baby",
+    "bookOpen": "BookOpen",
+    "music": "Music",
+    "star": "Star",
+    "refreshCw": "RefreshCw",
+    "checkCircle": "CheckCircle",
+    "smartphone": "Smartphone",
+    "monitor": "Monitor"
+  },
+  "layout": {
+    "container": {
+      "maxWidth": "1200px",
+      "padding": "1.5rem"
+    },
+    "grid": {
+      "columns": {
+        "mobile": 1,
+        "tablet": 2,
+        "desktop": 3
+      },
+      "gap": "1.5rem"
+    },
+    "breakpoints": {
+      "mobile": "640px",
+      "tablet": "768px", 
+      "desktop": "1024px"
+    }
+  },
+  "components": {
+    "hero": {
+      "variant": "cinematic",
+      "background": "$assets.heroImage",
+      "title": "IPTV Premium",
+      "subtitle": "A melhor experiência em entretenimento digital",
+      "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família.",
+      "features": [
+        "Mais de 10.000 canais",
+        "Filmes e séries em HD/4K",
+        "Suporte 24/7", 
+        "Sem contrato"
+      ],
+      "ctaButtons": [
+        {
+          "text": "Ver Planos",
+          "href": "#planos",
+          "variant": "primary",
+          "analyticsTag": "cta_hero_plans"
+        },
+        {
+          "text": "Teste Grátis",
+          "href": "#contato", 
+          "variant": "secondary",
+          "analyticsTag": "cta_hero_trial"
+        }
+      ]
+    },
+    "card": {
+      "radius": "0.5rem",
+      "shadow": "0 10px 30px -10px hsl(var(--primary) / 0.3)",
+      "imageRatio": "16:9",
+      "padding": "1.5rem"
+    },
+    "button": {
+      "primary": {
+        "bg": "$theme.colors.primary",
+        "color": "$theme.colors.onPrimary",
+        "radius": "0.375rem",
+        "padding": "0.75rem 1.5rem",
+        "fontSize": "1rem",
+        "fontWeight": 500
+      },
+      "secondary": {
+        "bg": "transparent",
+        "color": "$theme.colors.onBackground",
+        "border": "1px solid hsl($theme.colors.muted)",
+        "radius": "0.375rem", 
+        "padding": "0.75rem 1.5rem",
+        "fontSize": "1rem",
+        "fontWeight": 500
+      }
+    }
+  },
+  "header": {
+    "logo": {
+      "text": "IPTV Premium",
+      "image": null
+    },
+    "navigation": [
+      { "id": "home", "label": "Início", "href": "#home" },
+      { "id": "planos", "label": "Planos", "href": "#planos" },
+      { "id": "canais", "label": "Canais", "href": "#canais" },
+      { "id": "filmes", "label": "Filmes & Séries", "href": "#filmes" },
+      { "id": "contato", "label": "Contato", "href": "#contato" }
+    ],
+    "ctaButton": {
+      "text": "Assinar Agora",
+      "href": "#planos",
+      "analyticsTag": "cta_header"
+    }
+  },
+  "plans": {
+    "title": "Escolha seu Plano",
+    "subtitle": "Planos flexíveis para todos os perfis",
+    "items": [
+      {
+        "id": "basico",
+        "name": "Básico",
+        "price": "29.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 5.000 canais",
+          "Filmes e séries",
+          "Qualidade HD",
+          "2 telas simultâneas",
+          "Suporte por WhatsApp"
+        ],
+        "highlighted": false,
+        "ctaText": "Escolher Plano",
+        "analyticsTag": "cta_plan_basic"
+      },
+      {
+        "id": "premium",
+        "name": "Premium",
+        "price": "49.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 10.000 canais",
+          "Filmes e séries 4K",
+          "Qualidade Ultra HD",
+          "4 telas simultâneas",
+          "Suporte prioritário",
+          "EPG completo"
+        ],
+        "highlighted": true,
+        "ctaText": "Mais Popular",
+        "analyticsTag": "cta_plan_premium"
+      },
+      {
+        "id": "familia",
+        "name": "Família",
+        "price": "79.90",
+        "currency": "R$",
+        "period": "/mês",
+        "features": [
+          "Mais de 15.000 canais",
+          "Filmes e séries 4K",
+          "Qualidade Ultra HD",
+          "6 telas simultâneas",
+          "Suporte 24/7",
+          "EPG completo",
+          "Gravação de programas"
+        ],
+        "highlighted": false,
+        "ctaText": "Escolher Plano",
+        "analyticsTag": "cta_plan_family"
+      }
+    ]
+  },
+  "channels": {
+    "title": "Canais Disponíveis",
+    "subtitle": "Milhares de canais dos melhores conteúdos",
+    "categories": [
+      {
+        "name": "Esportes",
+        "icon": "trophy",
+        "count": "50+",
+        "description": "ESPN, Fox Sports, SporTV e muito mais"
+      },
+      {
+        "name": "Filmes",
+        "icon": "film",
+        "count": "100+",
+        "description": "HBO, Telecine, Netflix e canais premium"
+      },
+      {
+        "name": "Notícias",
+        "icon": "newspaper",
+        "count": "30+",
+        "description": "Globo News, CNN, Band News e outros"
+      },
+      {
+        "name": "Infantil",
+        "icon": "baby",
+        "count": "40+",
+        "description": "Disney, Cartoon Network, Nickelodeon"
+      },
+      {
+        "name": "Documentários",
+        "icon": "bookOpen",
+        "count": "25+",
+        "description": "Discovery, National Geographic, History"
+      },
+      {
+        "name": "Músicas",
+        "icon": "music",
+        "count": "20+",
+        "description": "MTV, Music Box, canais de música"
+      }
+    ]
+  },
+  "movies": {
+    "title": "Filmes & Séries",
+    "subtitle": "Catálogo sempre atualizado",
+    "description": "Acesse milhares de filmes e séries dos principais estúdios e produtoras mundiais. Conteúdo sempre atualizado com os últimos lançamentos.",
+    "features": [
+      {
+        "icon": "film",
+        "title": "Filmes em 4K",
+        "description": "Últimos lançamentos em ultra alta definição"
+      },
+      {
+        "icon": "tv",
+        "title": "Séries Completas",
+        "description": "Temporadas completas das melhores séries"
+      },
+      {
+        "icon": "star",
+        "title": "Conteúdo Premium",
+        "description": "HBO, Netflix, Amazon Prime e muito mais"
+      },
+      {
+        "icon": "refreshCw",
+        "title": "Sempre Atualizado",
+        "description": "Novos conteúdos adicionados semanalmente"
+      }
+    ],
+    "stats": [
+      { "number": "10.000+", "label": "Filmes disponíveis" },
+      { "number": "2.000+", "label": "Séries completas" },
+      { "number": "100+", "label": "Novos títulos/mês" }
+    ],
+    "cards": [
+      {
+        "id": "movie-001",
+        "title": "Ação & Aventura",
+        "subtitle": "Filmes de alta adrenalina",
+        "thumbnail": "/placeholder.svg",
+        "cta": {
+          "text": "Ver Filmes",
+          "link": "#filmes",
+          "analyticsTag": "cta_card_action"
+        }
+      },
+      {
+        "id": "movie-002",
+        "title": "Drama & Romance",
+        "subtitle": "Histórias emocionantes",
+        "thumbnail": "/placeholder.svg",
+        "cta": {
+          "text": "Ver Filmes",
+          "link": "#filmes",
+          "analyticsTag": "cta_card_drama"
+        }
+      },
+      {
+        "id": "movie-003",
+        "title": "Comédia",
+        "subtitle": "Diversão garantida",
+        "thumbnail": "/placeholder.svg",
+        "cta": {
+          "text": "Ver Filmes",
+          "link": "#filmes",
+          "analyticsTag": "cta_card_comedy"
+        }
+      }
+    ]
+  },
+  "contact": {
+    "title": "Entre em Contato",
+    "subtitle": "Estamos aqui para ajudar você",
+    "info": {
+      "phone": "(11) 99999-9999",
+      "email": "contato@iptvpremium.com",
+      "whatsapp": "5511999999999",
+      "schedule": "Atendimento 24h por dia, 7 dias por semana"
+    },
+    "ctaText": "Falar no WhatsApp",
+    "description": "Nossa equipe está sempre disponível para esclarecer suas dúvidas e ajudar na escolha do melhor plano para você.",
+    "analyticsTag": "cta_contact_whatsapp"
+  },
+  "accessibility": {
+    "minContrastRatio": 4.5,
+    "reducedMotion": true
+  },
+  "i18n": {
+    "default": "pt-BR",
+    "strings": {
+      "cta_primary": "Responda AGORA e economize até 90% todo mês!",
+      "loading": "Carregando...",
+      "error": "Erro ao carregar",
+      "retry": "Tentar novamente"
+    }
+  },
+  "seo": {
+    "title": "IPTV Premium - A melhor experiência em entretenimento digital",
+    "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família com suporte 24/7.",
+    "keywords": "IPTV, streaming, filmes, séries, canais, entretenimento",
+    "openGraph": {
+      "title": "IPTV Premium - Entretenimento sem limites",
+      "description": "Mais de 10.000 canais em HD/4K, filmes e séries premium. Teste grátis!",
+      "image": "/src/assets/hero-bg.jpg"
+    }
+  }
+}

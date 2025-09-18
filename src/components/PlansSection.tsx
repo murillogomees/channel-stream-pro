@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Crown, Star, Zap } from "lucide-react";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useSettings } from "@/hooks/useSettings";
 
 const PlansSection = () => {
-  const { config } = useSiteConfig();
+  const { settings } = useSettings();
   
   const iconMap = {
     "Zap": Zap,
@@ -12,7 +12,7 @@ const PlansSection = () => {
     "Crown": Crown
   };
 
-  const plans = config.plans?.items || [];
+  const plans = settings.plans.items;
 
   return (
     <section className="py-20 px-6 bg-gradient-to-b from-background to-card">
@@ -20,10 +20,10 @@ const PlansSection = () => {
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            {config.plans?.title || "Escolha o plano ideal para você"}
+            {settings.plans.title}
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            {config.plans?.subtitle || "Todos os planos incluem teste grátis de 24 horas. Cancele quando quiser, sem burocracia."}
+            {settings.plans.subtitle}
           </p>
         </div>
 

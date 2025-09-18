@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useSettings } from "@/hooks/useSettings";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { config } = useSiteConfig();
+  const { settings } = useSettings();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,13 +28,13 @@ const Navigation = () => {
               <Tv className="h-6 w-6 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-gradient-primary">
-              {config.header?.logo?.text || "IPTV Premium"}
+              {settings.header.logo.text}
             </span>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {config.header?.navigation?.map((item) => (
+            {settings.header.navigation.map((item) => (
               <a
                 key={item.id}
                 href={item.href}
@@ -51,7 +51,7 @@ const Navigation = () => {
               <Phone className="h-4 w-4" />
               Contato
             </Button>
-            <Button variant="default" size="sm" onClick={() => window.open(`https://wa.me/${config.contact?.info?.whatsapp}`, '_blank')}>
+            <Button variant="default" size="sm" onClick={() => window.open(`https://wa.me/${settings.contact.info.whatsapp}`, '_blank')}>
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </Button>
@@ -74,7 +74,7 @@ const Navigation = () => {
         {isOpen && (
           <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-lg">
             <div className="py-4 space-y-4">
-              {config.header?.navigation?.map((item) => (
+              {settings.header.navigation.map((item) => (
                 <a
                   key={item.id}
                   href={item.href}

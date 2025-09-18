@@ -5,12 +5,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useSettings } from "@/hooks/useSettings";
 
 const AdminCustomize = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { config, updateConfig, resetConfig } = useSiteConfig();
+  const { settings, updateSettings, resetSettings } = useSettings();
   const [jsonConfig, setJsonConfig] = useState("");
   const [loading, setSaving] = useState(false);
 
@@ -21,14 +21,14 @@ const AdminCustomize = () => {
       return;
     }
     
-    setJsonConfig(JSON.stringify(config, null, 2));
-  }, [navigate, config]);
+    setJsonConfig(JSON.stringify(settings, null, 2));
+  }, [navigate, settings]);
 
   const handleSave = () => {
     setSaving(true);
     try {
-      const newConfig = JSON.parse(jsonConfig);
-      updateConfig(newConfig);
+      const newSettings = JSON.parse(jsonConfig);
+      updateSettings(newSettings);
       toast({
         title: "Configurações salvas",
         description: "As alterações foram aplicadas com sucesso!",
@@ -46,8 +46,8 @@ const AdminCustomize = () => {
 
   const handleReset = () => {
     if (confirm("Tem certeza que deseja restaurar as configurações padrão?")) {
-      resetConfig();
-      setJsonConfig(JSON.stringify(config, null, 2));
+      resetSettings();
+      setJsonConfig(JSON.stringify(settings, null, 2));
       toast({
         title: "Configurações restauradas",
         description: "As configurações foram restauradas para o padrão.",
@@ -59,7 +59,7 @@ const AdminCustomize = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonConfig);
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "site-config.json");
+    downloadAnchorNode.setAttribute("download", "settings.json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -92,10 +92,11 @@ const AdminCustomize = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Configuração JSON do Site</CardTitle>
+            <CardTitle>Configuração Settings.json do Site</CardTitle>
             <CardDescription>
-              Edite todos os elementos do site através da configuração JSON abaixo. 
-              Inclui textos, cores, menus, telefones, planos e todas as informações da página inicial.
+              Controle total do site através do settings.json. Inclui tema, tipografia, ícones, assets, 
+              layout, componentes, textos, planos, thumbnails e todas as configurações da página inicial.
+              Este arquivo tem precedência suprema sobre qualquer outro estilo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -104,13 +105,13 @@ const AdminCustomize = () => {
                 <Save className="h-4 w-4 mr-2" />
                 {loading ? "Salvando..." : "Salvar Alterações"}
               </Button>
-              <Button variant="outline" onClick={handleDownload}>
+                 <Button variant="outline" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
-                Download JSON
+                Download Settings
               </Button>
               <Button variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
                 <Upload className="h-4 w-4 mr-2" />
-                Upload JSON
+                Upload Settings
               </Button>
               <Button variant="destructive" onClick={handleReset}>
                 <RotateCcw className="h-4 w-4 mr-2" />
@@ -128,20 +129,23 @@ const AdminCustomize = () => {
             <Textarea
               value={jsonConfig}
               onChange={(e) => setJsonConfig(e.target.value)}
-              placeholder="Configuração JSON do site..."
+              placeholder="Configuração Settings.json do site..."
               className="min-h-[600px] font-mono text-sm"
             />
 
             <div className="bg-muted/20 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Estrutura do JSON:</h4>
+              <h4 className="font-medium mb-2">Estrutura do Settings.json:</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li><strong>header:</strong> Logo, menu de navegação e botão CTA</li>
-                <li><strong>hero:</strong> Seção principal com título, subtítulo e botões</li>
-                <li><strong>plans:</strong> Planos disponíveis com preços e características</li>
-                <li><strong>channels:</strong> Categorias de canais disponíveis</li>
-                <li><strong>movies:</strong> Seção de filmes e séries</li>
-                <li><strong>contact:</strong> Informações de contato e telefones</li>
-                <li><strong>theme:</strong> Cores e fontes do site</li>
+                <li><strong>theme:</strong> Cores, gradientes e tokens (precedência suprema)</li>
+                <li><strong>typography:</strong> Fontes, tamanhos, pesos e espaçamentos</li>
+                <li><strong>assets:</strong> Logos, imagens hero, thumbnails e fallbacks</li>
+                <li><strong>icons:</strong> Mapeamento de ícones por nome</li>
+                <li><strong>layout:</strong> Container, grid, breakpoints responsivos</li>
+                <li><strong>components:</strong> Configurações específicas de hero, cards, botões</li>
+                <li><strong>movies.cards:</strong> Thumbnails e CTAs dos cards de filmes</li>
+                <li><strong>accessibility:</strong> Contraste, motion e ARIA labels</li>
+                <li><strong>i18n:</strong> Idioma padrão e strings localizadas</li>
+                <li><strong>seo:</strong> Meta tags, OpenGraph e keywords</li>
               </ul>
             </div>
           </CardContent>
