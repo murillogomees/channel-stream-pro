@@ -5,12 +5,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettingsContext } from "@/context/SettingsContext";
 
 const AdminCustomize = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { settings, updateSettings, resetSettings } = useSettings();
+  const { settings, updateSettings, resetSettings, lastUpdated } = useSettingsContext();
   const [jsonConfig, setJsonConfig] = useState("");
   const [loading, setSaving] = useState(false);
 
@@ -47,7 +47,10 @@ const AdminCustomize = () => {
   const handleReset = () => {
     if (confirm("Tem certeza que deseja restaurar as configurações padrão?")) {
       resetSettings();
-      setJsonConfig(JSON.stringify(settings, null, 2));
+      // Wait for settings to update before updating JSON
+      setTimeout(() => {
+        setJsonConfig(JSON.stringify(settings, null, 2));
+      }, 100);
       toast({
         title: "Configurações restauradas",
         description: "As configurações foram restauradas para o padrão.",
@@ -105,7 +108,7 @@ const AdminCustomize = () => {
                 <Save className="h-4 w-4 mr-2" />
                 {loading ? "Salvando..." : "Salvar Alterações"}
               </Button>
-                 <Button variant="outline" onClick={handleDownload}>
+              <Button variant="outline" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
                 Download Settings
               </Button>
@@ -125,6 +128,14 @@ const AdminCustomize = () => {
                 className="hidden"
               />
             </div>
+
+            {lastUpdated && (
+              <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-lg">
+                <p className="text-sm">
+                  ✅ Configurações aplicadas com sucesso em {lastUpdated.toLocaleTimeString()}
+                </p>
+              </div>
+            )}
 
             <Textarea
               value={jsonConfig}

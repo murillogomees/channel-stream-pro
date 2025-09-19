@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
 import heroBackground from "@/assets/hero-bg.jpg";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettingsContext } from "@/context/SettingsContext";
 
 const HeroSection = () => {
-  const { settings, getAsset, getIcon } = useSettings();
+  const { settings, getAsset, getIcon } = useSettingsContext();
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero">
       {/* Background Image */}

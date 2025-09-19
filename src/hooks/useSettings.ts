@@ -28,9 +28,9 @@ const resolveToken = (value: string, settings: Settings): string => {
 const applyCSSVariables = (settings: Settings) => {
   const root = document.documentElement;
   
-  // Apply color tokens
+  // Apply color tokens to match index.css structure
   Object.entries(settings.theme.colors).forEach(([key, value]) => {
-    root.style.setProperty(`--color-${key}`, value);
+    root.style.setProperty(`--${key}`, value);
   });
   
   // Apply gradients
@@ -44,37 +44,36 @@ const applyCSSVariables = (settings: Settings) => {
   // Apply layout tokens
   root.style.setProperty('--container-max-width', settings.layout.container.maxWidth);
   root.style.setProperty('--container-padding', settings.layout.container.padding);
+  
+  // Force a repaint to ensure changes are applied
+  root.style.display = 'none';
+  root.offsetHeight; // Trigger reflow
+  root.style.display = '';
 };
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<Settings>(settingsData);
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const updateSettings = (newSettings: Settings) => {
-    // Validate lock setting
-    if (settings.lock && !settings.allowOverrides) {
-      console.warn('Settings are locked and overrides are not allowed');
-      return;
-    }
-    
+    // Always allow updates from admin panel
     setSettings(newSettings);
     applyCSSVariables(newSettings);
     
-    // Save to localStorage if not locked
-    if (!settings.lock) {
-      localStorage.setItem('settings', JSON.stringify(newSettings));
-    }
+    // Save to localStorage
+    localStorage.setItem('settings', JSON.stringify(newSettings));
+    setLastUpdated(new Date());
+    
+    console.log('Settings updated and applied:', newSettings);
   };
 
   const resetSettings = () => {
-    if (settings.lock) {
-      console.warn('Cannot reset locked settings');
-      return;
-    }
-    
     setSettings(settingsData);
     applyCSSVariables(settingsData);
     localStorage.removeItem('settings');
+    setLastUpdated(new Date());
+    console.log('Settings reset to default');
   };
 
   const getToken = (path: string): string => {
@@ -99,22 +98,23 @@ export const useSettings = () => {
   };
 
   useEffect(() => {
-    // Load from localStorage if available and not locked
-    if (!settings.lock) {
-      const savedSettings = localStorage.getItem('settings');
-      if (savedSettings) {
-        try {
-          const parsed = JSON.parse(savedSettings);
-          setSettings(parsed);
-          applyCSSVariables(parsed);
-        } catch (error) {
-          console.error('Error loading saved settings:', error);
-        }
+    // Load from localStorage if available
+    const savedSettings = localStorage.getItem('settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(parsed);
+        applyCSSVariables(parsed);
+        console.log('Loaded settings from localStorage:', parsed);
+        return;
+      } catch (error) {
+        console.error('Error loading saved settings:', error);
       }
     }
     
-    // Always apply CSS variables on mount
-    applyCSSVariables(settings);
+    // Apply default settings on mount
+    applyCSSVariables(settingsData);
+    console.log('Applied default settings:', settingsData);
   }, []);
 
   return {
@@ -126,6 +126,7 @@ export const useSettings = () => {
     getTypography,
     getIcon,
     getAsset,
-    loading
+    loading,
+    lastUpdated
   };
 };

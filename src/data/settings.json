@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lock": true,
-  "allowOverrides": false,
+  "lock": false,
+  "allowOverrides": true,
   "theme": {
     "colors": {
       "primary": "40 76% 36%",

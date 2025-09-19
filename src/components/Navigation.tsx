@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettingsContext } from "@/context/SettingsContext";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { settings } = useSettings();
+  const { settings } = useSettingsContext();
 
   useEffect(() => {
     const handleScroll = () => {
