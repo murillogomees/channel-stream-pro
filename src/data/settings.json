@@ -64,7 +64,7 @@
     }
   },
   "assets": {
-    "logo": "/src/assets/hero-bg.jpg",
+    "logo": "/src/assets/logo.png",
     "heroImage": "/src/assets/hero-bg.jpg",
     "fallback": "/placeholder.svg"
   },
@@ -159,7 +159,7 @@
   "header": {
     "logo": {
       "text": "IPTV Premium",
-      "image": null
+      "image": "/src/assets/logo.png"
     },
     "navigation": [
       { "id": "home", "label": "Início", "href": "#home" },

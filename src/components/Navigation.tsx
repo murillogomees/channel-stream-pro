@@ -24,12 +24,22 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-gradient-primary rounded-lg shadow-glow">
-              <Tv className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-gradient-primary">
-              {settings.header.logo.text}
-            </span>
+            {settings.header.logo.image ? (
+              <img 
+                src={settings.header.logo.image} 
+                alt={settings.header.logo.text}
+                className="h-8 w-auto"
+              />
+            ) : (
+              <>
+                <div className="p-2 bg-gradient-primary rounded-lg shadow-glow">
+                  <Tv className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <span className="text-xl font-bold text-gradient-primary">
+                  {settings.header.logo.text}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Desktop Navigation */}
