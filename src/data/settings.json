@@ -110,7 +110,7 @@
       "subtitle": "A melhor experiência em entretenimento digital",
       "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família.",
       "features": [
-        "Mais de 10.000 canais",
+        "Mais de 172.000 canais",
         "Filmes e séries em HD/4K",
         "Suporte 24/7", 
         "Sem contrato"
@@ -158,7 +158,7 @@
   },
   "header": {
     "logo": {
-      "text": "IPTV Premium",
+      "text": "IPTV LINK",
       "image": "/src/assets/logo.png"
     },
     "navigation": [
@@ -180,15 +180,14 @@
     "items": [
       {
         "id": "basico",
-        "name": "Básico",
-        "price": "29.90",
+        "name": "Mensal",
+        "price": "30",
         "currency": "R$",
         "period": "/mês",
         "features": [
-          "Mais de 5.000 canais",
+          "Mais de 172.000 canais",
           "Filmes e séries",
-          "Qualidade HD",
-          "2 telas simultâneas",
+          "Qualidade 4k",
           "Suporte por WhatsApp"
         ],
         "highlighted": false,
@@ -197,17 +196,15 @@
       },
       {
         "id": "premium",
-        "name": "Premium",
-        "price": "49.90",
+        "name": "Trimestral",
+        "price": "75",
         "currency": "R$",
-        "period": "/mês",
+        "period": "/trimestral",
         "features": [
-          "Mais de 10.000 canais",
-          "Filmes e séries 4K",
-          "Qualidade Ultra HD",
-          "4 telas simultâneas",
-          "Suporte prioritário",
-          "EPG completo"
+          "Mais de 172.000 canais",
+          "Filmes e séries",
+          "Qualidade 4k",
+          "Suporte por WhatsApp"
         ],
         "highlighted": true,
         "ctaText": "Mais Popular",
@@ -215,18 +212,31 @@
       },
       {
         "id": "familia",
-        "name": "Família",
-        "price": "79.90",
+        "name": "Semestral",
+        "price": "130",
         "currency": "R$",
-        "period": "/mês",
+        "period": "/semestral",
         "features": [
-          "Mais de 15.000 canais",
-          "Filmes e séries 4K",
-          "Qualidade Ultra HD",
-          "6 telas simultâneas",
-          "Suporte 24/7",
-          "EPG completo",
-          "Gravação de programas"
+          "Mais de 172.000 canais",
+          "Filmes e séries",
+          "Qualidade 4k",
+          "Suporte por WhatsApp"
+        ],
+        "highlighted": false,
+        "ctaText": "Escolher Plano",
+        "analyticsTag": "cta_plan_family"
+      },
+      {
+        "id": "Anual",
+        "name": "Anual",
+        "price": "240",
+        "currency": "R$",
+        "period": "/anual",
+        "features": [
+          "Mais de 172.000 canais",
+          "Filmes e séries",
+          "Qualidade 4k",
+          "Suporte por WhatsApp"
         ],
         "highlighted": false,
         "ctaText": "Escolher Plano",
@@ -303,9 +313,9 @@
       }
     ],
     "stats": [
-      { "number": "10.000+", "label": "Filmes disponíveis" },
-      { "number": "2.000+", "label": "Séries completas" },
-      { "number": "100+", "label": "Novos títulos/mês" }
+      { "number": "20.000+", "label": "Filmes disponíveis" },
+      { "number": "4.000+", "label": "Séries completas" },
+      { "number": "400+", "label": "Novos títulos/mês" }
     ],
     "cards": [
       {
@@ -347,9 +357,9 @@
     "title": "Entre em Contato",
     "subtitle": "Estamos aqui para ajudar você",
     "info": {
-      "phone": "(11) 99999-9999",
+      "phone": "(61) 3242-5880",
       "email": "contato@iptvpremium.com",
-      "whatsapp": "5511999999999",
+      "whatsapp": "556132425880",
       "schedule": "Atendimento 24h por dia, 7 dias por semana"
     },
     "ctaText": "Falar no WhatsApp",
@@ -371,8 +381,8 @@
   },
   "admin": {
     "credentials": {
-      "email": "admin@iptv.com",
-      "password": "admin123"
+      "email": "murillo@iptv.com",
+      "password": "@LPko2930@"
     }
   },
   "cardImages": {
@@ -386,12 +396,12 @@
     "music": "/placeholder.svg"
   },
   "seo": {
-    "title": "IPTV Premium - A melhor experiência em entretenimento digital",
+    "title": "IPTV LINK - A melhor experiência em entretenimento digital",
     "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família com suporte 24/7.",
-    "keywords": "IPTV, streaming, filmes, séries, canais, entretenimento",
+    "keywords": "IPTV LINK, streaming, filmes, séries, canais, entretenimento",
     "openGraph": {
-      "title": "IPTV Premium - Entretenimento sem limites",
-      "description": "Mais de 10.000 canais em HD/4K, filmes e séries premium. Teste grátis!",
+      "title": "IPTV LINK - Entretenimento sem limites",
+      "description": "Mais de 172.000 canais em HD/4K, filmes e séries premium. Teste grátis!",
       "image": "/src/assets/hero-bg.jpg"
     }
   }
