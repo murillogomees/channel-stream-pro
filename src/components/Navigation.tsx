@@ -21,9 +21,7 @@ const Navigation = () => {
           {/* Logo */}
           <div className="flex items-center gap-3">
             {settings.header.logo.image ? <div className="flex items-center gap-3">
-                <img src={settings.header.logo.image} alt={settings.header.logo.text} className="h-10 w-auto" style={{
-              filter: 'brightness(0) invert(1)'
-            }} />
+                
                 <span className="text-xl font-bold text-white">
                   {settings.header.logo.text}
                 </span>
