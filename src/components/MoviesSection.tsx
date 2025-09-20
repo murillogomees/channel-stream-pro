@@ -2,8 +2,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Play, Clock, Plus } from "lucide-react";
+import { useSettingsContext } from "@/context/SettingsContext";
 
 const MoviesSection = () => {
+  const { settings } = useSettingsContext();
+
   const featuredMovies = [
     {
       title: "Vingadores: Ultimato",
@@ -12,7 +15,7 @@ const MoviesSection = () => {
       rating: "9.2",
       duration: "181 min",
       isNew: true,
-      image: "https://images.unsplash.com/photo-1635863138275-d9864d29c4fe?w=300&h=450&fit=crop"
+      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
     },
     {
       title: "Duna: Parte Dois",
@@ -21,7 +24,7 @@ const MoviesSection = () => {
       rating: "8.8",
       duration: "166 min",
       isNew: true,
-      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=450&fit=crop"
+      image: settings.cardImages?.dramaRomance || "/placeholder.svg"
     },
     {
       title: "John Wick 4",
@@ -30,7 +33,7 @@ const MoviesSection = () => {
       rating: "8.5",
       duration: "169 min",
       isNew: false,
-      image: "https://images.unsplash.com/photo-1489599133391-8b3791d1a08e?w=300&h=450&fit=crop"
+      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
     },
     {
       title: "Oppenheimer",
@@ -39,7 +42,7 @@ const MoviesSection = () => {
       rating: "9.0",
       duration: "180 min",
       isNew: false,
-      image: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=300&h=450&fit=crop"
+      image: settings.cardImages?.dramaRomance || "/placeholder.svg"
     },
     {
       title: "Spider-Man: Sem Volta",
@@ -48,7 +51,7 @@ const MoviesSection = () => {
       rating: "8.7",
       duration: "148 min",
       isNew: false,
-      image: "https://images.unsplash.com/photo-1635863138275-d9864d29c4fe?w=300&h=450&fit=crop"
+      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
     },
     {
       title: "Top Gun: Maverick",
@@ -57,7 +60,7 @@ const MoviesSection = () => {
       rating: "8.9",
       duration: "131 min",
       isNew: false,
-      image: "https://images.unsplash.com/photo-1489599133391-8b3791d1a08e?w=300&h=450&fit=crop"
+      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
     }
   ];
 
@@ -102,12 +105,11 @@ const MoviesSection = () => {
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="text-gradient-accent">Filmes</span> e{" "}
-            <span className="text-gradient-primary">séries</span> atualizados
+            <span className="text-gradient-accent">{settings.movies?.title?.split(' ')[0] || 'Filmes'}</span> e{" "}
+            <span className="text-gradient-primary">{settings.movies?.title?.split(' ')[2] || 'séries'}</span> atualizados
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Catálogo atualizado semanalmente com os últimos lançamentos.
-            Maratonas, blockbusters e clássicos do cinema mundial.
+            {settings.movies?.description || 'Catálogo atualizado semanalmente com os últimos lançamentos.'}
           </p>
         </div>
 

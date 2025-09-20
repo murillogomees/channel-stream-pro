@@ -312,7 +312,7 @@
         "id": "movie-001",
         "title": "Ação & Aventura",
         "subtitle": "Filmes de alta adrenalina",
-        "thumbnail": "/placeholder.svg",
+        "thumbnail": "$cardImages.actionAdventure",
         "cta": {
           "text": "Ver Filmes",
           "link": "#filmes",
@@ -323,7 +323,7 @@
         "id": "movie-002",
         "title": "Drama & Romance",
         "subtitle": "Histórias emocionantes",
-        "thumbnail": "/placeholder.svg",
+        "thumbnail": "$cardImages.dramaRomance",
         "cta": {
           "text": "Ver Filmes",
           "link": "#filmes",
@@ -334,7 +334,7 @@
         "id": "movie-003",
         "title": "Comédia",
         "subtitle": "Diversão garantida",
-        "thumbnail": "/placeholder.svg",
+        "thumbnail": "$cardImages.comedy",
         "cta": {
           "text": "Ver Filmes",
           "link": "#filmes",
