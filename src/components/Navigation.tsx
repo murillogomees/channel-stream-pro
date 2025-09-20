@@ -23,13 +23,19 @@ const Navigation = () => {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {settings.header.logo.image ? (
-              <img 
-                src={settings.header.logo.image} 
-                alt={settings.header.logo.text}
-                className="h-8 w-auto"
-              />
+              <div className="flex items-center gap-3">
+                <img 
+                  src={settings.header.logo.image} 
+                  alt={settings.header.logo.text}
+                  className="h-10 w-auto"
+                  style={{ filter: 'brightness(0) invert(1)' }}
+                />
+                <span className="text-xl font-bold text-white">
+                  {settings.header.logo.text}
+                </span>
+              </div>
             ) : (
               <>
                 <div className="p-2 bg-gradient-primary rounded-lg shadow-glow">
