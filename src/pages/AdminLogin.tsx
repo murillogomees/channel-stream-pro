@@ -6,12 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Lock, User, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-
-// Simple admin credentials for demo
-const ADMIN_CREDENTIALS = {
-  email: "admin@iptv.com",
-  password: "admin123"
-};
+import { useSettingsContext } from "@/context/SettingsContext";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -19,13 +14,16 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { settings } = useSettingsContext();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simple credential check
-    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+    // Get credentials from settings
+    const adminCredentials = settings.admin?.credentials;
+    
+    if (email === adminCredentials?.email && password === adminCredentials?.password) {
       localStorage.setItem('adminAuth', 'true');
       toast({
         title: "Login realizado com sucesso",
@@ -98,7 +96,7 @@ const AdminLogin = () => {
           </form>
           <div className="mt-4 p-3 bg-muted/20 rounded-lg">
             <p className="text-xs text-muted-foreground">
-              <strong>Demo:</strong> admin@iptv.com / admin123
+              <strong>Demo:</strong> {settings.admin?.credentials?.email} / {settings.admin?.credentials?.password}
             </p>
           </div>
         </CardContent>

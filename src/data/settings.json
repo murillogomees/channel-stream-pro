@@ -369,6 +369,22 @@
       "retry": "Tentar novamente"
     }
   },
+  "admin": {
+    "credentials": {
+      "email": "admin@iptv.com",
+      "password": "admin123"
+    }
+  },
+  "cardImages": {
+    "actionAdventure": "/placeholder.svg",
+    "dramaRomance": "/placeholder.svg", 
+    "comedy": "/placeholder.svg",
+    "sports": "/placeholder.svg",
+    "news": "/placeholder.svg",
+    "kids": "/placeholder.svg",
+    "documentaries": "/placeholder.svg",
+    "music": "/placeholder.svg"
+  },
   "seo": {
     "title": "IPTV Premium - A melhor experiência em entretenimento digital",
     "description": "Acesso a milhares de canais, filmes e séries em alta qualidade. Entretenimento ilimitado para toda a família com suporte 24/7.",
