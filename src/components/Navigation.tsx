@@ -6,7 +6,8 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const {
-    settings
+    settings,
+    getAsset
   } = useSettingsContext();
   useEffect(() => {
     const handleScroll = () => {
@@ -20,19 +21,24 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            {settings.header.logo.image ? <div className="flex items-center gap-3">
-                
-                <span className="text-xl font-bold text-white">
-                  {settings.header.logo.text}
-                </span>
-              </div> : <>
+            {settings.header.logo.image ? (
+              <img
+                src={getAsset ? getAsset("logo") : settings.header.logo.image}
+                alt={`${settings.header.logo.text} logo`}
+                className="h-8 md:h-9 lg:h-10 w-auto select-none"
+                loading="eager"
+                decoding="async"
+              />
+            ) : (
+              <>
                 <div className="p-2 bg-gradient-primary rounded-lg shadow-glow">
                   <Tv className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <span className="text-xl font-bold text-gradient-primary">
                   {settings.header.logo.text}
                 </span>
-              </>}
+              </>
+            )}
           </div>
 
           {/* Desktop Navigation */}

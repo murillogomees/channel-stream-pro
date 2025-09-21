@@ -64,7 +64,7 @@
     }
   },
   "assets": {
-    "logo": "/src/assets/logo.png",
+    "logo": "/logo.png",
     "heroImage": "/src/assets/hero-bg.jpg",
     "fallback": "/placeholder.svg"
   },
@@ -159,7 +159,7 @@
   "header": {
     "logo": {
       "text": "IPTV LINK",
-      "image": "/src/assets/logo.png"
+      "image": "/logo.png"
     },
     "navigation": [
       { "id": "home", "label": "Início", "href": "#home" },
