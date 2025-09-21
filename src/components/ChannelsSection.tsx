@@ -95,23 +95,23 @@ const ChannelsSection = () => {
   ];
 
   return (
-    <section className="py-20 px-6 bg-gradient-to-b from-card to-background">
-      <div className="container mx-auto">
+    <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-card to-background">
+      <div className="container mx-auto max-w-7xl">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+        <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
             Mais de{" "}
             <span className="text-gradient-primary">10.000 canais</span>{" "}
             disponíveis
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto px-4">
             Entretenimento para toda família. Esportes, filmes, séries, desenhos,
             documentários e muito mais, tudo em alta qualidade.
           </p>
         </div>
 
         {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-12">
           {channelCategories.map((category, index) => {
             const IconComponent = category.icon;
             return (
@@ -160,7 +160,7 @@ const ChannelsSection = () => {
         </div>
 
         {/* Features Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 text-center">
           {[
             { title: "Full HD & 4K", desc: "Qualidade de cinema" },
             { title: "EPG Completo", desc: "Guia de programação" },
