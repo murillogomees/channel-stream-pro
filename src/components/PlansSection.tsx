@@ -2,20 +2,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Crown, Star, Zap } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
-
 const PlansSection = () => {
-  const { settings } = useSettings();
-  
+  const {
+    settings
+  } = useSettings();
   const iconMap = {
     "Zap": Zap,
     "Star": Star,
     "Crown": Crown
   };
-
   const plans = settings.plans.items;
-
-  return (
-    <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-card">
+  return <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-card">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
@@ -30,32 +27,18 @@ const PlansSection = () => {
         {/* Plans Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
           {plans.map((plan, index) => {
-            const IconComponent = Star; // Default icon
-            return (
-              <Card
-                key={index}
-                className={`relative bg-gradient-card border-2 transition-smooth hover:scale-[1.02] hover:shadow-elevated ${
-                  plan.highlighted
-                    ? "border-primary shadow-glow"
-                    : "border-border hover:border-primary/40"
-                }`}
-              >
-                {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <div className="bg-gradient-primary px-6 py-2 rounded-full text-sm font-bold text-primary-foreground shadow-glow">
+          const IconComponent = Star; // Default icon
+          return <Card key={index} className={`relative bg-gradient-card border-2 transition-smooth hover:scale-[1.02] hover:shadow-elevated ${plan.highlighted ? "border-primary shadow-glow" : "border-border hover:border-primary/40"}`}>
+                {plan.highlighted && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <div className="bg-gradient-primary rounded-full text-sm font-bold text-primary-foreground shadow-glow py-[5px] px-[15px]">
                       Mais Popular
                     </div>
-                  </div>
-                )}
+                  </div>}
 
                 <CardHeader className="text-center pb-4">
                   <div className="flex justify-center mb-4">
-                    <div className={`p-3 rounded-full ${
-                      plan.highlighted ? "bg-gradient-primary shadow-glow" : "bg-secondary"
-                    }`}>
-                      <IconComponent className={`h-8 w-8 ${
-                        plan.highlighted ? "text-primary-foreground" : "text-primary"
-                      }`} />
+                    <div className={`p-3 rounded-full ${plan.highlighted ? "bg-gradient-primary shadow-glow" : "bg-secondary"}`}>
+                      <IconComponent className={`h-8 w-8 ${plan.highlighted ? "text-primary-foreground" : "text-primary"}`} />
                     </div>
                   </div>
                   <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
@@ -72,26 +55,19 @@ const PlansSection = () => {
                 <CardContent className="space-y-6">
                   {/* Features */}
                   <ul className="space-y-3">
-                    {plan.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-center gap-3">
+                    {plan.features.map((feature, featureIndex) => <li key={featureIndex} className="flex items-center gap-3">
                         <CheckCircle className="h-5 w-5 text-primary flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
+                      </li>)}
                   </ul>
 
                   {/* CTA Button */}
-                  <Button
-                    variant={plan.highlighted ? "hero" : "default"}
-                    size="default"
-                    className="w-full"
-                  >
+                  <Button variant={plan.highlighted ? "hero" : "default"} size="default" className="w-full">
                     {plan.ctaText}
                   </Button>
                 </CardContent>
-              </Card>
-            );
-          })}
+              </Card>;
+        })}
         </div>
 
         {/* Additional Info */}
@@ -107,8 +83,6 @@ const PlansSection = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default PlansSection;
