@@ -82,7 +82,7 @@ const ContactSection = () => {
           })}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="bg-gradient-card border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
@@ -100,6 +100,21 @@ const ContactSection = () => {
                   <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-primary/10 border-primary/20 shadow-glow">
+            <CardContent className="p-6 text-center">
+              <h3 className="text-xl font-bold text-gradient-primary mb-2">
+                Atendimento Premium 24/7
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Tenha suporte prioritário e acesso a técnicos especializados
+              </p>
+              <Button variant="default" className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Falar com Especialista
+              </Button>
             </CardContent>
           </Card>
 
@@ -132,23 +147,6 @@ const ContactSection = () => {
                   <span className="text-foreground">Dúvidas sobre Planos</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="text-center mt-12">
-          <Card className="bg-gradient-primary/10 border-primary/20 shadow-glow inline-block">
-            <CardContent className="p-6">
-              <h3 className="text-xl font-bold text-gradient-primary mb-2">
-                Atendimento Premium 24/7
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Tenha suporte prioritário e acesso a técnicos especializados
-              </p>
-              <Button variant="default" className="gap-2">
-                <MessageCircle className="h-4 w-4" />
-                Falar com Especialista
-              </Button>
             </CardContent>
           </Card>
         </div>
