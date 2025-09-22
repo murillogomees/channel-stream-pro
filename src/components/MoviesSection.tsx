@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Play, Clock, Plus } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
+import { useState } from "react";
+import VideoModal from "@/components/VideoModal";
 
 // Import movie posters
 import vingadoresUltimatoPoster from "@/assets/posters/vingadores-ultimato.jpg";
@@ -12,8 +14,15 @@ import oppenheimerPoster from "@/assets/posters/oppenheimer.jpg";
 import spiderManNoWayHomePoster from "@/assets/posters/spider-man-no-way-home.jpg";
 import topGunMaverickPoster from "@/assets/posters/top-gun-maverick.jpg";
 
+// Import trailers
+import vingadoresUltimatoTrailer from "@/assets/trailers/vingadores-ultimato.mp4";
+import johnWick4Trailer from "@/assets/trailers/john-wick-4.mp4";
+import oppenheimerTrailer from "@/assets/trailers/oppenheimer.mp4";
+import topGunMaverickTrailer from "@/assets/trailers/top-gun-maverick.mp4";
+
 const MoviesSection = () => {
   const { settings } = useSettingsContext();
+  const [selectedTrailer, setSelectedTrailer] = useState<{ src: string; title: string } | null>(null);
 
   const featuredMovies = [
     {
@@ -23,7 +32,8 @@ const MoviesSection = () => {
       rating: "9.2",
       duration: "181 min",
       isNew: true,
-      image: vingadoresUltimatoPoster
+      image: vingadoresUltimatoPoster,
+      trailer: vingadoresUltimatoTrailer
     },
     {
       title: "Duna: Parte Dois",
@@ -32,7 +42,8 @@ const MoviesSection = () => {
       rating: "8.8",
       duration: "166 min",
       isNew: true,
-      image: dunaParteDoisPoster
+      image: dunaParteDoisPoster,
+      trailer: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
     },
     {
       title: "John Wick 4",
@@ -41,7 +52,8 @@ const MoviesSection = () => {
       rating: "8.5",
       duration: "169 min",
       isNew: false,
-      image: johnWick4Poster
+      image: johnWick4Poster,
+      trailer: johnWick4Trailer
     },
     {
       title: "Oppenheimer",
@@ -50,7 +62,8 @@ const MoviesSection = () => {
       rating: "9.0",
       duration: "180 min",
       isNew: false,
-      image: oppenheimerPoster
+      image: oppenheimerPoster,
+      trailer: oppenheimerTrailer
     },
     {
       title: "Spider-Man: Sem Volta",
@@ -59,7 +72,8 @@ const MoviesSection = () => {
       rating: "8.7",
       duration: "148 min",
       isNew: false,
-      image: spiderManNoWayHomePoster
+      image: spiderManNoWayHomePoster,
+      trailer: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
     },
     {
       title: "Top Gun: Maverick",
@@ -68,7 +82,8 @@ const MoviesSection = () => {
       rating: "8.9",
       duration: "131 min",
       isNew: false,
-      image: topGunMaverickPoster
+      image: topGunMaverickPoster,
+      trailer: topGunMaverickTrailer
     }
   ];
 
@@ -133,9 +148,10 @@ const MoviesSection = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {featuredMovies.map((movie, index) => (
-              <Card
+                <Card
                 key={index}
                 className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden"
+                onClick={() => setSelectedTrailer({ src: movie.trailer, title: movie.title })}
               >
                 <div className="relative">
                   <img
@@ -245,6 +261,16 @@ const MoviesSection = () => {
             </div>
           </div>
         </div>
+
+        {/* Video Modal */}
+        {selectedTrailer && (
+          <VideoModal
+            isOpen={!!selectedTrailer}
+            onClose={() => setSelectedTrailer(null)}
+            videoSrc={selectedTrailer.src}
+            title={selectedTrailer.title}
+          />
+        )}
       </div>
     </section>
   );
