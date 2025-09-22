@@ -4,6 +4,7 @@ import PlansSection from "@/components/PlansSection";
 import ChannelsSection from "@/components/ChannelsSection";
 import MoviesSection from "@/components/MoviesSection";
 import ContactSection from "@/components/ContactSection";
+import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
@@ -26,6 +27,7 @@ const Index = () => {
           <ContactSection />
         </section>
       </main>
+      <Footer />
     </div>
   );
 };
