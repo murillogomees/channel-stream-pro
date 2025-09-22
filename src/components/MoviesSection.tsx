@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Star, Calendar, Play, Clock, Plus } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
 
+// Import movie posters
+import vingadoresUltimatoPoster from "@/assets/posters/vingadores-ultimato.jpg";
+import dunaParteDoisPoster from "@/assets/posters/duna-parte-dois.jpg";
+import johnWick4Poster from "@/assets/posters/john-wick-4.jpg";
+import oppenheimerPoster from "@/assets/posters/oppenheimer.jpg";
+import spiderManNoWayHomePoster from "@/assets/posters/spider-man-no-way-home.jpg";
+import topGunMaverickPoster from "@/assets/posters/top-gun-maverick.jpg";
+
 const MoviesSection = () => {
   const { settings } = useSettingsContext();
 
@@ -15,7 +23,7 @@ const MoviesSection = () => {
       rating: "9.2",
       duration: "181 min",
       isNew: true,
-      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
+      image: vingadoresUltimatoPoster
     },
     {
       title: "Duna: Parte Dois",
@@ -24,7 +32,7 @@ const MoviesSection = () => {
       rating: "8.8",
       duration: "166 min",
       isNew: true,
-      image: settings.cardImages?.dramaRomance || "/placeholder.svg"
+      image: dunaParteDoisPoster
     },
     {
       title: "John Wick 4",
@@ -33,7 +41,7 @@ const MoviesSection = () => {
       rating: "8.5",
       duration: "169 min",
       isNew: false,
-      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
+      image: johnWick4Poster
     },
     {
       title: "Oppenheimer",
@@ -42,7 +50,7 @@ const MoviesSection = () => {
       rating: "9.0",
       duration: "180 min",
       isNew: false,
-      image: settings.cardImages?.dramaRomance || "/placeholder.svg"
+      image: oppenheimerPoster
     },
     {
       title: "Spider-Man: Sem Volta",
@@ -51,7 +59,7 @@ const MoviesSection = () => {
       rating: "8.7",
       duration: "148 min",
       isNew: false,
-      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
+      image: spiderManNoWayHomePoster
     },
     {
       title: "Top Gun: Maverick",
@@ -60,7 +68,7 @@ const MoviesSection = () => {
       rating: "8.9",
       duration: "131 min",
       isNew: false,
-      image: settings.cardImages?.actionAdventure || "/placeholder.svg"
+      image: topGunMaverickPoster
     }
   ];
 
