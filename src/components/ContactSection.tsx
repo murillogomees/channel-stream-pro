@@ -83,28 +83,29 @@ const ContactSection = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="bg-gradient-card border-border">
+          <Card className="bg-gradient-card border-border text-center">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <Clock className="h-5 w-5" />
-                Horário de Atendimento
-              </CardTitle>
+              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-accent">
+                <Clock className="h-8 w-8 text-primary-foreground" />
+              </div>
+              <CardTitle className="text-xl text-foreground">Horário de Atendimento</CardTitle>
               <CardDescription className="text-muted-foreground">
                 Nossos horários de funcionamento
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-foreground font-medium">Atendimento:</span>
-                  <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
-                </div>
+              <div className="text-center">
+                <span className="text-foreground font-medium block mb-2">Atendimento:</span>
+                <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-primary/10 border-primary/20 shadow-glow">
-            <CardContent className="p-6 text-center">
+          <Card className="bg-gradient-primary/10 border-primary/20 shadow-glow text-center">
+            <CardContent className="p-6">
+              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-primary shadow-glow mb-4">
+                <MessageCircle className="h-8 w-8 text-primary-foreground" />
+              </div>
               <h3 className="text-xl font-bold text-gradient-primary mb-2">
                 Atendimento Premium 24/7
               </h3>
@@ -118,31 +119,31 @@ const ContactSection = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-card border-border">
+          <Card className="bg-gradient-card border-border text-center">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <Headphones className="h-5 w-5" />
-                Suporte Técnico
-              </CardTitle>
+              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-accent">
+                <Headphones className="h-8 w-8 text-primary-foreground" />
+              </div>
+              <CardTitle className="text-xl text-foreground">Suporte Técnico</CardTitle>
               <CardDescription className="text-muted-foreground">
                 Estamos aqui para ajudar
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-foreground">Configuração de Apps</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-foreground">Problemas de Conexão</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-foreground">Instalação de Players</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-foreground">Dúvidas sobre Planos</span>
                 </div>
