@@ -94,11 +94,6 @@ const AdminLogin = () => {
               {loading ? "Entrando..." : "Entrar no Sistema"}
             </Button>
           </form>
-          <div className="mt-4 p-3 bg-muted/20 rounded-lg">
-            <p className="text-xs text-muted-foreground">
-              <strong>Demo:</strong> {settings.admin?.credentials?.email} / {settings.admin?.credentials?.password}
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
