@@ -7,7 +7,8 @@ const ContactSection = () => {
   const { settings } = useSettings();
   
   const whatsappNumber = "5561314258880";
-  const whatsappUrl = `https://wa.me/${whatsappNumber}`;
+  const whatsappMessage = "Olá! Gostaria de saber mais sobre os planos IPTV.";
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
   
   const contactMethods = [
     {
@@ -75,7 +76,7 @@ const ContactSection = () => {
                   <Button
                     variant={method.featured ? "default" : "outline"}
                     className="w-full"
-                    onClick={() => window.open(method.href, '_blank')}
+                    onClick={() => window.location.href = method.href}
                   >
                     {method.action}
                   </Button>
@@ -118,7 +119,7 @@ const ContactSection = () => {
               <Button 
                 variant="default" 
                 className="gap-2"
-                onClick={() => window.open(whatsappUrl, '_blank')}
+                onClick={() => window.location.href = whatsappUrl}
               >
                 <MessageCircle className="h-4 w-4" />
                 Falar com Especialista

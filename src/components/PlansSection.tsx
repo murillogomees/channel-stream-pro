@@ -66,7 +66,7 @@ const PlansSection = () => {
                     variant={plan.highlighted ? "hero" : "default"} 
                     size="default" 
                     className="w-full"
-                    onClick={() => window.open("https://wa.me/5561314258880", '_blank')}
+                    onClick={() => window.location.href = "https://wa.me/5561314258880?text=" + encodeURIComponent("Olá! Gostaria de contratar um plano IPTV.")}
                   >
                     {plan.ctaText}
                   </Button>
