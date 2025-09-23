@@ -138,12 +138,8 @@ const MoviesSection = () => {
 
         {/* Featured Movies */}
         <div className="mb-16">
-          <div className="flex items-center justify-between mb-8">
+          <div className="mb-8">
             <h3 className="text-3xl font-bold">🎬 Filmes em Destaque</h3>
-            <Button variant="outline">
-              <Plus className="h-4 w-4" />
-              Ver Todos
-            </Button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
@@ -200,12 +196,8 @@ const MoviesSection = () => {
 
         {/* Popular Series */}
         <div className="mb-16">
-          <div className="flex items-center justify-between mb-8">
+          <div className="mb-8">
             <h3 className="text-3xl font-bold">📺 Séries Populares</h3>
-            <Button variant="outline">
-              <Plus className="h-4 w-4" />
-              Ver Todas
-            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
