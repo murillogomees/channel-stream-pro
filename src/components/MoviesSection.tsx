@@ -14,6 +14,12 @@ import oppenheimerPoster from "@/assets/posters/oppenheimer.jpg";
 import spiderManNoWayHomePoster from "@/assets/posters/spider-man-no-way-home.jpg";
 import topGunMaverickPoster from "@/assets/posters/top-gun-maverick.jpg";
 
+// Import series posters
+import successionPoster from "@/assets/posters/succession.jpg";
+import theLastOfUsPoster from "@/assets/posters/the-last-of-us.jpg";
+import houseOfTheDragonPoster from "@/assets/posters/house-of-the-dragon.jpg";
+import strangerThingsPoster from "@/assets/posters/stranger-things.jpg";
+
 // Import trailers
 import vingadoresUltimatoTrailer from "@/assets/trailers/vingadores-ultimato.mp4";
 import johnWick4Trailer from "@/assets/trailers/john-wick-4.mp4";
@@ -94,7 +100,8 @@ const MoviesSection = () => {
       genre: "Drama",
       rating: "9.1",
       seasons: "4 temporadas",
-      episodes: "39 episódios"
+      episodes: "39 episódios",
+      image: successionPoster
     },
     {
       title: "The Last of Us",
@@ -102,7 +109,8 @@ const MoviesSection = () => {
       genre: "Drama/Terror",
       rating: "8.8",
       seasons: "1 temporada",
-      episodes: "9 episódios"
+      episodes: "9 episódios",
+      image: theLastOfUsPoster
     },
     {
       title: "House of the Dragon",
@@ -110,7 +118,8 @@ const MoviesSection = () => {
       genre: "Fantasia/Drama",
       rating: "8.6",
       seasons: "1 temporada",
-      episodes: "10 episódios"
+      episodes: "10 episódios",
+      image: houseOfTheDragonPoster
     },
     {
       title: "Stranger Things",
@@ -118,7 +127,8 @@ const MoviesSection = () => {
       genre: "Ficção/Terror",
       rating: "8.9",
       seasons: "4 temporadas",
-      episodes: "42 episódios"
+      episodes: "42 episódios",
+      image: strangerThingsPoster
     }
   ];
 
@@ -206,24 +216,38 @@ const MoviesSection = () => {
             <h3 className="text-3xl font-bold">📺 Séries Populares</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {popularSeries.map((series, index) => (
               <Card
                 key={index}
-                className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card cursor-pointer h-full flex flex-col"
+                className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
               >
-                <CardContent className="p-6 flex-1 flex flex-col justify-between">
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <h4 className="font-bold text-lg leading-tight min-h-[3.5rem] flex items-center justify-center">
-                        {series.title}
-                      </h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={series.image}
+                    alt={series.title}
+                    className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
+                    <Button
+                      variant="hero"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-smooth"
+                    >
+                      <Play className="h-6 w-6" />
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-sm leading-tight line-clamp-2 text-center min-h-[2.5rem] flex items-center justify-center">
+                      {series.title}
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground font-medium">{series.year}</span>
                         <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-yellow-400" />
+                          <Star className="h-3 w-3 text-yellow-400" />
                           <span className="font-semibold">{series.rating}</span>
                         </div>
                       </div>
@@ -232,9 +256,9 @@ const MoviesSection = () => {
                           {series.genre}
                         </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground space-y-2 text-center">
+                      <div className="text-xs text-muted-foreground space-y-1 text-center">
                         <div className="font-medium">{series.seasons}</div>
-                        <div className="text-xs opacity-80">{series.episodes}</div>
+                        <div className="opacity-80">{series.episodes}</div>
                       </div>
                     </div>
                   </div>
