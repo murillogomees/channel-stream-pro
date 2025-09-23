@@ -29,16 +29,16 @@ const PlansSection = () => {
         {plans.map((plan, index) => {
           const IconComponent = Star; // Default icon
           return <Card key={index} className={`relative bg-gradient-card border-2 transition-smooth hover:scale-[1.02] hover:shadow-elevated h-full flex flex-col ${plan.highlighted ? "border-primary shadow-glow" : "border-border hover:border-primary/40"}`}>
-                {plan.highlighted && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <div className="bg-gradient-primary rounded-full text-sm font-bold text-primary-foreground shadow-glow py-2 px-4">
+                {plan.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <div className="bg-gradient-primary rounded-full text-xs font-semibold text-primary-foreground shadow-glow py-1 px-3">
                       Mais Popular
                     </div>
                   </div>}
 
                 <CardHeader className="text-center pb-4 flex-shrink-0">
                   <div className="flex justify-center mb-4">
-                    <div className={`p-4 rounded-full ${plan.highlighted ? "bg-gradient-primary shadow-glow" : "bg-secondary"}`}>
-                      <IconComponent className={`h-8 w-8 ${plan.highlighted ? "text-primary-foreground" : "text-primary"}`} />
+                    <div className={`p-3 rounded-full ${plan.highlighted ? "bg-gradient-primary shadow-glow" : "bg-secondary"}`}>
+                      <IconComponent className={`h-6 w-6 ${plan.highlighted ? "text-primary-foreground" : "text-primary"}`} />
                     </div>
                   </div>
                   <CardTitle className="text-2xl font-bold leading-tight min-h-[3rem] flex items-center justify-center">
