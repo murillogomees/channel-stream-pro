@@ -55,27 +55,29 @@ const ContactSection = () => {
             return (
               <Card 
                 key={method.title} 
-                className={`bg-gradient-card border-border text-center ${
+                className={`bg-gradient-card border-border text-center h-full flex flex-col ${
                   method.featured ? 'shadow-glow ring-2 ring-primary/20' : ''
                 }`}
               >
-                <CardHeader>
-                  <div className={`mx-auto p-3 rounded-full w-fit ${
+                <CardHeader className="flex-shrink-0">
+                  <div className={`mx-auto p-4 rounded-full w-fit ${
                     method.featured 
                       ? 'bg-gradient-primary shadow-glow' 
                       : 'bg-gradient-accent'
                   }`}>
                     <Icon className="h-8 w-8 text-primary-foreground" />
                   </div>
-                  <CardTitle className="text-xl text-foreground">{method.title}</CardTitle>
-                  <CardDescription className="text-muted-foreground">
+                  <CardTitle className="text-xl text-foreground leading-tight min-h-[3rem] flex items-center justify-center">
+                    {method.title}
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground font-medium px-2">
                     {method.description}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 flex flex-col justify-end">
                   <Button
                     variant={method.featured ? "default" : "outline"}
-                    className="w-full"
+                    className="w-full font-semibold"
                     onClick={() => window.location.href = method.href}
                   >
                     {method.action}

@@ -115,46 +115,50 @@ const ChannelsSection = () => {
           {channelCategories.map((category, index) => {
             const IconComponent = category.icon;
             return (
-              <Card
-                key={index}
-                className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card group"
-              >
-                <CardContent className="p-6 text-center space-y-4">
-                  <div className="flex justify-center">
-                    <div className={`p-4 rounded-full ${category.bgColor} group-hover:scale-110 transition-smooth`}>
-                      <IconComponent className={`h-8 w-8 ${category.color}`} />
+                <Card
+                  key={index}
+                  className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card group h-full flex flex-col"
+                >
+                  <CardContent className="p-6 text-center space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex justify-center">
+                        <div className={`p-4 rounded-full ${category.bgColor} group-hover:scale-110 transition-smooth`}>
+                          <IconComponent className={`h-8 w-8 ${category.color}`} />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-bold leading-tight min-h-[3rem] flex items-center justify-center">
+                          {category.name}
+                        </h3>
+                        <Badge variant="secondary" className="text-sm font-semibold mx-auto">
+                          {category.count} canais
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">{category.name}</h3>
-                    <Badge variant="secondary" className="text-sm font-semibold">
-                      {category.count} canais
-                    </Badge>
-                  </div>
 
-                  {/* Channel Examples */}
-                  <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Exemplos:</div>
-                    <div className="flex flex-wrap gap-1 justify-center">
-                      {category.channels.slice(0, 6).map((channel, channelIndex) => (
-                        <Badge
-                          key={channelIndex}
-                          variant="outline"
-                          className="text-xs px-2 py-1"
-                        >
-                          {channel}
-                        </Badge>
-                      ))}
-                      {category.channels.length > 6 && (
-                        <Badge variant="outline" className="text-xs px-2 py-1">
-                          +{category.channels.length - 6}
-                        </Badge>
-                      )}
+                    {/* Channel Examples */}
+                    <div className="space-y-3">
+                      <div className="text-sm text-muted-foreground font-medium">Exemplos:</div>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {category.channels.slice(0, 6).map((channel, channelIndex) => (
+                          <Badge
+                            key={channelIndex}
+                            variant="outline"
+                            className="text-xs px-2 py-1 font-medium"
+                          >
+                            {channel}
+                          </Badge>
+                        ))}
+                        {category.channels.length > 6 && (
+                          <Badge variant="outline" className="text-xs px-2 py-1 font-medium">
+                            +{category.channels.length - 6}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
             );
           })}
         </div>
@@ -167,9 +171,13 @@ const ChannelsSection = () => {
             { title: "Sem Travamentos", desc: "Streaming estável" },
             { title: "Multi Idiomas", desc: "Legendas e dublagem" },
           ].map((feature, index) => (
-            <div key={index} className="bg-gradient-card p-6 rounded-lg border border-border">
-              <h4 className="font-bold text-primary mb-2">{feature.title}</h4>
-              <p className="text-sm text-muted-foreground">{feature.desc}</p>
+            <div key={index} className="bg-gradient-card p-6 rounded-lg border border-border h-full flex flex-col justify-center space-y-3">
+              <h4 className="font-bold text-primary text-lg leading-tight min-h-[3rem] flex items-center justify-center">
+                {feature.title}
+              </h4>
+              <p className="text-sm text-muted-foreground font-medium">
+                {feature.desc}
+              </p>
             </div>
           ))}
         </div>

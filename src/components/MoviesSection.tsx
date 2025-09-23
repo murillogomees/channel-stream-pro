@@ -146,17 +146,17 @@ const MoviesSection = () => {
             {featuredMovies.map((movie, index) => (
                 <Card
                 key={index}
-                className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden"
+                className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
                 onClick={() => setSelectedTrailer({ src: movie.trailer, title: movie.title })}
               >
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <img
                     src={movie.image}
                     alt={movie.title}
                     className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
                   />
                   {movie.isNew && (
-                    <Badge className="absolute top-2 left-2 bg-gradient-primary shadow-glow">
+                    <Badge className="absolute top-3 left-3 bg-gradient-primary shadow-glow text-xs font-semibold">
                       Novo
                     </Badge>
                   )}
@@ -170,23 +170,29 @@ const MoviesSection = () => {
                     </Button>
                   </div>
                 </div>
-                <CardContent className="p-4">
-                  <h4 className="font-bold text-sm mb-2 line-clamp-2">{movie.title}</h4>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div className="flex items-center justify-between">
-                      <span>{movie.year}</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 text-yellow-400" />
-                        <span>{movie.rating}</span>
+                <CardContent className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-sm leading-tight line-clamp-2 text-center min-h-[2.5rem] flex items-center justify-center">
+                      {movie.title}
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">{movie.year}</span>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-400" />
+                          <span className="font-semibold">{movie.rating}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{movie.duration}</span>
+                      </div>
+                      <div className="flex justify-center">
+                        <Badge variant="outline" className="text-xs font-medium">
+                          {movie.genre}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3" />
-                      <span>{movie.duration}</span>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {movie.genre}
-                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -204,24 +210,32 @@ const MoviesSection = () => {
             {popularSeries.map((series, index) => (
               <Card
                 key={index}
-                className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card cursor-pointer"
+                className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card cursor-pointer h-full flex flex-col"
               >
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <h4 className="font-bold text-lg">{series.title}</h4>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{series.year}</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-400" />
-                        <span className="font-semibold">{series.rating}</span>
-                      </div>
+                <CardContent className="p-6 flex-1 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h4 className="font-bold text-lg leading-tight min-h-[3.5rem] flex items-center justify-center">
+                        {series.title}
+                      </h4>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {series.genre}
-                    </Badge>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <div>{series.seasons}</div>
-                      <div>{series.episodes}</div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground font-medium">{series.year}</span>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-yellow-400" />
+                          <span className="font-semibold">{series.rating}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-center">
+                        <Badge variant="outline" className="text-xs font-medium">
+                          {series.genre}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-2 text-center">
+                        <div className="font-medium">{series.seasons}</div>
+                        <div className="text-xs opacity-80">{series.episodes}</div>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
