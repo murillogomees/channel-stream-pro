@@ -36,32 +36,48 @@ const AdminDashboard = () => {
           </Button>
         </div>
 
-        <div className="grid gap-6 justify-center">
+        <div className="mb-8">
           {/* Site Customization */}
-          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
+          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
                 onClick={() => navigate('/admin/customize')}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5 text-primary" />
-                Personalizar Site
-              </CardTitle>
-              <CardDescription>
-                Edite cores, fontes, logotipos, textos e todos os elementos visuais da página inicial
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <Edit3 className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Customização Completa</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure header, hero, planos, contatos e mais
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+              <div className="md:col-span-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <Palette className="h-6 w-6 text-primary" />
+                  <h3 className="text-xl font-bold">Personalizar Site</h3>
+                </div>
+                <p className="text-muted-foreground">
+                  Edite cores, fontes, logotipos, textos e todos os elementos visuais da página inicial
+                </p>
+              </div>
+              
+              <div className="md:col-span-1 flex items-center justify-center">
+                <div className="flex items-center gap-4">
+                  <Edit3 className="h-12 w-12 text-primary/60" />
+                  <div>
+                    <p className="font-semibold text-lg">Customização Completa</p>
+                    <p className="text-sm text-muted-foreground">
+                      Interface intuitiva e fácil
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="md:col-span-1 flex items-center justify-center">
+                <div className="text-center space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-primary/10 p-2 rounded">Header</div>
+                    <div className="bg-accent/10 p-2 rounded">Hero</div>
+                    <div className="bg-secondary/30 p-2 rounded">Planos</div>
+                    <div className="bg-muted/30 p-2 rounded">Contatos</div>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Configure todas as seções
                   </p>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
-
         </div>
 
         {/* Quick Stats */}
