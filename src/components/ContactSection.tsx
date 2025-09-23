@@ -19,22 +19,6 @@ const ContactSection = () => {
       href: whatsappUrl,
       featured: true,
     },
-    {
-      icon: Phone,
-      title: "Telefone",
-      description: "Atendimento 24/7",
-      action: "Chamar no WhatsApp",
-      href: whatsappUrl,
-      featured: false,
-    },
-    {
-      icon: Mail,
-      title: "Email",
-      description: "Resposta em até 2 horas",
-      action: "Chamar no WhatsApp",
-      href: whatsappUrl,
-      featured: false,
-    },
   ];
 
   return (
@@ -50,116 +34,91 @@ const ContactSection = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          {contactMethods.map((method) => {
-            const Icon = method.icon;
-            return (
-              <Card 
-                key={method.title} 
-                className={`bg-gradient-card border-border text-center h-full flex flex-col ${
-                  method.featured ? 'shadow-glow ring-2 ring-primary/20' : ''
-                }`}
-              >
-                <CardHeader className="flex-shrink-0">
-                  <div className={`mx-auto p-4 rounded-full w-fit ${
-                    method.featured 
-                      ? 'bg-gradient-primary shadow-glow' 
-                      : 'bg-gradient-accent'
-                  }`}>
-                    <Icon className="h-8 w-8 text-primary-foreground" />
+          {/* Main WhatsApp Contact Card */}
+          <div className="lg:col-span-1">
+            <Card className="bg-gradient-card border-border text-center h-full flex flex-col shadow-glow ring-2 ring-primary/20">
+              <CardHeader className="flex-shrink-0">
+                <div className="mx-auto p-4 rounded-full w-fit bg-gradient-primary shadow-glow">
+                  <MessageCircle className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <CardTitle className="text-xl text-foreground leading-tight min-h-[3rem] flex items-center justify-center">
+                  WhatsApp
+                </CardTitle>
+                <CardDescription className="text-muted-foreground font-medium px-2">
+                  Resposta em até 5 minutos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-end">
+                <Button
+                  variant="default"
+                  className="w-full font-semibold"
+                  onClick={() => window.location.href = whatsappUrl}
+                >
+                  Chamar no WhatsApp
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Horário de Atendimento */}
+          <div className="lg:col-span-1">
+            <Card className="bg-gradient-card border-border text-center h-full flex flex-col">
+              <CardHeader className="flex-shrink-0">
+                <div className="mx-auto p-4 rounded-full w-fit bg-gradient-accent">
+                  <Clock className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <CardTitle className="text-xl text-foreground leading-tight min-h-[3rem] flex items-center justify-center">
+                  Horário de Atendimento
+                </CardTitle>
+                <CardDescription className="text-muted-foreground font-medium px-2">
+                  Nossos horários de funcionamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-center">
+                <div className="text-center space-y-2">
+                  <span className="text-foreground font-medium block">Atendimento:</span>
+                  <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Suporte Técnico */}
+          <div className="lg:col-span-1">
+            <Card className="bg-gradient-card border-border text-center h-full flex flex-col">
+              <CardHeader className="flex-shrink-0">
+                <div className="mx-auto p-4 rounded-full w-fit bg-gradient-accent">
+                  <Headphones className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <CardTitle className="text-xl text-foreground leading-tight min-h-[3rem] flex items-center justify-center">
+                  Suporte Técnico
+                </CardTitle>
+                <CardDescription className="text-muted-foreground font-medium px-2">
+                  Estamos aqui para ajudar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-center">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-foreground text-sm">Configuração de Apps</span>
                   </div>
-                  <CardTitle className="text-xl text-foreground leading-tight min-h-[3rem] flex items-center justify-center">
-                    {method.title}
-                  </CardTitle>
-                  <CardDescription className="text-muted-foreground font-medium px-2">
-                    {method.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col justify-end">
-                  <Button
-                    variant={method.featured ? "default" : "outline"}
-                    className="w-full font-semibold"
-                    onClick={() => window.location.href = method.href}
-                  >
-                    {method.action}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="bg-gradient-card border-border text-center">
-            <CardHeader>
-              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-accent">
-                <Clock className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <CardTitle className="text-xl text-foreground">Horário de Atendimento</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Nossos horários de funcionamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <span className="text-foreground font-medium block mb-2">Atendimento:</span>
-                <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-primary/10 border-primary/20 shadow-glow text-center">
-            <CardContent className="p-6">
-              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-primary shadow-glow mb-4">
-                <MessageCircle className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <h3 className="text-xl font-bold text-gradient-primary mb-2">
-                Atendimento Premium 24/7
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Tenha suporte prioritário e acesso a técnicos especializados
-              </p>
-              <Button 
-                variant="default" 
-                className="gap-2"
-                onClick={() => window.location.href = whatsappUrl}
-              >
-                <MessageCircle className="h-4 w-4" />
-                Falar com Especialista
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-card border-border text-center">
-            <CardHeader>
-              <div className="mx-auto p-3 rounded-full w-fit bg-gradient-accent">
-                <Headphones className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <CardTitle className="text-xl text-foreground">Suporte Técnico</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Estamos aqui para ajudar
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-foreground">Configuração de Apps</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-foreground text-sm">Problemas de Conexão</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-foreground text-sm">Instalação de Players</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-foreground text-sm">Dúvidas sobre Planos</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-foreground">Problemas de Conexão</span>
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-foreground">Instalação de Players</span>
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-foreground">Dúvidas sobre Planos</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </section>
