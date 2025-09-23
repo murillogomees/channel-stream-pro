@@ -165,11 +165,6 @@ const MoviesSection = () => {
                     alt={movie.title}
                     className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
                   />
-                  {movie.isNew && (
-                    <Badge className="absolute top-3 left-3 bg-gradient-primary shadow-glow text-xs font-semibold">
-                      Novo
-                    </Badge>
-                  )}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
                     <Button
                       variant="hero"
