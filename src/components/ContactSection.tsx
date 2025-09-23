@@ -6,29 +6,32 @@ import { useSettings } from "@/hooks/useSettings";
 const ContactSection = () => {
   const { settings } = useSettings();
   
+  const whatsappNumber = "5561314258880";
+  const whatsappUrl = `https://wa.me/${whatsappNumber}`;
+  
   const contactMethods = [
     {
       icon: MessageCircle,
       title: "WhatsApp",
       description: "Resposta em até 5 minutos",
       action: "Chamar no WhatsApp",
-      href: `https://wa.me/${settings.contact.info.whatsapp}`,
+      href: whatsappUrl,
       featured: true,
     },
     {
       icon: Phone,
       title: "Telefone",
       description: "Atendimento 24/7",
-      action: settings.contact.info.phone,
-      href: `tel:${settings.contact.info.phone}`,
+      action: "Chamar no WhatsApp",
+      href: whatsappUrl,
       featured: false,
     },
     {
       icon: Mail,
       title: "Email",
       description: "Resposta em até 2 horas",
-      action: settings.contact.info.email,
-      href: `mailto:${settings.contact.info.email}`,
+      action: "Chamar no WhatsApp",
+      href: whatsappUrl,
       featured: false,
     },
   ];
@@ -112,7 +115,11 @@ const ContactSection = () => {
               <p className="text-muted-foreground mb-4">
                 Tenha suporte prioritário e acesso a técnicos especializados
               </p>
-              <Button variant="default" className="gap-2">
+              <Button 
+                variant="default" 
+                className="gap-2"
+                onClick={() => window.open(whatsappUrl, '_blank')}
+              >
                 <MessageCircle className="h-4 w-4" />
                 Falar com Especialista
               </Button>

@@ -62,7 +62,12 @@ const PlansSection = () => {
                   </ul>
 
                   {/* CTA Button */}
-                  <Button variant={plan.highlighted ? "hero" : "default"} size="default" className="w-full">
+                  <Button 
+                    variant={plan.highlighted ? "hero" : "default"} 
+                    size="default" 
+                    className="w-full"
+                    onClick={() => window.open("https://wa.me/5561314258880", '_blank')}
+                  >
                     {plan.ctaText}
                   </Button>
                 </CardContent>
