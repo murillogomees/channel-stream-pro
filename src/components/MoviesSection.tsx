@@ -32,16 +32,6 @@ const MoviesSection = () => {
 
   const featuredMovies = [
     {
-      title: "Vingadores: Ultimato",
-      year: "2023",
-      genre: "Ação/Aventura",
-      rating: "9.2",
-      duration: "181 min",
-      isNew: true,
-      image: vingadoresUltimatoPoster,
-      trailer: vingadoresUltimatoTrailer
-    },
-    {
       title: "Duna: Parte Dois",
       year: "2024",
       genre: "Ficção Científica",
@@ -80,16 +70,6 @@ const MoviesSection = () => {
       isNew: false,
       image: spiderManNoWayHomePoster,
       trailer: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-    },
-    {
-      title: "Top Gun: Maverick",
-      year: "2023",
-      genre: "Ação/Drama",
-      rating: "8.9",
-      duration: "131 min",
-      isNew: false,
-      image: topGunMaverickPoster,
-      trailer: topGunMaverickTrailer
     }
   ];
 
@@ -152,7 +132,7 @@ const MoviesSection = () => {
             <h3 className="text-3xl font-bold">🎬 Filmes em Destaque</h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {featuredMovies.map((movie, index) => (
                 <Card
                 key={index}
