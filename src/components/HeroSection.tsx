@@ -25,7 +25,7 @@ const HeroSection = () => {
             <img
               src={getAsset('logo')}
               alt="IPTV LINK Logo"
-              className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto object-contain filter brightness-0 invert"
+              className="h-20 sm:h-24 md:h-28 lg:h-32 xl:h-36 w-auto object-contain filter brightness-0 invert"
               style={{ maxWidth: '90vw' }}
             />
           </div>
