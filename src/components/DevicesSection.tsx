@@ -2,7 +2,7 @@ import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import * as Icons from "lucide-react";
-import devicesImage from "@/assets/devices-hero.png";
+import devicesImage from "@/assets/devices-mockup.jpg";
 
 const DevicesSection = () => {
   const { settings } = useSettingsContext();
