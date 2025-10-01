@@ -174,6 +174,56 @@
       "analyticsTag": "cta_header"
     }
   },
+  "devices": {
+    "title": "Disponível em Todos os Dispositivos",
+    "subtitle": "Assista onde e quando quiser",
+    "description": "Baixe nosso aplicativo e aproveite conteúdo ilimitado em qualquer plataforma",
+    "image": "/src/assets/devices-hero.png",
+    "platforms": [
+      {
+        "id": "android",
+        "name": "Android",
+        "icon": "Smartphone",
+        "downloadUrl": "https://play.google.com/store",
+        "enabled": true
+      },
+      {
+        "id": "ios",
+        "name": "iOS",
+        "icon": "Smartphone",
+        "downloadUrl": "https://apps.apple.com",
+        "enabled": true
+      },
+      {
+        "id": "windows",
+        "name": "Windows",
+        "icon": "Monitor",
+        "downloadUrl": "https://example.com/windows",
+        "enabled": true
+      },
+      {
+        "id": "mac",
+        "name": "macOS",
+        "icon": "Laptop",
+        "downloadUrl": "https://example.com/mac",
+        "enabled": true
+      },
+      {
+        "id": "tablet",
+        "name": "Tablet",
+        "icon": "Tablet",
+        "downloadUrl": "https://example.com/tablet",
+        "enabled": true
+      },
+      {
+        "id": "smarttv",
+        "name": "Smart TV",
+        "icon": "Tv",
+        "downloadUrl": "https://example.com/smarttv",
+        "enabled": true
+      }
+    ]
+  },
   "plans": {
     "title": "Escolha seu Plano",
     "subtitle": "Planos flexíveis para todos os perfis",

@@ -1,5 +1,6 @@
 import Navigation from "@/components/Navigation";
 import HeroSection from "@/components/HeroSection";
+import DevicesSection from "@/components/DevicesSection";
 import PlansSection from "@/components/PlansSection";
 import ChannelsSection from "@/components/ChannelsSection";
 import MoviesSection from "@/components/MoviesSection";
@@ -13,6 +14,9 @@ const Index = () => {
       <main>
         <section id="home">
           <HeroSection />
+        </section>
+        <section id="dispositivos">
+          <DevicesSection />
         </section>
         <section id="planos">
           <PlansSection />
