@@ -1,8 +1,13 @@
 import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import * as Icons from "lucide-react";
 import devicesImage from "@/assets/devices-mockup.jpg";
+import androidIcon from "@/assets/icons/android-device.png";
+import iosIcon from "@/assets/icons/ios-device.png";
+import windowsIcon from "@/assets/icons/windows-device.png";
+import macIcon from "@/assets/icons/mac-device.png";
+import tabletIcon from "@/assets/icons/tablet-device.png";
+import smarttvIcon from "@/assets/icons/smarttv-device.png";
 
 const DevicesSection = () => {
   const { settings } = useSettingsContext();
@@ -10,12 +15,13 @@ const DevicesSection = () => {
 
   if (!devicesConfig) return null;
 
-  const iconMap: Record<string, any> = {
-    Smartphone: Icons.Smartphone,
-    Monitor: Icons.Monitor,
-    Laptop: Icons.Laptop,
-    Tablet: Icons.Tablet,
-    Tv: Icons.Tv,
+  const deviceImageMap: Record<string, string> = {
+    android: androidIcon,
+    ios: iosIcon,
+    windows: windowsIcon,
+    mac: macIcon,
+    tablet: tabletIcon,
+    smarttv: smarttvIcon,
   };
 
   return (
@@ -48,7 +54,7 @@ const DevicesSection = () => {
           {devicesConfig.platforms
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
-              const IconComponent = iconMap[platform.icon] || Icons.Smartphone;
+              const deviceImage = deviceImageMap[platform.id];
               
               return (
                 <Card
@@ -60,8 +66,12 @@ const DevicesSection = () => {
                     }
                   }}
                 >
-                  <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <IconComponent className="w-8 h-8 text-primary" />
+                  <div className="w-20 h-20 flex items-center justify-center">
+                    <img 
+                      src={deviceImage} 
+                      alt={platform.name}
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                    />
                   </div>
                   <span className="text-sm font-semibold text-center group-hover:text-primary transition-colors">
                     {platform.name}
