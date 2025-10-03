@@ -429,12 +429,6 @@
       "retry": "Tentar novamente"
     }
   },
-  "admin": {
-    "credentials": {
-      "email": "murillo@iptv.com",
-      "password": "@LPko2930@"
-    }
-  },
   "cardImages": {
     "actionAdventure": "/placeholder.svg",
     "dramaRomance": "/placeholder.svg", 

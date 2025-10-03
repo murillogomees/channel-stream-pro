@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Lock, User, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useSettingsContext } from "@/context/SettingsContext";
+import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string()
+    .trim()
+    .email({ message: "Formato de email inválido" })
+    .max(255, { message: "Email muito longo" }),
+  password: z.string()
+    .min(6, { message: "Senha deve ter no mínimo 6 caracteres" })
+    .max(100, { message: "Senha muito longa" })
+});
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -14,31 +25,85 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { settings } = useSettingsContext();
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        
+        if (data) {
+          navigate('/admin/dashboard');
+        }
+      }
+    });
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Get credentials from settings
-    const adminCredentials = settings.admin?.credentials;
-    
-    if (email === adminCredentials?.email && password === adminCredentials?.password) {
-      localStorage.setItem('adminAuth', 'true');
-      toast({
-        title: "Login realizado com sucesso",
-        description: "Bem-vindo ao painel administrativo!",
+    try {
+      // Validate inputs
+      const validated = loginSchema.parse({ email, password });
+
+      // Sign in with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
       });
-      navigate('/admin/dashboard');
-    } else {
-      toast({
-        title: "Erro no login",
-        description: "Email ou senha incorretos",
-        variant: "destructive",
-      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Check if user has admin role
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', authData.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        if (roleError) throw roleError;
+
+        if (roleData) {
+          toast({
+            title: "Login realizado com sucesso",
+            description: "Bem-vindo ao painel administrativo!",
+          });
+          navigate('/admin/dashboard');
+        } else {
+          // User is not an admin
+          await supabase.auth.signOut();
+          toast({
+            title: "Acesso negado",
+            description: "Credenciais inválidas.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Erro de validação",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro no login",
+          description: "Credenciais inválidas. Por favor, tente novamente.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (

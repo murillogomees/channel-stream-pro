@@ -6,23 +6,36 @@ import { ArrowLeft, Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSettingsContext } from "@/context/SettingsContext";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 const AdminCustomize = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings, updateSettings, resetSettings, lastUpdated } = useSettingsContext();
+  const { isAdmin, loading: authLoading } = useAdminAuth();
   const [jsonConfig, setJsonConfig] = useState("");
   const [loading, setSaving] = useState(false);
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('adminAuth');
-    if (!isAuthenticated) {
+    if (!authLoading && !isAdmin) {
       navigate('/admin/login');
       return;
     }
     
     setJsonConfig(JSON.stringify(settings, null, 2));
-  }, [navigate, settings]);
+  }, [navigate, settings, isAdmin, authLoading]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   const handleSave = () => {
     setSaving(true);
