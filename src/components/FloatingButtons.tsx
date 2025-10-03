@@ -8,7 +8,7 @@ const FloatingButtons = () => {
   const instagramUrl = "https://instagram.com/iptvlinkbr";
 
   return (
-    <div className="fixed right-6 bottom-6 z-50 flex flex-col gap-3">
+    <div className="fixed right-6 bottom-[7.5rem] z-50 flex flex-col gap-3">
       {/* WhatsApp Button */}
       <Button
         variant="default"
@@ -21,15 +21,13 @@ const FloatingButtons = () => {
       </Button>
 
       {/* Instagram Button */}
-      <Button
-        variant="premium"
-        size="icon"
-        className="h-14 w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all"
+      <button
+        className="h-14 w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white flex items-center justify-center"
         onClick={() => window.open(instagramUrl, "_blank")}
         aria-label="Seguir no Instagram"
       >
         <Instagram className="h-6 w-6" />
-      </Button>
+      </button>
     </div>
   );
 };
