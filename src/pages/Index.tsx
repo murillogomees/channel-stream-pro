@@ -6,6 +6,7 @@ import ChannelsSection from "@/components/ChannelsSection";
 import MoviesSection from "@/components/MoviesSection";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
+import FloatingButtons from "@/components/FloatingButtons";
 
 const Index = () => {
   return (
@@ -32,6 +33,7 @@ const Index = () => {
         </section>
       </main>
       <Footer />
+      <FloatingButtons />
     </div>
   );
 };
