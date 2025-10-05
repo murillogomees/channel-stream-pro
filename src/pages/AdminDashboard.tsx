@@ -4,25 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { useLocalAuth } from "@/hooks/useLocalAuth";
 import { useClientes } from "@/hooks/useClientes";
-import { supabase } from "@/integrations/supabase/client";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAdmin, loading } = useAdminAuth();
+  const { isAuthenticated, loading, logout } = useLocalAuth();
   const { getStats } = useClientes();
   const stats = getStats();
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (!loading && !isAuthenticated) {
       navigate('/admin/login');
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAuthenticated, loading, navigate]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    logout();
     toast({
       title: "Logout realizado",
       description: "Você foi desconectado com sucesso.",
@@ -38,7 +37,7 @@ const AdminDashboard = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     return null;
   }
 

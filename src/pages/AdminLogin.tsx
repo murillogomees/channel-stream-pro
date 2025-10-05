@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Lock, User, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useLocalAuth } from "@/hooks/useLocalAuth";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -25,67 +25,38 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { login, isAuthenticated } = useLocalAuth();
 
   useEffect(() => {
-    // Check if user is already authenticated
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-        
-        if (data) {
-          navigate('/admin/dashboard');
-        }
-      }
-    });
-  }, [navigate]);
+    // Redireciona se já estiver autenticado
+    if (isAuthenticated) {
+      navigate('/admin/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Validate inputs
+      // Valida inputs
       const validated = loginSchema.parse({ email, password });
 
-      // Sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
-      });
+      // Faz login com autenticação local
+      const result = await login(validated.email, validated.password);
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Check if user has admin role
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', authData.user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-
-        if (roleError) throw roleError;
-
-        if (roleData) {
-          toast({
-            title: "Login realizado com sucesso",
-            description: "Bem-vindo ao painel administrativo!",
-          });
-          navigate('/admin/dashboard');
-        } else {
-          // User is not an admin
-          await supabase.auth.signOut();
-          toast({
-            title: "Acesso negado",
-            description: "Credenciais inválidas.",
-            variant: "destructive",
-          });
-        }
+      if (result.success) {
+        toast({
+          title: "Login realizado com sucesso",
+          description: "Bem-vindo ao painel administrativo!",
+        });
+        navigate('/admin/dashboard');
+      } else {
+        toast({
+          title: "Erro no login",
+          description: result.error || "Credenciais inválidas.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -97,7 +68,7 @@ const AdminLogin = () => {
       } else {
         toast({
           title: "Erro no login",
-          description: "Credenciais inválidas. Por favor, tente novamente.",
+          description: "Por favor, tente novamente.",
           variant: "destructive",
         });
       }

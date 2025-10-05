@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useLocalAuth } from '@/hooks/useLocalAuth';
 import { useClientes } from '@/hooks/useClientes';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -36,7 +36,7 @@ const situacaoColors: Record<string, string> = {
 
 export default function AdminClientes() {
   const navigate = useNavigate();
-  const { isAdmin, loading } = useAdminAuth();
+  const { isAuthenticated, loading } = useLocalAuth();
   const { clientes, deleteCliente } = useClientes();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -49,7 +49,7 @@ export default function AdminClientes() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     navigate('/admin/login');
     return null;
   }

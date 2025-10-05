@@ -6,24 +6,24 @@ import { ArrowLeft, Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSettingsContext } from "@/context/SettingsContext";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { useLocalAuth } from "@/hooks/useLocalAuth";
 
 const AdminCustomize = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings, updateSettings, resetSettings, lastUpdated } = useSettingsContext();
-  const { isAdmin, loading: authLoading } = useAdminAuth();
+  const { isAuthenticated, loading: authLoading } = useLocalAuth();
   const [jsonConfig, setJsonConfig] = useState("");
   const [loading, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !isAuthenticated) {
       navigate('/admin/login');
       return;
     }
     
     setJsonConfig(JSON.stringify(settings, null, 2));
-  }, [navigate, settings, isAdmin, authLoading]);
+  }, [navigate, settings, isAuthenticated, authLoading]);
 
   if (authLoading) {
     return (
@@ -33,7 +33,7 @@ const AdminCustomize = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     return null;
   }
 

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useLocalAuth } from '@/hooks/useLocalAuth';
 import { useClientes } from '@/hooks/useClientes';
 import { Cliente } from '@/types/cliente';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,7 @@ export default function AdminClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading } = useAdminAuth();
+  const { isAuthenticated, loading } = useLocalAuth();
   const { addCliente, updateCliente, getClienteById } = useClientes();
 
   const {
@@ -85,7 +85,7 @@ export default function AdminClienteForm() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     navigate('/admin/login');
     return null;
   }
