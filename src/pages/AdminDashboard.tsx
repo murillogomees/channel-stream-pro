@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -161,6 +161,69 @@ const AdminDashboard = () => {
                   <p className="text-xs text-muted-foreground font-medium">
                     Configure todas as seções
                   </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* App Activation System */}
+          <Card className="bg-gradient-card border-border hover:shadow-lg transition-smooth w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
+              <div className="lg:col-span-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <Key className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
+                  <h3 className="text-lg sm:text-xl font-bold">Sistema de Ativação</h3>
+                </div>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  Gerencie planos, chaves de ativação e dispositivos dos usuários
+                </p>
+              </div>
+              
+              <div className="lg:col-span-1 flex items-center justify-center">
+                <div className="grid grid-cols-3 gap-3 w-full">
+                  <div className="text-center">
+                    <Package className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mx-auto mb-2" />
+                    <p className="text-xs font-semibold">Planos</p>
+                  </div>
+                  <div className="text-center">
+                    <Key className="h-8 w-8 sm:h-10 sm:w-10 text-green-500 mx-auto mb-2" />
+                    <p className="text-xs font-semibold">Chaves</p>
+                  </div>
+                  <div className="text-center">
+                    <Smartphone className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 mx-auto mb-2" />
+                    <p className="text-xs font-semibold">Usuários</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
+                <div className="flex flex-col w-full lg:w-auto gap-2">
+                  <Button 
+                    onClick={() => navigate('/admin/plans')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Planos de Assinatura
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => navigate('/admin/activation-keys')}
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Key className="h-4 w-4 mr-2" />
+                    Chaves de Ativação
+                  </Button>
+
+                  <Button 
+                    onClick={() => navigate('/admin/app-users')}
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Smartphone className="h-4 w-4 mr-2" />
+                    Usuários do App
+                  </Button>
                 </div>
               </div>
             </div>
