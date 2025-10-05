@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -198,6 +198,15 @@ const AdminDashboard = () => {
               
               <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
                 <div className="flex flex-col w-full lg:w-auto gap-2">
+                  <Button 
+                    onClick={() => navigate('/admin/m3u-lists')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Listas M3U
+                  </Button>
+
                   <Button 
                     onClick={() => navigate('/admin/plans')} 
                     variant="outline"

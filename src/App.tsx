@@ -19,6 +19,7 @@ const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
 const AdminPlans = lazy(() => import("./pages/AdminPlans"));
 const AdminActivationKeys = lazy(() => import("./pages/AdminActivationKeys"));
 const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
+const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
 const AppActivation = lazy(() => import("./pages/AppActivation"));
 
 const AutoNotificationProvider = () => {
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="/admin/plans" element={<AdminPlans />} />
           <Route path="/admin/activation-keys" element={<AdminActivationKeys />} />
           <Route path="/admin/app-users" element={<AdminAppUsers />} />
+          <Route path="/admin/m3u-lists" element={<AdminM3ULists />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
