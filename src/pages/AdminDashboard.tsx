@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -108,6 +108,10 @@ const AdminDashboard = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gradient-primary">Painel Administrativo</h1>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/admin/perfil')}>
+              <User className="h-4 w-4 mr-2" />
+              Meu Perfil
+            </Button>
             <Button variant="outline" onClick={handleClearCache} title="Limpar todo o cache do navegador">
               <Trash2 className="h-4 w-4 mr-2" />
               Limpar Cache
