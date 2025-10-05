@@ -1,39 +1,60 @@
-import Navigation from "@/components/Navigation";
-import HeroSection from "@/components/HeroSection";
-import DevicesSection from "@/components/DevicesSection";
-import PlansSection from "@/components/PlansSection";
-import ChannelsSection from "@/components/ChannelsSection";
-import MoviesSection from "@/components/MoviesSection";
-import ContactSection from "@/components/ContactSection";
-import Footer from "@/components/Footer";
-import FloatingButtons from "@/components/FloatingButtons";
+import { lazy, Suspense } from "react";
+
+// Lazy load components for better performance
+const Navigation = lazy(() => import("@/components/Navigation"));
+const HeroSection = lazy(() => import("@/components/HeroSection"));
+const DevicesSection = lazy(() => import("@/components/DevicesSection"));
+const PlansSection = lazy(() => import("@/components/PlansSection"));
+const ChannelsSection = lazy(() => import("@/components/ChannelsSection"));
+const MoviesSection = lazy(() => import("@/components/MoviesSection"));
+const ContactSection = lazy(() => import("@/components/ContactSection"));
+const Footer = lazy(() => import("@/components/Footer"));
+const FloatingButtons = lazy(() => import("@/components/FloatingButtons"));
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Suspense fallback={<div className="h-16 bg-background" />}>
+        <Navigation />
+      </Suspense>
       <main>
         <section id="home">
-          <HeroSection />
+          <Suspense fallback={<div className="min-h-screen bg-background" />}>
+            <HeroSection />
+          </Suspense>
         </section>
         <section id="dispositivos">
-          <DevicesSection />
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <DevicesSection />
+          </Suspense>
         </section>
         <section id="planos">
-          <PlansSection />
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <PlansSection />
+          </Suspense>
         </section>
         <section id="canais">
-          <ChannelsSection />
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <ChannelsSection />
+          </Suspense>
         </section>
         <section id="filmes">
-          <MoviesSection />
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <MoviesSection />
+          </Suspense>
         </section>
         <section id="contato">
-          <ContactSection />
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <ContactSection />
+          </Suspense>
         </section>
       </main>
-      <Footer />
-      <FloatingButtons />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FloatingButtons />
+      </Suspense>
     </div>
   );
 };
