@@ -2,12 +2,19 @@ import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import devicesImage from "@/assets/devices-mockup.jpg";
+import devicesImageWebP from "@/assets/devices-mockup.webp";
 import androidIcon from "@/assets/icons/android-device.png";
+import androidIconWebP from "@/assets/icons/android-device.webp";
 import iosIcon from "@/assets/icons/ios-device.png";
+import iosIconWebP from "@/assets/icons/ios-device.webp";
 import windowsIcon from "@/assets/icons/windows-device.png";
+import windowsIconWebP from "@/assets/icons/windows-device.webp";
 import macIcon from "@/assets/icons/mac-device.png";
+import macIconWebP from "@/assets/icons/mac-device.webp";
 import tabletIcon from "@/assets/icons/tablet-device.png";
+import tabletIconWebP from "@/assets/icons/tablet-device.webp";
 import smarttvIcon from "@/assets/icons/smarttv-device.png";
+import smarttvIconWebP from "@/assets/icons/smarttv-device.webp";
 
 const DevicesSection = () => {
   const { settings } = useSettingsContext();
@@ -22,6 +29,15 @@ const DevicesSection = () => {
     mac: macIcon,
     tablet: tabletIcon,
     smarttv: smarttvIcon,
+  };
+
+  const deviceImageMapWebP: Record<string, string> = {
+    android: androidIconWebP,
+    ios: iosIconWebP,
+    windows: windowsIconWebP,
+    mac: macIconWebP,
+    tablet: tabletIconWebP,
+    smarttv: smarttvIconWebP,
   };
 
   return (
@@ -42,17 +58,20 @@ const DevicesSection = () => {
 
         {/* Devices Image */}
         <div className="mb-16 rounded-2xl overflow-hidden shadow-2xl">
-          <img
-            src={devicesImage}
-            alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
-            className="w-full h-auto object-cover"
-            width="1920"
-            height="1080"
-            loading="lazy"
-            decoding="async"
-            role="img"
-            aria-label="Demonstração de compatibilidade do IPTV LINK em múltiplos dispositivos"
-          />
+          <picture>
+            <source srcSet={devicesImageWebP} type="image/webp" />
+            <img
+              src={devicesImage}
+              alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
+              className="w-full h-auto object-cover"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              decoding="async"
+              role="img"
+              aria-label="Demonstração de compatibilidade do IPTV LINK em múltiplos dispositivos"
+            />
+          </picture>
         </div>
 
         {/* Platform Icons Grid */}
@@ -61,6 +80,7 @@ const DevicesSection = () => {
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
               const deviceImage = deviceImageMap[platform.id];
+              const deviceImageWebP = deviceImageMapWebP[platform.id];
               
               return (
                 <Card
@@ -81,16 +101,19 @@ const DevicesSection = () => {
                   }}
                 >
                   <div className="w-20 h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
-                    <img 
-                      src={deviceImage} 
-                      alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                      width="80"
-                      height="80"
-                      loading="lazy"
-                      decoding="async"
-                      aria-hidden="true"
-                    />
+                    <picture>
+                      <source srcSet={deviceImageWebP} type="image/webp" />
+                      <img 
+                        src={deviceImage} 
+                        alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
+                        className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                        width="80"
+                        height="80"
+                        loading="lazy"
+                        decoding="async"
+                        aria-hidden="true"
+                      />
+                    </picture>
                   </div>
                   <span className="text-sm font-semibold text-center group-hover:text-primary transition-colors">
                     {platform.name}

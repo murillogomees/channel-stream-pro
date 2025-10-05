@@ -9,16 +9,23 @@ import VideoModal from "@/components/VideoModal";
 // Import movie posters
 import vingadoresUltimatoPoster from "@/assets/posters/vingadores-ultimato.jpg";
 import dunaParteDoisPoster from "@/assets/posters/duna-parte-dois.jpg";
+import dunaParteDoisPosterWebP from "@/assets/posters/duna-parte-dois.webp";
 import johnWick4Poster from "@/assets/posters/john-wick-4.jpg";
 import oppenheimerPoster from "@/assets/posters/oppenheimer.jpg";
+import oppenheimerPosterWebP from "@/assets/posters/oppenheimer.webp";
 import spiderManNoWayHomePoster from "@/assets/posters/spider-man-no-way-home.jpg";
+import spiderManNoWayHomePosterWebP from "@/assets/posters/spider-man-no-way-home.webp";
 import topGunMaverickPoster from "@/assets/posters/top-gun-maverick.jpg";
 
 // Import series posters
 import successionPoster from "@/assets/posters/succession.jpg";
+import successionPosterWebP from "@/assets/posters/succession.webp";
 import theLastOfUsPoster from "@/assets/posters/the-last-of-us.jpg";
+import theLastOfUsPosterWebP from "@/assets/posters/the-last-of-us.webp";
 import houseOfTheDragonPoster from "@/assets/posters/house-of-the-dragon.jpg";
+import houseOfTheDragonPosterWebP from "@/assets/posters/house-of-the-dragon.webp";
 import strangerThingsPoster from "@/assets/posters/stranger-things.jpg";
+import strangerThingsPosterWebP from "@/assets/posters/stranger-things.webp";
 
 // Import trailers
 import vingadoresUltimatoTrailer from "@/assets/trailers/vingadores-ultimato.mp4";
@@ -39,6 +46,7 @@ const MoviesSection = () => {
       duration: "166 min",
       isNew: true,
       image: dunaParteDoisPoster,
+      imageWebP: dunaParteDoisPosterWebP,
       trailer: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
     },
     {
@@ -49,6 +57,7 @@ const MoviesSection = () => {
       duration: "169 min",
       isNew: false,
       image: johnWick4Poster,
+      imageWebP: undefined,
       trailer: johnWick4Trailer
     },
     {
@@ -59,6 +68,7 @@ const MoviesSection = () => {
       duration: "180 min",
       isNew: false,
       image: oppenheimerPoster,
+      imageWebP: oppenheimerPosterWebP,
       trailer: oppenheimerTrailer
     },
     {
@@ -69,6 +79,7 @@ const MoviesSection = () => {
       duration: "148 min",
       isNew: false,
       image: spiderManNoWayHomePoster,
+      imageWebP: spiderManNoWayHomePosterWebP,
       trailer: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
     }
   ];
@@ -81,7 +92,8 @@ const MoviesSection = () => {
       rating: "9.1",
       seasons: "4 temporadas",
       episodes: "39 episódios",
-      image: successionPoster
+      image: successionPoster,
+      imageWebP: successionPosterWebP
     },
     {
       title: "The Last of Us",
@@ -90,7 +102,8 @@ const MoviesSection = () => {
       rating: "8.8",
       seasons: "1 temporada",
       episodes: "9 episódios",
-      image: theLastOfUsPoster
+      image: theLastOfUsPoster,
+      imageWebP: theLastOfUsPosterWebP
     },
     {
       title: "House of the Dragon",
@@ -99,7 +112,8 @@ const MoviesSection = () => {
       rating: "8.6",
       seasons: "1 temporada",
       episodes: "10 episódios",
-      image: houseOfTheDragonPoster
+      image: houseOfTheDragonPoster,
+      imageWebP: houseOfTheDragonPosterWebP
     },
     {
       title: "Stranger Things",
@@ -108,7 +122,8 @@ const MoviesSection = () => {
       rating: "8.9",
       seasons: "4 temporadas",
       episodes: "42 episódios",
-      image: strangerThingsPoster
+      image: strangerThingsPoster,
+      imageWebP: strangerThingsPosterWebP
     }
   ];
 
@@ -148,15 +163,18 @@ const MoviesSection = () => {
                 }}
               >
                 <div className="relative flex-shrink-0">
-                  <img
-                    src={movie.image}
-                    alt={`Pôster do filme ${movie.title} (${movie.year}) - ${movie.genre} - Avaliação ${movie.rating} estrelas - Duração ${movie.duration}`}
-                    className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
-                    width="512"
-                    height="768"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <picture>
+                    {movie.imageWebP && <source srcSet={movie.imageWebP} type="image/webp" />}
+                    <img
+                      src={movie.image}
+                      alt={`Pôster do filme ${movie.title} (${movie.year}) - ${movie.genre} - Avaliação ${movie.rating} estrelas - Duração ${movie.duration}`}
+                      className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                      width="512"
+                      height="768"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
                     <Button
                       variant="hero"
@@ -214,15 +232,18 @@ const MoviesSection = () => {
                 tabIndex={0}
               >
                 <div className="relative flex-shrink-0">
-                  <img
-                    src={series.image}
-                    alt={`Pôster da série ${series.title} (${series.year}) - ${series.genre} - Avaliação ${series.rating} estrelas - ${series.seasons} com ${series.episodes}`}
-                    className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
-                    width="512"
-                    height="768"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <picture>
+                    {series.imageWebP && <source srcSet={series.imageWebP} type="image/webp" />}
+                    <img
+                      src={series.image}
+                      alt={`Pôster da série ${series.title} (${series.year}) - ${series.genre} - Avaliação ${series.rating} estrelas - ${series.seasons} com ${series.episodes}`}
+                      className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                      width="512"
+                      height="768"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
                     <Button
                       variant="hero"

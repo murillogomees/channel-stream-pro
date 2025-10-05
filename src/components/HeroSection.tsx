@@ -27,19 +27,22 @@ const HeroSection = () => {
         <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
           {/* Logo as Main Title */}
           <div className="flex justify-center mb-4">
-            <img
-              src={getAsset('logo')}
-              alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
-              className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain filter brightness-0 invert"
-              style={{ maxWidth: '90vw' }}
-              width="829"
-              height="388"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              role="img"
-              aria-label="IPTV LINK - Streaming Premium"
-            />
+            <picture>
+              <source srcSet="/logo.webp" type="image/webp" />
+              <img
+                src={getAsset('logo')}
+                alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
+                className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain filter brightness-0 invert"
+                style={{ maxWidth: '90vw' }}
+                width="829"
+                height="388"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                role="img"
+                aria-label="IPTV LINK - Streaming Premium"
+              />
+            </picture>
           </div>
 
           {/* Subtitle */}
