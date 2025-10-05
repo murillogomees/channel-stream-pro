@@ -137,7 +137,7 @@ export default function AdminTemplates() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 Templates de Mensagens
               </h1>
               <p className="text-sm text-muted-foreground">
