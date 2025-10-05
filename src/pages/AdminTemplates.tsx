@@ -130,57 +130,59 @@ export default function AdminTemplates() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Templates de Mensagens
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Gerencie os modelos de notificação WhatsApp
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restaurar Padrão
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setResetDialogOpen(true)} className="w-full sm:w-auto">
+              <RotateCcw className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Restaurar Padrão</span>
+              <span className="sm:hidden">Restaurar</span>
             </Button>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Template
+            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Novo Template</span>
+              <span className="sm:hidden">Novo</span>
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Variáveis Disponíveis</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Variáveis Disponíveis</CardTitle>
             <CardDescription>
               Use estas variáveis nas mensagens entre chaves, ex: {'{nome}'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary" />
-                <code className="bg-muted px-2 py-1 rounded">{'{nome}'}</code>
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{nome}'}</code>
               </div>
               <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary" />
-                <code className="bg-muted px-2 py-1 rounded">{'{dataVencimento}'}</code>
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{dataVencimento}'}</code>
               </div>
               <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary" />
-                <code className="bg-muted px-2 py-1 rounded">{'{linkPagamento}'}</code>
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{linkPagamento}'}</code>
               </div>
               <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary" />
-                <code className="bg-muted px-2 py-1 rounded">{'{plano}'}</code>
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{plano}'}</code>
               </div>
             </div>
           </CardContent>
@@ -188,37 +190,38 @@ export default function AdminTemplates() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Templates Cadastrados ({templates.length})</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Templates Cadastrados ({templates.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Dias</TableHead>
-                  <TableHead>Mensagem</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.length === 0 ? (
+            <div className="overflow-x-auto -mx-3 sm:-mx-4 lg:-mx-6">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableHead className="whitespace-nowrap">Nome</TableHead>
+                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Dias</TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">Mensagem</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Tipo</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       Nenhum template cadastrado
                     </TableCell>
                   </TableRow>
-                ) : (
-                  templates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">{template.name}</TableCell>
-                      <TableCell>{getDaysLabel(template.daysBeforeDue)}</TableCell>
-                      <TableCell className="max-w-md truncate">{template.message}</TableCell>
-                      <TableCell>
-                        <span className="capitalize">{template.type}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                  ) : (
+                    templates.map((template) => (
+                      <TableRow key={template.id}>
+                        <TableCell className="font-medium whitespace-nowrap">{template.name}</TableCell>
+                        <TableCell className="hidden sm:table-cell whitespace-nowrap">{getDaysLabel(template.daysBeforeDue)}</TableCell>
+                        <TableCell className="hidden md:table-cell max-w-xs truncate">{template.message}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="capitalize">{template.type}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -243,6 +246,7 @@ export default function AdminTemplates() {
                 )}
               </TableBody>
             </Table>
+          </div>
           </CardContent>
         </Card>
       </div>

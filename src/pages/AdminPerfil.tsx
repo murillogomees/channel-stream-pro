@@ -166,20 +166,25 @@ const AdminPerfil = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 max-w-2xl">
-        <div className="mb-8">
-          <Button variant="outline" onClick={() => navigate('/admin/dashboard')} className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar ao Dashboard
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl">
+        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold text-gradient-primary">Meu Perfil</h1>
-          <p className="text-muted-foreground mt-2">Gerencie suas informações pessoais</p>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              Meu Perfil
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Edite suas informações de administrador
+            </p>
+          </div>
         </div>
 
         <Card className="bg-gradient-card border-border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <User className="h-5 w-5 text-primary" />
               Informações Pessoais
             </CardTitle>
@@ -187,7 +192,7 @@ const AdminPerfil = () => {
               Atualize seu nome, email e senha
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6">
             {/* Nome */}
             <div className="space-y-2">
               <Label htmlFor="nome" className="flex items-center gap-2">

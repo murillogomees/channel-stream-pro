@@ -157,9 +157,9 @@ export default function AdminClienteForm() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Button
             variant="outline"
             size="icon"
@@ -167,7 +167,7 @@ export default function AdminClienteForm() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {id ? 'Editar Cliente' : 'Novo Cliente'}
           </h1>
         </div>
@@ -175,10 +175,10 @@ export default function AdminClienteForm() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <Card>
             <CardHeader>
-              <CardTitle>Informações do Cliente</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Informações do Cliente</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="nome">Nome</Label>
                   <Input id="nome" {...register('nome')} />
@@ -282,15 +282,16 @@ export default function AdminClienteForm() {
                 </div>
               </div>
 
-              <div className="flex gap-4 justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/admin/clientes')}
+                  className="w-full sm:w-auto"
                 >
                   Cancelar
                 </Button>
-                <Button type="submit">
+                <Button type="submit" className="w-full sm:w-auto">
                   {id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
                 </Button>
               </div>

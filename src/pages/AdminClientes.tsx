@@ -222,10 +222,10 @@ export default function AdminClientes() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <Button
               variant="outline"
               size="icon"
@@ -233,52 +233,54 @@ export default function AdminClientes() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Gerenciar Clientes
             </h1>
           </div>
-          <Button onClick={() => navigate('/admin/clientes/novo')}>
+          <Button onClick={() => navigate('/admin/clientes/novo')} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Novo Cliente
           </Button>
         </div>
 
-        <Card className="p-6">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Situação</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientes.map((cliente: Cliente) => (
-                  <TableRow key={cliente.id}>
-                    <TableCell className="font-medium">{cliente.nome}</TableCell>
-                    <TableCell>{cliente.email}</TableCell>
-                    <TableCell>{cliente.telefone}</TableCell>
-                    <TableCell>
-                      <Badge className={situacaoColors[cliente.situacao]}>
-                        {cliente.situacao}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{cliente.plano}</TableCell>
-                    <TableCell>
+        <Card className="p-3 sm:p-4 lg:p-6">
+          <div className="overflow-x-auto -mx-3 sm:-mx-4 lg:-mx-6">
+            <div className="inline-block min-w-full align-middle">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Nome</TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">Email</TableHead>
+                    <TableHead className="whitespace-nowrap">Telefone</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Situação</TableHead>
+                    <TableHead className="whitespace-nowrap hidden xl:table-cell">Plano</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientes.map((cliente: Cliente) => (
+                    <TableRow key={cliente.id}>
+                      <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.email}</TableCell>
+                      <TableCell className="whitespace-nowrap">{cliente.telefone}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Badge className={situacaoColors[cliente.situacao]}>
+                          {cliente.situacao}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">{cliente.plano}</TableCell>
+                      <TableCell className="hidden lg:table-cell whitespace-nowrap">
                       {cliente.dataVencimento
                         ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
                         : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
+                      </TableCell>
+                      <TableCell>
+                        {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button
@@ -442,11 +444,13 @@ export default function AdminClientes() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                 ))}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </Card>
       </div>

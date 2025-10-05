@@ -104,55 +104,55 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gradient-primary">Painel Administrativo</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/admin/perfil')}>
-              <User className="h-4 w-4 mr-2" />
-              Meu Perfil
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gradient-primary">Painel Administrativo</h1>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => navigate('/admin/perfil')} size="sm" className="flex-1 sm:flex-none">
+              <User className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Meu Perfil</span>
             </Button>
-            <Button variant="outline" onClick={handleClearCache} title="Limpar todo o cache do navegador">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Limpar Cache
+            <Button variant="outline" onClick={handleClearCache} title="Limpar todo o cache do navegador" size="sm" className="flex-1 sm:flex-none">
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Limpar Cache</span>
             </Button>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
+            <Button variant="outline" onClick={handleLogout} size="sm" className="flex-1 sm:flex-none">
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sair</span>
             </Button>
           </div>
         </div>
 
-        <div className="mb-8 space-y-4">
+        <div className="mb-6 sm:mb-8 space-y-4">
           {/* Site Customization */}
           <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
                 onClick={() => navigate('/admin/customize')}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-              <div className="md:col-span-1">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
+              <div className="lg:col-span-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <Palette className="h-6 w-6 text-primary" />
-                  <h3 className="text-xl font-bold">Personalizar Site</h3>
+                  <Palette className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                  <h3 className="text-lg sm:text-xl font-bold">Personalizar Site</h3>
                 </div>
-                <p className="text-muted-foreground">
+                <p className="text-sm sm:text-base text-muted-foreground">
                   Edite cores, fontes, logotipos, textos e todos os elementos visuais da página inicial
                 </p>
               </div>
               
-              <div className="md:col-span-1 flex items-center justify-center">
-                <div className="flex items-center gap-4">
-                  <Edit3 className="h-12 w-12 text-primary/60" />
+              <div className="lg:col-span-1 flex items-center justify-center">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Edit3 className="h-10 w-10 sm:h-12 sm:w-12 text-primary/60" />
                   <div>
-                    <p className="font-semibold text-lg">Customização Completa</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-base sm:text-lg">Customização Completa</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Interface intuitiva e fácil
                     </p>
                   </div>
                 </div>
               </div>
               
-              <div className="md:col-span-1 flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="lg:col-span-1 flex items-center justify-center">
+                <div className="text-center space-y-2 w-full">
+                  <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
                     <div className="bg-primary/10 p-2 rounded">Header</div>
                     <div className="bg-accent/10 p-2 rounded">Hero</div>
                     <div className="bg-secondary/30 p-2 rounded">Planos</div>
@@ -168,36 +168,36 @@ const AdminDashboard = () => {
 
           {/* WhatsApp Configuration */}
           <Card className="bg-gradient-card border-border hover:shadow-lg transition-smooth w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-              <div className="md:col-span-1">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
+              <div className="lg:col-span-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <MessageSquare className="h-6 w-6 text-green-500" />
-                  <h3 className="text-xl font-bold">WhatsApp BotBot.chat</h3>
+                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
+                  <h3 className="text-lg sm:text-xl font-bold">WhatsApp BotBot.chat</h3>
                 </div>
-                <p className="text-muted-foreground">
+                <p className="text-sm sm:text-base text-muted-foreground">
                   Configure credenciais e envie notificações automáticas de pagamento
                 </p>
               </div>
               
-              <div className="md:col-span-1 flex items-center justify-center">
-                <div className="flex items-center gap-4">
+              <div className="lg:col-span-1 flex items-center justify-center">
+                <div className="flex items-center gap-3 sm:gap-4">
                   {isConfigured ? (
-                    <CheckCircle className="h-12 w-12 text-green-500" />
+                    <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />
                   ) : (
-                    <XCircle className="h-12 w-12 text-yellow-500" />
+                    <XCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500" />
                   )}
                   <div>
-                    <p className="font-semibold text-lg">
+                    <p className="font-semibold text-base sm:text-lg">
                       {isConfigured ? 'Configurado' : 'Não Configurado'}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {isConfigured ? 'Sistema pronto' : 'Configure as credenciais'}
                     </p>
                   </div>
                 </div>
               </div>
               
-              <div className="md:col-span-1 flex items-center justify-center gap-2">
+              <div className="lg:col-span-1 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
                 <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -251,7 +251,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Client Stats */}
-        <div className="grid gap-6 md:grid-cols-3 mb-8">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
           <Card 
             className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
             onClick={() => navigate('/admin/clientes')}
@@ -308,24 +308,24 @@ const AdminDashboard = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
           <Card className="bg-gradient-card border-border">
             <CardHeader>
-              <CardTitle>Resumo do Sistema</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Resumo do Sistema</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-card rounded-lg border">
-                  <p className="text-2xl font-bold text-primary">100%</p>
-                  <p className="text-sm text-muted-foreground">Sistema Online</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
+                  <p className="text-xl sm:text-2xl font-bold text-primary">100%</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Sistema Online</p>
                 </div>
-                <div className="text-center p-4 bg-card rounded-lg border">
-                  <p className="text-2xl font-bold text-primary">24h</p>
-                  <p className="text-sm text-muted-foreground">Uptime</p>
+                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
+                  <p className="text-xl sm:text-2xl font-bold text-primary">24h</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Uptime</p>
                 </div>
-                <div className="text-center p-4 bg-card rounded-lg border">
-                  <p className="text-2xl font-bold text-primary">Ativo</p>
-                  <p className="text-sm text-muted-foreground">Status</p>
+                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
+                  <p className="text-xl sm:text-2xl font-bold text-primary">Ativo</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Status</p>
                 </div>
               </div>
             </CardContent>
@@ -333,14 +333,14 @@ const AdminDashboard = () => {
         </div>
 
         {/* Cache Management Info */}
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
           <Card className="bg-gradient-card border-border border-yellow-500/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trash2 className="h-5 w-5 text-yellow-500" />
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                 Gerenciamento de Cache
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Otimize o desempenho do site gerenciando o cache do navegador
               </CardDescription>
             </CardHeader>
