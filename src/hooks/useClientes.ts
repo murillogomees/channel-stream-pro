@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Cliente } from '@/types/cliente';
-import clientesData from '@/data/clientes.json';
+
+const STORAGE_KEY = 'clientes_data';
 
 export const useClientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
 
   useEffect(() => {
-    setClientes(clientesData as Cliente[]);
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setClientes(JSON.parse(stored));
+    }
   }, []);
 
   const addCliente = (cliente: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'>) => {
@@ -17,22 +21,26 @@ export const useClientes = () => {
       dataCadastro: now,
       dataUltimaEdicao: now,
     };
-    setClientes(prev => [...prev, novoCliente]);
+    const novosClientes = [...clientes, novoCliente];
+    setClientes(novosClientes);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosClientes));
     return novoCliente;
   };
 
   const updateCliente = (id: string, data: Partial<Cliente>) => {
-    setClientes(prev =>
-      prev.map(c =>
-        c.id === id
-          ? { ...c, ...data, dataUltimaEdicao: new Date().toISOString() }
-          : c
-      )
+    const novosClientes = clientes.map(c =>
+      c.id === id
+        ? { ...c, ...data, dataUltimaEdicao: new Date().toISOString() }
+        : c
     );
+    setClientes(novosClientes);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosClientes));
   };
 
   const deleteCliente = (id: string) => {
-    setClientes(prev => prev.filter(c => c.id !== id));
+    const novosClientes = clientes.filter(c => c.id !== id);
+    setClientes(novosClientes);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosClientes));
   };
 
   const getClienteById = (id: string) => {
