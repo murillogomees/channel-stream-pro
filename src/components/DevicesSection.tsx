@@ -44,8 +44,14 @@ const DevicesSection = () => {
         <div className="mb-16 rounded-2xl overflow-hidden shadow-2xl">
           <img
             src={devicesImage}
-            alt="Disponível em todos os dispositivos"
+            alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
             className="w-full h-auto object-cover"
+            width="1920"
+            height="1080"
+            loading="lazy"
+            decoding="async"
+            role="img"
+            aria-label="Demonstração de compatibilidade do IPTV LINK em múltiplos dispositivos"
           />
         </div>
 
@@ -65,12 +71,25 @@ const DevicesSection = () => {
                       window.open(platform.downloadUrl, "_blank");
                     }
                   }}
+                  role="button"
+                  aria-label={`Baixar aplicativo IPTV para ${platform.name}`}
+                  tabIndex={0}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && platform.downloadUrl) {
+                      window.open(platform.downloadUrl, "_blank");
+                    }
+                  }}
                 >
-                  <div className="w-20 h-20 flex items-center justify-center">
+                  <div className="w-20 h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
                     <img 
                       src={deviceImage} 
-                      alt={platform.name}
+                      alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
                       className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                      width="80"
+                      height="80"
+                      loading="lazy"
+                      decoding="async"
+                      aria-hidden="true"
                     />
                   </div>
                   <span className="text-sm font-semibold text-center group-hover:text-primary transition-colors">

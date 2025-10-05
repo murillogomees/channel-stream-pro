@@ -24,15 +24,19 @@ const Navigation = () => {
             {settings.header.logo.image ? (
               <img
                 src={getAsset ? getAsset("logo") : settings.header.logo.image}
-                alt={`${settings.header.logo.text} logo`}
+                alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
                 className="h-8 md:h-9 lg:h-10 w-auto select-none"
+                width="166"
+                height="78"
                 loading="eager"
                 decoding="async"
+                role="img"
+                aria-label={`Ir para página inicial - ${settings.header.logo.text}`}
               />
             ) : (
               <>
-                <div className="p-2 bg-gradient-primary rounded-lg shadow-glow">
-                  <Tv className="h-6 w-6 text-primary-foreground" />
+                <div className="p-2 bg-gradient-primary rounded-lg shadow-glow" role="img" aria-label="Ícone de TV representando streaming IPTV">
+                  <Tv className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
                 </div>
                 <span className="text-xl font-bold text-gradient-primary">
                   {settings.header.logo.text}

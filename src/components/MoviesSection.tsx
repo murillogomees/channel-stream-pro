@@ -138,20 +138,33 @@ const MoviesSection = () => {
                 key={index}
                 className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
                 onClick={() => setSelectedTrailer({ src: movie.trailer, title: movie.title })}
+                role="button"
+                aria-label={`Assistir trailer de ${movie.title}`}
+                tabIndex={0}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    setSelectedTrailer({ src: movie.trailer, title: movie.title });
+                  }
+                }}
               >
                 <div className="relative flex-shrink-0">
                   <img
                     src={movie.image}
-                    alt={movie.title}
+                    alt={`Pôster do filme ${movie.title} (${movie.year}) - ${movie.genre} - Avaliação ${movie.rating} estrelas - Duração ${movie.duration}`}
                     className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                    width="512"
+                    height="768"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
                     <Button
                       variant="hero"
                       size="icon"
                       className="opacity-0 group-hover:opacity-100 transition-smooth"
+                      aria-label={`Reproduzir trailer de ${movie.title}`}
                     >
-                      <Play className="h-6 w-6" />
+                      <Play className="h-6 w-6" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>
@@ -196,20 +209,28 @@ const MoviesSection = () => {
               <Card
                 key={index}
                 className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
+                role="button"
+                aria-label={`Ver informações da série ${series.title}`}
+                tabIndex={0}
               >
                 <div className="relative flex-shrink-0">
                   <img
                     src={series.image}
-                    alt={series.title}
+                    alt={`Pôster da série ${series.title} (${series.year}) - ${series.genre} - Avaliação ${series.rating} estrelas - ${series.seasons} com ${series.episodes}`}
                     className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                    width="512"
+                    height="768"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-smooth flex items-center justify-center">
                     <Button
                       variant="hero"
                       size="icon"
                       className="opacity-0 group-hover:opacity-100 transition-smooth"
+                      aria-label={`Reproduzir episódio de ${series.title}`}
                     >
-                      <Play className="h-6 w-6" />
+                      <Play className="h-6 w-6" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>

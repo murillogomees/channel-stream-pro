@@ -11,8 +11,13 @@ const HeroSection = () => {
       <div className="absolute inset-0 z-0">
         <img
           src={getAsset('heroImage')}
-          alt="IPTV Premium Streaming Background"
+          alt="Plano de fundo com imagem de streaming de televisão premium em alta qualidade, mostrando uma experiência de entretenimento moderna e imersiva"
           className="w-full h-full object-cover opacity-20"
+          width="1920"
+          height="1080"
+          loading="eager"
+          decoding="async"
+          aria-hidden="true"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
       </div>
@@ -24,9 +29,16 @@ const HeroSection = () => {
           <div className="flex justify-center mb-4">
             <img
               src={getAsset('logo')}
-              alt="IPTV LINK Logo"
+              alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
               className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain filter brightness-0 invert"
               style={{ maxWidth: '90vw' }}
+              width="829"
+              height="388"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              role="img"
+              aria-label="IPTV LINK - Streaming Premium"
             />
           </div>
 
