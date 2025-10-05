@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLocalAuth } from '@/hooks/useLocalAuth';
 import { useClientes } from '@/hooks/useClientes';
+import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -23,7 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon } from 'lucide-react';
 import { Cliente } from '@/types/cliente';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
@@ -35,11 +36,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { LOCAL_TEMPLATES, sendNotification } from '@/services/notificationScheduler';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { getWhatsAppService } from '@/services/whatsapp';
 
 const situacaoColors: Record<string, string> = {
   Testando: 'bg-blue-500',
@@ -60,7 +63,10 @@ export default function AdminClientes() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [showFileDialog, setShowFileDialog] = useState(false);
+  const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
   if (loading) {
     return (
@@ -113,6 +119,75 @@ export default function AdminClientes() {
       setSelectedCliente(null);
       setSelectedTemplate('');
     } catch (error: any) {
+      toast({
+        title: 'Erro ao enviar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendFile = async () => {
+    if (!selectedCliente || !file) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione um arquivo',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSending(true);
+    try {
+      const whatsappService = getWhatsAppService();
+      if (!whatsappService) {
+        throw new Error('WhatsApp não configurado');
+      }
+
+      const response = await whatsappService.sendFile(
+        selectedCliente.telefone,
+        file,
+        fileMessage || undefined
+      );
+
+      const fileInfo = getFileInfo();
+      addLog({
+        clienteId: selectedCliente.id,
+        clienteNome: selectedCliente.nome,
+        telefone: selectedCliente.telefone,
+        tipo: 'arquivo',
+        template: 'Envio de Arquivo',
+        status: response.message_status === 'success' ? 'success' : 'error',
+        resposta: response,
+        arquivoEnviado: fileInfo ? {
+          nome: fileInfo.name,
+          tipo: fileInfo.type,
+          tamanho: fileInfo.size,
+        } : undefined,
+      });
+
+      toast({
+        title: 'Sucesso!',
+        description: `Arquivo enviado para ${selectedCliente.nome}`,
+      });
+
+      setSelectedCliente(null);
+      setFileMessage('');
+      clearFile();
+      setShowFileDialog(false);
+    } catch (error: any) {
+      addLog({
+        clienteId: selectedCliente.id,
+        clienteNome: selectedCliente.nome,
+        telefone: selectedCliente.telefone,
+        tipo: 'arquivo',
+        template: 'Envio de Arquivo',
+        status: 'error',
+        erro: error.message,
+      });
+
       toast({
         title: 'Erro ao enviar',
         description: error.message,
@@ -268,6 +343,91 @@ export default function AdminClientes() {
                           </div>
                         </DialogContent>
                       </Dialog>
+                      
+                      <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={!isConfigured || !cliente.telefone}
+                            onClick={() => {
+                              setSelectedCliente(cliente);
+                              clearFile();
+                              setFileMessage('');
+                            }}
+                            title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Enviar Arquivo para {cliente.nome}</DialogTitle>
+                            <DialogDescription>
+                              Selecione um arquivo para enviar via WhatsApp
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Arquivo</Label>
+                              <Input
+                                type="file"
+                                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.docx,.xlsx,.csv,.txt,.mp3,.mp4,.ogg,.wav,.opus"
+                              />
+                              {fileError && (
+                                <p className="text-sm text-destructive">{fileError}</p>
+                              )}
+                              {file && !fileError && (
+                                <div className="mt-2 p-3 border rounded-md bg-muted/50">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <FileIcon className="h-4 w-4" />
+                                      <div>
+                                        <p className="text-sm font-medium">{getFileInfo()?.name}</p>
+                                        <p className="text-xs text-muted-foreground">{getFileInfo()?.sizeFormatted}</p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={clearFile}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  {preview && (
+                                    <img 
+                                      src={preview} 
+                                      alt="Preview" 
+                                      className="mt-2 max-h-40 rounded-md object-contain"
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Mensagem (opcional)</Label>
+                              <Textarea
+                                value={fileMessage}
+                                onChange={(e) => setFileMessage(e.target.value)}
+                                placeholder="Digite uma mensagem para acompanhar o arquivo..."
+                                rows={3}
+                              />
+                            </div>
+
+                            <Button 
+                              onClick={handleSendFile} 
+                              disabled={!file || sending || !!fileError}
+                              className="w-full"
+                            >
+                              {sending ? 'Enviando...' : 'Enviar Arquivo'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
                       <Button
                         variant="outline"
                         size="icon"

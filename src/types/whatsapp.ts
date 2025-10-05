@@ -23,6 +23,11 @@ export interface NotificationLog {
     status_code?: number;
     data?: any;
   };
+  arquivoEnviado?: {
+    nome: string;
+    tipo: string;
+    tamanho: number;
+  };
 }
 
 export interface NotificationSchedule {
