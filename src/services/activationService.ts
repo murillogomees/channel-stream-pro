@@ -7,6 +7,7 @@ const STORAGE_KEY = 'app_device_session';
 export interface DeviceSession {
   deviceId: string;
   userId: string;
+  subscriptionPlanId: string;
   expiresAt: string;
   m3uUrl: string;
   activatedAt: string;
@@ -120,6 +121,7 @@ export async function activateDevice(activationKey: string): Promise<ActivationR
     const session: DeviceSession = {
       deviceId,
       userId: result.user_id,
+      subscriptionPlanId: result.subscription_plan_id,
       expiresAt: result.expires_at,
       m3uUrl: result.m3u_url,
       activatedAt: new Date().toISOString()

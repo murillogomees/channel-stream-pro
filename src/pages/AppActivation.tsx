@@ -80,9 +80,9 @@ export default function AppActivation() {
           description: 'Seu dispositivo foi ativado com sucesso.'
         });
         
-        // Redirecionar para a página principal
+        // Redirecionar para o app
         setTimeout(() => {
-          navigate('/');
+          navigate('/app');
         }, 1000);
       } else {
         toast.error('Erro na ativação', {

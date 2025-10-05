@@ -7,6 +7,7 @@ import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
+const AppHome = lazy(() => import("./pages/AppHome"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
@@ -35,8 +36,9 @@ const App = () => (
     <BrowserRouter>
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/activate" element={<AppActivation />} />
+            <Route path="/" element={<Index />} />
+            <Route path="/activate" element={<AppActivation />} />
+            <Route path="/app" element={<AppHome />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/customize" element={<AdminCustomize />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
