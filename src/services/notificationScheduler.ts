@@ -172,19 +172,31 @@ export async function sendNotification(
   try {
     const message = fillTemplate(template, cliente);
     
-    const response = template.type === 'local'
-      ? await service.sendTextMessage(cliente.telefone, message)
-      : await service.sendTemplateMessage(
-          cliente.telefone,
-          template.botbotTemplateId!,
-          {
-            '{nome}': cliente.nome,
-            '{valor}': cliente.valorPago.toFixed(2),
-            '{dataVencimento}': cliente.dataVencimento 
-              ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
-              : '',
-          }
-        );
+    let response;
+    
+    // Se template tem arquivo, enviar com URL ou file
+    if (template.arquivo && template.arquivo.base64) {
+      // Converter base64 para URL se necessário, ou enviar direto como file
+      response = await service.sendFileByUrl(
+        cliente.telefone,
+        template.arquivo.base64,
+        message
+      );
+    } else if (template.type === 'local') {
+      response = await service.sendTextMessage(cliente.telefone, message);
+    } else {
+      response = await service.sendTemplateMessage(
+        cliente.telefone,
+        template.botbotTemplateId!,
+        {
+          '{nome}': cliente.nome,
+          '{valor}': cliente.valorPago.toFixed(2),
+          '{dataVencimento}': cliente.dataVencimento 
+            ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
+            : '',
+        }
+      );
+    }
 
     addLog({
       clienteId: cliente.id,
@@ -194,6 +206,11 @@ export async function sendNotification(
       template: template.name,
       status: 'success',
       resposta: response,
+      arquivoEnviado: template.arquivo ? {
+        nome: template.arquivo.nome,
+        tipo: template.arquivo.tipo,
+        tamanho: template.arquivo.tamanho,
+      } : undefined,
     });
 
     return response;

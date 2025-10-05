@@ -126,6 +126,47 @@ export class WhatsAppService {
     }
   }
 
+  async sendFileByUrl(
+    to: string,
+    fileUrl: string,
+    message?: string,
+    typingDelay: number = 3
+  ): Promise<BotBotResponse> {
+    const formattedPhone = formatToBrazilianInternational(to);
+    
+    if (!isValidBrazilianPhone(formattedPhone)) {
+      throw new Error(`Número de telefone inválido: ${to}`);
+    }
+
+    const formData = new FormData();
+    formData.append('appkey', this.appkey);
+    formData.append('authkey', this.authkey);
+    formData.append('to', formattedPhone);
+    formData.append('typingDelay', typingDelay.toString());
+    formData.append('file', fileUrl);
+    
+    if (message) {
+      formData.append('message', message);
+    }
+
+    try {
+      const response = await fetch(BOTBOT_API_URL, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data as BotBotResponse;
+    } catch (error) {
+      console.error('Erro ao enviar arquivo por URL WhatsApp:', error);
+      throw error;
+    }
+  }
+
   static validateCredentials(appkey: string, authkey: string): boolean {
     return appkey.trim().length > 0 && authkey.trim().length > 0;
   }
