@@ -202,13 +202,14 @@ export default function AdminClienteForm() {
                 <div className="space-y-2">
                   <Label htmlFor="situacao">Situação</Label>
                   <Select
-                    onValueChange={(value) => setValue('situacao', value as any)}
-                    value={watch('situacao') || undefined}
+                    onValueChange={(value) => setValue('situacao', value === "0" ? undefined : value as any)}
+                    value={watch('situacao') || "0"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="0" disabled>Selecione uma opção</SelectItem>
                       <SelectItem value="Testando">Testando</SelectItem>
                       <SelectItem value="Ativo">Ativo</SelectItem>
                       <SelectItem value="Devendo">Devendo</SelectItem>
@@ -221,13 +222,14 @@ export default function AdminClienteForm() {
                 <div className="space-y-2">
                   <Label htmlFor="plano">Plano</Label>
                   <Select
-                    onValueChange={(value) => setValue('plano', value as any)}
-                    value={watch('plano') || undefined}
+                    onValueChange={(value) => setValue('plano', value === "0" ? undefined : value as any)}
+                    value={watch('plano') || "0"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="0" disabled>Selecione uma opção</SelectItem>
                       <SelectItem value="Mensal">Mensal</SelectItem>
                       <SelectItem value="Trimestral">Trimestral</SelectItem>
                       <SelectItem value="Semestral">Semestral</SelectItem>
