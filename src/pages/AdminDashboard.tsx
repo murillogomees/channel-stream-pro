@@ -197,54 +197,65 @@ const AdminDashboard = () => {
                 </div>
               </div>
               
-              <div className="lg:col-span-1 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
-                <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Configurar
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Configurar BotBot.chat</DialogTitle>
-                      <DialogDescription>
-                        Insira suas credenciais da plataforma BotBot.chat
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="appkey">App Key</Label>
-                        <Input
-                          id="appkey"
-                          value={appkey}
-                          onChange={(e) => setAppkey(e.target.value)}
-                          placeholder="b4153549-be4e-494d-8561-ee1912c55ee9"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="authkey">Auth Key</Label>
-                        <Input
-                          id="authkey"
-                          value={authkey}
-                          onChange={(e) => setAuthkey(e.target.value)}
-                          placeholder="jFXdat4Uaq19lVnt107Yn77lRjScoV9gzcRVzw17h0RIOXK4Xl"
-                        />
-                      </div>
-                      <Button onClick={handleSaveWhatsAppConfig} className="w-full">
-                        Salvar Configuração
+              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
+                <div className="flex flex-col w-full lg:w-auto gap-2">
+                  <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configurar
                       </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button onClick={() => navigate('/admin/templates')} variant="outline">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Templates
-                </Button>
-                <Button onClick={() => navigate('/admin/notificacoes')}>
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Notificações
-                </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Configurar BotBot.chat</DialogTitle>
+                        <DialogDescription>
+                          Insira suas credenciais da plataforma BotBot.chat
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="appkey">App Key</Label>
+                          <Input
+                            id="appkey"
+                            value={appkey}
+                            onChange={(e) => setAppkey(e.target.value)}
+                            placeholder="b4153549-be4e-494d-8561-ee1912c55ee9"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="authkey">Auth Key</Label>
+                          <Input
+                            id="authkey"
+                            value={authkey}
+                            onChange={(e) => setAuthkey(e.target.value)}
+                            placeholder="jFXdat4Uaq19lVnt107Yn77lRjScoV9gzcRVzw17h0RIOXK4Xl"
+                          />
+                        </div>
+                        <Button onClick={handleSaveWhatsAppConfig} className="w-full">
+                          Salvar Configuração
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  
+                  <Button 
+                    onClick={() => navigate('/admin/templates')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Templates
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => navigate('/admin/notificacoes')}
+                    className="w-full justify-start"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Notificações
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
