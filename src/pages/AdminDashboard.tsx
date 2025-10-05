@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -29,6 +29,45 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
+  const handleClearCache = () => {
+    try {
+      // Limpar localStorage (exceto autenticação)
+      const authData = localStorage.getItem('adminAuth');
+      localStorage.clear();
+      if (authData) {
+        localStorage.setItem('adminAuth', authData);
+      }
+
+      // Limpar sessionStorage
+      sessionStorage.clear();
+
+      // Limpar cache do service worker se existir
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach(name => {
+            caches.delete(name);
+          });
+        });
+      }
+
+      toast({
+        title: "Cache limpo com sucesso",
+        description: "Todos os dados em cache foram removidos. A página será recarregada.",
+      });
+
+      // Recarregar sem cache após 1 segundo
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: "Erro ao limpar cache",
+        description: "Ocorreu um erro ao tentar limpar o cache.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -46,10 +85,16 @@ const AdminDashboard = () => {
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gradient-primary">Painel Administrativo</h1>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClearCache} title="Limpar todo o cache do navegador">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar Cache
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
 
         <div className="mb-8">
@@ -172,6 +217,39 @@ const AdminDashboard = () => {
                 <div className="text-center p-4 bg-card rounded-lg border">
                   <p className="text-2xl font-bold text-primary">Ativo</p>
                   <p className="text-sm text-muted-foreground">Status</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cache Management Info */}
+        <div className="mt-8">
+          <Card className="bg-gradient-card border-border border-yellow-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-yellow-500" />
+                Gerenciamento de Cache
+              </CardTitle>
+              <CardDescription>
+                Otimize o desempenho do site gerenciando o cache do navegador
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  O botão "Limpar Cache" remove todos os dados armazenados em cache, incluindo:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>Configurações do site (localStorage)</li>
+                  <li>Dados de sessão temporários (sessionStorage)</li>
+                  <li>Cache do Service Worker</li>
+                  <li>Imagens e recursos armazenados</li>
+                </ul>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-3 rounded-lg">
+                  <p className="text-sm font-medium">
+                    ⚠️ Nota: Seus dados de autenticação serão preservados após limpar o cache.
+                  </p>
                 </div>
               </div>
             </CardContent>
