@@ -1,5 +1,5 @@
-export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead' | '';
-export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual' | '';
+export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead';
+export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
 
 export interface Cliente {
   id: string;

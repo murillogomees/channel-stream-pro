@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useLocalAuth } from '@/hooks/useLocalAuth';
 import { useClientes } from '@/hooks/useClientes';
-import { Cliente } from '@/types/cliente';
+import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,10 +26,10 @@ const clienteSchema = z.object({
   telefone: z.string().optional(),
   telegram: z.string().optional(),
   email: z.string().optional(),
-  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead', '']).optional(),
+  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']).optional(),
   dataContratacao: z.string().optional(),
   dataVencimento: z.string().optional(),
-  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual', '']).optional(),
+  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual']).optional(),
   valorPago: z.number().optional(),
   dataUltimoPagamento: z.string().optional(),
   formaUltimoPagamento: z.string().optional(),
@@ -57,8 +57,6 @@ export default function AdminClienteForm() {
     resolver: zodResolver(clienteSchema),
     defaultValues: {
       valorPago: 0,
-      situacao: '',
-      plano: '',
     },
   });
 
@@ -94,10 +92,10 @@ export default function AdminClienteForm() {
       telefone: data.telefone || '',
       telegram: data.telegram || '',
       email: data.email || '',
-      situacao: data.situacao || '',
+      situacao: (data.situacao || 'Lead') as SituacaoCliente,
       dataContratacao: data.dataContratacao || '',
       dataVencimento: data.dataVencimento || '',
-      plano: data.plano || '',
+      plano: (data.plano || 'Mensal') as PlanoCliente,
       valorPago: data.valorPago || 0,
       dataUltimoPagamento: data.dataUltimoPagamento || '',
       formaUltimoPagamento: data.formaUltimoPagamento || '',
@@ -169,13 +167,12 @@ export default function AdminClienteForm() {
                   <Label htmlFor="situacao">Situação</Label>
                   <Select
                     onValueChange={(value) => setValue('situacao', value as any)}
-                    defaultValue={watch('situacao')}
+                    value={watch('situacao')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Selecione uma opção</SelectItem>
                       <SelectItem value="Testando">Testando</SelectItem>
                       <SelectItem value="Ativo">Ativo</SelectItem>
                       <SelectItem value="Devendo">Devendo</SelectItem>
@@ -189,13 +186,12 @@ export default function AdminClienteForm() {
                   <Label htmlFor="plano">Plano</Label>
                   <Select
                     onValueChange={(value) => setValue('plano', value as any)}
-                    defaultValue={watch('plano')}
+                    value={watch('plano')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Selecione uma opção</SelectItem>
                       <SelectItem value="Mensal">Mensal</SelectItem>
                       <SelectItem value="Trimestral">Trimestral</SelectItem>
                       <SelectItem value="Semestral">Semestral</SelectItem>
