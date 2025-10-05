@@ -203,13 +203,12 @@ export default function AdminClienteForm() {
                   <Label htmlFor="situacao">Situação</Label>
                   <Select
                     onValueChange={(value) => setValue('situacao', value as any)}
-                    value={watch('situacao') || ""}
+                    value={watch('situacao') || undefined}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="" disabled>Selecione uma opção</SelectItem>
                       <SelectItem value="Testando">Testando</SelectItem>
                       <SelectItem value="Ativo">Ativo</SelectItem>
                       <SelectItem value="Devendo">Devendo</SelectItem>
@@ -223,13 +222,12 @@ export default function AdminClienteForm() {
                   <Label htmlFor="plano">Plano</Label>
                   <Select
                     onValueChange={(value) => setValue('plano', value as any)}
-                    value={watch('plano') || ""}
+                    value={watch('plano') || undefined}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="" disabled>Selecione uma opção</SelectItem>
                       <SelectItem value="Mensal">Mensal</SelectItem>
                       <SelectItem value="Trimestral">Trimestral</SelectItem>
                       <SelectItem value="Semestral">Semestral</SelectItem>
