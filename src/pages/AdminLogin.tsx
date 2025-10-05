@@ -28,6 +28,18 @@ const AdminLogin = () => {
   const { login, isAuthenticated } = useLocalAuth();
 
   useEffect(() => {
+    // Temporary: Generate hash for password
+    const generateHash = async () => {
+      const encoder = new TextEncoder();
+      const saltedPassword = 'offline_auth_v1_@LPko2930@';
+      const data = encoder.encode(saltedPassword);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log('Hash correto para @LPko2930@:', hashHex);
+    };
+    generateHash();
+
     // Redireciona se já estiver autenticado
     if (isAuthenticated) {
       navigate('/admin/dashboard');
