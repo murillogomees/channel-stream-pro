@@ -32,7 +32,7 @@ const HeroSection = () => {
               <img
                 src={getAsset('logo')}
                 alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
-                className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain filter brightness-0 invert"
+                className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain"
                 style={{ maxWidth: '90vw' }}
                 width="829"
                 height="388"
