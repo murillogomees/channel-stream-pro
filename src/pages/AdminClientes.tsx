@@ -116,7 +116,7 @@ export default function AdminClientes() {
                     </TableCell>
                     <TableCell>{cliente.plano}</TableCell>
                     <TableCell>
-                      {cliente.periodoValidade
+                      {cliente.dataVencimento
                         ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
                         : 'N/A'}
                     </TableCell>

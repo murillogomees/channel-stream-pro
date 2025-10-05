@@ -46,13 +46,13 @@ export const useClientes = () => {
     cincoProximos.setDate(now.getDate() + 5);
 
     const vencendoProximos5Dias = clientes.filter(c => {
-      if (!c.periodoValidade || !c.dataVencimento) return false;
+      if (!c.dataVencimento) return false;
       const vencimento = new Date(c.dataVencimento);
       return vencimento >= now && vencimento <= cincoProximos;
     }).length;
 
     const ativosVencidos = clientes.filter(c => {
-      if (c.situacao !== 'Ativo' || !c.periodoValidade || !c.dataVencimento) return false;
+      if (c.situacao !== 'Ativo' || !c.dataVencimento) return false;
       const vencimento = new Date(c.dataVencimento);
       return vencimento < now;
     }).length;

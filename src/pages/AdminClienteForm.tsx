@@ -17,26 +17,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const clienteSchema = z.object({
-  nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
-  telefone: z.string().min(10, 'Telefone inválido'),
-  telegram: z.string(),
-  email: z.string().email('Email inválido'),
-  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']),
-  dataContratacao: z.string(),
-  periodoValidade: z.boolean(),
-  dataVencimento: z.string(),
-  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual']),
-  valorPago: z.number().min(0),
-  dataUltimoPagamento: z.string(),
-  formaUltimoPagamento: z.string(),
-  macSmartOne: z.string(),
-  usuario: z.string().min(3),
-  senha: z.string().min(6),
+  nome: z.string().optional(),
+  telefone: z.string().optional(),
+  telegram: z.string().optional(),
+  email: z.string().optional(),
+  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead', '']).optional(),
+  dataContratacao: z.string().optional(),
+  dataVencimento: z.string().optional(),
+  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual', '']).optional(),
+  valorPago: z.number().optional(),
+  dataUltimoPagamento: z.string().optional(),
+  formaUltimoPagamento: z.string().optional(),
+  macSmartOne: z.string().optional(),
+  usuario: z.string().optional(),
+  senha: z.string().optional(),
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
@@ -57,12 +56,11 @@ export default function AdminClienteForm() {
   } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
     defaultValues: {
-      periodoValidade: true,
       valorPago: 0,
+      situacao: '',
+      plano: '',
     },
   });
-
-  const periodoValidade = watch('periodoValidade');
 
   useEffect(() => {
     if (id) {
@@ -92,21 +90,20 @@ export default function AdminClienteForm() {
 
   const onSubmit = (data: ClienteFormData) => {
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
-      nome: data.nome,
-      telefone: data.telefone,
-      telegram: data.telegram,
-      email: data.email,
-      situacao: data.situacao,
-      dataContratacao: data.dataContratacao,
-      periodoValidade: data.periodoValidade,
-      dataVencimento: data.dataVencimento,
-      plano: data.plano,
-      valorPago: data.valorPago,
-      dataUltimoPagamento: data.dataUltimoPagamento,
-      formaUltimoPagamento: data.formaUltimoPagamento,
-      macSmartOne: data.macSmartOne,
-      usuario: data.usuario,
-      senha: data.senha,
+      nome: data.nome || '',
+      telefone: data.telefone || '',
+      telegram: data.telegram || '',
+      email: data.email || '',
+      situacao: data.situacao || '',
+      dataContratacao: data.dataContratacao || '',
+      dataVencimento: data.dataVencimento || '',
+      plano: data.plano || '',
+      valorPago: data.valorPago || 0,
+      dataUltimoPagamento: data.dataUltimoPagamento || '',
+      formaUltimoPagamento: data.formaUltimoPagamento || '',
+      macSmartOne: data.macSmartOne || '',
+      usuario: data.usuario || '',
+      senha: data.senha || '',
     };
 
     if (id) {
@@ -149,27 +146,18 @@ export default function AdminClienteForm() {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nome">Nome *</Label>
+                  <Label htmlFor="nome">Nome</Label>
                   <Input id="nome" {...register('nome')} />
-                  {errors.nome && (
-                    <p className="text-sm text-destructive">{errors.nome.message}</p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" {...register('email')} />
-                  {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone *</Label>
+                  <Label htmlFor="telefone">Telefone</Label>
                   <Input id="telefone" {...register('telefone')} />
-                  {errors.telefone && (
-                    <p className="text-sm text-destructive">{errors.telefone.message}</p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -178,15 +166,16 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="situacao">Situação *</Label>
+                  <Label htmlFor="situacao">Situação</Label>
                   <Select
                     onValueChange={(value) => setValue('situacao', value as any)}
                     defaultValue={watch('situacao')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a situação" />
+                      <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Selecione uma opção</SelectItem>
                       <SelectItem value="Testando">Testando</SelectItem>
                       <SelectItem value="Ativo">Ativo</SelectItem>
                       <SelectItem value="Devendo">Devendo</SelectItem>
@@ -197,15 +186,16 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="plano">Plano *</Label>
+                  <Label htmlFor="plano">Plano</Label>
                   <Select
                     onValueChange={(value) => setValue('plano', value as any)}
                     defaultValue={watch('plano')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o plano" />
+                      <SelectValue placeholder="Selecione uma opção" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Selecione uma opção</SelectItem>
                       <SelectItem value="Mensal">Mensal</SelectItem>
                       <SelectItem value="Trimestral">Trimestral</SelectItem>
                       <SelectItem value="Semestral">Semestral</SelectItem>
@@ -215,26 +205,14 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dataContratacao">Data de Contratação *</Label>
+                  <Label htmlFor="dataContratacao">Data de Contratação</Label>
                   <Input id="dataContratacao" type="date" {...register('dataContratacao')} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="periodoValidade" className="flex items-center gap-2">
-                    Período de Validade
-                    <Switch
-                      checked={periodoValidade}
-                      onCheckedChange={(checked) => setValue('periodoValidade', checked)}
-                    />
-                  </Label>
+                  <Label htmlFor="dataVencimento">Data de Vencimento</Label>
+                  <Input id="dataVencimento" type="date" {...register('dataVencimento')} />
                 </div>
-
-                {periodoValidade && (
-                  <div className="space-y-2">
-                    <Label htmlFor="dataVencimento">Data de Vencimento</Label>
-                    <Input id="dataVencimento" type="date" {...register('dataVencimento')} />
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="valorPago">Valor Pago</Label>
@@ -262,19 +240,13 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="usuario">Usuário *</Label>
+                  <Label htmlFor="usuario">Usuário</Label>
                   <Input id="usuario" {...register('usuario')} />
-                  {errors.usuario && (
-                    <p className="text-sm text-destructive">{errors.usuario.message}</p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="senha">Senha *</Label>
+                  <Label htmlFor="senha">Senha</Label>
                   <Input id="senha" type="password" {...register('senha')} />
-                  {errors.senha && (
-                    <p className="text-sm text-destructive">{errors.senha.message}</p>
-                  )}
                 </div>
               </div>
 

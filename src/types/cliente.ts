@@ -1,5 +1,5 @@
-export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead';
-export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
+export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead' | '';
+export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual' | '';
 
 export interface Cliente {
   id: string;
@@ -9,7 +9,6 @@ export interface Cliente {
   email: string;
   situacao: SituacaoCliente;
   dataContratacao: string;
-  periodoValidade: boolean;
   dataVencimento: string;
   plano: PlanoCliente;
   valorPago: number;
