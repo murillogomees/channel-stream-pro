@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseM3U, type Channel } from '@/utils/m3uParser';
 import { toast } from 'sonner';
 
-export function useChannels(subscriptionPlanId?: string) {
+export function useChannels(m3uUrl?: string) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -11,49 +11,28 @@ export function useChannels(subscriptionPlanId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!subscriptionPlanId) {
+    if (!m3uUrl) {
       setLoading(false);
       return;
     }
 
     loadChannels();
-  }, [subscriptionPlanId]);
+  }, [m3uUrl]);
 
   const loadChannels = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Get subscription plan
-      const { data: plan, error: planError } = await supabase
-        .from('subscription_plans')
-        .select('m3u_list_id')
-        .eq('id', subscriptionPlanId)
-        .single();
-
-      if (planError) throw planError;
-      if (!plan?.m3u_list_id) {
-        throw new Error('Nenhuma lista M3U associada ao plano');
+      if (!m3uUrl) {
+        throw new Error('URL do M3U não fornecida');
       }
 
-      // Get M3U list
-      const { data: m3uList, error: m3uError } = await supabase
-        .from('m3u_lists')
-        .select('file_url, name')
-        .eq('id', plan.m3u_list_id)
-        .eq('status', 'active')
-        .single();
-
-      if (m3uError) throw m3uError;
-      if (!m3uList) {
-        throw new Error('Lista M3U não encontrada');
-      }
-
-      // Download and parse M3U
+      // Download M3U from storage
       const { data: fileData, error: downloadError } = await supabase
         .storage
         .from('m3u-files')
-        .download(m3uList.file_url);
+        .download(m3uUrl);
 
       if (downloadError) throw downloadError;
 

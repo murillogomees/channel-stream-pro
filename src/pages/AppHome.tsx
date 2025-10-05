@@ -25,7 +25,7 @@ export default function AppHome() {
     setSelectedCategory,
     loading: channelsLoading,
     error: channelsError,
-  } = useChannels(session?.subscriptionPlanId);
+  } = useChannels(session?.m3uUrl);
 
   const { focusedId } = useTVNavigation(isTVMode);
 
