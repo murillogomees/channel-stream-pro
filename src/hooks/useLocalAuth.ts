@@ -72,7 +72,7 @@ export const useLocalAuth = () => {
     return () => clearInterval(interval);
   }, [checkAuth]);
 
-  // Login
+  // Login com validações de segurança
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       // Verifica rate limiting
@@ -81,47 +81,63 @@ export const useLocalAuth = () => {
         return { success: false, error: rateLimitCheck.message };
       }
 
+      // Valida e sanitiza inputs
+      const { sanitizeInput, validateEmail, validatePassword } = await import('@/lib/auth');
+      
+      const sanitizedEmail = sanitizeInput(email);
+      
+      if (!validateEmail(sanitizedEmail)) {
+        recordLoginAttempt(false, sanitizedEmail);
+        return { success: false, error: 'Email inválido.' };
+      }
+
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        recordLoginAttempt(false, sanitizedEmail);
+        return { success: false, error: passwordValidation.error };
+      }
+
       // Busca admin por email
-      const admin = adminsData.find(a => a.email.toLowerCase() === email.toLowerCase().trim());
+      const admin = adminsData.find(a => a.email.toLowerCase() === sanitizedEmail.toLowerCase());
       
       if (!admin) {
-        recordLoginAttempt(false);
+        recordLoginAttempt(false, sanitizedEmail);
         return { success: false, error: 'Credenciais inválidas.' };
       }
 
       // Verifica se está ativo
       if (!admin.ativo) {
-        recordLoginAttempt(false);
+        recordLoginAttempt(false, sanitizedEmail);
         return { success: false, error: 'Usuário inativo.' };
       }
 
       // Verifica senha
       const passwordValid = await verifyPassword(password, admin.passwordHash);
       if (!passwordValid) {
-        recordLoginAttempt(false);
+        recordLoginAttempt(false, sanitizedEmail);
         return { success: false, error: 'Credenciais inválidas.' };
       }
 
-      // Cria sessão
+      // Cria sessão segura
       const now = Date.now();
       const session: SessionData = {
         token: generateSessionToken(),
         userId: admin.id,
         email: admin.email,
         nome: admin.nome,
-        expiresAt: now + (24 * 60 * 60 * 1000), // 24 horas
+        expiresAt: now + (8 * 60 * 60 * 1000), // 8 horas (reduzido para maior segurança)
         lastActivity: now,
       };
 
       saveSession(session);
-      recordLoginAttempt(true);
+      recordLoginAttempt(true, sanitizedEmail);
       
       setCurrentUser(admin);
       setIsAuthenticated(true);
 
       return { success: true };
     } catch (error) {
-      console.error('Erro no login:', error);
+      // Não expõe detalhes do erro
       return { success: false, error: 'Erro ao processar login.' };
     }
   };

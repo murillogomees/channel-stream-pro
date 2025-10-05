@@ -1,12 +1,54 @@
 /**
  * Utilitários de autenticação local
  * Sistema 100% offline usando Web Crypto API
+ * Com proteções de segurança
  */
 
-// Gera hash SHA-256 de uma senha
+// Constantes de segurança
+const SALT_PREFIX = 'offline_auth_v1_';
+const SESSION_ENCRYPTION_KEY = 'session_key_v1';
+
+// Sanitiza entrada para prevenir XSS
+export function sanitizeInput(input: string): string {
+  if (!input) return '';
+  return input
+    .trim()
+    .replace(/[<>'"]/g, '') // Remove caracteres perigosos
+    .substring(0, 500); // Limite de tamanho
+}
+
+// Valida email
+export function validateEmail(email: string): boolean {
+  const sanitized = sanitizeInput(email);
+  const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(sanitized) && sanitized.length <= 255;
+}
+
+// Valida senha (mínimo de segurança)
+export function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (!password || password.length < 8) {
+    return { valid: false, error: 'Senha deve ter no mínimo 8 caracteres' };
+  }
+  if (password.length > 128) {
+    return { valid: false, error: 'Senha muito longa' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'Senha deve conter ao menos uma letra maiúscula' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: 'Senha deve conter ao menos uma letra minúscula' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'Senha deve conter ao menos um número' };
+  }
+  return { valid: true };
+}
+
+// Gera hash SHA-256 de uma senha com salt
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
+  const saltedPassword = SALT_PREFIX + password;
+  const data = encoder.encode(saltedPassword);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -36,20 +78,59 @@ export interface SessionData {
   lastActivity: number;
 }
 
-// Salva sessão no sessionStorage
-export function saveSession(session: SessionData): void {
-  sessionStorage.setItem('admin_session', JSON.stringify(session));
+// Criptografa dados sensíveis
+function encryptData(data: string): string {
+  // Simple XOR cipher para ofuscação básica
+  const key = SESSION_ENCRYPTION_KEY;
+  let encrypted = '';
+  for (let i = 0; i < data.length; i++) {
+    encrypted += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(encrypted);
 }
 
-// Carrega sessão do sessionStorage
+// Descriptografa dados
+function decryptData(encrypted: string): string | null {
+  try {
+    const key = SESSION_ENCRYPTION_KEY;
+    const data = atob(encrypted);
+    let decrypted = '';
+    for (let i = 0; i < data.length; i++) {
+      decrypted += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+    return decrypted;
+  } catch {
+    return null;
+  }
+}
+
+// Salva sessão no sessionStorage de forma segura
+export function saveSession(session: SessionData): void {
+  const sessionStr = JSON.stringify(session);
+  const encrypted = encryptData(sessionStr);
+  sessionStorage.setItem('admin_session', encrypted);
+}
+
+// Carrega sessão do sessionStorage de forma segura
 export function loadSession(): SessionData | null {
-  const sessionStr = sessionStorage.getItem('admin_session');
-  if (!sessionStr) return null;
+  const encrypted = sessionStorage.getItem('admin_session');
+  if (!encrypted) return null;
   
   try {
-    const session = JSON.parse(sessionStr) as SessionData;
+    const decrypted = decryptData(encrypted);
+    if (!decrypted) return null;
+    
+    const session = JSON.parse(decrypted) as SessionData;
+    
+    // Valida estrutura da sessão
+    if (!session.token || !session.userId || !session.email) {
+      clearSession();
+      return null;
+    }
+    
     return session;
   } catch {
+    clearSession();
     return null;
   }
 }
@@ -120,7 +201,7 @@ export function checkRateLimit(): { allowed: boolean; message?: string } {
   return { allowed: true };
 }
 
-export function recordLoginAttempt(success: boolean): void {
+export function recordLoginAttempt(success: boolean, email?: string): void {
   const attemptsStr = sessionStorage.getItem('login_attempts');
   const now = Date.now();
   
@@ -144,4 +225,20 @@ export function recordLoginAttempt(success: boolean): void {
   }
   
   sessionStorage.setItem('login_attempts', JSON.stringify(attempts));
+}
+
+// Previne timing attacks
+export async function constantTimeCompare(a: string, b: string): Promise<boolean> {
+  if (a.length !== b.length) {
+    // Executa hash mesmo assim para manter tempo constante
+    await hashPassword('dummy_password');
+    return false;
+  }
+  
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  
+  return result === 0;
 }

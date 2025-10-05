@@ -21,21 +21,57 @@ import {
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+// Schema de validação com segurança contra XSS e injeção
 const clienteSchema = z.object({
-  nome: z.string().optional(),
-  telefone: z.string().optional(),
-  telegram: z.string().optional(),
-  email: z.string().optional(),
+  nome: z.string()
+    .trim()
+    .max(200, 'Nome muito longo')
+    .transform(val => val.replace(/[<>"']/g, ''))
+    .optional(),
+  telefone: z.string()
+    .trim()
+    .max(20, 'Telefone muito longo')
+    .transform(val => val.replace(/[^0-9+\-() ]/g, ''))
+    .optional(),
+  telegram: z.string()
+    .trim()
+    .max(50, 'Telegram muito longo')
+    .transform(val => val.replace(/[<>"']/g, ''))
+    .optional(),
+  email: z.string()
+    .trim()
+    .email('Email inválido')
+    .max(255, 'Email muito longo')
+    .transform(val => val.toLowerCase())
+    .optional()
+    .or(z.literal('')),
   situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']).optional(),
   dataContratacao: z.string().optional(),
   dataVencimento: z.string().optional(),
   plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual']).optional(),
-  valorPago: z.number().optional(),
+  valorPago: z.number()
+    .min(0, 'Valor não pode ser negativo')
+    .max(999999.99, 'Valor muito alto')
+    .optional(),
   dataUltimoPagamento: z.string().optional(),
-  formaUltimoPagamento: z.string().optional(),
-  macSmartOne: z.string().optional(),
-  usuario: z.string().optional(),
-  senha: z.string().optional(),
+  formaUltimoPagamento: z.string()
+    .trim()
+    .max(100, 'Forma de pagamento muito longa')
+    .transform(val => val.replace(/[<>"']/g, ''))
+    .optional(),
+  macSmartOne: z.string()
+    .trim()
+    .max(100, 'MAC muito longo')
+    .transform(val => val.replace(/[^A-Fa-f0-9:-]/g, ''))
+    .optional(),
+  usuario: z.string()
+    .trim()
+    .max(100, 'Usuário muito longo')
+    .transform(val => val.replace(/[<>"']/g, ''))
+    .optional(),
+  senha: z.string()
+    .max(100, 'Senha muito longa')
+    .optional(),
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
