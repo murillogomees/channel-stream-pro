@@ -39,9 +39,9 @@ const Navigation = () => {
             ) : (
               <>
                 <div className="p-2 bg-gradient-primary rounded-lg shadow-glow" role="img" aria-label="Ícone de TV representando streaming IPTV">
-                  <Tv className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
+                  <Tv className="h-6 w-6 text-white" aria-hidden="true" />
                 </div>
-                <span className="text-xl font-bold text-gradient-primary">
+                <span className="text-xl font-bold text-foreground">
                   {settings.header.logo.text}
                 </span>
               </>
