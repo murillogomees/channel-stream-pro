@@ -16,6 +16,10 @@ const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
+const AdminPlans = lazy(() => import("./pages/AdminPlans"));
+const AdminActivationKeys = lazy(() => import("./pages/AdminActivationKeys"));
+const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
+const AppActivation = lazy(() => import("./pages/AppActivation"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -31,6 +35,7 @@ const App = () => (
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/activate" element={<AppActivation />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/customize" element={<AdminCustomize />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -40,6 +45,9 @@ const App = () => (
           <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
           <Route path="/admin/perfil" element={<AdminPerfil />} />
           <Route path="/admin/templates" element={<AdminTemplates />} />
+          <Route path="/admin/plans" element={<AdminPlans />} />
+          <Route path="/admin/activation-keys" element={<AdminActivationKeys />} />
+          <Route path="/admin/app-users" element={<AdminAppUsers />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

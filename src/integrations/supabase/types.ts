@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      activation_keys: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          generated_by: string | null
+          id: string
+          key: string
+          status: string
+          subscription_plan_id: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          generated_by?: string | null
+          id?: string
+          key: string
+          status?: string
+          subscription_plan_id: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          generated_by?: string | null
+          id?: string
+          key?: string
+          status?: string
+          subscription_plan_id?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activation_keys_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activation_keys_subscription_plan_id_fkey"
+            columns: ["subscription_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admins: {
         Row: {
           created_at: string
@@ -167,6 +218,63 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      app_users: {
+        Row: {
+          activated_at: string | null
+          activation_key_id: string | null
+          created_at: string | null
+          device_id: string
+          device_info: Json | null
+          expires_at: string
+          id: string
+          last_access_at: string | null
+          status: string
+          subscription_plan_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          activation_key_id?: string | null
+          created_at?: string | null
+          device_id: string
+          device_info?: Json | null
+          expires_at: string
+          id?: string
+          last_access_at?: string | null
+          status?: string
+          subscription_plan_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          activation_key_id?: string | null
+          created_at?: string | null
+          device_id?: string
+          device_info?: Json | null
+          expires_at?: string
+          id?: string
+          last_access_at?: string | null
+          status?: string
+          subscription_plan_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_users_activation_key_id_fkey"
+            columns: ["activation_key_id"]
+            isOneToOne: false
+            referencedRelation: "activation_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_users_subscription_plan_id_fkey"
+            columns: ["subscription_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -1508,6 +1616,50 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          duration_days: number
+          id: string
+          m3u_list_id: string | null
+          max_devices: number
+          name: string
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          duration_days?: number
+          id?: string
+          m3u_list_id?: string | null
+          max_devices?: number
+          name: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          duration_days?: number
+          id?: string
+          m3u_list_id?: string | null
+          max_devices?: number
+          name?: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_plans_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: Json | null
@@ -1599,9 +1751,45 @@ export type Database = {
       }
     }
     Functions: {
+      activate_device: {
+        Args: {
+          p_activation_key: string
+          p_device_id: string
+          p_device_info?: Json
+        }
+        Returns: {
+          error_message: string
+          expires_at: string
+          m3u_url: string
+          success: boolean
+          user_id: string
+        }[]
+      }
+      check_device_subscription: {
+        Args: { p_device_id: string }
+        Returns: {
+          active: boolean
+          days_remaining: number
+          expires_at: string
+          m3u_url: string
+          status: string
+          user_id: string
+        }[]
+      }
       current_email: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      generate_activation_keys: {
+        Args: {
+          p_expires_at?: string
+          p_quantity?: number
+          p_subscription_plan_id: string
+        }
+        Returns: {
+          created_at: string
+          key: string
+        }[]
       }
       get_user_company_id: {
         Args: Record<PropertyKey, never>
@@ -1626,9 +1814,21 @@ export type Database = {
         Args: { email: string }
         Returns: string
       }
+      validate_activation_key: {
+        Args: { p_key: string }
+        Returns: {
+          duration_days: number
+          error_message: string
+          key_id: string
+          m3u_list_id: string
+          plan_id: string
+          plan_name: string
+          valid: boolean
+        }[]
+      }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "app_user"
       cms_script_category: "essential" | "analytics" | "ads"
       cms_script_pos: "head" | "body_end"
       cms_script_provider:
@@ -1772,7 +1972,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "app_user"],
       cms_script_category: ["essential", "analytics", "ads"],
       cms_script_pos: ["head", "body_end"],
       cms_script_provider: ["gtm", "ga4", "google_ads", "meta_pixel", "custom"],
