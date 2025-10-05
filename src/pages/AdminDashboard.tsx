@@ -1,16 +1,19 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3 } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { useClientes } from "@/hooks/useClientes";
 import { supabase } from "@/integrations/supabase/client";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdminAuth();
+  const { getStats } = useClientes();
+  const stats = getStats();
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -91,6 +94,63 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+          </Card>
+        </div>
+
+        {/* Client Stats */}
+        <div className="grid gap-6 md:grid-cols-3 mb-8">
+          <Card 
+            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
+            onClick={() => navigate('/admin/clientes')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total de Clientes
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clientes cadastrados no sistema
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
+            onClick={() => navigate('/admin/clientes')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Vencem em 5 Dias
+              </CardTitle>
+              <Clock className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.vencendoProximos5Dias}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clientes com vencimento próximo
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
+            onClick={() => navigate('/admin/clientes')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Ativos Vencidos
+              </CardTitle>
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{stats.ativosVencidos}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clientes ativos com pagamento atrasado
+              </p>
+            </CardContent>
           </Card>
         </div>
 
