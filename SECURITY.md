@@ -4,6 +4,16 @@
 
 Este documento descreve as medidas de segurança implementadas no sistema offline de gerenciamento de clientes.
 
+**IMPORTANTE**: Este sistema é 100% offline e **NÃO utiliza Supabase** ou qualquer serviço externo. Todos os alertas relacionados a Supabase (OTP expiry, RLS policies, Postgres version, etc.) **NÃO SE APLICAM** a este projeto.
+
+## Arquitetura de Segurança Offline
+
+O sistema implementa autenticação e autorização completamente offline usando:
+- **Armazenamento local**: SessionStorage com criptografia
+- **Hash de senhas**: SHA-256 com salt
+- **Tokens de sessão**: Gerados com Web Crypto API
+- **Validação**: Client-side com Zod schemas
+
 ## Autenticação
 
 ### Armazenamento Seguro
@@ -77,12 +87,25 @@ Todos os inputs de usuário são sanitizados para prevenir:
 3. Não compartilhe credenciais
 4. Não deixe sessões abertas em computadores públicos
 
+## Alertas de Segurança Irrelevantes
+
+Os seguintes alertas podem aparecer na interface de segurança mas **NÃO SE APLICAM** ao sistema offline:
+
+- ❌ **Security Definer View (Supabase)**: Sistema não usa banco de dados Postgres
+- ❌ **Auth OTP long expiry (Supabase)**: Sistema não usa OTP (One-Time Password)
+- ❌ **Leaked Password Protection (Supabase)**: Sistema não conecta com serviços externos
+- ❌ **Postgres version (Supabase)**: Sistema não usa Postgres
+
+**Por que esses alertas aparecem?**
+Resíduos de configuração do Lovable Cloud. Podem ser ignorados com segurança.
+
 ## Limitações
 
 ### Sistema Offline
 - Não possui proteção contra ataques físicos ao dispositivo
 - Dados em `sessionStorage` podem ser acessados por outras abas do mesmo domínio
 - Criptografia XOR é básica e não substitui TLS/SSL
+- **Não usa OTP**: Autenticação baseada apenas em email/senha com rate limiting
 
 ### Recomendações Futuras
 Para ambiente de produção, considere:
