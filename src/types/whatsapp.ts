@@ -1,0 +1,56 @@
+export interface WhatsappTemplate {
+  id: string;
+  name: string;
+  message: string;
+  variables: string[];
+  type: 'local' | 'botbot';
+  botbotTemplateId?: string;
+  daysBeforeDue?: number;
+}
+
+export interface NotificationLog {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  telefone: string;
+  tipo: string;
+  template: string;
+  dataEnvio: string;
+  status: 'success' | 'error';
+  erro?: string;
+  resposta?: {
+    message_status?: string;
+    status_code?: number;
+    data?: any;
+  };
+}
+
+export interface NotificationSchedule {
+  clienteId: string;
+  dataVencimento: Date;
+  notificationsLog: {
+    daysBeforeDue: number;
+    sent: boolean;
+    sentAt?: Date;
+    error?: string;
+  }[];
+}
+
+export interface WhatsAppConfig {
+  appkey: string;
+  authkey: string;
+  enabled: boolean;
+  autoSendEnabled: boolean;
+  sendHour: number;
+  daysToNotify: number[];
+}
+
+export interface BotBotResponse {
+  message_status: string;
+  data?: {
+    from: string;
+    to: string;
+    status_code: number;
+  };
+  error?: string;
+}

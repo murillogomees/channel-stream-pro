@@ -23,8 +23,23 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock } from 'lucide-react';
 import { Cliente } from '@/types/cliente';
+import { getDaysUntilDue } from '@/services/notificationScheduler';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
+import { useNotificationLogs } from '@/hooks/useNotificationLogs';
+import { LOCAL_TEMPLATES, sendNotification } from '@/services/notificationScheduler';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const situacaoColors: Record<string, string> = {
   Testando: 'bg-blue-500',
@@ -36,10 +51,16 @@ const situacaoColors: Record<string, string> = {
 
 export default function AdminClientes() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { isAuthenticated, loading } = useLocalAuth();
   const { clientes, deleteCliente } = useClientes();
+  const { isConfigured } = useWhatsAppConfig();
+  const { addLog } = useNotificationLogs();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [sending, setSending] = useState(false);
 
   if (loading) {
     return (
@@ -65,6 +86,64 @@ export default function AdminClientes() {
       setDeleteId(null);
       setShowConfirm(false);
     }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!selectedCliente || !selectedTemplate) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione um template',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSending(true);
+    try {
+      const template = LOCAL_TEMPLATES.find(t => t.id === selectedTemplate);
+      if (!template) throw new Error('Template não encontrado');
+
+      await sendNotification(selectedCliente, template, addLog);
+      
+      toast({
+        title: 'Sucesso!',
+        description: `Mensagem enviada para ${selectedCliente.nome}`,
+      });
+
+      setSelectedCliente(null);
+      setSelectedTemplate('');
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao enviar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getDaysUntilBadge = (dataVencimento: string) => {
+    const days = getDaysUntilDue(dataVencimento);
+    if (days < 0) {
+      return <Badge variant="destructive" className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        Vencido há {Math.abs(days)}d
+      </Badge>;
+    }
+    if (days === 0) {
+      return <Badge variant="default" className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        Vence hoje
+      </Badge>;
+    }
+    if (days <= 5) {
+      return <Badge variant="secondary" className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        Vence em {days}d
+      </Badge>;
+    }
+    return null;
   };
 
   return (
@@ -100,6 +179,7 @@ export default function AdminClientes() {
                   <TableHead>Situação</TableHead>
                   <TableHead>Plano</TableHead>
                   <TableHead>Vencimento</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -120,7 +200,74 @@ export default function AdminClientes() {
                         ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
                         : 'N/A'}
                     </TableCell>
+                    <TableCell>
+                      {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={!isConfigured || !cliente.telefone}
+                            onClick={() => {
+                              setSelectedCliente(cliente);
+                              setSelectedTemplate('');
+                            }}
+                            title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar WhatsApp'}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Enviar WhatsApp para {cliente.nome}</DialogTitle>
+                            <DialogDescription>
+                              Escolha um template de mensagem
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Template</Label>
+                              <select
+                                className="w-full p-2 border rounded-md bg-background"
+                                value={selectedTemplate}
+                                onChange={(e) => setSelectedTemplate(e.target.value)}
+                              >
+                                <option value="">Selecione um template</option>
+                                {LOCAL_TEMPLATES.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {selectedTemplate && (
+                              <div className="space-y-2">
+                                <Label>Preview da Mensagem</Label>
+                                <Textarea
+                                  value={LOCAL_TEMPLATES.find(t => t.id === selectedTemplate)?.message
+                                    .replace(/{nome}/g, cliente.nome)
+                                    .replace(/{valor}/g, cliente.valorPago.toFixed(2))
+                                    .replace(/{dataVencimento}/g, cliente.dataVencimento ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR') : '')
+                                  }
+                                  readOnly
+                                  rows={4}
+                                />
+                              </div>
+                            )}
+
+                            <Button 
+                              onClick={handleSendWhatsApp} 
+                              disabled={!selectedTemplate || sending}
+                              className="w-full"
+                            >
+                              {sending ? 'Enviando...' : 'Enviar Agora'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                       <Button
                         variant="outline"
                         size="icon"

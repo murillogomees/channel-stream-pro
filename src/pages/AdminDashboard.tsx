@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2 } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
 import { useClientes } from "@/hooks/useClientes";
+import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -13,12 +17,30 @@ const AdminDashboard = () => {
   const { isAuthenticated, loading, logout } = useLocalAuth();
   const { getStats } = useClientes();
   const stats = getStats();
+  const { config, saveConfig, isConfigured } = useWhatsAppConfig();
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [appkey, setAppkey] = useState('');
+  const [authkey, setAuthkey] = useState('');
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/admin/login');
     }
   }, [isAuthenticated, loading, navigate]);
+
+  useEffect(() => {
+    setAppkey(config.appkey);
+    setAuthkey(config.authkey);
+  }, [config]);
+
+  const handleSaveWhatsAppConfig = () => {
+    saveConfig({ appkey, authkey, enabled: true });
+    setWhatsappDialogOpen(false);
+    toast({
+      title: "Configuração salva",
+      description: "Credenciais BotBot.chat configuradas com sucesso!",
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -97,7 +119,7 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-8 space-y-4">
           {/* Site Customization */}
           <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
                 onClick={() => navigate('/admin/customize')}>
@@ -136,6 +158,85 @@ const AdminDashboard = () => {
                     Configure todas as seções
                   </p>
                 </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* WhatsApp Configuration */}
+          <Card className="bg-gradient-card border-border hover:shadow-lg transition-smooth w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+              <div className="md:col-span-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <MessageSquare className="h-6 w-6 text-green-500" />
+                  <h3 className="text-xl font-bold">WhatsApp BotBot.chat</h3>
+                </div>
+                <p className="text-muted-foreground">
+                  Configure credenciais e envie notificações automáticas de pagamento
+                </p>
+              </div>
+              
+              <div className="md:col-span-1 flex items-center justify-center">
+                <div className="flex items-center gap-4">
+                  {isConfigured ? (
+                    <CheckCircle className="h-12 w-12 text-green-500" />
+                  ) : (
+                    <XCircle className="h-12 w-12 text-yellow-500" />
+                  )}
+                  <div>
+                    <p className="font-semibold text-lg">
+                      {isConfigured ? 'Configurado' : 'Não Configurado'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {isConfigured ? 'Sistema pronto' : 'Configure as credenciais'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="md:col-span-1 flex items-center justify-center gap-2">
+                <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Configurar
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Configurar BotBot.chat</DialogTitle>
+                      <DialogDescription>
+                        Insira suas credenciais da plataforma BotBot.chat
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="appkey">App Key</Label>
+                        <Input
+                          id="appkey"
+                          value={appkey}
+                          onChange={(e) => setAppkey(e.target.value)}
+                          placeholder="b4153549-be4e-494d-8561-ee1912c55ee9"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="authkey">Auth Key</Label>
+                        <Input
+                          id="authkey"
+                          value={authkey}
+                          onChange={(e) => setAuthkey(e.target.value)}
+                          placeholder="jFXdat4Uaq19lVnt107Yn77lRjScoV9gzcRVzw17h0RIOXK4Xl"
+                        />
+                      </div>
+                      <Button onClick={handleSaveWhatsAppConfig} className="w-full">
+                        Salvar Configuração
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button onClick={() => navigate('/admin/notificacoes')}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Gerenciar
+                </Button>
               </div>
             </div>
           </Card>
