@@ -5,6 +5,7 @@ import { useClientes } from '@/hooks/useClientes';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { useFileUpload } from '@/hooks/useFileUpload';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Send, MessageSquare, Download, Trash2, CheckCircle, XCircle, Paperclip, X, FileIcon } from 'lucide-react';
+import { ArrowLeft, Send, MessageSquare, Download, Trash2, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle } from 'lucide-react';
 import { LOCAL_TEMPLATES, getDaysUntilDue, sendNotification } from '@/services/notificationScheduler';
 import { Cliente } from '@/types/cliente';
 import { formatPhoneForDisplay } from '@/utils/phoneFormatter';
@@ -43,12 +44,18 @@ export default function AdminNotificacoes() {
   const { clientes } = useClientes();
   const { config, saveConfig, isConfigured } = useWhatsAppConfig();
   const { logs, addLog, clearLogs, getRecentLogs, exportToCSV } = useNotificationLogs();
+  const { isRunning, lastRunState, forceRun, getNextRunTime, getErrorHandler } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [customMessage, setCustomMessage] = useState('');
   const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [runningManual, setRunningManual] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
+
+  const errorHandler = getErrorHandler();
+  const recentErrors = errorHandler?.getRecentErrors() || [];
+  const nextRunTime = getNextRunTime();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -182,6 +189,25 @@ export default function AdminNotificacoes() {
 
   const recentLogs = getRecentLogs(20);
 
+  const handleForceRun = async () => {
+    setRunningManual(true);
+    try {
+      await forceRun();
+      toast({
+        title: 'Sucesso!',
+        description: 'Envio manual executado com sucesso',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRunningManual(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -208,6 +234,89 @@ export default function AdminNotificacoes() {
             {isConfigured ? 'Configurado' : 'Não Configurado'}
           </Badge>
         </div>
+
+        {/* Status do Sistema */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Status do Sistema</CardTitle>
+            <CardDescription>
+              Monitoramento do envio automático de notificações
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Sistema Automático:</span>
+                  <Badge variant={config.autoSendEnabled ? 'default' : 'secondary'}>
+                    {config.autoSendEnabled ? '🟢 Ativo' : '⚫ Desativado'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Status Atual:</span>
+                  <Badge variant={isRunning ? 'default' : 'outline'}>
+                    {isRunning ? '⚡ Processando' : '💤 Aguardando'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Última Execução:</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {lastRunState?.lastRunDate 
+                      ? new Date(lastRunState.lastRunDate).toLocaleDateString('pt-BR')
+                      : 'Nunca'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Próxima Execução:</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {nextRunTime 
+                      ? nextRunTime.toLocaleString('pt-BR', { 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })
+                      : 'Não agendado'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {lastRunState && (
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Mensagens Enviadas</p>
+                  <p className="text-2xl font-bold text-green-500">{lastRunState.totalSent}</p>
+                </div>
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Erros</p>
+                  <p className="text-2xl font-bold text-red-500">{lastRunState.errors}</p>
+                </div>
+              </div>
+            )}
+
+            <Button 
+              onClick={handleForceRun} 
+              variant="outline" 
+              className="w-full"
+              disabled={!isConfigured || runningManual}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {runningManual ? 'Executando...' : '🔄 Executar Agora (Teste)'}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Configurações */}
         <Card>
@@ -478,6 +587,62 @@ export default function AdminNotificacoes() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Erros Recentes */}
+        {recentErrors.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    Erros Recentes
+                  </CardTitle>
+                  <CardDescription>
+                    Últimos erros de envio de notificações
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => errorHandler?.clearErrors()}
+                >
+                  Limpar Erros
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data/Hora</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Erro</TableHead>
+                      <TableHead>Tentativas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentErrors.map((error, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="text-sm">
+                          {new Date(error.timestamp).toLocaleString('pt-BR')}
+                        </TableCell>
+                        <TableCell>{error.clienteNome}</TableCell>
+                        <TableCell className="max-w-md truncate text-sm text-destructive">
+                          {error.error}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{error.retryCount}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Histórico de Envios */}
         <Card>
