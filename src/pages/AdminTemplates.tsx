@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X } from 'lucide-react';
+import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,8 @@ export default function AdminTemplates() {
     extractVariables,
   } = useTemplates();
 
+  const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -77,11 +80,12 @@ export default function AdminTemplates() {
         daysBeforeDue: 0,
         type: 'local',
       });
+      clearFile();
     }
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.message.trim()) {
       toast.error('Preencha nome e mensagem');
       return;
@@ -89,21 +93,41 @@ export default function AdminTemplates() {
 
     const variables = extractVariables(formData.message);
 
+    let arquivoData = undefined;
+    if (file) {
+      const fileInfo = getFileInfo();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      arquivoData = {
+        nome: fileInfo?.name || '',
+        tipo: fileInfo?.type || '',
+        tamanho: fileInfo?.size || 0,
+        base64,
+      };
+    }
+
     if (editingTemplate) {
       updateTemplate(editingTemplate.id, {
         ...formData,
         variables,
+        arquivo: arquivoData,
       });
       toast.success('Template atualizado com sucesso!');
     } else {
       addTemplate({
         ...formData,
         variables,
+        arquivo: arquivoData,
       });
       toast.success('Template criado com sucesso!');
     }
 
     setDialogOpen(false);
+    clearFile();
   };
 
   const handleDelete = () => {
@@ -315,6 +339,65 @@ export default function AdminTemplates() {
                 </div>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="arquivo">Anexar Arquivo (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="arquivo"
+                  type="file"
+                  onChange={(e) => {
+                    const selectedFile = e.target.files?.[0] || null;
+                    handleFileSelect(selectedFile);
+                  }}
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                  className="cursor-pointer"
+                />
+              </div>
+              {fileError && (
+                <p className="text-sm text-destructive">{fileError}</p>
+              )}
+              {file && !fileError && (
+                <div className="mt-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileIcon className="h-4 w-4" />
+                      <div>
+                        <p className="text-sm font-medium">{getFileInfo()?.name}</p>
+                        <p className="text-xs text-muted-foreground">{getFileInfo()?.sizeFormatted}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={clearFile}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {preview && (
+                    <img 
+                      src={preview} 
+                      alt="Preview" 
+                      className="mt-2 max-h-40 rounded-md object-contain"
+                    />
+                  )}
+                </div>
+              )}
+              {editingTemplate?.arquivo && !file && (
+                <div className="mt-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <FileIcon className="h-4 w-4" />
+                    <div>
+                      <p className="text-sm font-medium">{editingTemplate.arquivo.nome}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(editingTemplate.arquivo.tamanho / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>

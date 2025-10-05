@@ -6,6 +6,12 @@ export interface WhatsappTemplate {
   type: 'local' | 'botbot';
   botbotTemplateId?: string;
   daysBeforeDue?: number;
+  arquivo?: {
+    nome: string;
+    tipo: string;
+    tamanho: number;
+    base64?: string;
+  };
 }
 
 export interface NotificationLog {
