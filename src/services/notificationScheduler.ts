@@ -2,7 +2,23 @@ import { Cliente } from '@/types/cliente';
 import { WhatsappTemplate } from '@/types/whatsapp';
 import { getWhatsAppService } from './whatsapp';
 
-export const LOCAL_TEMPLATES: WhatsappTemplate[] = [
+const STORAGE_KEY = 'whatsapp_templates';
+
+// Função para carregar templates do localStorage
+export const loadTemplates = (): WhatsappTemplate[] => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+      return DEFAULT_TEMPLATES;
+    }
+  }
+  return DEFAULT_TEMPLATES;
+};
+
+const DEFAULT_TEMPLATES: WhatsappTemplate[] = [
   {
     id: 'dia_menos_5',
     name: '5 dias antes do vencimento',
@@ -84,6 +100,9 @@ export const LOCAL_TEMPLATES: WhatsappTemplate[] = [
     daysBeforeDue: 5,
   },
 ];
+
+// Manter LOCAL_TEMPLATES para compatibilidade (agora dinâmico)
+export const LOCAL_TEMPLATES = loadTemplates();
 
 export function getDaysUntilDue(dataVencimento: string): number {
   const today = new Date();

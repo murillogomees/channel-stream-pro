@@ -1,7 +1,7 @@
 import { Cliente } from '@/types/cliente';
 import { WhatsAppConfig, WhatsappTemplate } from '@/types/whatsapp';
 import { LastRunState } from '@/types/notificationHistory';
-import { LOCAL_TEMPLATES, getDaysUntilDue, sendNotification } from './notificationScheduler';
+import { loadTemplates, getDaysUntilDue, sendNotification } from './notificationScheduler';
 import { PaymentDetectionService } from './paymentDetectionService';
 import { NotificationErrorHandler } from './notificationErrorHandler';
 import { RateLimiter } from '@/utils/rateLimiter';
@@ -157,6 +157,9 @@ export class AutoNotificationScheduler {
       daysUntilDue: number;
     }> = [];
 
+    // Carregar templates atualizados
+    const templates = loadTemplates();
+
     // Coletar todas as notificações a enviar
     for (const cliente of clientes) {
       if (!cliente.dataVencimento) continue;
@@ -164,7 +167,7 @@ export class AutoNotificationScheduler {
       const daysUntilDue = getDaysUntilDue(cliente.dataVencimento);
 
       // Encontrar template correspondente
-      const template = LOCAL_TEMPLATES.find(t => t.daysBeforeDue === daysUntilDue);
+      const template = templates.find(t => t.daysBeforeDue === daysUntilDue);
       if (!template) continue;
 
       // Verificar se está nos dias configurados para notificar

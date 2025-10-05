@@ -15,6 +15,7 @@ const AdminClientes = lazy(() => import("./pages/AdminClientes"));
 const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
+const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/admin/clientes/editar/:id" element={<AdminClienteForm />} />
           <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
           <Route path="/admin/perfil" element={<AdminPerfil />} />
+          <Route path="/admin/templates" element={<AdminTemplates />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

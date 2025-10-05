@@ -237,9 +237,13 @@ const AdminDashboard = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+                <Button onClick={() => navigate('/admin/templates')} variant="outline">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Templates
+                </Button>
                 <Button onClick={() => navigate('/admin/notificacoes')}>
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  Gerenciar
+                  Notificações
                 </Button>
               </div>
             </div>
