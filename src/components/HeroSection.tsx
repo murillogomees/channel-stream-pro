@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
 import heroBackground from "@/assets/hero-bg.jpg";
 import { useSettingsContext } from "@/context/SettingsContext";
-import logo from "@/assets/logo.png";
+import logoWhite from "@/assets/logo-white.png";
 
 const HeroSection = () => {
   const { settings, getAsset, getIcon } = useSettingsContext();
@@ -29,12 +29,12 @@ const HeroSection = () => {
           {/* Logo as Main Title */}
           <div className="flex justify-center mb-4">
             <img
-              src={logo}
+              src={logoWhite}
               alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
               className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain"
               style={{ maxWidth: '90vw' }}
-              width="829"
-              height="388"
+              width="431"
+              height="164"
               loading="eager"
               fetchPriority="high"
               decoding="async"

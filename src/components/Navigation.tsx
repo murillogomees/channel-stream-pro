@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
-import logo from "@/assets/logo.png";
+import logoWhite from "@/assets/logo-white.png";
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -23,11 +23,11 @@ const Navigation = () => {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img
-              src={logo}
+              src={logoWhite}
               alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
               className="h-8 md:h-9 lg:h-10 w-auto select-none"
-              width="166"
-              height="78"
+              width="431"
+              height="164"
               loading="eager"
               decoding="async"
               role="img"
