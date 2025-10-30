@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, Copy, Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Plus, Download, Copy, Loader2, CheckCircle2, XCircle, Clock, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,7 @@ interface SubscriptionPlan {
 }
 
 export default function AdminActivationKeys() {
+  const navigate = useNavigate();
   const [keys, setKeys] = useState<ActivationKey[]>([]);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -197,9 +199,18 @@ export default function AdminActivationKeys() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Chaves de Ativação</h1>
-          <p className="text-muted-foreground">Gerencie as chaves de ativação do aplicativo</p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/admin/dashboard')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Chaves de Ativação</h1>
+            <p className="text-muted-foreground">Gerencie as chaves de ativação do aplicativo</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportCSV}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Smartphone, Ban, CheckCircle } from 'lucide-react';
+import { Loader2, Smartphone, Ban, CheckCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -29,6 +30,7 @@ interface AppUser {
 }
 
 export default function AdminAppUsers() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -152,9 +154,18 @@ export default function AdminAppUsers() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Usuários do Aplicativo</h1>
-          <p className="text-muted-foreground">Gerencie os dispositivos ativados</p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/admin/dashboard')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Usuários do Aplicativo</h1>
+            <p className="text-muted-foreground">Gerencie os dispositivos ativados</p>
+          </div>
         </div>
       </div>
 
