@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
+import logo from "@/assets/logo.png";
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -21,31 +22,17 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            {settings.header.logo.image ? (
-              <picture>
-                <source srcSet="/logo.webp" type="image/webp" />
-                <img
-                  src={getAsset ? getAsset("logo") : settings.header.logo.image}
-                  alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
-                  className="h-8 md:h-9 lg:h-10 w-auto select-none"
-                  width="166"
-                  height="78"
-                  loading="eager"
-                  decoding="async"
-                  role="img"
-                  aria-label={`Ir para página inicial - ${settings.header.logo.text}`}
-                />
-              </picture>
-            ) : (
-              <>
-                <div className="p-2 bg-gradient-primary rounded-lg shadow-glow" role="img" aria-label="Ícone de TV representando streaming IPTV">
-                  <Tv className="h-6 w-6 text-white" aria-hidden="true" />
-                </div>
-                <span className="text-xl font-bold text-foreground">
-                  {settings.header.logo.text}
-                </span>
-              </>
-            )}
+            <img
+              src={logo}
+              alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
+              className="h-8 md:h-9 lg:h-10 w-auto select-none"
+              width="166"
+              height="78"
+              loading="eager"
+              decoding="async"
+              role="img"
+              aria-label={`Ir para página inicial - ${settings.header.logo.text}`}
+            />
           </div>
 
           {/* Desktop Navigation */}
