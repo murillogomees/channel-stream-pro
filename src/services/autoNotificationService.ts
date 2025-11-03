@@ -7,7 +7,7 @@ import { NotificationErrorHandler } from './notificationErrorHandler';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 const LAST_RUN_KEY = 'auto_notification_last_run';
-const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutos
+const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutos - verificar com mais frequência
 
 export class AutoNotificationScheduler {
   private intervalId: NodeJS.Timeout | null = null;
@@ -82,20 +82,22 @@ export class AutoNotificationScheduler {
         return;
       }
 
-      // 2. Verificar horário
+      // 2. Verificar horário - deve executar exatamente no horário configurado
       const now = new Date();
       const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
       
-      if (Math.abs(currentHour - config.sendHour) > 1) {
-        console.log(`⏰ Fora do horário de envio. Atual: ${currentHour}h, Configurado: ${config.sendHour}h`);
+      // Só executar se estiver na hora certa (entre :00 e :05)
+      if (currentHour !== config.sendHour || currentMinute > 5) {
+        console.log(`⏰ Fora do horário de envio. Atual: ${currentHour}:${currentMinute}, Configurado: ${config.sendHour}:00`);
         this.isRunning = false;
         return;
       }
 
       // 3. Verificar se já executou hoje
-      const today = now.toDateString();
-      if (this.lastRunState?.lastRunDate === today && this.lastRunState?.lastRunHour === config.sendHour) {
-        console.log('✅ Já executou envio automático hoje no horário configurado');
+      const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      if (this.lastRunState?.lastRunDate === today) {
+        console.log('✅ Já executou envio automático hoje');
         this.isRunning = false;
         return;
       }
@@ -128,7 +130,7 @@ export class AutoNotificationScheduler {
 
       // 9. Salvar estado de execução
       this.saveLastRunState({
-        lastRunDate: today,
+        lastRunDate: now.toISOString().split('T')[0],
         lastRunHour: config.sendHour,
         totalSent: result.sent,
         errors: result.errors,
@@ -236,8 +238,8 @@ export class AutoNotificationScheduler {
       authkey: '',
       enabled: false,
       autoSendEnabled: false,
-      sendHour: 9,
-      daysToNotify: [-5, -4, -3, -2, 0, 1, 2, 3, 4, 5],
+      sendHour: 10,
+      daysToNotify: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
     };
   }
 
@@ -259,9 +261,9 @@ export class AutoNotificationScheduler {
         const clientHistory = history[clienteId];
         if (!clientHistory) return false;
 
-        const today = new Date().toDateString();
+        const today = new Date().toISOString().split('T')[0];
         return clientHistory.notificacoesEnviadas.some((record: any) => {
-          const recordDate = new Date(record.sentAt).toDateString();
+          const recordDate = new Date(record.sentAt).toISOString().split('T')[0];
           return recordDate === today && record.daysBeforeDue === daysBeforeDue && record.success;
         });
       },
