@@ -240,12 +240,22 @@ export default function AdminClienteForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="dataContratacao">Data de Contratação</Label>
-                  <Input id="dataContratacao" type="date" {...register('dataContratacao')} />
+                  <Input 
+                    id="dataContratacao" 
+                    type="date" 
+                    value={watch('dataContratacao') || ''}
+                    onChange={(e) => setValue('dataContratacao', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="dataVencimento">Data de Vencimento</Label>
-                  <Input id="dataVencimento" type="date" {...register('dataVencimento')} />
+                  <Input 
+                    id="dataVencimento" 
+                    type="date" 
+                    value={watch('dataVencimento') || ''}
+                    onChange={(e) => setValue('dataVencimento', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -260,7 +270,12 @@ export default function AdminClienteForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="dataUltimoPagamento">Data do Último Pagamento</Label>
-                  <Input id="dataUltimoPagamento" type="date" {...register('dataUltimoPagamento')} />
+                  <Input 
+                    id="dataUltimoPagamento" 
+                    type="date" 
+                    value={watch('dataUltimoPagamento') || ''}
+                    onChange={(e) => setValue('dataUltimoPagamento', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
