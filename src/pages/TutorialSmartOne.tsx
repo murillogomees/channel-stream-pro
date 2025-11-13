@@ -12,11 +12,13 @@ import { sendClientWelcomeNotification } from '@/services/prospectNotificationSe
 import { Loader2, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 import { PlanoCliente } from '@/types/cliente';
 
-import step1 from '@/assets/tutorial/01-app-store-search.png';
-import step2 from '@/assets/smartone-logo.png';
-import step3 from '@/assets/tutorial/03-app-home.png';
-import step4 from '@/assets/tutorial/04-settings-menu.png';
-import step5 from '@/assets/tutorial/05-mac-address.png';
+import smartoneLogo from '@/assets/smartone-logo.png';
+
+const step1 = smartoneLogo;
+const step2 = smartoneLogo;
+const step3 = smartoneLogo;
+const step4 = smartoneLogo;
+const step5 = smartoneLogo;
 
 const tutorialSteps = [
   {
