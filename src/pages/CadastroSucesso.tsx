@@ -144,7 +144,7 @@ export default function CadastroSucesso() {
           <Button 
             size="lg" 
             className="w-full sm:w-auto"
-            onClick={() => window.open('https://wa.me/5561996975924', '_blank')}
+            onClick={() => window.open('https://wa.me/556131425880', '_blank')}
           >
             <MessageCircle className="mr-2 h-5 w-5" />
             Falar com Suporte

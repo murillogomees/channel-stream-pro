@@ -45,7 +45,7 @@ const Navigation = () => {
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
             
-            <Button variant="default" size="sm" onClick={() => window.open(`https://wa.me/${settings.contact.info.whatsapp}`, '_blank')}>
+            <Button variant="default" size="sm" onClick={() => window.open('https://wa.me/556131425880', '_blank')}>
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </Button>

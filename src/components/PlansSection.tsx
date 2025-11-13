@@ -71,7 +71,7 @@ const PlansSection = () => {
                       className="w-full font-semibold"
                       onClick={() => {
                         const message = `Olá! Tenho interesse no plano ${plan.name}. Gostaria de mais informações.`;
-                        window.location.href = `https://wa.me/5561314258880?text=${encodeURIComponent(message)}`;
+                        window.location.href = `https://wa.me/556131425880?text=${encodeURIComponent(message)}`;
                       }}
                     >
                       {plan.ctaText}

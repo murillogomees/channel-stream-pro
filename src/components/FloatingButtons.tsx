@@ -2,7 +2,7 @@ import { MessageCircle, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FloatingButtons = () => {
-  const whatsappNumber = "556132425880";
+  const whatsappNumber = "556131425880";
   const whatsappMessage = "Olá! Gostaria de saber mais sobre os planos IPTV.";
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
   const instagramUrl = "https://instagram.com/iptvlinkbr";

@@ -129,9 +129,8 @@ const DevicesSection = () => {
             size="lg"
             className="bg-primary hover:bg-primary/90 text-onPrimary font-semibold px-8 py-6 text-lg shadow-lg hover:shadow-xl transition-all"
             onClick={() => {
-              const whatsappNumber = settings.contact?.info?.whatsapp?.replace(/\D/g, "");
               const message = encodeURIComponent("Olá! Gostaria de saber mais sobre como baixar o aplicativo em meus dispositivos.");
-              window.open(`https://wa.me/${whatsappNumber}?text=${message}`, "_blank");
+              window.open(`https://wa.me/556131425880?text=${message}`, "_blank");
             }}
           >
             Fale Conosco para Baixar
