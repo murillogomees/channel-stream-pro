@@ -141,6 +141,16 @@ export default function AdminClienteForm() {
     const sanitizePhone = (str: string) => str.replace(/[^0-9+\-() ]/g, '');
     const sanitizeMac = (str: string) => str.replace(/[^A-Fa-f0-9:-]/g, '');
     
+    // Gerar credenciais M3U automaticamente se não existirem
+    let usuario = sanitizeString(data.usuario || '');
+    let senha = data.senha || '';
+    
+    if (!usuario || !senha) {
+      const timestamp = Date.now();
+      usuario = `user_${timestamp}`;
+      senha = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+    
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
       nome: sanitizeString(data.nome || ''),
       telefone: sanitizePhone(data.telefone || ''),
@@ -154,8 +164,8 @@ export default function AdminClienteForm() {
       dataUltimoPagamento: data.dataUltimoPagamento || '',
       formaUltimoPagamento: sanitizeString(data.formaUltimoPagamento || ''),
       macSmartOne: sanitizeMac(data.macSmartOne || ''),
-      usuario: sanitizeString(data.usuario || ''),
-      senha: data.senha || '',
+      usuario: usuario,
+      senha: senha,
       clienteAtivo: data.clienteAtivo ?? false,
       smartone_status: 'nao_enviado',
     };

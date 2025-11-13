@@ -199,49 +199,32 @@ export default function TutorialSmartOne() {
     setIsSubmitting(true);
 
     try {
-      // Calcular data de vencimento baseada no plano
+      // Cadastro externo SEMPRE dá 15 dias grátis para teste
       const hoje = new Date();
-      let diasPlano = 30;
-      let valor = formData.valorPago || 0;
-      
-      switch (formData.plano) {
-        case 'Mensal':
-          diasPlano = 30;
-          valor = valor || 29.90;
-          break;
-        case 'Trimestral':
-          diasPlano = 90;
-          valor = valor || 79.90;
-          break;
-        case 'Semestral':
-          diasPlano = 180;
-          valor = valor || 149.90;
-          break;
-        case 'Anual':
-          diasPlano = 365;
-          valor = valor || 279.90;
-          break;
-      }
-
       const dataVencimento = new Date(hoje);
-      dataVencimento.setDate(hoje.getDate() + diasPlano);
+      dataVencimento.setDate(hoje.getDate() + 15); // 15 dias de teste grátis
 
-      // Criar cliente
+      // Gerar credenciais M3U únicas para o cliente
+      const timestamp = Date.now();
+      const usuarioM3U = `user_${timestamp}`;
+      const senhaM3U = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+      // Criar cliente em período de teste
       const novoCliente = addCliente({
         nome: formData.nome,
         telefone: formData.telefone,
         email: formData.email,
         telegram: '',
-        situacao: 'Ativo',
-        dataContratacao: hoje.toISOString(),
-        dataVencimento: dataVencimento.toISOString(),
+        situacao: 'Testando', // Status de teste
+        dataContratacao: hoje.toISOString().split('T')[0],
+        dataVencimento: dataVencimento.toISOString().split('T')[0],
         plano: formData.plano,
-        valorPago: valor,
-        dataUltimoPagamento: hoje.toISOString(),
-        formaUltimoPagamento: 'Pix',
-        macSmartOne: formData.macSmartOne,
-        usuario: '',
-        senha: '',
+        valorPago: 0, // Teste grátis, sem pagamento inicial
+        dataUltimoPagamento: '',
+        formaUltimoPagamento: '',
+        macSmartOne: formData.macSmartOne.toUpperCase(),
+        usuario: usuarioM3U,
+        senha: senhaM3U,
         clienteAtivo: true,
         origemCadastro: formData.origemCadastro,
       });
