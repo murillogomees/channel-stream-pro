@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import TemplatePreview from '@/components/TemplatePreview';
+import MessageSnippets from '@/components/MessageSnippets';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { Button } from '@/components/ui/button';
@@ -360,34 +361,46 @@ export default function AdminTemplates() {
           <CardHeader>
             <CardTitle className="text-lg sm:text-xl">Variáveis Disponíveis</CardTitle>
             <CardDescription>
-              Use estas variáveis nas mensagens entre chaves, ex: {'{nome}'}
+              Use estas variáveis nas mensagens com chaves duplas, ex: {`{{nome}}`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{nome}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{nome}}`}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{dataVencimento}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{email}}`}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{valor}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{celular}}`}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{linkPagamento}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{plano}}`}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{plano}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{valor}}`}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{telefone}'}</code>
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{data_vencimento}}`}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{dias_restantes}}`}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{chave_pix}}`}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{link_pagamento}}`}</code>
               </div>
             </div>
 
@@ -561,13 +574,22 @@ export default function AdminTemplates() {
                 id="message"
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                placeholder="Olá {nome}! Seu plano vence em {dataVencimento}..."
-                rows={5}
+                placeholder="Olá {{nome}}! Seu plano vence em {{data_vencimento}}..."
+                rows={8}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Use variáveis: {'{nome}'}, {'{dataVencimento}'}, {'{valor}'}, {'{linkPagamento}'}, {'{plano}'}, {'{telefone}'}
+                Use variáveis com chaves duplas: {`{{nome}}`}, {`{{data_vencimento}}`}, {`{{valor}}`}, {`{{link_pagamento}}`}
               </p>
             </div>
+
+            <MessageSnippets 
+              onInsert={(text) => {
+                setFormData({ 
+                  ...formData, 
+                  message: formData.message + (formData.message ? '\n\n' : '') + text 
+                });
+              }} 
+            />
 
             {formData.message && (
               <>
