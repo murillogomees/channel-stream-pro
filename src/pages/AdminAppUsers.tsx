@@ -22,7 +22,6 @@ interface AppUser {
   activated_at: string;
   expires_at: string;
   status: 'active' | 'suspended' | 'expired' | 'trial';
-  mac_address: string | null;
   subscription_plans: {
     name: string;
   } | null;
@@ -44,7 +43,20 @@ export default function AdminAppUsers() {
       
       const { data, error } = await supabase
         .from('app_users')
-        .select('*, subscription_plans(name)')
+        .select(`
+          id,
+          device_id,
+          subscription_plan_id,
+          activation_key_id,
+          status,
+          activated_at,
+          expires_at,
+          created_at,
+          updated_at,
+          subscription_plans (
+            name
+          )
+        `)
         .order('activated_at', { ascending: false });
 
       if (error) throw error;
