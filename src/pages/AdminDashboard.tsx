@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -336,6 +336,15 @@ const AdminDashboard = () => {
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Config. Notificações
+                  </Button>
+
+                  <Button 
+                    onClick={() => navigate('/admin/notification-retry')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Fila de Retry
                   </Button>
                   
                   <Button 
