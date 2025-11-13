@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
+import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -73,16 +74,28 @@ export default function AdminTemplates() {
   
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [testPhoneValidation, setTestPhoneValidation] = useState<{
+    isValid: boolean;
+    error?: string;
+    formatted?: string;
+  }>({ isValid: true });
   
-  // Carregar número de teste
+  // Carregar e validar número de teste
   useEffect(() => {
     const configStored = localStorage.getItem('whatsapp_config');
     if (configStored) {
       try {
         const config = JSON.parse(configStored);
-        setTestPhoneNumber(config.testPhoneNumber || '5561996975924');
+        const phoneNum = config.testPhoneNumber || '5561996975924';
+        setTestPhoneNumber(phoneNum);
+        
+        if (phoneNum) {
+          const validation = validateBrazilianPhone(phoneNum);
+          setTestPhoneValidation(validation);
+        }
       } catch (error) {
         setTestPhoneNumber('5561996975924');
+        setTestPhoneValidation(validateBrazilianPhone('5561996975924'));
       }
     }
   }, [dialogOpen]);
@@ -201,6 +214,14 @@ export default function AdminTemplates() {
         return;
       }
 
+      // Validar número antes de enviar
+      const validation = validateBrazilianPhone(config.testPhoneNumber);
+      if (!validation.isValid) {
+        toast.error(`Número inválido: ${validation.error}`);
+        setIsSendingTest(false);
+        return;
+      }
+
       // Preparar dados de exemplo
       const exampleData: Record<string, string> = {
         nome: 'João Silva',
@@ -237,7 +258,7 @@ export default function AdminTemplates() {
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(`Teste enviado para ${formatTestPhone(config.testPhoneNumber)}! 📱`);
+        toast.success(`Teste enviado para ${validation.formatted}! 📱`);
       } else {
         throw new Error(result.error || 'Erro ao enviar mensagem');
       }
@@ -365,12 +386,28 @@ export default function AdminTemplates() {
             </div>
 
             {testPhoneNumber && (
-              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+              <div className={`border p-3 rounded-lg ${
+                testPhoneValidation.isValid 
+                  ? 'bg-blue-500/10 border-blue-500/20' 
+                  : 'bg-red-500/10 border-red-500/20'
+              }`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                    <Send className="h-4 w-4" />
+                  <div className={`flex items-center gap-2 ${
+                    testPhoneValidation.isValid 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {testPhoneValidation.isValid ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
                     <span className="text-sm font-medium">
-                      Número de teste: <span className="font-mono">{formatTestPhone(testPhoneNumber)}</span>
+                      {testPhoneValidation.isValid ? (
+                        <>Teste: <span className="font-mono">{testPhoneValidation.formatted}</span></>
+                      ) : (
+                        <>Número inválido: {testPhoneValidation.error}</>
+                      )}
                     </span>
                   </div>
                   <Button
@@ -379,7 +416,7 @@ export default function AdminTemplates() {
                     onClick={() => navigate('/admin/notificacoes')}
                     className="text-xs"
                   >
-                    Alterar
+                    {testPhoneValidation.isValid ? 'Alterar' : 'Corrigir'}
                   </Button>
                 </div>
               </div>
@@ -643,7 +680,7 @@ export default function AdminTemplates() {
               <Button 
                 variant="outline" 
                 onClick={handleSendTest}
-                disabled={isSendingTest || !formData.message.trim()}
+                disabled={isSendingTest || !formData.message.trim() || !testPhoneValidation.isValid}
                 className="flex-1 sm:flex-none"
               >
                 <Send className="h-4 w-4 mr-2" />

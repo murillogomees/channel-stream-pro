@@ -6,6 +6,7 @@ import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
+import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,11 @@ export default function AdminNotificacoes() {
   const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [runningManual, setRunningManual] = useState(false);
+  const [phoneValidation, setPhoneValidation] = useState<{
+    isValid: boolean;
+    error?: string;
+    formatted?: string;
+  }>({ isValid: true });
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
   const errorHandler = getErrorHandler();
@@ -62,6 +68,16 @@ export default function AdminNotificacoes() {
       navigate('/admin/login');
     }
   }, [isAuthenticated, loading, navigate]);
+
+  // Validar número de teste quando mudar
+  useEffect(() => {
+    if (config.testPhoneNumber) {
+      const validation = validateBrazilianPhone(config.testPhoneNumber);
+      setPhoneValidation(validation);
+    } else {
+      setPhoneValidation({ isValid: true });
+    }
+  }, [config.testPhoneNumber]);
 
   if (loading) {
     return (
@@ -359,27 +375,57 @@ export default function AdminNotificacoes() {
               
               <div className="space-y-2">
                 <Label>Número para Testes</Label>
-                <Input
-                  type="text"
-                  placeholder="5561999999999"
-                  value={config.testPhoneNumber || ''}
-                  onChange={(e) => saveConfig({ testPhoneNumber: e.target.value })}
-                  disabled={!isConfigured}
-                />
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="5561999999999"
+                    value={config.testPhoneNumber || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, ''); // Remove não-dígitos
+                      saveConfig({ testPhoneNumber: value });
+                    }}
+                    disabled={!isConfigured}
+                    className={!phoneValidation.isValid && config.testPhoneNumber ? 'border-red-500' : ''}
+                  />
+                  {!phoneValidation.isValid && config.testPhoneNumber && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {phoneValidation.error}
+                    </p>
+                  )}
+                  {phoneValidation.isValid && phoneValidation.formatted && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      {phoneValidation.formatted}
+                    </p>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Número com DDI para envio de testes
+                  Formato: 55 + DDD + Número (ex: 5561996975924)
                 </p>
               </div>
             </div>
 
-            {config.testPhoneNumber && (
+            {config.testPhoneNumber && phoneValidation.isValid && (
               <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 p-3 rounded-lg">
                 <p className="text-sm font-medium flex items-center gap-2">
-                  <Send className="h-4 w-4" />
-                  Número de teste configurado: <span className="font-mono">{config.testPhoneNumber}</span>
+                  <CheckCircle className="h-4 w-4" />
+                  Número de teste válido: <span className="font-mono">{phoneValidation.formatted}</span>
                 </p>
                 <p className="text-xs mt-1 opacity-80">
                   Este número será usado para enviar mensagens de teste dos templates
+                </p>
+              </div>
+            )}
+
+            {config.testPhoneNumber && !phoneValidation.isValid && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Número de teste inválido
+                </p>
+                <p className="text-xs mt-1 opacity-80">
+                  Corrija o formato do número antes de enviar testes
                 </p>
               </div>
             )}
