@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useClientes } from '@/hooks/useClientes';
 import { smartoneService } from '@/services/smartoneService';
 import { sendClientWelcomeNotification } from '@/services/prospectNotificationService';
-import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Loader2, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 import { PlanoCliente } from '@/types/cliente';
 
 import step1 from '@/assets/tutorial/01-app-store-search.png';
@@ -55,11 +55,77 @@ export default function TutorialSmartOne() {
     macSmartOne: '',
     plano: 'Mensal' as PlanoCliente,
     valorPago: 0,
+    origemCadastro: 'Website' as 'Google Ads' | 'Facebook' | 'Instagram' | 'Indicação' | 'Website' | 'Outro',
   });
+  const [macError, setMacError] = useState('');
+  const [macWarning, setMacWarning] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { addCliente, updateCliente } = useClientes();
+  const { addCliente, updateCliente, clientes } = useClientes();
   const navigate = useNavigate();
+
+  // Formatar MAC automaticamente durante digitação
+  const formatMacAddress = (value: string): string => {
+    // Remove caracteres não hexadecimais
+    const cleaned = value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    
+    // Adiciona : a cada 2 caracteres
+    const formatted = cleaned.match(/.{1,2}/g)?.join(':') || cleaned;
+    
+    // Limita a 17 caracteres (XX:XX:XX:XX:XX:XX)
+    return formatted.substring(0, 17);
+  };
+
+  // Validar MAC em tempo real
+  const validateMac = (mac: string) => {
+    if (mac.length === 0) {
+      setMacError('');
+      setMacWarning('');
+      return;
+    }
+
+    // Validar formato
+    const macRegex = /^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$/;
+    
+    if (mac.length < 17) {
+      setMacError('MAC incompleto');
+      setMacWarning('');
+      return;
+    }
+
+    if (!macRegex.test(mac)) {
+      setMacError('Formato inválido. Use XX:XX:XX:XX:XX:XX');
+      setMacWarning('');
+      return;
+    }
+
+    // Verificar se MAC já existe
+    const macExistente = clientes.find(c => 
+      c.macSmartOne?.toUpperCase() === mac.toUpperCase()
+    );
+
+    if (macExistente) {
+      setMacError('');
+      setMacWarning(`Este MAC já está cadastrado para ${macExistente.nome}`);
+      return;
+    }
+
+    // MAC válido e disponível
+    setMacError('');
+    setMacWarning('');
+  };
+
+  // Atualizar MAC com formatação e validação
+  useEffect(() => {
+    if (formData.macSmartOne) {
+      validateMac(formData.macSmartOne);
+    }
+  }, [formData.macSmartOne, clientes]);
+
+  const handleMacChange = (value: string) => {
+    const formatted = formatMacAddress(value);
+    setFormData(prev => ({ ...prev, macSmartOne: formatted }));
+  };
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -77,12 +143,26 @@ export default function TutorialSmartOne() {
       return;
     }
 
-    // Validar formato MAC (XX:XX:XX:XX:XX:XX ou XX-XX-XX-XX-XX-XX)
-    const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+    // Validar formato MAC
+    const macRegex = /^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$/;
     if (!macRegex.test(formData.macSmartOne)) {
       toast({
         title: 'MAC inválido',
         description: 'O endereço MAC deve estar no formato XX:XX:XX:XX:XX:XX',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Verificar se MAC já foi cadastrado
+    const macExistente = clientes.find(c => 
+      c.macSmartOne?.toUpperCase() === formData.macSmartOne.toUpperCase()
+    );
+
+    if (macExistente) {
+      toast({
+        title: 'MAC já cadastrado',
+        description: `Este endereço MAC já está registrado para ${macExistente.nome}`,
         variant: 'destructive',
       });
       return;
@@ -132,13 +212,14 @@ export default function TutorialSmartOne() {
         dataUltimoPagamento: hoje.toISOString(),
         formaUltimoPagamento: 'Pix',
         macSmartOne: formData.macSmartOne,
-        usuario: '', // Será preenchido pelo SmartOne
-        senha: '', // Será preenchido pelo SmartOne
+        usuario: '',
+        senha: '',
         clienteAtivo: true,
+        origemCadastro: formData.origemCadastro,
       });
 
       // Tentar criar playlist no SmartOne
-      const syncResult = await smartoneService.syncPlaylistForClient(
+      await smartoneService.syncPlaylistForClient(
         novoCliente,
         updateCliente
       );
@@ -148,13 +229,13 @@ export default function TutorialSmartOne() {
 
       toast({
         title: '✅ Cadastro realizado!',
-        description: 'Seu acesso foi criado com sucesso. Verifique seu WhatsApp para mais informações.',
+        description: 'Redirecionando...',
       });
 
-      // Redirecionar para página de sucesso ou home
+      // Redirecionar para página de sucesso
       setTimeout(() => {
-        navigate('/');
-      }, 3000);
+        navigate('/cadastro-sucesso');
+      }, 1500);
 
     } catch (error) {
       console.error('Erro ao processar cadastro:', error);
@@ -267,9 +348,32 @@ export default function TutorialSmartOne() {
                   id="macSmartOne"
                   placeholder="AA:BB:CC:DD:EE:FF"
                   value={formData.macSmartOne}
-                  onChange={(e) => handleInputChange('macSmartOne', e.target.value.toUpperCase())}
+                  onChange={(e) => handleMacChange(e.target.value)}
+                  className={
+                    macError ? 'border-destructive' : 
+                    macWarning ? 'border-yellow-500' : 
+                    formData.macSmartOne.length === 17 && !macError ? 'border-green-500' : ''
+                  }
                   required
                 />
+                {macError && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{macError}</span>
+                  </div>
+                )}
+                {macWarning && !macError && (
+                  <div className="flex items-center gap-2 text-sm text-yellow-600">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{macWarning}</span>
+                  </div>
+                )}
+                {!macError && !macWarning && formData.macSmartOne.length === 17 && (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>MAC válido e disponível</span>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Copie o endereço MAC da tela de informações do app
                 </p>
@@ -307,6 +411,26 @@ export default function TutorialSmartOne() {
                   Deixe em branco para usar o valor padrão do plano
                 </p>
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="origemCadastro">Como nos conheceu? (opcional)</Label>
+                <Select
+                  value={formData.origemCadastro}
+                  onValueChange={(value: any) => handleInputChange('origemCadastro', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma opção" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Website">Pesquisa no Google / Site</SelectItem>
+                    <SelectItem value="Google Ads">Anúncio no Google</SelectItem>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Indicação">Indicação de Amigo</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="bg-muted p-4 rounded-lg">
@@ -324,7 +448,7 @@ export default function TutorialSmartOne() {
               type="submit"
               size="lg"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!macError || !!macWarning}
             >
               {isSubmitting ? (
                 <>

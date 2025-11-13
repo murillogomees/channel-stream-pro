@@ -31,6 +31,7 @@ const AdminNotificationAlerts = lazy(() => import("./pages/AdminNotificationAler
 const AdminNotificationLive = lazy(() => import("./pages/AdminNotificationLive"));
 const AdminSmartOneConfig = lazy(() => import("./pages/AdminSmartOneConfig"));
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
+const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -48,6 +49,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
+          <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/activate" element={<AppActivation />} />
             <Route path="/app" element={<AppHome />} />
           <Route path="/admin/login" element={<AdminLogin />} />

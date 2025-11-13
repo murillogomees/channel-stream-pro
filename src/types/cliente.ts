@@ -24,4 +24,5 @@ export interface Cliente {
   smartone_playlist_id?: string;
   smartone_raw_response?: string;
   smartone_last_sync_at?: string;
+  origemCadastro?: 'Google Ads' | 'Facebook' | 'Instagram' | 'Indicação' | 'Website' | 'Outro';
 }

@@ -60,10 +60,19 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-4 sm:pt-6 px-4">
+            <Button 
+              variant="hero"
+              size="lg" 
+              className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
+              onClick={() => window.location.href = "/tutorial"}
+            >
+              <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
+              Ativar Meu Acesso Agora
+            </Button>
             {settings.components.hero.ctaButtons.map((button, index) => (
               <Button 
                 key={index}
-                variant={button.variant === "primary" ? "hero" : "cta"} 
+                variant={button.variant === "primary" ? "cta" : "outline"} 
                 size="lg" 
                 className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
                 onClick={() => window.location.href = "https://wa.me/5561314258880?text=" + encodeURIComponent("Olá! Gostaria de fazer o teste grátis do IPTV.")}
