@@ -22,8 +22,7 @@ const AdminActivationKeys = lazy(() => import("./pages/AdminActivationKeys"));
 const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
 const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
 const AppActivation = lazy(() => import("./pages/AppActivation"));
-const Tutorial = lazy(() => import("./pages/Tutorial"));
-const AdminProspectos = lazy(() => import("./pages/AdminProspectos"));
+const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -39,8 +38,7 @@ const App = () => (
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/tutorial" element={<Tutorial />} />
-            <Route path="/activate" element={<AppActivation />} />
+          <Route path="/activate" element={<AppActivation />} />
             <Route path="/app" element={<AppHome />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/customize" element={<AdminCustomize />} />
@@ -55,7 +53,7 @@ const App = () => (
           <Route path="/admin/activation-keys" element={<AdminActivationKeys />} />
           <Route path="/admin/app-users" element={<AdminAppUsers />} />
           <Route path="/admin/m3u-lists" element={<AdminM3ULists />} />
-          <Route path="/admin/prospectos" element={<AdminProspectos />} />
+          <Route path="/admin/variables" element={<AdminVariables />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
