@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -171,6 +171,27 @@ export default function AdminTemplates() {
       payment_reminder: 'Lembrete Pgto',
     };
     return labels[eventType] || eventType;
+  };
+
+  const getPreviewMessage = () => {
+    if (!formData.message) return '';
+    
+    const exampleData: Record<string, string> = {
+      nome: 'João Silva',
+      dataVencimento: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+      valor: '49.90',
+      linkPagamento: 'https://exemplo.com/pagar/abc123',
+      plano: 'Mensal',
+      telefone: '(11) 98765-4321',
+    };
+    
+    let preview = formData.message;
+    Object.entries(exampleData).forEach(([key, value]) => {
+      const regex = new RegExp(`\\{${key}\\}`, 'g');
+      preview = preview.replace(regex, value);
+    });
+    
+    return preview;
   };
 
   return (
@@ -381,16 +402,49 @@ export default function AdminTemplates() {
             </div>
 
             {formData.message && (
-              <div className="bg-muted p-4 rounded-lg">
-                <p className="text-sm font-medium mb-2">Variáveis detectadas:</p>
-                <div className="flex flex-wrap gap-2">
-                  {extractVariables(formData.message).map((v) => (
-                    <code key={v} className="bg-background px-2 py-1 rounded text-xs">
-                      {v}
-                    </code>
-                  ))}
+              <>
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Variáveis detectadas:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {extractVariables(formData.message).map((v) => (
+                      <code key={v} className="bg-background px-2 py-1 rounded text-xs">
+                        {v}
+                      </code>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                <div className="border-2 border-primary/20 bg-primary/5 p-4 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-primary" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">Preview em Tempo Real</p>
+                      <p className="text-xs text-muted-foreground">Visualize como ficará a mensagem</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-primary/10">
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-bold text-primary-foreground">JS</span>
+                      </div>
+                      <div className="flex-1 bg-primary/10 p-3 rounded-2xl rounded-tl-none">
+                        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                          {getPreviewMessage()}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">
+                      {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    <span>Exemplo: João Silva, R$ 49,90, Plano Mensal</span>
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
