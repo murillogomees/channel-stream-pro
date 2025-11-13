@@ -5,7 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useLocalAuth } from '@/hooks/useLocalAuth';
 import { useClientes } from '@/hooks/useClientes';
+import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
+import { sendWelcomeMessage } from '@/services/eventNotificationService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -82,6 +84,7 @@ export default function AdminClienteForm() {
   const { toast } = useToast();
   const { isAuthenticated, loading } = useLocalAuth();
   const { addCliente, updateCliente, getClienteById } = useClientes();
+  const { addLog } = useNotificationLogs();
 
   const {
     register,
@@ -122,7 +125,7 @@ export default function AdminClienteForm() {
     return null;
   }
 
-  const onSubmit = (data: ClienteFormData) => {
+  const onSubmit = async (data: ClienteFormData) => {
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
       nome: data.nome || '',
       telefone: data.telefone || '',
@@ -147,11 +150,37 @@ export default function AdminClienteForm() {
         description: 'As informações foram salvas com sucesso.',
       });
     } else {
-      addCliente(clienteData);
+      const novoCliente = addCliente(clienteData);
       toast({
         title: 'Cliente cadastrado',
         description: 'O novo cliente foi adicionado com sucesso.',
       });
+
+      // Enviar mensagem de boas-vindas automaticamente
+      try {
+        const clienteCompleto: Cliente = {
+          ...clienteData,
+          id: novoCliente.id,
+          dataCadastro: novoCliente.dataCadastro,
+          dataUltimaEdicao: novoCliente.dataUltimaEdicao,
+        };
+
+        const enviado = await sendWelcomeMessage(clienteCompleto, addLog);
+        
+        if (enviado) {
+          toast({
+            title: 'Mensagem de boas-vindas enviada',
+            description: `WhatsApp enviado para ${clienteData.nome}`,
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao enviar mensagem de boas-vindas:', error);
+        toast({
+          title: 'Aviso',
+          description: 'Cliente cadastrado, mas houve erro ao enviar mensagem de boas-vindas.',
+          variant: 'destructive',
+        });
+      }
     }
     navigate('/admin/clientes');
   };
