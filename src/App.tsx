@@ -30,6 +30,7 @@ const AdminNotificationStats = lazy(() => import("./pages/AdminNotificationStats
 const AdminNotificationAlerts = lazy(() => import("./pages/AdminNotificationAlerts"));
 const AdminNotificationLive = lazy(() => import("./pages/AdminNotificationLive"));
 const AdminSmartOneConfig = lazy(() => import("./pages/AdminSmartOneConfig"));
+const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -46,6 +47,7 @@ const App = () => (
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/activate" element={<AppActivation />} />
             <Route path="/app" element={<AppHome />} />
           <Route path="/admin/login" element={<AdminLogin />} />
