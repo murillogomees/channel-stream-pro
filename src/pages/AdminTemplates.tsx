@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,6 +70,8 @@ export default function AdminTemplates() {
     type: 'local' as 'local' | 'botbot',
     eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder',
   });
+  
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   const handleOpenDialog = (template?: WhatsappTemplate) => {
     if (template) {
@@ -153,6 +155,78 @@ export default function AdminTemplates() {
     resetToDefaults();
     toast.success('Templates restaurados para padrão!');
     setResetDialogOpen(false);
+  };
+
+  const handleSendTest = async () => {
+    if (!formData.message.trim()) {
+      toast.error('Preencha a mensagem antes de testar');
+      return;
+    }
+
+    setIsSendingTest(true);
+
+    try {
+      // Buscar configuração do WhatsApp
+      const configStored = localStorage.getItem('whatsapp_config');
+      if (!configStored) {
+        toast.error('Configure o WhatsApp primeiro em Notificações');
+        setIsSendingTest(false);
+        return;
+      }
+
+      const config = JSON.parse(configStored);
+      if (!config.appkey || !config.authkey) {
+        toast.error('Credenciais WhatsApp não configuradas');
+        setIsSendingTest(false);
+        return;
+      }
+
+      // Preparar dados de exemplo
+      const exampleData: Record<string, string> = {
+        nome: 'João Silva',
+        dataVencimento: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+        valor: '49.90',
+        linkPagamento: 'https://exemplo.com/pagar/abc123',
+        plano: 'Mensal',
+        telefone: '(11) 98765-4321',
+      };
+
+      // Substituir variáveis na mensagem
+      let testMessage = formData.message;
+      Object.entries(exampleData).forEach(([key, value]) => {
+        const regex = new RegExp(`\\{${key}\\}`, 'g');
+        testMessage = testMessage.replace(regex, value);
+      });
+
+      testMessage += '\n\n---\n🧪 Esta é uma mensagem de TESTE do sistema IPTV LINK';
+
+      // Enviar mensagem usando a API do BotBot
+      const response = await fetch('https://api.botbot.app/v1/sendmessage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'appkey': config.appkey,
+          'authkey': config.authkey,
+        },
+        body: JSON.stringify({
+          to: '5561996975924', // Número fornecido pelo usuário
+          message: testMessage,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success('Mensagem de teste enviada com sucesso! 📱');
+      } else {
+        throw new Error(result.error || 'Erro ao enviar mensagem');
+      }
+    } catch (error: any) {
+      console.error('Erro ao enviar teste:', error);
+      toast.error(`Erro ao enviar teste: ${error.message}`);
+    } finally {
+      setIsSendingTest(false);
+    }
   };
 
   const getDaysLabel = (days: number | undefined) => {
@@ -439,9 +513,14 @@ export default function AdminTemplates() {
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    <span>Exemplo: João Silva, R$ 49,90, Plano Mensal</span>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                      <span>Exemplo: João Silva, R$ 49,90, Plano Mensal</span>
+                    </div>
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                      Número teste: (61) 99697-5924
+                    </span>
                   </div>
                 </div>
               </>
@@ -507,13 +586,24 @@ export default function AdminTemplates() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleSendTest}
+              disabled={isSendingTest || !formData.message.trim()}
+              className="w-full sm:w-auto"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {isSendingTest ? 'Enviando...' : 'Enviar Teste'}
             </Button>
-            <Button onClick={handleSave}>
-              {editingTemplate ? 'Atualizar' : 'Criar'}
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} className="flex-1 sm:flex-none">
+                {editingTemplate ? 'Atualizar' : 'Criar'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
