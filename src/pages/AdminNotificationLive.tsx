@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getRealtimeService, RealtimeNotificationEvent, RealtimeStats } from "@/services/realtimeNotificationService";
+import { RealtimeConnectionStatus } from "@/components/RealtimeConnectionStatus";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -595,6 +596,9 @@ const AdminNotificationLive = () => {
             )}
           </div>
         </div>
+
+        {/* Connection Status */}
+        <RealtimeConnectionStatus />
 
         {/* Painel de Filtros */}
         {showFilters && (

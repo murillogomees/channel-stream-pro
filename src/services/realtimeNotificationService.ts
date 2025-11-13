@@ -24,39 +24,241 @@ export interface RealtimeStats {
   lastUpdate: string;
 }
 
+interface ConnectionConfig {
+  maxRetries: number;
+  retryDelayMs: number;
+  maxRetryDelayMs: number;
+  connectionTimeoutMs: number;
+  heartbeatIntervalMs: number;
+}
+
+const DEFAULT_CONFIG: ConnectionConfig = {
+  maxRetries: 5,
+  retryDelayMs: 1000,
+  maxRetryDelayMs: 30000,
+  connectionTimeoutMs: 10000,
+  heartbeatIntervalMs: 30000,
+};
+
 class RealtimeNotificationService {
   private channel: RealtimeChannel | null = null;
   private listeners: Map<string, (event: RealtimeNotificationEvent) => void> = new Map();
+  private retryCount: number = 0;
+  private config: ConnectionConfig = DEFAULT_CONFIG;
+  private reconnectTimer: number | null = null;
+  private heartbeatTimer: number | null = null;
+  private isConnecting: boolean = false;
+  private useFallbackMode: boolean = false;
+  private fallbackTimer: number | null = null;
+  private connectionErrorCount: number = 0;
+  private lastSuccessfulConnection: number = 0;
   
   connect() {
-    if (this.channel) {
+    if (this.isConnecting) {
+      console.log('[Realtime] Conexão já em andamento');
       return this.channel;
     }
 
-    this.channel = supabase.channel('notifications_live', {
-      config: {
-        broadcast: { self: true }
-      }
-    });
+    if (this.channel && this.getConnectionStatus() === 'connected') {
+      console.log('[Realtime] Já conectado');
+      return this.channel;
+    }
 
-    this.channel
-      .on('broadcast', { event: 'notification_event' }, (payload) => {
-        console.log('[Realtime] Evento recebido:', payload);
-        this.notifyListeners(payload.payload as RealtimeNotificationEvent);
-      })
-      .subscribe((status) => {
-        console.log('[Realtime] Status da conexão:', status);
-      });
-
+    this.isConnecting = true;
+    this.attemptConnection();
     return this.channel;
   }
 
+  private async attemptConnection() {
+    try {
+      console.log(`[Realtime] Tentando conectar (tentativa ${this.retryCount + 1}/${this.config.maxRetries})`);
+      
+      // Cleanup existing channel
+      if (this.channel) {
+        await supabase.removeChannel(this.channel);
+        this.channel = null;
+      }
+
+      // Create new channel with timeout
+      const connectionPromise = this.createChannel();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), this.config.connectionTimeoutMs)
+      );
+
+      await Promise.race([connectionPromise, timeoutPromise]);
+      
+      // Connection successful
+      this.onConnectionSuccess();
+      
+    } catch (error) {
+      console.error('[Realtime] Erro na conexão:', error);
+      this.onConnectionError(error);
+    }
+  }
+
+  private createChannel(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.channel = supabase.channel('notifications_live', {
+        config: {
+          broadcast: { self: true },
+          presence: { key: '' }
+        }
+      });
+
+      this.channel
+        .on('broadcast', { event: 'notification_event' }, (payload) => {
+          console.log('[Realtime] Evento recebido:', payload);
+          this.notifyListeners(payload.payload as RealtimeNotificationEvent);
+        })
+        .subscribe((status, error) => {
+          console.log('[Realtime] Status da subscrição:', status, error);
+          
+          if (status === 'SUBSCRIBED') {
+            resolve();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            reject(error || new Error(`Subscription failed: ${status}`));
+          } else if (status === 'CLOSED') {
+            console.log('[Realtime] Canal fechado, tentando reconectar...');
+            this.scheduleReconnect();
+          }
+        });
+    });
+  }
+
+  private onConnectionSuccess() {
+    console.log('[Realtime] Conexão estabelecida com sucesso');
+    this.isConnecting = false;
+    this.retryCount = 0;
+    this.connectionErrorCount = 0;
+    this.lastSuccessfulConnection = Date.now();
+    this.useFallbackMode = false;
+    
+    // Clear any pending reconnect
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    // Start heartbeat
+    this.startHeartbeat();
+  }
+
+  private onConnectionError(error: any) {
+    console.error('[Realtime] Falha na conexão:', error);
+    this.isConnecting = false;
+    this.connectionErrorCount++;
+    
+    // Check if we should switch to fallback mode
+    if (this.connectionErrorCount >= this.config.maxRetries) {
+      console.warn('[Realtime] Muitas falhas, ativando modo fallback (polling)');
+      this.activateFallbackMode();
+      return;
+    }
+    
+    // Schedule retry with exponential backoff
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+
+    const delay = Math.min(
+      this.config.retryDelayMs * Math.pow(2, this.retryCount),
+      this.config.maxRetryDelayMs
+    );
+
+    console.log(`[Realtime] Reagendando conexão em ${delay}ms`);
+    
+    this.reconnectTimer = window.setTimeout(() => {
+      this.retryCount++;
+      if (this.retryCount < this.config.maxRetries) {
+        this.connect();
+      } else {
+        console.error('[Realtime] Máximo de tentativas atingido');
+        this.activateFallbackMode();
+      }
+    }, delay);
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+    }
+
+    this.heartbeatTimer = window.setInterval(() => {
+      const status = this.getConnectionStatus();
+      
+      if (status !== 'connected') {
+        console.warn('[Realtime] Heartbeat falhou, reconectando...');
+        this.connect();
+      } else {
+        console.log('[Realtime] Heartbeat OK');
+      }
+    }, this.config.heartbeatIntervalMs);
+  }
+
+  private activateFallbackMode() {
+    this.useFallbackMode = true;
+    console.log('[Realtime] Modo fallback ativado - notificações podem ter delay');
+    
+    // Notify listeners about fallback mode
+    this.notifyListeners({
+      type: 'notification_failed',
+      timestamp: new Date().toISOString(),
+      data: {
+        status: 'error',
+        error: 'WebSocket indisponível, usando modo fallback'
+      }
+    });
+    
+    // Start fallback polling (simplified - could poll database)
+    this.startFallbackPolling();
+  }
+
+  private startFallbackPolling() {
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer);
+    }
+
+    // Try to reconnect every minute in fallback mode
+    this.fallbackTimer = window.setInterval(() => {
+      console.log('[Realtime] Tentando sair do modo fallback...');
+      this.retryCount = 0;
+      this.connectionErrorCount = 0;
+      this.connect();
+    }, 60000);
+  }
+
   disconnect() {
+    console.log('[Realtime] Desconectando...');
+    
+    // Clear all timers
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer);
+      this.fallbackTimer = null;
+    }
+    
+    // Remove channel
     if (this.channel) {
       supabase.removeChannel(this.channel);
       this.channel = null;
-      console.log('[Realtime] Desconectado');
     }
+    
+    this.isConnecting = false;
+    this.useFallbackMode = false;
+    console.log('[Realtime] Desconectado');
   }
 
   async broadcastNotificationSent(data: {
@@ -67,56 +269,83 @@ class RealtimeNotificationService {
     status: 'success' | 'error';
     error?: string;
   }) {
-    if (!this.channel) {
-      console.warn('[Realtime] Canal não conectado');
+    if (!this.channel || this.getConnectionStatus() !== 'connected') {
+      console.warn('[Realtime] Canal não conectado, tentando reconectar...');
+      this.connect();
+      
+      // If in fallback mode, just log locally
+      if (this.useFallbackMode) {
+        console.log('[Realtime] Modo fallback - evento armazenado localmente');
+        return;
+      }
       return;
     }
 
-    const event: RealtimeNotificationEvent = {
-      type: data.status === 'success' ? 'notification_sent' : 'notification_failed',
-      timestamp: new Date().toISOString(),
-      data,
-    };
+    try {
+      const event: RealtimeNotificationEvent = {
+        type: data.status === 'success' ? 'notification_sent' : 'notification_failed',
+        timestamp: new Date().toISOString(),
+        data,
+      };
 
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'notification_event',
-      payload: event,
-    });
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'notification_event',
+        payload: event,
+      });
 
-    console.log('[Realtime] Evento enviado:', event);
+      console.log('[Realtime] Evento enviado:', event);
+    } catch (error) {
+      console.error('[Realtime] Erro ao enviar evento:', error);
+      // Trigger reconnect on send error
+      this.scheduleReconnect();
+    }
   }
 
   async broadcastBatchStarted(batchSize: number) {
-    if (!this.channel) return;
+    if (!this.channel || this.getConnectionStatus() !== 'connected') {
+      console.warn('[Realtime] Canal não conectado para batch_started');
+      return;
+    }
 
-    const event: RealtimeNotificationEvent = {
-      type: 'batch_started',
-      timestamp: new Date().toISOString(),
-      data: { batchSize },
-    };
+    try {
+      const event: RealtimeNotificationEvent = {
+        type: 'batch_started',
+        timestamp: new Date().toISOString(),
+        data: { batchSize },
+      };
 
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'notification_event',
-      payload: event,
-    });
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'notification_event',
+        payload: event,
+      });
+    } catch (error) {
+      console.error('[Realtime] Erro ao enviar batch_started:', error);
+    }
   }
 
   async broadcastBatchCompleted(successCount: number, errorCount: number) {
-    if (!this.channel) return;
+    if (!this.channel || this.getConnectionStatus() !== 'connected') {
+      console.warn('[Realtime] Canal não conectado para batch_completed');
+      return;
+    }
 
-    const event: RealtimeNotificationEvent = {
-      type: 'batch_completed',
-      timestamp: new Date().toISOString(),
-      data: { successCount, errorCount },
-    };
+    try {
+      const event: RealtimeNotificationEvent = {
+        type: 'batch_completed',
+        timestamp: new Date().toISOString(),
+        data: { successCount, errorCount },
+      };
 
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'notification_event',
-      payload: event,
-    });
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'notification_event',
+        payload: event,
+      });
+    } catch (error) {
+      console.error('[Realtime] Erro ao enviar batch_completed:', error);
+    }
   }
 
   subscribe(id: string, callback: (event: RealtimeNotificationEvent) => void) {
@@ -140,12 +369,43 @@ class RealtimeNotificationService {
   }
 
   getConnectionStatus(): 'connected' | 'disconnected' | 'connecting' {
+    if (this.isConnecting) return 'connecting';
     if (!this.channel) return 'disconnected';
     
     const state = this.channel.state;
     if (state === 'joined') return 'connected';
     if (state === 'joining') return 'connecting';
     return 'disconnected';
+  }
+
+  isInFallbackMode(): boolean {
+    return this.useFallbackMode;
+  }
+
+  getConnectionHealth(): {
+    status: 'connected' | 'disconnected' | 'connecting';
+    fallbackMode: boolean;
+    retryCount: number;
+    errorCount: number;
+    lastConnection: number | null;
+  } {
+    return {
+      status: this.getConnectionStatus(),
+      fallbackMode: this.useFallbackMode,
+      retryCount: this.retryCount,
+      errorCount: this.connectionErrorCount,
+      lastConnection: this.lastSuccessfulConnection || null,
+    };
+  }
+
+  // Force reconnect (useful for manual recovery)
+  forceReconnect() {
+    console.log('[Realtime] Forçando reconexão...');
+    this.disconnect();
+    this.retryCount = 0;
+    this.connectionErrorCount = 0;
+    this.useFallbackMode = false;
+    this.connect();
   }
 }
 
