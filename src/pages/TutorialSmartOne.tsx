@@ -133,12 +133,40 @@ export default function TutorialSmartOne() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.nome || !formData.telefone || !formData.email || !formData.macSmartOne) {
+
+    // Validações rigorosas
+    if (!formData.nome.trim()) {
       toast({
-        title: 'Campos obrigatórios',
-        description: 'Por favor, preencha todos os campos obrigatórios.',
         variant: 'destructive',
+        title: 'Nome obrigatório',
+        description: 'Por favor, informe seu nome completo.',
+      });
+      return;
+    }
+
+    if (!formData.telefone.trim() || formData.telefone.length < 10) {
+      toast({
+        variant: 'destructive',
+        title: 'Telefone obrigatório',
+        description: 'Por favor, informe um telefone válido com DDD.',
+      });
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Email obrigatório',
+        description: 'Por favor, informe um email válido.',
+      });
+      return;
+    }
+
+    if (!formData.macSmartOne || macError) {
+      toast({
+        variant: 'destructive',
+        title: 'MAC obrigatório',
+        description: 'Por favor, informe o endereço MAC válido do seu dispositivo.',
       });
       return;
     }

@@ -31,46 +31,53 @@ import { useToast } from '@/hooks/use-toast';
 const clienteSchema = z.object({
   nome: z.string()
     .trim()
+    .min(1, 'Nome é obrigatório')
     .max(200, 'Nome muito longo')
-    .optional(),
+    .regex(/^[a-zA-ZÀ-ÿ\s]+$/, 'Nome deve conter apenas letras'),
   telefone: z.string()
     .trim()
+    .min(10, 'Telefone deve ter no mínimo 10 dígitos')
     .max(20, 'Telefone muito longo')
-    .optional(),
+    .regex(/^[\d\s\(\)\-\+]+$/, 'Telefone inválido'),
   telegram: z.string()
     .trim()
     .max(50, 'Telegram muito longo')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   email: z.string()
     .trim()
     .email('Email inválido')
     .max(255, 'Email muito longo')
     .optional()
     .or(z.literal('')),
-  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']).optional(),
-  dataContratacao: z.string().optional(),
-  dataVencimento: z.string().optional(),
-  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual']).optional(),
+  situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']),
+  dataContratacao: z.string().min(1, 'Data de contratação é obrigatória'),
+  dataVencimento: z.string().min(1, 'Data de vencimento é obrigatória'),
+  plano: z.enum(['Mensal', 'Trimestral', 'Semestral', 'Anual']),
   valorPago: z.number()
     .min(0, 'Valor não pode ser negativo')
-    .max(999999.99, 'Valor muito alto')
-    .optional(),
-  dataUltimoPagamento: z.string().optional(),
+    .max(999999.99, 'Valor muito alto'),
+  dataUltimoPagamento: z.string().optional().or(z.literal('')),
   formaUltimoPagamento: z.string()
     .trim()
     .max(100, 'Forma de pagamento muito longa')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   macSmartOne: z.string()
     .trim()
     .max(100, 'MAC muito longo')
-    .optional(),
+    .regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^$/, 'MAC inválido. Use formato XX:XX:XX:XX:XX:XX')
+    .optional()
+    .or(z.literal('')),
   usuario: z.string()
     .trim()
     .max(100, 'Usuário muito longo')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   senha: z.string()
     .max(100, 'Senha muito longa')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   clienteAtivo: z.boolean().optional(),
 });
 
