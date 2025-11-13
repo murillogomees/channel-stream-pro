@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Radio, Users, CheckCircle2, XCircle, Clock, Activity, Zap, Filter, X, Save, Trash2, Bookmark } from "lucide-react";
+import { ArrowLeft, Radio, CheckCircle2, XCircle, Clock, Activity, Zap, Filter, Save, Trash2, Bookmark, Play, Pause, FastForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ const AdminNotificationLive = () => {
   
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
   const [events, setEvents] = useState<RealtimeNotificationEvent[]>([]);
+  const [bufferedEvents, setBufferedEvents] = useState<RealtimeNotificationEvent[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
   const [stats, setStats] = useState<RealtimeStats>({
     totalSent: 0,
     successCount: 0,
@@ -229,16 +231,24 @@ const AdminNotificationLive = () => {
     };
   }, []);
 
-  // Auto-scroll para o final quando novos eventos chegam
+  // Auto-scroll para o final quando novos eventos chegam (somente se não estiver pausado)
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && !isPaused) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [events, isPaused]);
 
   const handleRealtimeEvent = (event: RealtimeNotificationEvent) => {
     console.log('[Dashboard] Evento recebido:', event);
     
+    // Se estiver pausado, adicionar ao buffer
+    if (isPaused) {
+      setBufferedEvents((prev) => [event, ...prev]);
+      console.log('[Dashboard] Evento adicionado ao buffer (pausado)');
+      return;
+    }
+
+    // Se não estiver pausado, adicionar normalmente
     setEvents((prev) => {
       const newEvents = [event, ...prev];
       // Manter apenas os últimos 100 eventos
@@ -265,6 +275,76 @@ const AdminNotificationLive = () => {
       
       return newStats;
     });
+  };
+
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+    
+    // Se está despausando e há eventos no buffer, adicionar aos eventos visíveis
+    if (isPaused && bufferedEvents.length > 0) {
+      setEvents((prev) => {
+        const combined = [...bufferedEvents, ...prev];
+        return combined.slice(0, 100);
+      });
+      
+      // Processar estatísticas dos eventos do buffer
+      bufferedEvents.forEach(event => {
+        setStats((prev) => {
+          const newStats = { ...prev, lastUpdate: event.timestamp };
+          
+          if (event.type === 'notification_sent') {
+            newStats.totalSent++;
+            newStats.successCount++;
+          } else if (event.type === 'notification_failed') {
+            newStats.totalSent++;
+            newStats.errorCount++;
+          } else if (event.type === 'batch_completed') {
+            if (event.data.successCount) newStats.successCount += event.data.successCount;
+            if (event.data.errorCount) newStats.errorCount += event.data.errorCount;
+          }
+          
+          return newStats;
+        });
+      });
+      
+      setBufferedEvents([]);
+    }
+  };
+
+  const resumeAndProcess = () => {
+    if (bufferedEvents.length > 0) {
+      setEvents((prev) => {
+        const combined = [...bufferedEvents, ...prev];
+        return combined.slice(0, 100);
+      });
+      
+      // Processar estatísticas
+      bufferedEvents.forEach(event => {
+        setStats((prev) => {
+          const newStats = { ...prev, lastUpdate: event.timestamp };
+          
+          if (event.type === 'notification_sent') {
+            newStats.totalSent++;
+            newStats.successCount++;
+          } else if (event.type === 'notification_failed') {
+            newStats.totalSent++;
+            newStats.errorCount++;
+          } else if (event.type === 'batch_completed') {
+            if (event.data.successCount) newStats.successCount += event.data.successCount;
+            if (event.data.errorCount) newStats.errorCount += event.data.errorCount;
+          }
+          
+          return newStats;
+        });
+      });
+      
+      setBufferedEvents([]);
+    }
+    setIsPaused(false);
+  };
+
+  const clearBuffer = () => {
+    setBufferedEvents([]);
   };
 
   const clearEvents = () => {
@@ -450,6 +530,57 @@ const AdminNotificationLive = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            {/* Controles de Pause/Play */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant={isPaused ? "default" : "outline"}
+                onClick={togglePause}
+                className={cn(
+                  "transition-all",
+                  isPaused && "bg-yellow-600 hover:bg-yellow-700"
+                )}
+              >
+                {isPaused ? (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Retomar
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-4 w-4 mr-2" />
+                    Pausar
+                  </>
+                )}
+              </Button>
+
+              {isPaused && bufferedEvents.length > 0 && (
+                <>
+                  <Badge variant="secondary" className="animate-pulse">
+                    {bufferedEvents.length} em buffer
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resumeAndProcess}
+                    title="Processar eventos do buffer e retomar"
+                  >
+                    <FastForward className="h-4 w-4 mr-2" />
+                    Processar ({bufferedEvents.length})
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearBuffer}
+                    title="Descartar eventos do buffer"
+                  >
+                    Descartar
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <Separator orientation="vertical" className="h-10" />
+
             <Button 
               variant={showFilters ? "default" : "outline"} 
               onClick={() => setShowFilters(!showFilters)}
@@ -798,11 +929,22 @@ const AdminNotificationLive = () => {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Radio className="h-5 w-5 text-red-600 animate-pulse" />
+                  <Radio className={cn(
+                    "h-5 w-5",
+                    isPaused ? "text-yellow-600" : "text-red-600 animate-pulse"
+                  )} />
                   Stream de Eventos ao Vivo
+                  {isPaused && (
+                    <Badge variant="secondary" className="ml-2">
+                      PAUSADO
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
-                  Acompanhe as notificações sendo enviadas em tempo real
+                  {isPaused 
+                    ? "Stream pausado - eventos estão sendo armazenados em buffer"
+                    : "Acompanhe as notificações sendo enviadas em tempo real"
+                  }
                 </CardDescription>
               </div>
               {stats.lastUpdate && (
@@ -901,6 +1043,8 @@ const AdminNotificationLive = () => {
             <p>• As estatísticas são atualizadas automaticamente a cada evento</p>
             <p>• A conexão é mantida via WebSocket do Supabase Realtime</p>
             <p>• Os eventos são armazenados apenas durante a sessão ativa</p>
+            <p>• <strong>Pause o stream</strong> para analisar eventos sem perder novos envios</p>
+            <p>• Eventos recebidos durante a pausa ficam em buffer e podem ser processados ou descartados</p>
           </CardContent>
         </Card>
       </div>
