@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Server, Zap, Download } from 'lucide-react';
+import { ArrowLeft, Activity, Server, Zap, Download, TrendingUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getSystemHealthService, SystemHealthStatus } from '@/services/systemHealthService';
-import { getWebSocketMetricsService, WebSocketMetrics } from '@/services/websocketMetricsService';
+import { getWebSocketMetricsService, WebSocketMetrics, MetricsSnapshot } from '@/services/websocketMetricsService';
 import { getAdminAlertService, AdminAlert } from '@/services/adminAlertService';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const AdminSystemHealth = () => {
   const navigate = useNavigate();
   const [health, setHealth] = useState<SystemHealthStatus | null>(null);
   const [metrics, setMetrics] = useState<WebSocketMetrics | null>(null);
   const [alerts, setAlerts] = useState<AdminAlert[]>([]);
+  const [snapshots, setSnapshots] = useState<MetricsSnapshot[]>([]);
 
   useEffect(() => {
     const healthService = getSystemHealthService();
@@ -27,6 +32,7 @@ const AdminSystemHealth = () => {
       setHealth(healthService.getStatus());
       setMetrics(metricsService.getMetrics());
       setAlerts(alertService.getUnacknowledgedAlerts());
+      setSnapshots(metricsService.getSnapshotHistory());
     };
 
     updateData();
@@ -63,6 +69,40 @@ const AdminSystemHealth = () => {
     const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
   };
+
+  // Prepare chart data
+  const latencyChartData = snapshots.map(snapshot => ({
+    time: format(new Date(snapshot.timestamp), 'HH:mm:ss', { locale: ptBR }),
+    timestamp: snapshot.timestamp,
+    latencia: Math.round(snapshot.metrics.averageLatency),
+    minima: Math.round(snapshot.metrics.minLatency),
+    maxima: Math.round(snapshot.metrics.maxLatency),
+  })).slice(-30); // Last 30 snapshots
+
+  const uptimeChartData = snapshots.map(snapshot => ({
+    time: format(new Date(snapshot.timestamp), 'HH:mm:ss', { locale: ptBR }),
+    timestamp: snapshot.timestamp,
+    uptime: Math.round(snapshot.metrics.totalUptime / 1000 / 60), // Convert to minutes
+    downtime: Math.round(snapshot.metrics.totalDowntime / 1000 / 60),
+  })).slice(-30);
+
+  const connectionChartData = snapshots.map(snapshot => ({
+    time: format(new Date(snapshot.timestamp), 'HH:mm:ss', { locale: ptBR }),
+    timestamp: snapshot.timestamp,
+    sucesso: snapshot.metrics.successfulConnections,
+    falhas: snapshot.metrics.failedConnections,
+    taxa: snapshot.metrics.totalConnections > 0 
+      ? Math.round((snapshot.metrics.successfulConnections / snapshot.metrics.totalConnections) * 100)
+      : 0,
+  })).slice(-30);
+
+  const eventsChartData = snapshots.map(snapshot => ({
+    time: format(new Date(snapshot.timestamp), 'HH:mm:ss', { locale: ptBR }),
+    timestamp: snapshot.timestamp,
+    enviados: snapshot.metrics.totalEventsSent,
+    recebidos: snapshot.metrics.totalEventsReceived,
+    falhas: snapshot.metrics.failedEvents,
+  })).slice(-30);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -160,6 +200,252 @@ const AdminSystemHealth = () => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Trend Charts */}
+        {snapshots.length > 5 && (
+          <Tabs defaultValue="latency" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="latency">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Latência
+              </TabsTrigger>
+              <TabsTrigger value="uptime">
+                <Clock className="h-4 w-4 mr-2" />
+                Uptime
+              </TabsTrigger>
+              <TabsTrigger value="connections">
+                <Activity className="h-4 w-4 mr-2" />
+                Conexões
+              </TabsTrigger>
+              <TabsTrigger value="events">
+                <Zap className="h-4 w-4 mr-2" />
+                Eventos
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Latency Chart */}
+            <TabsContent value="latency">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Latência ao Longo do Tempo</CardTitle>
+                  <CardDescription>
+                    Evolução da latência de conexão WebSocket (últimos {latencyChartData.length} snapshots)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={latencyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="time" 
+                        tick={{ fontSize: 12 }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis 
+                        label={{ value: 'Latência (ms)', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="latencia" 
+                        stroke="hsl(var(--primary))" 
+                        name="Média"
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="minima" 
+                        stroke="hsl(142 76% 36%)" 
+                        name="Mínima"
+                        strokeDasharray="5 5"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="maxima" 
+                        stroke="hsl(0 72% 51%)" 
+                        name="Máxima"
+                        strokeDasharray="5 5"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Uptime/Downtime Chart */}
+            <TabsContent value="uptime">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Uptime vs Downtime</CardTitle>
+                  <CardDescription>
+                    Tempo de atividade vs inatividade em minutos (últimos {uptimeChartData.length} snapshots)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={uptimeChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="time" 
+                        tick={{ fontSize: 12 }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis 
+                        label={{ value: 'Tempo (minutos)', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                      <Legend />
+                      <Area 
+                        type="monotone" 
+                        dataKey="uptime" 
+                        stackId="1"
+                        stroke="hsl(142 76% 36%)" 
+                        fill="hsl(142 76% 36% / 0.3)" 
+                        name="Uptime"
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="downtime" 
+                        stackId="1"
+                        stroke="hsl(0 72% 51%)" 
+                        fill="hsl(0 72% 51% / 0.3)" 
+                        name="Downtime"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Connections Chart */}
+            <TabsContent value="connections">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Conexões Bem-Sucedidas vs Falhas</CardTitle>
+                  <CardDescription>
+                    Evolução das tentativas de conexão (últimos {connectionChartData.length} snapshots)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={connectionChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="time" 
+                        tick={{ fontSize: 12 }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis 
+                        label={{ value: 'Conexões', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="sucesso" 
+                        fill="hsl(142 76% 36%)" 
+                        name="Sucesso"
+                      />
+                      <Bar 
+                        dataKey="falhas" 
+                        fill="hsl(0 72% 51%)" 
+                        name="Falhas"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Success Rate Line */}
+                  <div className="mt-6">
+                    <div className="text-sm text-muted-foreground mb-2">Taxa de Sucesso ao Longo do Tempo</div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <LineChart data={connectionChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="time" 
+                          tick={{ fontSize: 12 }}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis 
+                          domain={[0, 100]}
+                          label={{ value: 'Taxa (%)', angle: -90, position: 'insideLeft' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          formatter={(value) => `${value}%`}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="taxa" 
+                          stroke="hsl(var(--primary))" 
+                          name="Taxa de Sucesso"
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Events Chart */}
+            <TabsContent value="events">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Eventos WebSocket</CardTitle>
+                  <CardDescription>
+                    Eventos enviados, recebidos e falhados (últimos {eventsChartData.length} snapshots)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={eventsChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="time" 
+                        tick={{ fontSize: 12 }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis 
+                        label={{ value: 'Eventos', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="enviados" 
+                        stroke="hsl(var(--primary))" 
+                        name="Enviados"
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="recebidos" 
+                        stroke="hsl(142 76% 36%)" 
+                        name="Recebidos"
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="falhas" 
+                        stroke="hsl(0 72% 51%)" 
+                        name="Falhas"
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         )}
 
         {/* Alerts */}
