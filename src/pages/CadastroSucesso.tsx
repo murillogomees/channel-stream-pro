@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Home, PlayCircle, MessageCircle } from 'lucide-react';
+import { CheckCircle2, Home, MessageCircle } from 'lucide-react';
+import VideoTutorial from '@/components/VideoTutorial';
 
 export default function CadastroSucesso() {
   const navigate = useNavigate();
@@ -74,24 +75,14 @@ export default function CadastroSucesso() {
         </Card>
 
         {/* Video Tutorial Card */}
-        <Card className="p-8 mb-8">
-          <h2 className="text-2xl font-bold mb-4">🎬 Vídeo Tutorial</h2>
-          <p className="text-muted-foreground mb-6">
-            Assista ao vídeo tutorial para aproveitar ao máximo seu IPTV LINK
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold mb-4 text-center">🎬 Como Usar o SmartOne IPTV</h2>
+          <p className="text-center text-muted-foreground mb-6">
+            Assista ao tutorial interativo e aprenda a navegar pelo aplicativo
           </p>
           
-          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center mb-4">
-            <div className="text-center">
-              <PlayCircle className="w-16 h-16 text-primary mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">
-                Tutorial de Primeiro Acesso
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                (Em breve disponível)
-              </p>
-            </div>
-          </div>
-        </Card>
+          <VideoTutorial />
+        </div>
 
         {/* Tips Card */}
         <Card className="p-8 mb-8">
