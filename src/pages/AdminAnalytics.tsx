@@ -7,10 +7,16 @@ import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, Do
 import { useNavigate } from "react-router-dom";
 import { useClientes } from "@/hooks/useClientes";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LineChart, AreaChart, Area } from "recharts";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 
 type PeriodFilter = '7' | '30' | '90' | '365' | 'all';
+
+interface MarketingInvestment {
+  [canal: string]: number;
+}
+
+const INVESTMENT_STORAGE_KEY = 'marketing_investments';
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
@@ -28,6 +34,32 @@ const AdminAnalytics = () => {
     'Website': 35,
     'Outro': 30
   });
+
+  // Estado para investimentos em marketing por canal
+  const [marketingInvestments, setMarketingInvestments] = useState<MarketingInvestment>(() => {
+    const stored = localStorage.getItem(INVESTMENT_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {
+      'Google Ads': 0,
+      'Facebook': 0,
+      'Instagram': 0,
+      'Indicação': 0,
+      'Website': 0,
+      'Outro': 0
+    };
+  });
+
+  // Salvar investimentos no localStorage
+  useEffect(() => {
+    localStorage.setItem(INVESTMENT_STORAGE_KEY, JSON.stringify(marketingInvestments));
+  }, [marketingInvestments]);
+
+  // Atualizar investimento de um canal
+  const updateInvestment = (canal: string, valor: number) => {
+    setMarketingInvestments(prev => ({
+      ...prev,
+      [canal]: valor
+    }));
+  };
 
   // Filtrar clientes por período
   const filteredClientes = useMemo(() => {
@@ -363,6 +395,86 @@ const AdminAnalytics = () => {
   const receitaTotal = roiChartData.reduce((sum, item) => sum + item.receitaTotal, 0);
   const melhorROI = roiChartData.length > 0 ? roiChartData[0] : null;
 
+  // Análise de CAC e ROI Real
+  const cacRoiData = roiChartData.map(item => {
+    const investimento = marketingInvestments[item.origem] || 0;
+    const cac = item.totalClientes > 0 ? investimento / item.totalClientes : 0;
+    const roiReal = investimento > 0 ? ((item.receitaTotal - investimento) / investimento * 100) : 0;
+    const lucro = item.receitaTotal - investimento;
+    
+    return {
+      ...item,
+      investimento,
+      cac,
+      roiReal,
+      lucro
+    };
+  }).sort((a, b) => b.roiReal - a.roiReal);
+
+  const investimentoTotal = Object.values(marketingInvestments).reduce((sum, val) => sum + val, 0);
+  const lucroTotal = receitaTotal - investimentoTotal;
+  const roiGeralReal = investimentoTotal > 0 ? ((receitaTotal - investimentoTotal) / investimentoTotal * 100) : 0;
+  const melhorCanalROI = cacRoiData.length > 0 ? cacRoiData[0] : null;
+
+  // Análise de tendência de receita mensal
+  const receitaMensal = filteredClientes.reduce((acc, cliente) => {
+    if (!cliente.dataCadastro || !cliente.valorPago) return acc;
+    const date = new Date(cliente.dataCadastro);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = 0;
+    }
+    acc[monthKey] += cliente.valorPago;
+    
+    return acc;
+  }, {} as Record<string, number>);
+
+  const receitaMensalData = Object.entries(receitaMensal)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, receita]) => ({
+      month,
+      receita: parseFloat(receita.toFixed(2))
+    }));
+
+  // Previsão de receita baseada em média móvel (últimos 3 meses)
+  const calcularPrevisao = () => {
+    if (receitaMensalData.length < 3) return [];
+    
+    const ultimos3Meses = receitaMensalData.slice(-3);
+    const mediaMovel = ultimos3Meses.reduce((sum, item) => sum + item.receita, 0) / 3;
+    
+    // Calcular taxa de crescimento
+    const crescimento = receitaMensalData.length >= 2
+      ? (receitaMensalData[receitaMensalData.length - 1].receita - receitaMensalData[receitaMensalData.length - 2].receita) / receitaMensalData[receitaMensalData.length - 2].receita
+      : 0;
+    
+    // Gerar previsão para próximos 3 meses
+    const ultimoMes = receitaMensalData[receitaMensalData.length - 1];
+    const [ano, mes] = ultimoMes.month.split('-').map(Number);
+    
+    const previsoes = [];
+    for (let i = 1; i <= 3; i++) {
+      const novoMes = new Date(ano, mes - 1 + i, 1);
+      const monthKey = `${novoMes.getFullYear()}-${String(novoMes.getMonth() + 1).padStart(2, '0')}`;
+      const previsaoValor = mediaMovel * (1 + (crescimento * i * 0.5)); // Crescimento amortecido
+      
+      previsoes.push({
+        month: monthKey,
+        receita: null,
+        previsao: parseFloat(previsaoValor.toFixed(2))
+      });
+    }
+    
+    return previsoes;
+  };
+
+  const previsaoReceita = calcularPrevisao();
+  const receitaComPrevisao = [
+    ...receitaMensalData.map(item => ({ ...item, previsao: null })),
+    ...previsaoReceita
+  ];
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -507,7 +619,22 @@ const AdminAnalytics = () => {
                 R$ {receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
               <p className="text-xs text-muted-foreground">
-                {melhorROI ? `${melhorROI.origem}: R$ ${melhorROI.receitaTotal.toFixed(2)}` : 'Sem dados'}
+                Lucro: R$ {lucroTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">ROI Real Geral</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${roiGeralReal >= 100 ? 'text-green-500' : roiGeralReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                {roiGeralReal.toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {melhorCanalROI ? `Melhor: ${melhorCanalROI.origem}` : 'Configure investimentos'}
               </p>
             </CardContent>
           </Card>
@@ -542,7 +669,7 @@ const AdminAnalytics = () => {
                       </p>
                     </div>
                     
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <div className="text-right">
                         <p className={`text-xl font-bold ${getConversaoColor(taxa)}`}>
                           {item.taxa}%
@@ -581,6 +708,218 @@ const AdminAnalytics = () => {
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Dashboard de CAC e ROI Real */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Custo de Aquisição (CAC) e ROI Real por Canal</CardTitle>
+            <CardDescription>
+              Configure o investimento em marketing e visualize CAC, ROI real e lucratividade de cada canal
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 mb-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card className="border-2 border-primary/20 bg-primary/5">
+                  <CardContent className="pt-6">
+                    <div className="text-sm text-muted-foreground mb-1">Investimento Total</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      R$ {investimentoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-2 border-green-500/20 bg-green-500/5">
+                  <CardContent className="pt-6">
+                    <div className="text-sm text-muted-foreground mb-1">Lucro Total</div>
+                    <div className={`text-2xl font-bold ${lucroTotal >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      R$ {lucroTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-2 border-blue-500/20 bg-blue-500/5">
+                  <CardContent className="pt-6">
+                    <div className="text-sm text-muted-foreground mb-1">ROI Real Geral</div>
+                    <div className={`text-2xl font-bold ${roiGeralReal >= 100 ? 'text-green-500' : roiGeralReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                      {roiGeralReal.toFixed(1)}%
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Configurar Investimento por Canal</h4>
+              {cacRoiData.map((item, index) => (
+                <div key={index} className="p-4 border border-border rounded-lg hover:bg-accent/5 transition-smooth">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div 
+                      className="w-3 h-3 rounded-full mt-1 flex-shrink-0" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground mb-1">{item.origem}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.clientesPagantes} pagantes | {item.totalClientes} clientes | 
+                        Receita: R$ {item.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">Investimento:</span>
+                      <Input
+                        type="number"
+                        value={item.investimento}
+                        onChange={(e) => updateInvestment(item.origem, parseFloat(e.target.value) || 0)}
+                        className="w-32 h-9 text-sm"
+                        min="0"
+                        step="100"
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-4 pl-7">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">CAC</p>
+                      <p className="text-lg font-bold text-foreground">
+                        R$ {item.cac.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">por cliente</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Lucro</p>
+                      <p className={`text-lg font-bold ${item.lucro >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        R$ {item.lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">receita - investimento</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">ROI Real</p>
+                      <p className={`text-lg font-bold ${item.roiReal >= 100 ? 'text-green-500' : item.roiReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                        {item.investimento > 0 ? `${item.roiReal.toFixed(1)}%` : '-'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">retorno investimento</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">LTV/CAC</p>
+                      <p className={`text-lg font-bold ${item.cac > 0 && item.valorMedio / item.cac >= 3 ? 'text-green-500' : 'text-yellow-500'}`}>
+                        {item.cac > 0 ? (item.valorMedio / item.cac).toFixed(2) : '-'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">ideal: &gt; 3.0</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tendência e Previsão de Receita */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Tendência e Previsão de Receita</CardTitle>
+            <CardDescription>
+              Evolução histórica da receita mensal com previsão baseada em média móvel dos últimos 3 meses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={receitaComPrevisao}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs"
+                    tickFormatter={(value) => {
+                      const [year, month] = value.split('-');
+                      return `${month}/${year.slice(2)}`;
+                    }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const [year, month] = data.month.split('-');
+                        const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                        
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-foreground mb-2 capitalize">{monthName}</p>
+                            <div className="space-y-1">
+                              {data.receita !== null && (
+                                <p className="text-sm text-green-500">
+                                  Receita Real: <span className="font-medium">R$ {data.receita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </p>
+                              )}
+                              {data.previsao !== null && (
+                                <p className="text-sm text-blue-500">
+                                  Previsão: <span className="font-medium">R$ {data.previsao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  <Area 
+                    type="monotone" 
+                    dataKey="receita" 
+                    fill="hsl(var(--chart-1))"
+                    fillOpacity={0.3}
+                    stroke="hsl(var(--chart-1))"
+                    strokeWidth={2}
+                    name="Receita Real"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="previsao" 
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Previsão"
+                    dot={{ r: 4, fill: 'hsl(var(--primary))' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {previsaoReceita.length > 0 && (
+              <div className="mt-6 p-4 border border-border rounded-lg bg-accent/5">
+                <h4 className="font-semibold text-foreground mb-3">Previsão para os Próximos 3 Meses</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  {previsaoReceita.map((item, index) => {
+                    const [year, month] = item.month.split('-');
+                    const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                    
+                    return (
+                      <div key={index} className="text-center p-3 border border-border rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1 capitalize">{monthName}</p>
+                        <p className="text-xl font-bold text-primary">
+                          R$ {item.previsao?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  * Previsão baseada em média móvel dos últimos 3 meses e tendência de crescimento
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
