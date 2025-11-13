@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle, Users } from 'lucide-react';
+import TemplatePreview from '@/components/TemplatePreview';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { Button } from '@/components/ui/button';
@@ -581,84 +582,60 @@ export default function AdminTemplates() {
                   </div>
                 </div>
 
-                <div className="border-2 border-primary/20 bg-primary/5 p-4 rounded-lg space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-4 w-4 text-primary" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">Preview em Tempo Real</p>
-                      <p className="text-xs text-muted-foreground">Visualize como ficará a mensagem</p>
-                    </div>
+                <TemplatePreview message={formData.message} />
+
+                <div className="bg-muted/50 p-3 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Selecionar destinatários para teste:</p>
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notificacoes')}>
+                      <Settings className="h-4 w-4" />
+                    </Button>
                   </div>
                   
-                  <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-primary/10">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-primary-foreground">JS</span>
-                      </div>
-                      <div className="flex-1 bg-primary/10 p-3 rounded-2xl rounded-tl-none">
-                        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-                          {getPreviewMessage()}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-right">
-                      {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  
-                  <div className="bg-muted/50 p-3 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Selecionar destinatários:</p>
-                      <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notificacoes')}>
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <label className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTestPhones.includes(testPhoneNumber)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTestPhones([...selectedTestPhones, testPhoneNumber]);
+                          } else {
+                            setSelectedTestPhones(selectedTestPhones.filter(p => p !== testPhoneNumber));
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm">Padrão: {formatTestPhone(testPhoneNumber)}</span>
+                    </label>
                     
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      <label className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
+                    {testContacts.map((contact: any) => (
+                      <label key={contact.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={selectedTestPhones.includes(testPhoneNumber)}
+                          checked={selectedTestPhones.includes(contact.phone)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedTestPhones([...selectedTestPhones, testPhoneNumber]);
+                              setSelectedTestPhones([...selectedTestPhones, contact.phone]);
                             } else {
-                              setSelectedTestPhones(selectedTestPhones.filter(p => p !== testPhoneNumber));
+                              setSelectedTestPhones(selectedTestPhones.filter(p => p !== contact.phone));
                             }
                           }}
                           className="rounded"
                         />
                         <Users className="h-4 w-4" />
-                        <span className="text-sm">Padrão: {formatTestPhone(testPhoneNumber)}</span>
+                        <span className="text-sm">{contact.name}: {formatTestPhone(contact.phone)}</span>
                       </label>
-                      
-                      {testContacts.map((contact: any) => (
-                        <label key={contact.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedTestPhones.includes(contact.phone)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedTestPhones([...selectedTestPhones, contact.phone]);
-                              } else {
-                                setSelectedTestPhones(selectedTestPhones.filter(p => p !== contact.phone));
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <Users className="h-4 w-4" />
-                          <span className="text-sm">{contact.name}: {formatTestPhone(contact.phone)}</span>
-                        </label>
-                      ))}
-                    </div>
-                    
-                    {selectedTestPhones.length > 0 && (
-                      <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
-                        <CheckCircle className="h-3 w-3" />
-                        <span>{selectedTestPhones.length} contato(s) selecionado(s)</span>
-                      </div>
-                    )}
+                    ))}
                   </div>
+                  
+                  {selectedTestPhones.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
+                      <CheckCircle className="h-3 w-3" />
+                      <span>{selectedTestPhones.length} contato(s) selecionado(s)</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}
