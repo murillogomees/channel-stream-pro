@@ -25,6 +25,7 @@ const AppActivation = lazy(() => import("./pages/AppActivation"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSettings"));
 const AdminNotificationRetry = lazy(() => import("./pages/AdminNotificationRetry"));
+const AdminNotificationStats = lazy(() => import("./pages/AdminNotificationStats"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/admin/variables" element={<AdminVariables />} />
           <Route path="/admin/notification-settings" element={<AdminNotificationSettings />} />
           <Route path="/admin/notification-retry" element={<AdminNotificationRetry />} />
+          <Route path="/admin/notification-stats" element={<AdminNotificationStats />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
