@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,10 +8,12 @@ import { useClientes } from '@/hooks/useClientes';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { sendWelcomeMessage } from '@/services/eventNotificationService';
+import { sendClientUpdateMessage } from '@/services/clientUpdateNotificationService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -28,23 +30,19 @@ const clienteSchema = z.object({
   nome: z.string()
     .trim()
     .max(200, 'Nome muito longo')
-    .transform(val => val.replace(/[<>"']/g, ''))
     .optional(),
   telefone: z.string()
     .trim()
     .max(20, 'Telefone muito longo')
-    .transform(val => val.replace(/[^0-9+\-() ]/g, ''))
     .optional(),
   telegram: z.string()
     .trim()
     .max(50, 'Telegram muito longo')
-    .transform(val => val.replace(/[<>"']/g, ''))
     .optional(),
   email: z.string()
     .trim()
     .email('Email inválido')
     .max(255, 'Email muito longo')
-    .transform(val => val.toLowerCase())
     .optional()
     .or(z.literal('')),
   situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']).optional(),
@@ -59,17 +57,14 @@ const clienteSchema = z.object({
   formaUltimoPagamento: z.string()
     .trim()
     .max(100, 'Forma de pagamento muito longa')
-    .transform(val => val.replace(/[<>"']/g, ''))
     .optional(),
   macSmartOne: z.string()
     .trim()
     .max(100, 'MAC muito longo')
-    .transform(val => val.replace(/[^A-Fa-f0-9:-]/g, ''))
     .optional(),
   usuario: z.string()
     .trim()
     .max(100, 'Usuário muito longo')
-    .transform(val => val.replace(/[<>"']/g, ''))
     .optional(),
   senha: z.string()
     .max(100, 'Senha muito longa')
@@ -85,6 +80,8 @@ export default function AdminClienteForm() {
   const { isAuthenticated, loading } = useLocalAuth();
   const { addCliente, updateCliente, getClienteById } = useClientes();
   const { addLog } = useNotificationLogs();
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
+  const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
 
   const {
     register,
@@ -103,9 +100,10 @@ export default function AdminClienteForm() {
     if (id) {
       const cliente = getClienteById(id);
       if (cliente) {
+        setClienteOriginal(cliente);
         Object.entries(cliente).forEach(([key, value]) => {
           if (key !== 'id' && key !== 'dataCadastro' && key !== 'dataUltimaEdicao') {
-            setValue(key as keyof ClienteFormData, value);
+            setValue(key as keyof ClienteFormData, value, { shouldValidate: false });
           }
         });
       }
@@ -126,20 +124,25 @@ export default function AdminClienteForm() {
   }
 
   const onSubmit = async (data: ClienteFormData) => {
+    // Sanitizar dados antes de salvar
+    const sanitizeString = (str: string) => str.replace(/[<>"']/g, '');
+    const sanitizePhone = (str: string) => str.replace(/[^0-9+\-() ]/g, '');
+    const sanitizeMac = (str: string) => str.replace(/[^A-Fa-f0-9:-]/g, '');
+    
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
-      nome: data.nome || '',
-      telefone: data.telefone || '',
-      telegram: data.telegram || '',
-      email: data.email || '',
+      nome: sanitizeString(data.nome || ''),
+      telefone: sanitizePhone(data.telefone || ''),
+      telegram: sanitizeString(data.telegram || ''),
+      email: (data.email || '').toLowerCase(),
       situacao: (data.situacao || 'Lead') as SituacaoCliente,
       dataContratacao: data.dataContratacao || '',
       dataVencimento: data.dataVencimento || '',
       plano: (data.plano || 'Mensal') as PlanoCliente,
       valorPago: data.valorPago || 0,
       dataUltimoPagamento: data.dataUltimoPagamento || '',
-      formaUltimoPagamento: data.formaUltimoPagamento || '',
-      macSmartOne: data.macSmartOne || '',
-      usuario: data.usuario || '',
+      formaUltimoPagamento: sanitizeString(data.formaUltimoPagamento || ''),
+      macSmartOne: sanitizeMac(data.macSmartOne || ''),
+      usuario: sanitizeString(data.usuario || ''),
       senha: data.senha || '',
     };
 
@@ -149,6 +152,33 @@ export default function AdminClienteForm() {
         title: 'Cliente atualizado',
         description: 'As informações foram salvas com sucesso.',
       });
+
+      // Enviar mensagem de atualização se checkbox estiver marcado
+      if (enviarWhatsApp && clienteOriginal) {
+        try {
+          const clienteAtualizado: Cliente = {
+            ...clienteData,
+            id: id,
+            dataCadastro: clienteOriginal.dataCadastro,
+            dataUltimaEdicao: new Date().toISOString(),
+          };
+
+          const enviado = await sendClientUpdateMessage(
+            clienteAtualizado,
+            clienteOriginal,
+            addLog
+          );
+          
+          if (enviado) {
+            toast({
+              title: 'Mensagem enviada',
+              description: `WhatsApp de atualização enviado para ${clienteData.nome}`,
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao enviar mensagem de atualização:', error);
+        }
+      }
     } else {
       const novoCliente = addCliente(clienteData);
       toast({
@@ -156,30 +186,32 @@ export default function AdminClienteForm() {
         description: 'O novo cliente foi adicionado com sucesso.',
       });
 
-      // Enviar mensagem de boas-vindas automaticamente
-      try {
-        const clienteCompleto: Cliente = {
-          ...clienteData,
-          id: novoCliente.id,
-          dataCadastro: novoCliente.dataCadastro,
-          dataUltimaEdicao: novoCliente.dataUltimaEdicao,
-        };
+      // Enviar mensagem de boas-vindas se checkbox estiver marcado
+      if (enviarWhatsApp) {
+        try {
+          const clienteCompleto: Cliente = {
+            ...clienteData,
+            id: novoCliente.id,
+            dataCadastro: novoCliente.dataCadastro,
+            dataUltimaEdicao: novoCliente.dataUltimaEdicao,
+          };
 
-        const enviado = await sendWelcomeMessage(clienteCompleto, addLog);
-        
-        if (enviado) {
+          const enviado = await sendWelcomeMessage(clienteCompleto, addLog);
+          
+          if (enviado) {
+            toast({
+              title: 'Mensagem de boas-vindas enviada',
+              description: `WhatsApp enviado para ${clienteData.nome}`,
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao enviar mensagem de boas-vindas:', error);
           toast({
-            title: 'Mensagem de boas-vindas enviada',
-            description: `WhatsApp enviado para ${clienteData.nome}`,
+            title: 'Aviso',
+            description: 'Cliente cadastrado, mas houve erro ao enviar mensagem de boas-vindas.',
+            variant: 'destructive',
           });
         }
-      } catch (error) {
-        console.error('Erro ao enviar mensagem de boas-vindas:', error);
-        toast({
-          title: 'Aviso',
-          description: 'Cliente cadastrado, mas houve erro ao enviar mensagem de boas-vindas.',
-          variant: 'destructive',
-        });
       }
     }
     navigate('/admin/clientes');
@@ -326,6 +358,23 @@ export default function AdminClienteForm() {
                   <Label htmlFor="senha">Senha</Label>
                   <Input id="senha" type="password" {...register('senha')} />
                 </div>
+              </div>
+
+              <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg border border-border">
+                <Checkbox
+                  id="enviarWhatsApp"
+                  checked={enviarWhatsApp}
+                  onCheckedChange={(checked) => setEnviarWhatsApp(checked as boolean)}
+                />
+                <Label 
+                  htmlFor="enviarWhatsApp" 
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {id 
+                    ? 'Enviar mensagem de atualização ao cliente via WhatsApp'
+                    : 'Enviar mensagem de boas-vindas ao cliente via WhatsApp'
+                  }
+                </Label>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end">
