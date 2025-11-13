@@ -155,8 +155,8 @@ export default function CadastroSucesso() {
         <div className="flex flex-col sm:flex-row gap-4">
           <Button 
             size="lg" 
-            variant="outline"
-            className="flex-1"
+            variant="secondary"
+            className="flex-1 bg-primary/10 hover:bg-primary hover:text-primary-foreground"
             onClick={() => navigate('/')}
           >
             <Home className="mr-2 h-5 w-5" />
