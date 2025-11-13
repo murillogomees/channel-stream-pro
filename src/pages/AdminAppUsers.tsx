@@ -46,7 +46,6 @@ export default function AdminAppUsers() {
         .select(`
           id,
           device_id,
-          mac_address,
           subscription_plan_id,
           activation_key_id,
           status,
