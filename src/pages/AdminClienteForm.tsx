@@ -9,6 +9,7 @@ import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { sendWelcomeMessage } from '@/services/eventNotificationService';
 import { sendClientUpdateMessage } from '@/services/clientUpdateNotificationService';
+import { smartoneService } from '@/services/smartoneService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -84,6 +85,7 @@ export default function AdminClienteForm() {
   const { addLog } = useNotificationLogs();
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
+  const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
 
   const {
     register,
@@ -148,6 +150,7 @@ export default function AdminClienteForm() {
       usuario: sanitizeString(data.usuario || ''),
       senha: data.senha || '',
       clienteAtivo: data.clienteAtivo ?? false,
+      smartone_status: 'nao_enviado',
     };
 
     if (id) {
@@ -156,6 +159,46 @@ export default function AdminClienteForm() {
         title: 'Cliente atualizado',
         description: 'As informações foram salvas com sucesso.',
       });
+
+      // Verificar se MAC foi alterado ou adicionado
+      const macChanged = clienteOriginal && 
+        clienteOriginal.macSmartOne !== clienteData.macSmartOne &&
+        clienteData.macSmartOne;
+
+      if (macChanged && clienteData.usuario && clienteData.senha) {
+        setIsSyncingSmartone(true);
+        toast({
+          title: "Sincronizando com SmartOne",
+          description: "Criando playlist no SmartOne IPTV...",
+        });
+
+        const clienteAtualizado: Cliente = {
+          ...clienteData,
+          id: id,
+          dataCadastro: clienteOriginal.dataCadastro,
+          dataUltimaEdicao: new Date().toISOString(),
+        };
+
+        const result = await smartoneService.syncPlaylistForClient(
+          clienteAtualizado,
+          updateCliente
+        );
+
+        setIsSyncingSmartone(false);
+
+        if (result.success) {
+          toast({
+            title: "SmartOne sincronizado",
+            description: "Playlist criada com sucesso no SmartOne IPTV.",
+          });
+        } else {
+          toast({
+            title: "Erro ao sincronizar SmartOne",
+            description: result.error || "Não foi possível criar a playlist no SmartOne.",
+            variant: "destructive",
+          });
+        }
+      }
 
       // Enviar mensagem de atualização se checkbox estiver marcado
       if (enviarWhatsApp && clienteOriginal) {
@@ -189,6 +232,35 @@ export default function AdminClienteForm() {
         title: 'Cliente cadastrado',
         description: 'O novo cliente foi adicionado com sucesso.',
       });
+
+      // Se tem MAC, usuário e senha, sincronizar com SmartOne
+      if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
+        setIsSyncingSmartone(true);
+        toast({
+          title: "Sincronizando com SmartOne",
+          description: "Criando playlist no SmartOne IPTV...",
+        });
+
+        const result = await smartoneService.syncPlaylistForClient(
+          novoCliente,
+          updateCliente
+        );
+
+        setIsSyncingSmartone(false);
+
+        if (result.success) {
+          toast({
+            title: "SmartOne sincronizado",
+            description: "Playlist criada com sucesso no SmartOne IPTV.",
+          });
+        } else {
+          toast({
+            title: "Erro ao sincronizar SmartOne",
+            description: result.error || "Não foi possível criar a playlist no SmartOne.",
+            variant: "destructive",
+          });
+        }
+      }
 
       // Enviar mensagem de boas-vindas se checkbox estiver marcado
       if (enviarWhatsApp) {
@@ -409,8 +481,8 @@ export default function AdminClienteForm() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  {id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+                <Button type="submit" disabled={isSyncingSmartone} className="w-full sm:w-auto">
+                  {isSyncingSmartone ? 'Sincronizando...' : id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
                 </Button>
               </div>
             </CardContent>

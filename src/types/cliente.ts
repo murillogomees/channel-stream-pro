@@ -20,4 +20,8 @@ export interface Cliente {
   dataCadastro: string;
   dataUltimaEdicao: string;
   clienteAtivo?: boolean; // Indica se o cliente está usando os serviços atualmente
+  smartone_status?: 'nao_enviado' | 'pendente' | 'criado' | 'erro';
+  smartone_playlist_id?: string;
+  smartone_raw_response?: string;
+  smartone_last_sync_at?: string;
 }

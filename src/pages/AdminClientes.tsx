@@ -273,6 +273,7 @@ export default function AdminClientes() {
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="whitespace-nowrap hidden sm:table-cell">Ativo</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">SmartOne</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -306,6 +307,27 @@ export default function AdminClientes() {
                             Inativo
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Badge 
+                          variant={
+                            cliente.smartone_status === 'criado' ? "default" :
+                            cliente.smartone_status === 'pendente' ? "secondary" :
+                            cliente.smartone_status === 'erro' ? "destructive" :
+                            "outline"
+                          }
+                          className={
+                            cliente.smartone_status === 'criado' ? "bg-green-600" :
+                            cliente.smartone_status === 'pendente' ? "bg-yellow-500" :
+                            cliente.smartone_status === 'erro' ? "" :
+                            ""
+                          }
+                        >
+                          {cliente.smartone_status === 'criado' ? '✓ Criado' :
+                           cliente.smartone_status === 'pendente' ? '⏳ Pendente' :
+                           cliente.smartone_status === 'erro' ? '✗ Erro' :
+                           '○ Não enviado'}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">

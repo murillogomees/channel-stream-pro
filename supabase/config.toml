@@ -2,3 +2,6 @@ project_id = "fcmwpbgdehtuqxcjqmxi"
 
 [functions.notify-prospect]
 verify_jwt = false
+
+[functions.smartone-sync]
+verify_jwt = false
