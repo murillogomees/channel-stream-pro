@@ -73,7 +73,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: -5,
+    daysBeforeDue: 5,
   },
   {
     id: 'expiration_minus_3',
@@ -82,7 +82,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: -3,
+    daysBeforeDue: 3,
   },
   {
     id: 'expiration_minus_1',
@@ -91,7 +91,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: -1,
+    daysBeforeDue: 1,
   },
   {
     id: 'expiration_zero',
@@ -119,7 +119,7 @@ IPTV LINK`,
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: 1,
+    daysBeforeDue: -1,
   },
   {
     id: 'expiration_plus_3',
@@ -128,7 +128,7 @@ IPTV LINK`,
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: 3,
+    daysBeforeDue: -3,
   },
   {
     id: 'expiration_plus_5',
@@ -137,7 +137,7 @@ IPTV LINK`,
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
-    daysBeforeDue: 5,
+    daysBeforeDue: -5,
   },
 ];
 

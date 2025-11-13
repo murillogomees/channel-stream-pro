@@ -36,8 +36,8 @@ export function getDaysUntilDue(dataVencimento: string): number {
   const diffTime = dueDate.getTime() - today.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   
-  // Retorna negativo se antes do vencimento, positivo se depois
-  return -diffDays;
+  // Retorna positivo para dias restantes (futuro), negativo para dias vencidos (passado)
+  return diffDays;
 }
 
 export function shouldSendNotification(

@@ -199,26 +199,42 @@ export default function AdminClientes() {
   };
 
   const getDaysUntilBadge = (dataVencimento: string) => {
+    if (!dataVencimento) return null;
+    
     const days = getDaysUntilDue(dataVencimento);
+    
     if (days < 0) {
+      // Vencido (passado)
       return <Badge variant="destructive" className="flex items-center gap-1">
         <Clock className="h-3 w-3" />
         Vencido há {Math.abs(days)}d
       </Badge>;
     }
     if (days === 0) {
-      return <Badge variant="default" className="flex items-center gap-1">
+      return <Badge variant="default" className="flex items-center gap-1 bg-orange-500">
         <Clock className="h-3 w-3" />
         Vence hoje
       </Badge>;
     }
     if (days <= 5) {
-      return <Badge variant="secondary" className="flex items-center gap-1">
+      // Vence em breve (futuro próximo)
+      return <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-500">
         <Clock className="h-3 w-3" />
         Vence em {days}d
       </Badge>;
     }
-    return null;
+    if (days <= 30) {
+      // Vencimento futuro normal
+      return <Badge variant="outline" className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        Vence em {days}d
+      </Badge>;
+    }
+    // Vencimento distante
+    return <Badge variant="outline" className="flex items-center gap-1 text-muted-foreground">
+      <Clock className="h-3 w-3" />
+      Vence em {days}d
+    </Badge>;
   };
 
   return (
@@ -256,6 +272,7 @@ export default function AdminClientes() {
                     <TableHead className="whitespace-nowrap hidden xl:table-cell">Plano</TableHead>
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Ativo</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -278,6 +295,17 @@ export default function AdminClientes() {
                       </TableCell>
                       <TableCell>
                         {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {cliente.clienteAtivo ? (
+                          <Badge variant="default" className="bg-green-600">
+                            Usando
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-gray-500">
+                            Inativo
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">

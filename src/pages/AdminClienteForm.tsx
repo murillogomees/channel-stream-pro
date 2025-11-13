@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +70,7 @@ const clienteSchema = z.object({
   senha: z.string()
     .max(100, 'Senha muito longa')
     .optional(),
+  clienteAtivo: z.boolean().optional(),
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
@@ -93,6 +95,7 @@ export default function AdminClienteForm() {
     resolver: zodResolver(clienteSchema),
     defaultValues: {
       valorPago: 0,
+      clienteAtivo: false,
     },
   });
 
@@ -144,6 +147,7 @@ export default function AdminClienteForm() {
       macSmartOne: sanitizeMac(data.macSmartOne || ''),
       usuario: sanitizeString(data.usuario || ''),
       senha: data.senha || '',
+      clienteAtivo: data.clienteAtivo ?? false,
     };
 
     if (id) {
@@ -357,6 +361,25 @@ export default function AdminClienteForm() {
                 <div className="space-y-2">
                   <Label htmlFor="senha">Senha</Label>
                   <Input id="senha" type="password" {...register('senha')} />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border border-border">
+                <Switch
+                  id="clienteAtivo"
+                  checked={watch('clienteAtivo') ?? false}
+                  onCheckedChange={(checked) => setValue('clienteAtivo', checked)}
+                />
+                <div className="flex-1">
+                  <Label 
+                    htmlFor="clienteAtivo" 
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    Cliente Ativo
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Indica se o cliente está atualmente usando os serviços
+                  </p>
                 </div>
               </div>
 

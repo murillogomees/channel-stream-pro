@@ -19,4 +19,5 @@ export interface Cliente {
   senha: string;
   dataCadastro: string;
   dataUltimaEdicao: string;
+  clienteAtivo?: boolean; // Indica se o cliente está usando os serviços atualmente
 }
