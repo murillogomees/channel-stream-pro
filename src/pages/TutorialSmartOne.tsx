@@ -463,7 +463,7 @@ export default function TutorialSmartOne() {
 
             <div className="bg-muted p-4 rounded-lg">
               <h3 className="font-semibold mb-2">🎉 O que você vai receber:</h3>
-              <ul className="space-y-1 text-sm text-muted-foreground">
+              <ul className="space-y-1 text-sm text-foreground">
                 <li>✓ Acesso imediato ao SmartOne IPTV</li>
                 <li>✓ Playlist configurada automaticamente</li>
                 <li>✓ Mensagem no WhatsApp com todos os detalhes</li>
