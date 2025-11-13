@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.smartone-sync]
 verify_jwt = false
+
+[functions.smartone-webhook]
+verify_jwt = false

@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { smartoneService } from '@/services/smartoneService';
+import { webhookService } from '@/services/webhookService';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -23,8 +24,11 @@ export default function AdminSmartOneConfig() {
   const [keyApi, setKeyApi] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [webhookTestResult, setWebhookTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const webhookUrl = webhookService.getWebhookUrl();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -120,6 +124,52 @@ export default function AdminSmartOneConfig() {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleCopyWebhookUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      toast({
+        title: 'URL copiada!',
+        description: 'A URL do webhook foi copiada para a área de transferência.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao copiar',
+        description: 'Não foi possível copiar a URL. Tente manualmente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    setIsTestingWebhook(true);
+    setWebhookTestResult(null);
+
+    try {
+      const result = await webhookService.testWebhook();
+      setWebhookTestResult(result);
+      
+      if (result.success) {
+        toast({
+          title: 'Webhook testado com sucesso',
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: 'Erro no teste do webhook',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      setWebhookTestResult({
+        success: false,
+        message: `Erro ao testar webhook: ${error.message}`,
+      });
+    } finally {
+      setIsTestingWebhook(false);
     }
   };
 
@@ -306,6 +356,129 @@ export default function AdminSmartOneConfig() {
             )}
           </Button>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Webhook className="h-5 w-5 text-primary" />
+                  Webhook de Notificações
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  Configure o SmartOne para enviar notificações sobre mudanças de status
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                Automático
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertTitle className="flex items-center gap-2 text-sm">
+                <Webhook className="h-4 w-4" />
+                URL do Webhook
+              </AlertTitle>
+              <AlertDescription className="mt-2">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Configure esta URL no painel do SmartOne IPTV para receber notificações automáticas 
+                  sobre criação, atualização e erros de playlists.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Input
+                    value={webhookUrl}
+                    readOnly
+                    className="font-mono text-xs bg-muted"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopyWebhookUrl}
+                    title="Copiar URL"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+
+            {webhookTestResult && (
+              <Alert variant={webhookTestResult.success ? "default" : "destructive"}>
+                <div className="flex items-start gap-2">
+                  {webhookTestResult.success ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-destructive mt-0.5" />
+                  )}
+                  <div>
+                    <AlertTitle>
+                      {webhookTestResult.success ? 'Webhook funcionando' : 'Erro no webhook'}
+                    </AlertTitle>
+                    <AlertDescription>{webhookTestResult.message}</AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={handleTestWebhook}
+              disabled={isTestingWebhook}
+              className="w-full sm:w-auto"
+            >
+              {isTestingWebhook ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Testando Webhook...
+                </>
+              ) : (
+                <>
+                  <TestTube className="mr-2 h-4 w-4" />
+                  Testar Webhook
+                </>
+              )}
+            </Button>
+
+            <div className="space-y-2 pt-4 border-t">
+              <h4 className="text-sm font-semibold">Eventos Suportados</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                  <Badge variant="default" className="bg-green-600">✓</Badge>
+                  <span><strong>playlist.created</strong> - Playlist criada</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                  <Badge variant="default" className="bg-blue-600">↻</Badge>
+                  <span><strong>playlist.updated</strong> - Playlist atualizada</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                  <Badge variant="destructive">✗</Badge>
+                  <span><strong>playlist.error</strong> - Erro na playlist</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                  <Badge variant="secondary">🗑</Badge>
+                  <span><strong>playlist.deleted</strong> - Playlist removida</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <h4 className="text-sm font-semibold">Formato do Payload</h4>
+              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+{`{
+  "event": "playlist.created",
+  "playlist_id": "abc123",
+  "mac": "00:11:22:33:44:55",
+  "status": "active",
+  "created_at": "2024-01-01T12:00:00Z",
+  "metadata": {
+    "m3u_url": "http://..."
+  }
+}`}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-muted">
           <CardHeader>
