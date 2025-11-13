@@ -1,14 +1,26 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, DollarSign, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useClientes } from "@/hooks/useClientes";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LineChart, AreaChart, Area } from "recharts";
+import { useState } from "react";
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
   const { clientes } = useClientes();
+  
+  // Estado para metas de conversão por canal
+  const [conversionGoals, setConversionGoals] = useState<Record<string, number>>({
+    'Google Ads': 50,
+    'Facebook': 40,
+    'Instagram': 45,
+    'Indicação': 70,
+    'Website': 35,
+    'Outro': 30
+  });
 
   // Processar dados de origem
   const origemData = clientes.reduce((acc, cliente) => {
@@ -94,6 +106,101 @@ const AdminAnalytics = () => {
     return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Baixo</Badge>;
   };
 
+  // Análise temporal - conversão ao longo dos meses
+  const temporalData = clientes.reduce((acc, cliente) => {
+    if (!cliente.dataCadastro) return acc;
+    const date = new Date(cliente.dataCadastro);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const origem = cliente.origemCadastro || 'Não informado';
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = {};
+    }
+    if (!acc[monthKey][origem]) {
+      acc[monthKey][origem] = { total: 0, ativos: 0 };
+    }
+    
+    acc[monthKey][origem].total += 1;
+    if (cliente.clienteAtivo || cliente.situacao === 'Ativo') {
+      acc[monthKey][origem].ativos += 1;
+    }
+    
+    return acc;
+  }, {} as Record<string, Record<string, { total: number; ativos: number }>>);
+
+  const temporalChartData = Object.entries(temporalData)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, origens]) => {
+      const dataPoint: any = { month };
+      Object.entries(origens).forEach(([origem, data]) => {
+        dataPoint[origem] = ((data.ativos / data.total) * 100).toFixed(1);
+      });
+      return dataPoint;
+    });
+
+  // Análise de funil de conversão
+  const funnelData = clientes.reduce((acc, cliente) => {
+    const origem = cliente.origemCadastro || 'Não informado';
+    if (!acc[origem]) {
+      acc[origem] = { lead: 0, testando: 0, ativo: 0 };
+    }
+    
+    if (cliente.situacao === 'Lead') {
+      acc[origem].lead += 1;
+    } else if (cliente.situacao === 'Testando') {
+      acc[origem].testando += 1;
+    } else if (cliente.situacao === 'Ativo') {
+      acc[origem].ativo += 1;
+    }
+    
+    return acc;
+  }, {} as Record<string, { lead: number; testando: number; ativo: number }>);
+
+  const funnelChartData = Object.entries(funnelData).map(([origem, stages]) => {
+    const total = stages.lead + stages.testando + stages.ativo;
+    const leadToTest = total > 0 ? ((stages.testando + stages.ativo) / total * 100).toFixed(1) : '0';
+    const testToActive = (stages.testando + stages.ativo) > 0 ? (stages.ativo / (stages.testando + stages.ativo) * 100).toFixed(1) : '0';
+    
+    return {
+      origem,
+      Lead: stages.lead,
+      Testando: stages.testando,
+      Ativo: stages.ativo,
+      taxaLeadToTest: parseFloat(leadToTest),
+      taxaTestToActive: parseFloat(testToActive)
+    };
+  });
+
+  // Análise de ROI - Receita por canal
+  const roiData = clientes.reduce((acc, cliente) => {
+    const origem = cliente.origemCadastro || 'Não informado';
+    if (!acc[origem]) {
+      acc[origem] = { totalReceita: 0, count: 0, clientes: [] };
+    }
+    
+    const valor = cliente.valorPago || 0;
+    acc[origem].totalReceita += valor;
+    acc[origem].count += 1;
+    if (valor > 0) {
+      acc[origem].clientes.push(valor);
+    }
+    
+    return acc;
+  }, {} as Record<string, { totalReceita: number; count: number; clientes: number[] }>);
+
+  const roiChartData = Object.entries(roiData)
+    .map(([origem, data]) => ({
+      origem,
+      receitaTotal: data.totalReceita,
+      valorMedio: data.clientes.length > 0 ? data.totalReceita / data.clientes.length : 0,
+      clientesPagantes: data.clientes.length,
+      totalClientes: data.count
+    }))
+    .sort((a, b) => b.receitaTotal - a.receitaTotal);
+
+  const receitaTotal = roiChartData.reduce((sum, item) => sum + item.receitaTotal, 0);
+  const melhorROI = roiChartData.length > 0 ? roiChartData[0] : null;
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -129,7 +236,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
@@ -185,7 +292,377 @@ const AdminAnalytics = () => {
               </p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                R$ {receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {melhorROI ? `${melhorROI.origem}: R$ ${melhorROI.receitaTotal.toFixed(2)}` : 'Sem dados'}
+              </p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Sistema de Metas de Conversão */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Metas de Conversão por Canal</CardTitle>
+            <CardDescription>
+              Defina e acompanhe as taxas de conversão esperadas para cada canal de marketing
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {conversaoChartData.map((item, index) => {
+                const meta = conversionGoals[item.name] || 0;
+                const taxa = parseFloat(item.taxa);
+                const abaixoDaMeta = taxa < meta;
+                const percentualMeta = meta > 0 ? ((taxa / meta) * 100).toFixed(0) : '0';
+                
+                return (
+                  <div key={index} className="flex items-center gap-4 p-4 border border-border rounded-lg">
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">{item.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.ativos} ativos de {item.total} leads
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className={`text-xl font-bold ${getConversaoColor(taxa)}`}>
+                          {item.taxa}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">atual</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={meta}
+                          onChange={(e) => setConversionGoals(prev => ({
+                            ...prev,
+                            [item.name]: parseFloat(e.target.value) || 0
+                          }))}
+                          className="w-20 h-9 text-sm"
+                          min="0"
+                          max="100"
+                        />
+                        <span className="text-xs text-muted-foreground">% meta</span>
+                      </div>
+                      
+                      {abaixoDaMeta && (
+                        <Badge className="bg-red-500/10 text-red-500 border-red-500/20 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {percentualMeta}% da meta
+                        </Badge>
+                      )}
+                      {!abaixoDaMeta && meta > 0 && (
+                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                          Meta atingida
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Análise Temporal de Conversão */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Evolução da Taxa de Conversão por Canal</CardTitle>
+            <CardDescription>
+              Acompanhe como a taxa de conversão de cada canal evolui ao longo dos meses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={temporalChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs"
+                    tickFormatter={(value) => {
+                      const [year, month] = value.split('-');
+                      return `${month}/${year.slice(2)}`;
+                    }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    label={{ value: 'Taxa de Conversão (%)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const [year, month] = payload[0].payload.month.split('-');
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-foreground mb-2">
+                              {new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                            </p>
+                            <div className="space-y-1">
+                              {payload.map((item: any, index: number) => (
+                                <p key={index} className="text-sm" style={{ color: item.color }}>
+                                  {item.name}: {item.value}%
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  {Object.keys(chartData.reduce((acc, item) => ({ ...acc, [item.name]: true }), {})).map((origem, index) => (
+                    <Line 
+                      key={origem}
+                      type="monotone" 
+                      dataKey={origem} 
+                      stroke={COLORS[index % COLORS.length]}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Funil de Conversão */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Funil de Conversão por Origem</CardTitle>
+            <CardDescription>
+              Visualize as etapas Lead → Testando → Ativo e taxas de abandono em cada fase
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={funnelChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" className="text-xs" />
+                  <YAxis dataKey="origem" type="category" className="text-xs" width={100} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-foreground mb-2">{data.origem}</p>
+                            <div className="space-y-1 text-sm">
+                              <p className="text-blue-500">Lead: {data.Lead}</p>
+                              <p className="text-yellow-500">Testando: {data.Testando}</p>
+                              <p className="text-green-500">Ativo: {data.Ativo}</p>
+                              <div className="border-t border-border mt-2 pt-2">
+                                <p className="text-muted-foreground">
+                                  Lead → Testando: <span className="font-medium text-foreground">{data.taxaLeadToTest}%</span>
+                                </p>
+                                <p className="text-muted-foreground">
+                                  Testando → Ativo: <span className="font-medium text-foreground">{data.taxaTestToActive}%</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Lead" stackId="a" fill="hsl(var(--chart-3))" name="Lead" />
+                  <Bar dataKey="Testando" stackId="a" fill="hsl(var(--chart-4))" name="Testando" />
+                  <Bar dataKey="Ativo" stackId="a" fill="hsl(var(--chart-1))" name="Ativo" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Detalhamento das taxas de abandono */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Taxas de Conversão por Etapa</h4>
+              {funnelChartData.map((item, index) => (
+                <div key={index} className="p-4 border border-border rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="font-medium text-foreground">{item.origem}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      Total: {item.Lead + item.Testando + item.Ativo}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Lead → Testando/Ativo</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`text-lg font-bold ${getConversaoColor(item.taxaLeadToTest)}`}>
+                          {item.taxaLeadToTest}%
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          ({item.Testando + item.Ativo} de {item.Lead + item.Testando + item.Ativo})
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Testando → Ativo</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`text-lg font-bold ${getConversaoColor(item.taxaTestToActive)}`}>
+                          {item.taxaTestToActive}%
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          ({item.Ativo} de {item.Testando + item.Ativo})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Análise de ROI */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Análise de Valor por Canal (ROI)</CardTitle>
+            <CardDescription>
+              Receita total e valor médio gerado por cada origem de cadastro
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={roiChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="origem" className="text-xs" />
+                  <YAxis 
+                    yAxisId="left"
+                    className="text-xs"
+                    label={{ value: 'Receita Total (R$)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    className="text-xs"
+                    label={{ value: 'Valor Médio (R$)', angle: 90, position: 'insideRight' }}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-foreground mb-2">{data.origem}</p>
+                            <div className="space-y-1 text-sm">
+                              <p className="text-green-500">
+                                Receita Total: <span className="font-medium">R$ {data.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              </p>
+                              <p className="text-blue-500">
+                                Valor Médio: <span className="font-medium">R$ {data.valorMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              </p>
+                              <p className="text-muted-foreground">
+                                Clientes Pagantes: <span className="font-medium text-foreground">{data.clientesPagantes}</span>
+                              </p>
+                              <p className="text-muted-foreground">
+                                Total de Clientes: <span className="font-medium text-foreground">{data.totalClientes}</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  <Bar 
+                    yAxisId="left"
+                    dataKey="receitaTotal" 
+                    fill="hsl(var(--chart-1))" 
+                    name="Receita Total (R$)" 
+                    radius={[8, 8, 0, 0]} 
+                  />
+                  <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="valorMedio" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    name="Valor Médio (R$)"
+                    dot={{ r: 4 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Tabela de ROI detalhada */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Detalhamento de Receita por Canal</h4>
+              {roiChartData.map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/5 transition-smooth">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">{item.origem}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.clientesPagantes} pagantes de {item.totalClientes} clientes
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-500">
+                        R$ {item.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">receita total</p>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-blue-500">
+                        R$ {item.valorMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">valor médio</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground text-lg">Total Geral</span>
+                  <span className="text-3xl font-bold text-primary">
+                    R$ {receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Seção de Conversão */}
         <Card>
