@@ -2,15 +2,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, DollarSign, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, DollarSign, AlertTriangle, Download, ArrowUpRight, ArrowDownRight, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useClientes } from "@/hooks/useClientes";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LineChart, AreaChart, Area } from "recharts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { toast } from "sonner";
+
+type PeriodFilter = '7' | '30' | '90' | '365' | 'all';
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
   const { clientes } = useClientes();
+  
+  // Estado para filtro de período
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   
   // Estado para metas de conversão por canal
   const [conversionGoals, setConversionGoals] = useState<Record<string, number>>({
@@ -22,8 +29,145 @@ const AdminAnalytics = () => {
     'Outro': 30
   });
 
+  // Filtrar clientes por período
+  const filteredClientes = useMemo(() => {
+    if (periodFilter === 'all') return clientes;
+    
+    const now = new Date();
+    const daysAgo = parseInt(periodFilter);
+    const filterDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+    
+    return clientes.filter(cliente => {
+      if (!cliente.dataCadastro) return false;
+      const cadastroDate = new Date(cliente.dataCadastro);
+      return cadastroDate >= filterDate;
+    });
+  }, [clientes, periodFilter]);
+
+  // Calcular período anterior para comparação
+  const previousPeriodClientes = useMemo(() => {
+    if (periodFilter === 'all') return [];
+    
+    const now = new Date();
+    const daysAgo = parseInt(periodFilter);
+    const currentPeriodStart = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+    const previousPeriodStart = new Date(currentPeriodStart.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+    
+    return clientes.filter(cliente => {
+      if (!cliente.dataCadastro) return false;
+      const cadastroDate = new Date(cliente.dataCadastro);
+      return cadastroDate >= previousPeriodStart && cadastroDate < currentPeriodStart;
+    });
+  }, [clientes, periodFilter]);
+
+  // Função para exportar dados para CSV
+  const exportToCSV = () => {
+    try {
+      // Cabeçalhos do CSV
+      const headers = [
+        'Canal',
+        'Total Leads',
+        'Clientes Ativos',
+        'Taxa de Conversão (%)',
+        'Meta (%)',
+        'Status Meta',
+        'Receita Total (R$)',
+        'Valor Médio (R$)',
+        'Leads',
+        'Testando',
+        'Ativos'
+      ];
+      
+      // Dados das linhas
+      const rows = conversaoChartData.map((item, index) => {
+        const meta = conversionGoals[item.name] || 0;
+        const taxa = parseFloat(item.taxa);
+        const statusMeta = taxa >= meta ? 'Atingida' : 'Abaixo da Meta';
+        const roi = roiChartData.find(r => r.origem === item.name);
+        const funil = funnelChartData.find(f => f.origem === item.name);
+        
+        return [
+          item.name,
+          item.total,
+          item.ativos,
+          item.taxa,
+          meta,
+          statusMeta,
+          roi?.receitaTotal.toFixed(2) || '0.00',
+          roi?.valorMedio.toFixed(2) || '0.00',
+          funil?.Lead || 0,
+          funil?.Testando || 0,
+          funil?.Ativo || 0
+        ];
+      });
+      
+      // Adicionar totais
+      rows.push([
+        'TOTAL',
+        totalClientes,
+        clientesAtivos,
+        taxaConversaoGeral,
+        '-',
+        '-',
+        receitaTotal.toFixed(2),
+        '-',
+        '-',
+        '-',
+        '-'
+      ]);
+      
+      // Criar CSV
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+      
+      // Download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `analytics-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Relatório exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar CSV:', error);
+      toast.error('Erro ao exportar relatório');
+    }
+  };
+
+  // Verificar metas e disparar alertas
+  const checkConversionGoals = () => {
+    const belowGoal = conversaoChartData.filter(item => {
+      const meta = conversionGoals[item.name] || 0;
+      const taxa = parseFloat(item.taxa);
+      return taxa < meta && meta > 0;
+    });
+    
+    if (belowGoal.length > 0) {
+      toast.warning(
+        `${belowGoal.length} canal(is) abaixo da meta de conversão`,
+        {
+          description: belowGoal.map(item => `${item.name}: ${item.taxa}%`).join(', '),
+          action: {
+            label: 'Ver detalhes',
+            onClick: () => {
+              document.getElementById('metas-section')?.scrollIntoView({ behavior: 'smooth' });
+            }
+          }
+        }
+      );
+    } else {
+      toast.success('Todas as metas estão sendo atingidas! 🎉');
+    }
+  };
+
   // Processar dados de origem
-  const origemData = clientes.reduce((acc, cliente) => {
+  const origemData = filteredClientes.reduce((acc, cliente) => {
     const origem = cliente.origemCadastro || 'Não informado';
     acc[origem] = (acc[origem] || 0) + 1;
     return acc;
@@ -32,8 +176,15 @@ const AdminAnalytics = () => {
   const chartData = Object.entries(origemData).map(([name, value]) => ({
     name,
     value,
-    percentage: ((value / clientes.length) * 100).toFixed(1)
+    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
   }));
+
+  // Dados do período anterior
+  const previousOrigemData = previousPeriodClientes.reduce((acc, cliente) => {
+    const origem = cliente.origemCadastro || 'Não informado';
+    acc[origem] = (acc[origem] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   // Cores para o gráfico
   const COLORS = [
@@ -45,7 +196,7 @@ const AdminAnalytics = () => {
   ];
 
   // Dados por situação
-  const situacaoData = clientes.reduce((acc, cliente) => {
+  const situacaoData = filteredClientes.reduce((acc, cliente) => {
     acc[cliente.situacao] = (acc[cliente.situacao] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -53,11 +204,11 @@ const AdminAnalytics = () => {
   const situacaoChartData = Object.entries(situacaoData).map(([name, value]) => ({
     name,
     value,
-    percentage: ((value / clientes.length) * 100).toFixed(1)
+    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
   }));
 
   // Dados por plano
-  const planoData = clientes.reduce((acc, cliente) => {
+  const planoData = filteredClientes.reduce((acc, cliente) => {
     acc[cliente.plano] = (acc[cliente.plano] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -68,7 +219,7 @@ const AdminAnalytics = () => {
   }));
 
   // Dados de conversão por origem
-  const conversaoData = clientes.reduce((acc, cliente) => {
+  const conversaoData = filteredClientes.reduce((acc, cliente) => {
     const origem = cliente.origemCadastro || 'Não informado';
     if (!acc[origem]) {
       acc[origem] = { total: 0, ativos: 0 };
@@ -89,10 +240,21 @@ const AdminAnalytics = () => {
   })).sort((a, b) => parseFloat(b.taxa) - parseFloat(a.taxa));
 
   // Calcular métricas gerais de conversão
-  const totalClientes = clientes.length;
-  const clientesAtivos = clientes.filter(c => c.clienteAtivo || c.situacao === 'Ativo').length;
+  const totalClientes = filteredClientes.length;
+  const clientesAtivos = filteredClientes.filter(c => c.clienteAtivo || c.situacao === 'Ativo').length;
+  const previousTotalClientes = previousPeriodClientes.length;
+  const previousClientesAtivos = previousPeriodClientes.filter(c => c.clienteAtivo || c.situacao === 'Ativo').length;
   const taxaConversaoGeral = totalClientes > 0 ? ((clientesAtivos / totalClientes) * 100).toFixed(1) : '0';
+  const previousTaxaConversao = previousTotalClientes > 0 ? ((previousClientesAtivos / previousTotalClientes) * 100).toFixed(1) : '0';
   const melhorOrigem = conversaoChartData.length > 0 ? conversaoChartData[0] : null;
+
+  // Calcular variações percentuais
+  const clientesGrowth = previousTotalClientes > 0 
+    ? (((totalClientes - previousTotalClientes) / previousTotalClientes) * 100).toFixed(1)
+    : '0';
+  const conversaoGrowth = parseFloat(previousTaxaConversao) > 0
+    ? (parseFloat(taxaConversaoGeral) - parseFloat(previousTaxaConversao)).toFixed(1)
+    : '0';
 
   const getConversaoColor = (taxa: number) => {
     if (taxa >= 70) return 'text-green-500';
@@ -107,7 +269,7 @@ const AdminAnalytics = () => {
   };
 
   // Análise temporal - conversão ao longo dos meses
-  const temporalData = clientes.reduce((acc, cliente) => {
+  const temporalData = filteredClientes.reduce((acc, cliente) => {
     if (!cliente.dataCadastro) return acc;
     const date = new Date(cliente.dataCadastro);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -139,7 +301,7 @@ const AdminAnalytics = () => {
     });
 
   // Análise de funil de conversão
-  const funnelData = clientes.reduce((acc, cliente) => {
+  const funnelData = filteredClientes.reduce((acc, cliente) => {
     const origem = cliente.origemCadastro || 'Não informado';
     if (!acc[origem]) {
       acc[origem] = { lead: 0, testando: 0, ativo: 0 };
@@ -172,7 +334,7 @@ const AdminAnalytics = () => {
   });
 
   // Análise de ROI - Receita por canal
-  const roiData = clientes.reduce((acc, cliente) => {
+  const roiData = filteredClientes.reduce((acc, cliente) => {
     const origem = cliente.origemCadastro || 'Não informado';
     if (!acc[origem]) {
       acc[origem] = { totalReceita: 0, count: 0, clientes: [] };
@@ -219,7 +381,7 @@ const AdminAnalytics = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
@@ -233,6 +395,31 @@ const AdminAnalytics = () => {
               <p className="text-muted-foreground">Análise detalhada das origens e estatísticas dos clientes</p>
             </div>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <Select value={periodFilter} onValueChange={(value) => setPeriodFilter(value as PeriodFilter)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Selecione o período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+                <SelectItem value="365">Último ano</SelectItem>
+                <SelectItem value="all">Todo o período</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button onClick={checkConversionGoals} variant="outline" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Verificar Metas
+            </Button>
+            
+            <Button onClick={exportToCSV} className="gap-2">
+              <Download className="h-4 w-4" />
+              Exportar CSV
+            </Button>
+          </div>
         </div>
 
         {/* Cards de Resumo */}
@@ -243,9 +430,17 @@ const AdminAnalytics = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{clientes.length}</div>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold">{filteredClientes.length}</div>
+                {periodFilter !== 'all' && parseFloat(clientesGrowth) !== 0 && (
+                  <Badge variant={parseFloat(clientesGrowth) > 0 ? "default" : "destructive"} className="gap-1">
+                    {parseFloat(clientesGrowth) > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {Math.abs(parseFloat(clientesGrowth))}%
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Todos os cadastros no sistema
+                {periodFilter === 'all' ? 'Todos os cadastros' : `Novos no período selecionado`}
               </p>
             </CardContent>
           </Card>
@@ -256,11 +451,20 @@ const AdminAnalytics = () => {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${getConversaoColor(parseFloat(taxaConversaoGeral))}`}>
-                {taxaConversaoGeral}%
+              <div className="flex items-center justify-between">
+                <div className={`text-2xl font-bold ${getConversaoColor(parseFloat(taxaConversaoGeral))}`}>
+                  {taxaConversaoGeral}%
+                </div>
+                {periodFilter !== 'all' && parseFloat(conversaoGrowth) !== 0 && (
+                  <Badge variant={parseFloat(conversaoGrowth) > 0 ? "default" : "destructive"} className="gap-1">
+                    {parseFloat(conversaoGrowth) > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {Math.abs(parseFloat(conversaoGrowth))}pp
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {clientesAtivos} de {totalClientes} ativos
+                {periodFilter !== 'all' && ` | Anterior: ${previousTaxaConversao}%`}
               </p>
             </CardContent>
           </Card>
@@ -310,7 +514,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* Sistema de Metas de Conversão */}
-        <Card>
+        <Card id="metas-section">
           <CardHeader>
             <CardTitle>Metas de Conversão por Canal</CardTitle>
             <CardDescription>
