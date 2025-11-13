@@ -62,7 +62,7 @@ export async function getDeviceId(): Promise<string> {
 export async function validateActivationKey(key: string): Promise<ActivationResult> {
   try {
     const { data, error } = await supabase.rpc('validate_activation_key', {
-      activation_key: key.toUpperCase()
+      p_key: key.toUpperCase()
     });
 
     if (error) {
@@ -95,8 +95,8 @@ export async function activateDevice(activationKey: string): Promise<ActivationR
     const deviceId = await getDeviceId();
 
     const { data, error } = await supabase.rpc('activate_device', {
-      activation_key: activationKey.toUpperCase(),
-      device_id: deviceId
+      p_activation_key: activationKey.toUpperCase(),
+      p_device_id: deviceId
     });
 
     if (error) {
@@ -111,7 +111,7 @@ export async function activateDevice(activationKey: string): Promise<ActivationR
     const result = data[0];
     
     if (!result.success) {
-      return { success: false, error: result.message };
+      return { success: false, error: result.error_message };
     }
 
     // Criar sessão
@@ -119,7 +119,7 @@ export async function activateDevice(activationKey: string): Promise<ActivationR
       deviceId,
       userId: deviceId, // Usar device_id como userId
       expiresAt: result.expires_at,
-      m3uUrl: '', // M3U URL será obtido do plano
+      m3uUrl: result.m3u_url || '',
       activatedAt: new Date().toISOString()
     };
 
@@ -141,7 +141,7 @@ export async function checkSubscription(): Promise<SubscriptionStatus> {
     const deviceId = await getDeviceId();
 
     const { data, error } = await supabase.rpc('check_device_subscription', {
-      device_id: deviceId
+      p_device_id: deviceId
     });
 
     if (error) {
@@ -156,12 +156,12 @@ export async function checkSubscription(): Promise<SubscriptionStatus> {
     const result = data[0];
 
     return {
-      active: result.is_active,
+      active: result.active,
       userId: deviceId,
       expiresAt: result.expires_at,
       daysRemaining: result.days_remaining,
-      m3uUrl: '',
-      status: result.is_active ? 'active' : 'expired'
+      m3uUrl: result.m3u_url || '',
+      status: result.status
     };
   } catch (error) {
     console.error('Subscription check exception:', error);

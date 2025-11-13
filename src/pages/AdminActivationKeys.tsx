@@ -103,8 +103,8 @@ export default function AdminActivationKeys() {
       setIsGenerating(true);
 
       const { data, error } = await supabase.rpc('generate_activation_keys', {
-        plan_id: formData.subscription_plan_id,
-        quantity: formData.quantity
+        p_subscription_plan_id: formData.subscription_plan_id,
+        p_quantity: formData.quantity
       });
 
       if (error) throw error;

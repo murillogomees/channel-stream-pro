@@ -96,9 +96,11 @@ const AdminLogin = () => {
           variant: "destructive",
         });
       } else {
+        const err = error as any;
+        console.error("[AdminLogin] Supabase auth error:", err);
         toast({
           title: "Erro no login",
-          description: "Credenciais inválidas ou erro de conexão.",
+          description: err?.message || "Credenciais inválidas ou erro de conexão.",
           variant: "destructive",
         });
       }
