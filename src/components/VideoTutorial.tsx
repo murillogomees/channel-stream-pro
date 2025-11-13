@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Play, Pause, SkipBack, SkipForward, RotateCcw } from 'lucide-react';
 
-import step1 from '@/assets/tutorial/video-step1-main-menu.png';
-import step2 from '@/assets/tutorial/video-step2-channel-grid.png';
-import step3 from '@/assets/tutorial/video-step3-watching.png';
-import step4 from '@/assets/tutorial/video-step4-channel-info.png';
-import step5 from '@/assets/tutorial/video-step5-movies.png';
-import step6 from '@/assets/tutorial/video-step6-favorites.png';
+import step1 from '@/assets/tutorial/real-step1-home.png';
+import step2 from '@/assets/tutorial/real-step2-settings.png';
+import step3 from '@/assets/tutorial/real-step3-channels.png';
+import step4 from '@/assets/tutorial/real-step4-watching.png';
+import step5 from '@/assets/tutorial/real-step5-movies.png';
+import step6 from '@/assets/tutorial/real-step6-mac.png';
 
 interface TutorialStep {
   image: string;
@@ -20,38 +20,38 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     image: step1,
-    title: 'Menu Principal do SmartOne IPTV',
-    description: 'Ao abrir o app, você verá o menu principal com categorias como TV ao Vivo, Filmes, Séries e Esportes. Use o controle remoto para navegar entre as opções.',
+    title: '1. Tela Inicial do SmartOne IPTV',
+    description: 'Ao abrir o app, você verá a tela inicial com o logo SmartOne e o menu inferior com 5 opções: Reload, Settings (Configurações), Channels (Canais), Movies (Filmes) e Series (Séries). Use o controle remoto para navegar.',
     duration: 5,
   },
   {
     image: step2,
-    title: 'Grade de Canais',
-    description: 'Escolha a categoria "TV ao Vivo" para ver todos os canais disponíveis. Os canais são organizados por categorias: Notícias, Entretenimento, Esportes e mais.',
+    title: '2. Menu de Configurações',
+    description: 'Acesse Settings para configurar o idioma, player skin, formato de saída e outras preferências. O menu lateral mostra todas as opções: ACCOUNTS, SETUP, ABOUT, INFO, PRELOAD e RETURN.',
     duration: 5,
   },
   {
     image: step3,
-    title: 'Assistindo TV ao Vivo',
-    description: 'Selecione qualquer canal para começar a assistir. A barra de controle aparece na parte inferior com informações do canal, controles de volume e outras opções.',
+    title: '3. Grade de Canais ao Vivo',
+    description: 'Na seção Channels você encontra todos os canais disponíveis organizados em categorias. Navegue pela grade usando as setas do controle e selecione o canal que deseja assistir.',
     duration: 5,
   },
   {
     image: step4,
-    title: 'Informações do Programa',
-    description: 'Pressione o botão "Info" do controle para ver detalhes do programa atual: nome, descrição, horário e próximas atrações do canal.',
+    title: '4. Assistindo TV ao Vivo',
+    description: 'O player mostra o conteúdo em tela cheia. A barra de controle na parte inferior exibe o nome do canal, horário, controles de volume e outras informações. Pressione OK para mostrar/ocultar os controles.',
     duration: 5,
   },
   {
     image: step5,
-    title: 'Catálogo de Filmes',
-    description: 'Acesse a seção "Filmes" para explorar milhares de títulos organizados por categoria: Ação, Drama, Comédia, Suspense e mais. Clique em qualquer filme para assistir.',
+    title: '5. Catálogo de Filmes e Séries',
+    description: 'Na seção Movies você encontra milhares de filmes organizados por categorias. Navegue pelos títulos, selecione um filme e pressione OK para assistir. O mesmo vale para a seção Series.',
     duration: 5,
   },
   {
     image: step6,
-    title: 'Seus Favoritos',
-    description: 'Marque seus canais favoritos clicando no ícone de coração. Acesse rapidamente seus canais preferidos na seção "Favoritos".',
+    title: '6. Encontrando o Endereço MAC',
+    description: 'Para ativar seu acesso, vá em Settings > INFO e copie o endereço MAC exibido. Esse código identifica seu dispositivo e é necessário para a ativação do serviço.',
     duration: 5,
   },
 ];
