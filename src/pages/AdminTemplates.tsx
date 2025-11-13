@@ -74,7 +74,7 @@ export default function AdminTemplates() {
   
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
-  const [selectedTestPhone, setSelectedTestPhone] = useState<string>('');
+  const [selectedTestPhones, setSelectedTestPhones] = useState<string[]>([]);
   const [testContacts, setTestContacts] = useState<any[]>([]);
   const [testPhoneValidation, setTestPhoneValidation] = useState<{
     isValid: boolean;
@@ -92,15 +92,13 @@ export default function AdminTemplates() {
         setTestPhoneNumber(phoneNum);
         setTestContacts(config.testContacts || []);
         
-        // Inicializar com o número padrão se não houver seleção
-        if (!selectedTestPhone && dialogOpen) {
-          setSelectedTestPhone(phoneNum);
-        }
-        
-        // Validar o número selecionado ou o padrão
-        const phoneToValidate = (dialogOpen && selectedTestPhone) ? selectedTestPhone : phoneNum;
-        if (phoneToValidate) {
-          const validation = validateBrazilianPhone(phoneToValidate);
+        // Validar números selecionados
+        if (selectedTestPhones.length > 0) {
+          const firstPhone = selectedTestPhones[0];
+          const validation = validateBrazilianPhone(firstPhone);
+          setTestPhoneValidation(validation);
+        } else if (phoneNum) {
+          const validation = validateBrazilianPhone(phoneNum);
           setTestPhoneValidation(validation);
         }
       } catch (error) {
@@ -108,7 +106,7 @@ export default function AdminTemplates() {
         setTestPhoneValidation(validateBrazilianPhone('5561996975924'));
       }
     }
-  }, [dialogOpen, selectedTestPhone]);
+  }, [dialogOpen, selectedTestPhones]);
 
   const handleOpenDialog = (template?: WhatsappTemplate) => {
     if (template) {
@@ -203,38 +201,24 @@ export default function AdminTemplates() {
     setIsSendingTest(true);
 
     try {
-      // Buscar configuração do WhatsApp
       const configStored = localStorage.getItem('whatsapp_config');
       if (!configStored) {
         toast.error('Configure o WhatsApp primeiro em Notificações');
-        setIsSendingTest(false);
         return;
       }
 
       const config = JSON.parse(configStored);
       if (!config.appkey || !config.authkey) {
         toast.error('Credenciais WhatsApp não configuradas');
-        setIsSendingTest(false);
         return;
       }
 
-      // Usar número selecionado ou padrão
-      const phoneToUse = selectedTestPhone || config.testPhoneNumber;
-      if (!phoneToUse) {
-        toast.error('Configure o número de teste em Notificações');
-        setIsSendingTest(false);
-        return;
-      }
+      // Determinar números para enviar
+      const phonesToSend = selectedTestPhones.length > 0 
+        ? selectedTestPhones 
+        : [config.testPhoneNumber];
 
-      // Validar número antes de enviar
-      const validation = validateBrazilianPhone(phoneToUse);
-      if (!validation.isValid) {
-        toast.error(`Número inválido: ${validation.error}`);
-        setIsSendingTest(false);
-        return;
-      }
-
-      // Preparar dados de exemplo
+      // Preparar mensagem
       const exampleData: Record<string, string> = {
         nome: 'João Silva',
         dataVencimento: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
@@ -244,41 +228,48 @@ export default function AdminTemplates() {
         telefone: '(11) 98765-4321',
       };
 
-      // Substituir variáveis na mensagem
       let testMessage = formData.message;
       Object.entries(exampleData).forEach(([key, value]) => {
-        const regex = new RegExp(`\\{${key}\\}`, 'g');
-        testMessage = testMessage.replace(regex, value);
+        testMessage = testMessage.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
       });
-
       testMessage += '\n\n---\n🧪 Esta é uma mensagem de TESTE do sistema IPTV LINK';
 
-      // Enviar mensagem usando a API do BotBot
-      const response = await fetch('https://api.botbot.app/v1/sendmessage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'appkey': config.appkey,
-          'authkey': config.authkey,
-        },
-        body: JSON.stringify({
-          to: phoneToUse,
-          message: testMessage,
-        }),
-      });
+      // Enviar para todos os números selecionados
+      let successCount = 0;
+      let errorCount = 0;
 
-      const result = await response.json();
+      for (const phone of phonesToSend) {
+        try {
+          const response = await fetch('https://api.botbot.app/v1/sendmessage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'appkey': config.appkey,
+              'authkey': config.authkey,
+            },
+            body: JSON.stringify({ to: phone, message: testMessage }),
+          });
 
-      if (response.ok) {
-        const contactName = config.testContacts?.find((c: any) => c.phone === phoneToUse)?.name;
-        const displayName = contactName ? `${contactName} (${formatTestPhone(phoneToUse)})` : formatTestPhone(phoneToUse);
-        toast.success(`Teste enviado para ${displayName}! 📱`);
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+          
+          // Pequeno delay entre envios
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`✅ Teste enviado para ${successCount} contato(s)! ${errorCount > 0 ? `(${errorCount} erro(s))` : ''}`);
       } else {
-        throw new Error(result.error || 'Erro ao enviar mensagem');
+        toast.error('❌ Falha ao enviar testes');
       }
     } catch (error: any) {
-      console.error('Erro ao enviar teste:', error);
-      toast.error(`Erro ao enviar teste: ${error.message}`);
+      toast.error(`Erro: ${error.message}`);
     } finally {
       setIsSendingTest(false);
     }
@@ -615,49 +606,56 @@ export default function AdminTemplates() {
                     </p>
                   </div>
                   
-                  <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                  <div className="bg-muted/50 p-3 rounded-lg space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Enviar para:</p>
+                      <p className="text-sm font-medium">Selecionar destinatários:</p>
                       <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notificacoes')}>
                         <Settings className="h-4 w-4" />
                       </Button>
                     </div>
-                    {testContacts.length > 0 ? (
-                      <Select value={selectedTestPhone} onValueChange={setSelectedTestPhone}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Número padrão" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={testPhoneNumber}>
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              <span>Padrão: {formatTestPhone(testPhoneNumber)}</span>
-                            </div>
-                          </SelectItem>
-                          {testContacts.map((contact: any) => (
-                            <SelectItem key={contact.id} value={contact.phone}>
-                              <div className="flex items-center gap-2">
-                                <Users className="h-4 w-4" />
-                                <span>{contact.name}: {formatTestPhone(contact.phone)}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        {formatTestPhone(testPhoneNumber)}
-                      </div>
-                    )}
-                    {testPhoneValidation.isValid ? (
-                      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                    
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      <label className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedTestPhones.includes(testPhoneNumber)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTestPhones([...selectedTestPhones, testPhoneNumber]);
+                            } else {
+                              setSelectedTestPhones(selectedTestPhones.filter(p => p !== testPhoneNumber));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <Users className="h-4 w-4" />
+                        <span className="text-sm">Padrão: {formatTestPhone(testPhoneNumber)}</span>
+                      </label>
+                      
+                      {testContacts.map((contact: any) => (
+                        <label key={contact.id} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedTestPhones.includes(contact.phone)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTestPhones([...selectedTestPhones, contact.phone]);
+                              } else {
+                                setSelectedTestPhones(selectedTestPhones.filter(p => p !== contact.phone));
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <Users className="h-4 w-4" />
+                          <span className="text-sm">{contact.name}: {formatTestPhone(contact.phone)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {selectedTestPhones.length > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
                         <CheckCircle className="h-3 w-3" />
-                        <span>{testPhoneValidation.formatted}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{testPhoneValidation.error}</span>
+                        <span>{selectedTestPhones.length} contato(s) selecionado(s)</span>
                       </div>
                     )}
                   </div>
