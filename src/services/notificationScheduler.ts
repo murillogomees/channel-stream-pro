@@ -151,6 +151,21 @@ export async function sendNotification(
       } : undefined,
     });
 
+    // Broadcast realtime event
+    try {
+      const { getRealtimeService } = await import('./realtimeNotificationService');
+      const realtimeService = getRealtimeService();
+      await realtimeService.broadcastNotificationSent({
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        telefone: cliente.telefone,
+        template: template.name,
+        status: 'success',
+      });
+    } catch (realtimeError) {
+      console.error('Erro ao enviar evento realtime:', realtimeError);
+    }
+
     return response;
   } catch (error: any) {
     addLog({
@@ -162,6 +177,22 @@ export async function sendNotification(
       status: 'error',
       erro: error.message,
     });
+
+    // Broadcast realtime event for error
+    try {
+      const { getRealtimeService } = await import('./realtimeNotificationService');
+      const realtimeService = getRealtimeService();
+      await realtimeService.broadcastNotificationSent({
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        telefone: cliente.telefone,
+        template: template.name,
+        status: 'error',
+        error: error.message,
+      });
+    } catch (realtimeError) {
+      console.error('Erro ao enviar evento realtime:', realtimeError);
+    }
 
     throw error;
   }

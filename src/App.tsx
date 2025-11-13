@@ -28,6 +28,7 @@ const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSe
 const AdminNotificationRetry = lazy(() => import("./pages/AdminNotificationRetry"));
 const AdminNotificationStats = lazy(() => import("./pages/AdminNotificationStats"));
 const AdminNotificationAlerts = lazy(() => import("./pages/AdminNotificationAlerts"));
+const AdminNotificationLive = lazy(() => import("./pages/AdminNotificationLive"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -64,6 +65,7 @@ const App = () => (
           <Route path="/admin/notification-retry" element={<AdminNotificationRetry />} />
           <Route path="/admin/notification-stats" element={<AdminNotificationStats />} />
           <Route path="/admin/notification-alerts" element={<AdminNotificationAlerts />} />
+          <Route path="/admin/notification-live" element={<AdminNotificationLive />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

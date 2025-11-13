@@ -194,6 +194,17 @@ export class AutoNotificationScheduler {
 
     console.log(`📤 ${notifications.length} notificações de vencimento a enviar`);
 
+    // Broadcast batch started
+    if (notifications.length > 0) {
+      try {
+        const { getRealtimeService } = await import('./realtimeNotificationService');
+        const realtimeService = getRealtimeService();
+        await realtimeService.broadcastBatchStarted(notifications.length);
+      } catch (e) {
+        console.error('Erro ao enviar evento realtime batch started:', e);
+      }
+    }
+
     // Enviar com rate limiting
     for (const { cliente, template, daysUntilDue } of notifications) {
       try {
@@ -236,6 +247,17 @@ export class AutoNotificationScheduler {
         });
       } catch (error) {
         // Erro já foi logado dentro do rateLimiter
+      }
+    }
+
+    // Broadcast batch completed
+    if (notifications.length > 0) {
+      try {
+        const { getRealtimeService } = await import('./realtimeNotificationService');
+        const realtimeService = getRealtimeService();
+        await realtimeService.broadcastBatchCompleted(sent, errors);
+      } catch (e) {
+        console.error('Erro ao enviar evento realtime batch completed:', e);
       }
     }
 
