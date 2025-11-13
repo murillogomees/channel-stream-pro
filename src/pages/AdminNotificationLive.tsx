@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Radio, Users, CheckCircle2, XCircle, Clock, Activity, Zap, Filter, X } from "lucide-react";
+import { ArrowLeft, Radio, Users, CheckCircle2, XCircle, Clock, Activity, Zap, Filter, X, Save, Trash2, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getRealtimeService, RealtimeNotificationEvent, RealtimeStats } from "@/services/realtimeNotificationService";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -48,6 +50,158 @@ const AdminNotificationLive = () => {
       outros: true,
     }
   });
+
+  // Presets de filtros
+  const [savedPresets, setSavedPresets] = useState<Array<{
+    id: string;
+    name: string;
+    filters: typeof filters;
+  }>>([]);
+  const [presetName, setPresetName] = useState('');
+  const [showSavePreset, setShowSavePreset] = useState(false);
+
+  const defaultPresets = [
+    {
+      id: 'all',
+      name: 'Todos',
+      filters: {
+        types: {
+          notification_sent: true,
+          notification_failed: true,
+          batch_started: true,
+          batch_completed: true,
+        },
+        status: { success: true, error: true },
+        templates: {
+          vencimento: true,
+          boas_vindas: true,
+          renovacao: true,
+          admin: true,
+          outros: true,
+        }
+      }
+    },
+    {
+      id: 'errors_only',
+      name: 'Apenas Erros',
+      filters: {
+        types: {
+          notification_sent: false,
+          notification_failed: true,
+          batch_started: false,
+          batch_completed: false,
+        },
+        status: { success: false, error: true },
+        templates: {
+          vencimento: true,
+          boas_vindas: true,
+          renovacao: true,
+          admin: true,
+          outros: true,
+        }
+      }
+    },
+    {
+      id: 'success_only',
+      name: 'Apenas Sucessos',
+      filters: {
+        types: {
+          notification_sent: true,
+          notification_failed: false,
+          batch_started: false,
+          batch_completed: false,
+        },
+        status: { success: true, error: false },
+        templates: {
+          vencimento: true,
+          boas_vindas: true,
+          renovacao: true,
+          admin: true,
+          outros: true,
+        }
+      }
+    },
+    {
+      id: 'vencimentos',
+      name: 'Vencimentos',
+      filters: {
+        types: {
+          notification_sent: true,
+          notification_failed: true,
+          batch_started: false,
+          batch_completed: false,
+        },
+        status: { success: true, error: true },
+        templates: {
+          vencimento: true,
+          boas_vindas: false,
+          renovacao: false,
+          admin: false,
+          outros: false,
+        }
+      }
+    },
+    {
+      id: 'boas_vindas',
+      name: 'Boas-vindas',
+      filters: {
+        types: {
+          notification_sent: true,
+          notification_failed: true,
+          batch_started: false,
+          batch_completed: false,
+        },
+        status: { success: true, error: true },
+        templates: {
+          vencimento: false,
+          boas_vindas: true,
+          renovacao: false,
+          admin: false,
+          outros: false,
+        }
+      }
+    },
+    {
+      id: 'renovacoes',
+      name: 'Renovações',
+      filters: {
+        types: {
+          notification_sent: true,
+          notification_failed: true,
+          batch_started: false,
+          batch_completed: false,
+        },
+        status: { success: true, error: true },
+        templates: {
+          vencimento: false,
+          boas_vindas: false,
+          renovacao: true,
+          admin: false,
+          outros: false,
+        }
+      }
+    },
+    {
+      id: 'batch_only',
+      name: 'Apenas Lotes',
+      filters: {
+        types: {
+          notification_sent: false,
+          notification_failed: false,
+          batch_started: true,
+          batch_completed: true,
+        },
+        status: { success: true, error: true },
+        templates: {
+          vencimento: true,
+          boas_vindas: true,
+          renovacao: true,
+          admin: true,
+          outros: true,
+        }
+      }
+    },
+  ];
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const listenerIdRef = useRef(`live-dashboard-${Date.now()}`);
@@ -60,6 +214,9 @@ const AdminNotificationLive = () => {
     // Registrar listener para eventos
     const listenerId = listenerIdRef.current;
     realtimeService.subscribe(listenerId, handleRealtimeEvent);
+
+    // Carregar presets salvos
+    loadSavedPresets();
 
     // Atualizar status da conexão periodicamente
     const statusInterval = setInterval(() => {
@@ -150,6 +307,46 @@ const AdminNotificationLive = () => {
         outros: true,
       }
     });
+  };
+
+  const loadSavedPresets = () => {
+    try {
+      const stored = localStorage.getItem('notification_live_presets');
+      if (stored) {
+        setSavedPresets(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar presets:', error);
+    }
+  };
+
+  const savePreset = () => {
+    if (!presetName.trim()) {
+      return;
+    }
+
+    const newPreset = {
+      id: `custom_${Date.now()}`,
+      name: presetName.trim(),
+      filters: { ...filters },
+    };
+
+    const updated = [...savedPresets, newPreset];
+    setSavedPresets(updated);
+    localStorage.setItem('notification_live_presets', JSON.stringify(updated));
+    
+    setPresetName('');
+    setShowSavePreset(false);
+  };
+
+  const deletePreset = (id: string) => {
+    const updated = savedPresets.filter(p => p.id !== id);
+    setSavedPresets(updated);
+    localStorage.setItem('notification_live_presets', JSON.stringify(updated));
+  };
+
+  const applyPreset = (preset: typeof defaultPresets[0]) => {
+    setFilters(preset.filters);
   };
 
   const getTemplateCategory = (templateName: string): keyof typeof filters.templates => {
@@ -277,12 +474,106 @@ const AdminNotificationLive = () => {
                   <Filter className="h-5 w-5" />
                   Filtros
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  Resetar Filtros
-                </Button>
+                <div className="flex gap-2">
+                  <Dialog open={showSavePreset} onOpenChange={setShowSavePreset}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Save className="h-4 w-4 mr-2" />
+                        Salvar Preset
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Salvar Preset de Filtro</DialogTitle>
+                        <DialogDescription>
+                          Salve a configuração atual de filtros para uso rápido
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="preset-name">Nome do Preset</Label>
+                          <Input
+                            id="preset-name"
+                            value={presetName}
+                            onChange={(e) => setPresetName(e.target.value)}
+                            placeholder="Ex: Erros Críticos"
+                            onKeyDown={(e) => e.key === 'Enter' && savePreset()}
+                          />
+                        </div>
+                        <Button onClick={savePreset} className="w-full" disabled={!presetName.trim()}>
+                          <Save className="h-4 w-4 mr-2" />
+                          Salvar
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    Resetar
+                  </Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Presets Rápidos */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Bookmark className="h-4 w-4" />
+                  Presets Rápidos
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {defaultPresets.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyPreset(preset)}
+                      className="text-xs"
+                    >
+                      {preset.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Presets Salvos */}
+              {savedPresets.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Meus Presets
+                    </h3>
+                    <div className="space-y-2">
+                      {savedPresets.map((preset) => (
+                        <div
+                          key={preset.id}
+                          className="flex items-center justify-between p-2 border rounded-lg"
+                        >
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => applyPreset(preset)}
+                            className="flex-1 justify-start"
+                          >
+                            {preset.name}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deletePreset(preset.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Filtro por Tipo de Evento */}
                 <div className="space-y-4">
