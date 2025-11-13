@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
+import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -26,9 +27,11 @@ const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSettings"));
 const AdminNotificationRetry = lazy(() => import("./pages/AdminNotificationRetry"));
 const AdminNotificationStats = lazy(() => import("./pages/AdminNotificationStats"));
+const AdminNotificationAlerts = lazy(() => import("./pages/AdminNotificationAlerts"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
+  useNotificationAlerts();
   return null;
 };
 
@@ -60,6 +63,7 @@ const App = () => (
           <Route path="/admin/notification-settings" element={<AdminNotificationSettings />} />
           <Route path="/admin/notification-retry" element={<AdminNotificationRetry />} />
           <Route path="/admin/notification-stats" element={<AdminNotificationStats />} />
+          <Route path="/admin/notification-alerts" element={<AdminNotificationAlerts />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
