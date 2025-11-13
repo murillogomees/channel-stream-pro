@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Phone, Bell } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Phone, Bell, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { validateBrazilianPhone } from "@/utils/phoneValidator";
+import { getDesktopNotificationService } from "@/services/desktopNotificationService";
 
 interface NotificationPhone {
   id: string;
@@ -23,6 +24,10 @@ const AdminNotificationSettings = () => {
   const [phones, setPhones] = useState<NotificationPhone[]>([]);
   const [newPhone, setNewPhone] = useState("");
   const [newName, setNewName] = useState("");
+  const [desktopNotificationsEnabled, setDesktopNotificationsEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  
+  const desktopService = getDesktopNotificationService();
 
   // Carregar configurações do localStorage
   useEffect(() => {
@@ -48,6 +53,10 @@ const AdminNotificationSettings = () => {
       setPhones([defaultPhone]);
       saveToStorage([defaultPhone]);
     }
+
+    // Carregar status de notificações desktop
+    setDesktopNotificationsEnabled(desktopService.isEnabled());
+    setNotificationPermission(desktopService.getPermission());
   }, []);
 
   const saveToStorage = (phonesData: NotificationPhone[]) => {
@@ -121,6 +130,35 @@ const AdminNotificationSettings = () => {
     return phone;
   };
 
+  const handleToggleDesktopNotifications = async () => {
+    try {
+      const success = await desktopService.setEnabled(!desktopNotificationsEnabled);
+      if (success) {
+        setDesktopNotificationsEnabled(!desktopNotificationsEnabled);
+        setNotificationPermission(desktopService.getPermission());
+        toast.success(
+          !desktopNotificationsEnabled 
+            ? "Notificações de desktop ativadas!" 
+            : "Notificações de desktop desativadas"
+        );
+      } else {
+        toast.error("Permissão de notificações negada pelo navegador");
+      }
+    } catch (error) {
+      console.error("Erro ao alternar notificações:", error);
+      toast.error("Erro ao configurar notificações");
+    }
+  };
+
+  const handleTestDesktopNotification = async () => {
+    try {
+      await desktopService.testNotification();
+      toast.success("Notificação de teste enviada!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao enviar notificação de teste");
+    }
+  };
+
   const activeCount = phones.filter(p => p.active).length;
 
   return (
@@ -141,6 +179,59 @@ const AdminNotificationSettings = () => {
             </p>
           </div>
         </div>
+
+        {/* Notificações Desktop */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="h-5 w-5" />
+              Notificações de Desktop
+            </CardTitle>
+            <CardDescription>
+              Receba alertas no desktop quando erros críticos ocorrerem, mesmo com o dashboard fechado
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="desktop-notifications">Ativar Notificações Desktop</Label>
+                <p className="text-sm text-muted-foreground">
+                  {notificationPermission === 'granted' && 'Permissão concedida'}
+                  {notificationPermission === 'denied' && 'Permissão negada - verifique as configurações do navegador'}
+                  {notificationPermission === 'default' && 'Clique para solicitar permissão'}
+                </p>
+              </div>
+              <Switch
+                id="desktop-notifications"
+                checked={desktopNotificationsEnabled}
+                onCheckedChange={handleToggleDesktopNotifications}
+              />
+            </div>
+
+            {desktopNotificationsEnabled && (
+              <div className="pt-4 border-t">
+                <Button 
+                  onClick={handleTestDesktopNotification}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Enviar Notificação de Teste
+                </Button>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-muted p-4 text-sm">
+              <p className="font-medium mb-2">Como funcionam:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Alertas aparecem mesmo com o dashboard fechado</li>
+                <li>• Notificações para erros individuais e lotes com falhas</li>
+                <li>• Clique na notificação para ir direto ao dashboard ao vivo</li>
+                <li>• Funciona em segundo plano enquanto o navegador estiver aberto</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

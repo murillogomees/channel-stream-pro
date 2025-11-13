@@ -1,17 +1,43 @@
 import { useEffect } from 'react';
 import { getAlertService } from '@/services/notificationAlertService';
 import { useNotificationLogs } from './useNotificationLogs';
+import { getRealtimeService } from '@/services/realtimeNotificationService';
+import { getDesktopNotificationService } from '@/services/desktopNotificationService';
 
 export function useNotificationAlerts() {
   const { logs } = useNotificationLogs();
   const alertService = getAlertService();
+  const realtimeService = getRealtimeService();
+  const desktopService = getDesktopNotificationService();
 
   useEffect(() => {
     // Verificar alertas sempre que houver novos logs
     if (logs.length > 0) {
       alertService.checkAndAlert(logs);
     }
-  }, [logs.length]); // Dispara quando há mudança no número de logs
+  }, [logs.length]);
+
+  useEffect(() => {
+    // Conectar ao serviço de realtime
+    realtimeService.connect();
+
+    // Inscrever-se para eventos de erro
+    const listenerId = 'desktop-notifications';
+    realtimeService.subscribe(listenerId, (event) => {
+      if (event.type === 'notification_failed') {
+        desktopService.notifyError(event);
+      } else if (event.type === 'batch_completed' && event.data.errorCount && event.data.errorCount > 0) {
+        desktopService.notifyBatchError(
+          event.data.successCount || 0,
+          event.data.errorCount
+        );
+      }
+    });
+
+    return () => {
+      realtimeService.unsubscribe(listenerId);
+    };
+  }, []);
 
   return { alertService };
 }
