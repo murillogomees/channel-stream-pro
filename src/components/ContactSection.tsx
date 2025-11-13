@@ -6,9 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 const ContactSection = () => {
   const { settings } = useSettings();
   
-  const whatsappNumber = "556131425880";
-  const whatsappMessage = "Olá! Gostaria de saber mais sobre os planos IPTV.";
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+  const whatsappUrl = "https://wa.me/556131425880?text=Olá%21+Gostaria+de+fazer+o+teste+grátis+do+IPTV";
   
   const contactMethods = [
     {
@@ -52,7 +50,7 @@ const ContactSection = () => {
                 <Button
                   variant="default"
                   className="w-full font-semibold"
-                  onClick={() => window.location.href = whatsappUrl}
+                  onClick={() => window.open(whatsappUrl, "_blank")}
                 >
                   Chamar no WhatsApp
                 </Button>
