@@ -62,6 +62,7 @@ export interface WhatsAppConfig {
   autoSendEnabled: boolean;
   sendHour: number;
   daysToNotify: number[];
+  testPhoneNumber: string;
 }
 
 export interface BotBotResponse {

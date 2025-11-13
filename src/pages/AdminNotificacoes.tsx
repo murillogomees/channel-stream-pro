@@ -352,8 +352,37 @@ export default function AdminNotificacoes() {
                   onChange={(e) => saveConfig({ sendHour: parseInt(e.target.value) })}
                   disabled={!isConfigured}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Horário para envio automático (0-23)
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Número para Testes</Label>
+                <Input
+                  type="text"
+                  placeholder="5561999999999"
+                  value={config.testPhoneNumber || ''}
+                  onChange={(e) => saveConfig({ testPhoneNumber: e.target.value })}
+                  disabled={!isConfigured}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Número com DDI para envio de testes
+                </p>
               </div>
             </div>
+
+            {config.testPhoneNumber && (
+              <div className="bg-blue-500/10 border border-blue-500/20 text-blue-500 p-3 rounded-lg">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Send className="h-4 w-4" />
+                  Número de teste configurado: <span className="font-mono">{config.testPhoneNumber}</span>
+                </p>
+                <p className="text-xs mt-1 opacity-80">
+                  Este número será usado para enviar mensagens de teste dos templates
+                </p>
+              </div>
+            )}
 
             {!isConfigured && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-3 rounded-lg">

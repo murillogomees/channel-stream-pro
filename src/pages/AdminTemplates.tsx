@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +72,20 @@ export default function AdminTemplates() {
   });
   
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  
+  // Carregar número de teste
+  useEffect(() => {
+    const configStored = localStorage.getItem('whatsapp_config');
+    if (configStored) {
+      try {
+        const config = JSON.parse(configStored);
+        setTestPhoneNumber(config.testPhoneNumber || '5561996975924');
+      } catch (error) {
+        setTestPhoneNumber('5561996975924');
+      }
+    }
+  }, [dialogOpen]);
 
   const handleOpenDialog = (template?: WhatsappTemplate) => {
     if (template) {
@@ -181,6 +195,12 @@ export default function AdminTemplates() {
         return;
       }
 
+      if (!config.testPhoneNumber) {
+        toast.error('Configure o número de teste em Notificações');
+        setIsSendingTest(false);
+        return;
+      }
+
       // Preparar dados de exemplo
       const exampleData: Record<string, string> = {
         nome: 'João Silva',
@@ -209,7 +229,7 @@ export default function AdminTemplates() {
           'authkey': config.authkey,
         },
         body: JSON.stringify({
-          to: '5561996975924', // Número fornecido pelo usuário
+          to: config.testPhoneNumber,
           message: testMessage,
         }),
       });
@@ -217,7 +237,7 @@ export default function AdminTemplates() {
       const result = await response.json();
 
       if (response.ok) {
-        toast.success('Mensagem de teste enviada com sucesso! 📱');
+        toast.success(`Teste enviado para ${formatTestPhone(config.testPhoneNumber)}! 📱`);
       } else {
         throw new Error(result.error || 'Erro ao enviar mensagem');
       }
@@ -268,6 +288,16 @@ export default function AdminTemplates() {
     return preview;
   };
 
+  const formatTestPhone = (phone: string) => {
+    // Remove DDI 55 se tiver
+    const cleaned = phone.replace(/^55/, '');
+    // Formato: (XX) XXXXX-XXXX
+    if (cleaned.length === 11) {
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7)}`;
+    }
+    return phone;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
@@ -306,7 +336,7 @@ export default function AdminTemplates() {
               Use estas variáveis nas mensagens entre chaves, ex: {'{nome}'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
@@ -333,6 +363,27 @@ export default function AdminTemplates() {
                 <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{telefone}'}</code>
               </div>
             </div>
+
+            {testPhoneNumber && (
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                    <Send className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Número de teste: <span className="font-mono">{formatTestPhone(testPhoneNumber)}</span>
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate('/admin/notificacoes')}
+                    className="text-xs"
+                  >
+                    Alterar
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -518,9 +569,10 @@ export default function AdminTemplates() {
                       <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                       <span>Exemplo: João Silva, R$ 49,90, Plano Mensal</span>
                     </div>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      Número teste: (61) 99697-5924
-                    </span>
+                    <div className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                      <Settings className="h-3 w-3" />
+                      <span>Teste: {formatTestPhone(testPhoneNumber)}</span>
+                    </div>
                   </div>
                 </div>
               </>
@@ -587,15 +639,26 @@ export default function AdminTemplates() {
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleSendTest}
-              disabled={isSendingTest || !formData.message.trim()}
-              className="w-full sm:w-auto"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {isSendingTest ? 'Enviando...' : 'Enviar Teste'}
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button 
+                variant="outline" 
+                onClick={handleSendTest}
+                disabled={isSendingTest || !formData.message.trim()}
+                className="flex-1 sm:flex-none"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {isSendingTest ? 'Enviando...' : 'Enviar Teste'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/admin/notificacoes')}
+                title="Alterar número de teste nas configurações"
+                className="shrink-0"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex gap-2 w-full sm:w-auto">
               <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
                 Cancelar

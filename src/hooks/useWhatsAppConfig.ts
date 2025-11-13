@@ -8,6 +8,7 @@ const DEFAULT_CONFIG: WhatsAppConfig = {
   autoSendEnabled: false,
   sendHour: 10,
   daysToNotify: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+  testPhoneNumber: '5561996975924',
 };
 
 export function useWhatsAppConfig() {
