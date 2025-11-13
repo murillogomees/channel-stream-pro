@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Upload, Trash2, Loader2, FileText, Download, Eye, EyeOff } from 'lucide-react';
+import { Plus, Upload, Trash2, Loader2, FileText, Download, Eye, EyeOff, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ interface M3UList {
   status: string;
   created_at: string;
   updated_at: string;
+  is_default?: boolean;
 }
 
 export default function AdminM3ULists() {
@@ -213,6 +214,30 @@ export default function AdminM3ULists() {
     }
   };
 
+  const handleSetDefault = async (id: string, currentDefault: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('m3u_lists')
+        // @ts-ignore - Campo is_default será adicionado após executar M3U_DEFAULT_SETUP.sql
+        .update({ is_default: !currentDefault })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success(
+        !currentDefault 
+          ? 'Lista definida como padrão para novos cadastros!' 
+          : 'Lista removida como padrão'
+      );
+      loadLists();
+    } catch (error: any) {
+      console.error('Error setting default:', error);
+      toast.error('Erro ao definir lista padrão', {
+        description: error.message
+      });
+    }
+  };
+
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'N/A';
     const mb = bytes / (1024 * 1024);
@@ -309,7 +334,17 @@ export default function AdminM3ULists() {
               ) : (
                 lists.map((list) => (
                   <TableRow key={list.id}>
-                    <TableCell className="font-medium">{list.name}</TableCell>
+                     <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {list.name}
+                        {list.is_default && (
+                          <Badge variant="default" className="gap-1">
+                            <Star className="w-3 h-3 fill-current" />
+                            Padrão
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
@@ -325,6 +360,14 @@ export default function AdminM3ULists() {
                     <TableCell>{format(new Date(list.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant={list.is_default ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => handleSetDefault(list.id, list.is_default || false)}
+                          title={list.is_default ? 'Remover como padrão' : 'Definir como padrão'}
+                        >
+                          <Star className={`w-4 h-4 ${list.is_default ? 'fill-current' : ''}`} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"

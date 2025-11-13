@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,8 +55,49 @@ serve(async (req) => {
       );
     }
 
-    // Construir URL M3U do cliente
-    const m3uUrl = `http://dns.fastcdn.fun:80/get.php?username=${usuario}&password=${senha}&type=m3u_plus&output=ts`;
+    // Buscar a lista M3U padrão do banco de dados
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const { data: defaultList, error: dbError } = await supabaseClient
+      .from('m3u_lists')
+      .select('file_url')
+      .eq('is_default', true)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (dbError) {
+      console.error('Error fetching default M3U list:', dbError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Erro ao buscar lista M3U padrão do banco de dados',
+          details: dbError.message 
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!defaultList) {
+      console.error('No default M3U list found');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Nenhuma lista M3U padrão encontrada. Configure uma lista como padrão em /admin/m3u-lists' 
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Usar a URL da lista M3U padrão do banco
+    const m3uUrl = defaultList.file_url;
+    console.log('Using default M3U list URL:', m3uUrl);
 
     // Chamar API do SmartOne
     console.log('Calling SmartOne API:', SMARTONE_API_BASE_URL);
@@ -106,6 +148,7 @@ serve(async (req) => {
         success: true,
         playlistId: smartoneData.id || smartoneData.playlist_id || 'N/A',
         data: smartoneData,
+        m3uUrl: m3uUrl, // Retornar a URL usada para referência
       }),
       {
         status: 200,
