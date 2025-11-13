@@ -55,6 +55,13 @@ export interface NotificationSchedule {
   }[];
 }
 
+export interface TestContact {
+  id: string;
+  name: string;
+  phone: string;
+  addedAt: string;
+}
+
 export interface WhatsAppConfig {
   appkey: string;
   authkey: string;
@@ -63,6 +70,7 @@ export interface WhatsAppConfig {
   sendHour: number;
   daysToNotify: number[];
   testPhoneNumber: string;
+  testContacts: TestContact[];
 }
 
 export interface BotBotResponse {

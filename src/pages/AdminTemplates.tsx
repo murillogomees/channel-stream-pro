@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,8 @@ export default function AdminTemplates() {
   
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [selectedTestPhone, setSelectedTestPhone] = useState<string>('');
+  const [testContacts, setTestContacts] = useState<any[]>([]);
   const [testPhoneValidation, setTestPhoneValidation] = useState<{
     isValid: boolean;
     error?: string;
@@ -88,9 +90,17 @@ export default function AdminTemplates() {
         const config = JSON.parse(configStored);
         const phoneNum = config.testPhoneNumber || '5561996975924';
         setTestPhoneNumber(phoneNum);
+        setTestContacts(config.testContacts || []);
         
-        if (phoneNum) {
-          const validation = validateBrazilianPhone(phoneNum);
+        // Inicializar com o número padrão se não houver seleção
+        if (!selectedTestPhone && dialogOpen) {
+          setSelectedTestPhone(phoneNum);
+        }
+        
+        // Validar o número selecionado ou o padrão
+        const phoneToValidate = (dialogOpen && selectedTestPhone) ? selectedTestPhone : phoneNum;
+        if (phoneToValidate) {
+          const validation = validateBrazilianPhone(phoneToValidate);
           setTestPhoneValidation(validation);
         }
       } catch (error) {
@@ -98,7 +108,7 @@ export default function AdminTemplates() {
         setTestPhoneValidation(validateBrazilianPhone('5561996975924'));
       }
     }
-  }, [dialogOpen]);
+  }, [dialogOpen, selectedTestPhone]);
 
   const handleOpenDialog = (template?: WhatsappTemplate) => {
     if (template) {
@@ -208,14 +218,16 @@ export default function AdminTemplates() {
         return;
       }
 
-      if (!config.testPhoneNumber) {
+      // Usar número selecionado ou padrão
+      const phoneToUse = selectedTestPhone || config.testPhoneNumber;
+      if (!phoneToUse) {
         toast.error('Configure o número de teste em Notificações');
         setIsSendingTest(false);
         return;
       }
 
       // Validar número antes de enviar
-      const validation = validateBrazilianPhone(config.testPhoneNumber);
+      const validation = validateBrazilianPhone(phoneToUse);
       if (!validation.isValid) {
         toast.error(`Número inválido: ${validation.error}`);
         setIsSendingTest(false);
@@ -250,7 +262,7 @@ export default function AdminTemplates() {
           'authkey': config.authkey,
         },
         body: JSON.stringify({
-          to: config.testPhoneNumber,
+          to: phoneToUse,
           message: testMessage,
         }),
       });
@@ -258,7 +270,9 @@ export default function AdminTemplates() {
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(`Teste enviado para ${validation.formatted}! 📱`);
+        const contactName = config.testContacts?.find((c: any) => c.phone === phoneToUse)?.name;
+        const displayName = contactName ? `${contactName} (${formatTestPhone(phoneToUse)})` : formatTestPhone(phoneToUse);
+        toast.success(`Teste enviado para ${displayName}! 📱`);
       } else {
         throw new Error(result.error || 'Erro ao enviar mensagem');
       }
@@ -601,15 +615,51 @@ export default function AdminTemplates() {
                     </p>
                   </div>
                   
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                      <span>Exemplo: João Silva, R$ 49,90, Plano Mensal</span>
+                  <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Enviar para:</p>
+                      <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notificacoes')}>
+                        <Settings className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      <Settings className="h-3 w-3" />
-                      <span>Teste: {formatTestPhone(testPhoneNumber)}</span>
-                    </div>
+                    {testContacts.length > 0 ? (
+                      <Select value={selectedTestPhone} onValueChange={setSelectedTestPhone}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Número padrão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={testPhoneNumber}>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              <span>Padrão: {formatTestPhone(testPhoneNumber)}</span>
+                            </div>
+                          </SelectItem>
+                          {testContacts.map((contact: any) => (
+                            <SelectItem key={contact.id} value={contact.phone}>
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span>{contact.name}: {formatTestPhone(contact.phone)}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        {formatTestPhone(testPhoneNumber)}
+                      </div>
+                    )}
+                    {testPhoneValidation.isValid ? (
+                      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-3 w-3" />
+                        <span>{testPhoneValidation.formatted}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{testPhoneValidation.error}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
