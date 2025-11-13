@@ -34,6 +34,7 @@ const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
+const Auth = lazy(() => import("./pages/Auth"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -50,6 +51,7 @@ const App = () => (
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/app/login" element={<AppLogin />} />
