@@ -3,6 +3,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { getWebSocketMetricsService } from './websocketMetricsService';
 import { getSystemHealthService, ServiceHealth } from './systemHealthService';
 import { getAdminAlertService } from './adminAlertService';
+import { getMetricsPersistenceService } from './metricsPersistenceService';
 
 export interface RealtimeNotificationEvent {
   type: 'notification_sent' | 'notification_failed' | 'batch_started' | 'batch_completed';
@@ -58,7 +59,8 @@ class RealtimeNotificationService {
   private metricsService = getWebSocketMetricsService();
   private healthService = getSystemHealthService();
   private alertService = getAdminAlertService();
-  
+  private persistenceService = getMetricsPersistenceService();
+
   connect() {
     if (this.isConnecting) {
       console.log('[Realtime] Conexão já em andamento');
@@ -71,6 +73,13 @@ class RealtimeNotificationService {
     }
 
     this.isConnecting = true;
+    
+    // Start auto-save when connecting
+    this.persistenceService.startAutoSave(
+      () => this.metricsService.getMetrics(),
+      () => this.healthService.getStatus()
+    );
+    
     this.attemptConnection();
     return this.channel;
   }
