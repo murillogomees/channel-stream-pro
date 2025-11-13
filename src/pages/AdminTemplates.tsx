@@ -36,6 +36,13 @@ import {
 import { useTemplates } from '@/hooks/useTemplates';
 import { WhatsappTemplate } from '@/types/whatsapp';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function AdminTemplates() {
   const navigate = useNavigate();
@@ -61,6 +68,7 @@ export default function AdminTemplates() {
     message: '',
     daysBeforeDue: 0,
     type: 'local' as 'local' | 'botbot',
+    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder',
   });
 
   const handleOpenDialog = (template?: WhatsappTemplate) => {
@@ -71,6 +79,7 @@ export default function AdminTemplates() {
         message: template.message,
         daysBeforeDue: template.daysBeforeDue || 0,
         type: template.type,
+        eventType: template.eventType,
       });
     } else {
       setEditingTemplate(null);
@@ -79,6 +88,7 @@ export default function AdminTemplates() {
         message: '',
         daysBeforeDue: 0,
         type: 'local',
+        eventType: 'expiration',
       });
       clearFile();
     }
@@ -146,10 +156,21 @@ export default function AdminTemplates() {
   };
 
   const getDaysLabel = (days: number | undefined) => {
-    if (days === undefined) return 'N/A';
-    if (days < 0) return `${Math.abs(days)} dias antes`;
-    if (days === 0) return 'Dia do vencimento';
-    return `${days} dias depois`;
+    if (days === undefined) return '-';
+    if (days < 0) return `${Math.abs(days)}d antes`;
+    if (days === 0) return 'Dia venc.';
+    return `${days}d depois`;
+  };
+
+  const getEventLabel = (eventType: string) => {
+    const labels: Record<string, string> = {
+      expiration: 'Vencimento',
+      welcome_trial: 'Boas-vindas Teste',
+      welcome_plan: 'Boas-vindas Plano',
+      renewal: 'Renovação',
+      payment_reminder: 'Lembrete Pgto',
+    };
+    return labels[eventType] || eventType;
   };
 
   return (
@@ -202,11 +223,19 @@ export default function AdminTemplates() {
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{valor}'}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
                 <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{linkPagamento}'}</code>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary flex-shrink-0" />
                 <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{plano}'}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{'{telefone}'}</code>
               </div>
             </div>
           </CardContent>
@@ -222,9 +251,9 @@ export default function AdminTemplates() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Nome</TableHead>
-                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Dias</TableHead>
-                    <TableHead className="whitespace-nowrap hidden md:table-cell">Mensagem</TableHead>
-                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Tipo</TableHead>
+                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Evento</TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">Dias</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Mensagem</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -239,11 +268,11 @@ export default function AdminTemplates() {
                     templates.map((template) => (
                       <TableRow key={template.id}>
                         <TableCell className="font-medium whitespace-nowrap">{template.name}</TableCell>
-                        <TableCell className="hidden sm:table-cell whitespace-nowrap">{getDaysLabel(template.daysBeforeDue)}</TableCell>
-                        <TableCell className="hidden md:table-cell max-w-xs truncate">{template.message}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          <span className="capitalize">{template.type}</span>
+                        <TableCell className="hidden sm:table-cell whitespace-nowrap">
+                          <span className="text-xs bg-muted px-2 py-1 rounded">{getEventLabel(template.eventType)}</span>
                         </TableCell>
+                        <TableCell className="hidden md:table-cell whitespace-nowrap">{getDaysLabel(template.daysBeforeDue)}</TableCell>
+                        <TableCell className="hidden lg:table-cell max-w-xs truncate">{template.message}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 sm:gap-2">
                           <Button
@@ -298,20 +327,44 @@ export default function AdminTemplates() {
             </div>
 
             <div>
-              <Label htmlFor="daysBeforeDue">Dias em relação ao vencimento</Label>
-              <Input
-                id="daysBeforeDue"
-                type="number"
-                value={formData.daysBeforeDue}
-                onChange={(e) =>
-                  setFormData({ ...formData, daysBeforeDue: parseInt(e.target.value) })
-                }
-                placeholder="0 = dia do vencimento, -3 = 3 dias antes, 5 = 5 dias depois"
-              />
+              <Label htmlFor="eventType">Tipo de Evento</Label>
+              <Select 
+                value={formData.eventType} 
+                onValueChange={(value: any) => setFormData({ ...formData, eventType: value })}
+              >
+                <SelectTrigger id="eventType">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expiration">Vencimento de Plano</SelectItem>
+                  <SelectItem value="welcome_trial">Boas-vindas - Período de Teste</SelectItem>
+                  <SelectItem value="welcome_plan">Boas-vindas - Plano Contratado</SelectItem>
+                  <SelectItem value="renewal">Renovação Confirmada</SelectItem>
+                  <SelectItem value="payment_reminder">Lembrete de Pagamento</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Valores negativos: antes do vencimento | 0: dia do vencimento | Positivos: após vencimento
+                Quando este template será enviado automaticamente
               </p>
             </div>
+
+            {formData.eventType === 'expiration' && (
+              <div>
+                <Label htmlFor="daysBeforeDue">Dias em relação ao vencimento</Label>
+                <Input
+                  id="daysBeforeDue"
+                  type="number"
+                  value={formData.daysBeforeDue}
+                  onChange={(e) =>
+                    setFormData({ ...formData, daysBeforeDue: parseInt(e.target.value) })
+                  }
+                  placeholder="0 = dia do vencimento, -3 = 3 dias antes, 5 = 5 dias depois"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valores negativos: antes do vencimento | 0: dia do vencimento | Positivos: após vencimento
+                </p>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="message">Mensagem</Label>
@@ -323,7 +376,7 @@ export default function AdminTemplates() {
                 rows={5}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Use variáveis: {'{nome}'}, {'{dataVencimento}'}, {'{linkPagamento}'}, {'{plano}'}
+                Use variáveis: {'{nome}'}, {'{dataVencimento}'}, {'{valor}'}, {'{linkPagamento}'}, {'{plano}'}, {'{telefone}'}
               </p>
             </div>
 

@@ -125,18 +125,24 @@ export class AutoNotificationScheduler {
       // 7. Salvar snapshot atual
       paymentService.saveCurrentData(clientes);
 
-      // 8. Processar notificações
+      // 8. Processar eventos especiais (boas-vindas e renovações)
+      const { processEventNotifications } = await import('./eventNotificationService');
+      const { addLog } = this.getNotificationLogs();
+      const eventResult = await processEventNotifications(clientes, paidClients, addLog);
+      console.log(`🎉 Eventos processados: ${eventResult.welcomeSent} boas-vindas, ${eventResult.renewalSent} renovações`);
+
+      // 9. Processar notificações de vencimento
       const result = await this.processNotifications(clientes, config);
 
-      // 9. Salvar estado de execução
+      // 10. Salvar estado de execução
       this.saveLastRunState({
         lastRunDate: now.toISOString().split('T')[0],
         lastRunHour: config.sendHour,
-        totalSent: result.sent,
+        totalSent: result.sent + eventResult.welcomeSent + eventResult.renewalSent,
         errors: result.errors,
       });
 
-      console.log(`✅ Envio automático concluído: ${result.sent} enviadas, ${result.errors} erros`);
+      console.log(`✅ Envio automático concluído: ${result.sent} vencimentos, ${eventResult.welcomeSent} boas-vindas, ${eventResult.renewalSent} renovações, ${result.errors} erros`);
 
     } catch (error) {
       console.error('❌ Erro no envio automático:', error);
@@ -162,14 +168,16 @@ export class AutoNotificationScheduler {
     // Carregar templates atualizados
     const templates = loadTemplates();
 
-    // Coletar todas as notificações a enviar
+    // Coletar todas as notificações de vencimento a enviar
     for (const cliente of clientes) {
       if (!cliente.dataVencimento) continue;
 
       const daysUntilDue = getDaysUntilDue(cliente.dataVencimento);
 
-      // Encontrar template correspondente
-      const template = templates.find(t => t.daysBeforeDue === daysUntilDue);
+      // Encontrar template de vencimento correspondente
+      const template = templates.find(
+        t => t.eventType === 'expiration' && t.daysBeforeDue === daysUntilDue
+      );
       if (!template) continue;
 
       // Verificar se está nos dias configurados para notificar
@@ -184,14 +192,20 @@ export class AutoNotificationScheduler {
       notifications.push({ cliente, template, daysUntilDue });
     }
 
-    console.log(`📤 ${notifications.length} notificações a enviar`);
+    console.log(`📤 ${notifications.length} notificações de vencimento a enviar`);
 
     // Enviar com rate limiting
     for (const { cliente, template, daysUntilDue } of notifications) {
       try {
         await rateLimiter.add(async () => {
           try {
-            const result = await sendNotification(cliente, template, addLog);
+            // Preparar variáveis extras
+            const extraVars: Record<string, string> = {
+              linkPagamento: 'https://exemplo.com/pagar', // Pode ser configurável
+              telefone: cliente.telefone || '',
+            };
+
+            const result = await sendNotification(cliente, template, addLog, extraVars);
             
             addNotificationRecord(
               cliente.id,

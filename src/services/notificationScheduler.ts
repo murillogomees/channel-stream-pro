@@ -19,86 +19,8 @@ export const loadTemplates = (): WhatsappTemplate[] => {
 };
 
 const DEFAULT_TEMPLATES: WhatsappTemplate[] = [
-  {
-    id: 'dia_menos_5',
-    name: '5 dias antes do vencimento',
-    message: 'Olá {nome}! Seu plano IPTV vence em 5 dias ({dataVencimento}). Valor: R$ {valor}. Evite interrupção renovando agora!',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: -5,
-  },
-  {
-    id: 'dia_menos_4',
-    name: '4 dias antes do vencimento',
-    message: 'Olá {nome}! Faltam 4 dias para o vencimento ({dataVencimento}). Renove já para não perder acesso! Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: -4,
-  },
-  {
-    id: 'dia_menos_3',
-    name: '3 dias antes do vencimento',
-    message: '⚠️ {nome}, seu plano vence em 3 dias ({dataVencimento}). Garanta seu acesso renovando agora! Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: -3,
-  },
-  {
-    id: 'dia_menos_2',
-    name: '2 dias antes do vencimento',
-    message: '🚨 {nome}, ATENÇÃO! Faltam apenas 2 dias para o vencimento. Renove para não perder seu serviço! Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: -2,
-  },
-  {
-    id: 'dia_zero',
-    name: 'Dia do vencimento',
-    message: '⏰ ÚLTIMO DIA! {nome}, seu plano vence HOJE ({dataVencimento}). Renove agora para continuar assistindo! Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 0,
-  },
-  {
-    id: 'dia_mais_1',
-    name: '1 dia após vencimento',
-    message: '❌ {nome}, seu plano venceu ontem ({dataVencimento}). Regularize para reativar seu acesso. Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 1,
-  },
-  {
-    id: 'dia_mais_2',
-    name: '2 dias após vencimento',
-    message: '❌ {nome}, já se passaram 2 dias do vencimento ({dataVencimento}). Entre em contato para reativação urgente! Valor: R$ {valor}',
-    variables: ['{nome}', '{dataVencimento}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 2,
-  },
-  {
-    id: 'dia_mais_3',
-    name: '3 dias após vencimento',
-    message: '❌ {nome}, seu acesso está suspenso há 3 dias. Regularize seu pagamento de R$ {valor} para reativar!',
-    variables: ['{nome}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 3,
-  },
-  {
-    id: 'dia_mais_4',
-    name: '4 dias após vencimento',
-    message: '⛔ {nome}, última chance! Seu plano está vencido há 4 dias. Renove agora: R$ {valor}',
-    variables: ['{nome}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 4,
-  },
-  {
-    id: 'dia_mais_5',
-    name: '5 dias após vencimento',
-    message: '⛔ {nome}, seu acesso será cancelado em breve. Plano vencido há 5 dias. Valor para reativação: R$ {valor}',
-    variables: ['{nome}', '{valor}'],
-    type: 'local',
-    daysBeforeDue: 5,
-  },
+  // Templates padrão mantidos para compatibilidade
+  // Usar loadTemplates() para carregar templates customizados
 ];
 
 // Manter LOCAL_TEMPLATES para compatibilidade (agora dinâmico)
@@ -141,9 +63,10 @@ export function shouldSendNotification(
   return !sentToday;
 }
 
-export function fillTemplate(template: WhatsappTemplate, cliente: Cliente): string {
+export function fillTemplate(template: WhatsappTemplate, cliente: Cliente, extraVars?: Record<string, string>): string {
   let message = template.message;
   
+  // Substituir variáveis padrão
   message = message.replace(/{nome}/g, cliente.nome);
   message = message.replace(/{valor}/g, cliente.valorPago.toFixed(2));
   
@@ -152,13 +75,26 @@ export function fillTemplate(template: WhatsappTemplate, cliente: Cliente): stri
     message = message.replace(/{dataVencimento}/g, dataFormatada);
   }
   
+  if (cliente.plano) {
+    message = message.replace(/{plano}/g, cliente.plano);
+  }
+  
+  // Substituir variáveis extras (como linkPagamento, dataProximaCobranca, etc)
+  if (extraVars) {
+    Object.entries(extraVars).forEach(([key, value]) => {
+      const regex = new RegExp(`{${key}}`, 'g');
+      message = message.replace(regex, value);
+    });
+  }
+  
   return message;
 }
 
 export async function sendNotification(
   cliente: Cliente,
   template: WhatsappTemplate,
-  addLog: (log: any) => void
+  addLog: (log: any) => void,
+  extraVars?: Record<string, string>
 ) {
   const service = getWhatsAppService();
   
@@ -171,7 +107,7 @@ export async function sendNotification(
   }
 
   try {
-    const message = fillTemplate(template, cliente);
+    const message = fillTemplate(template, cliente, extraVars);
     
     let response;
     
@@ -195,6 +131,7 @@ export async function sendNotification(
           '{dataVencimento}': cliente.dataVencimento 
             ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
             : '',
+          ...extraVars,
         }
       );
     }

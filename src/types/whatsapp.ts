@@ -1,3 +1,10 @@
+export type TemplateEventType = 
+  | 'expiration' // Baseado em dias antes/depois do vencimento
+  | 'welcome_trial' // Novo cliente em período de teste
+  | 'welcome_plan' // Novo cliente com plano contratado
+  | 'renewal' // Pagamento detectado/renovação confirmada
+  | 'payment_reminder'; // Lembrete genérico de pagamento
+
 export interface WhatsappTemplate {
   id: string;
   name: string;
@@ -5,7 +12,8 @@ export interface WhatsappTemplate {
   variables: string[];
   type: 'local' | 'botbot';
   botbotTemplateId?: string;
-  daysBeforeDue?: number;
+  eventType: TemplateEventType;
+  daysBeforeDue?: number; // Usado apenas para eventType 'expiration'
   arquivo?: {
     nome: string;
     tipo: string;
