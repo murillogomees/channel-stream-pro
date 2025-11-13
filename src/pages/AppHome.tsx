@@ -42,7 +42,7 @@ export default function AppHome() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate('/activate');
+      navigate('/');
     }
   }, [isLoading, isAuthenticated, navigate]);
 
@@ -62,7 +62,7 @@ export default function AppHome() {
   const handleLogout = async () => {
     await logout();
     toast.success('Desconectado com sucesso');
-    navigate('/activate');
+    navigate('/');
   };
 
   if (isLoading || channelsLoading) {
