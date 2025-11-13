@@ -13,7 +13,7 @@ import { Loader2, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 import { PlanoCliente } from '@/types/cliente';
 
 import step1 from '@/assets/tutorial/01-app-store-search.png';
-import step2 from '@/assets/tutorial/02-app-install.png';
+import step2 from '@/assets/smartone-logo.png';
 import step3 from '@/assets/tutorial/03-app-home.png';
 import step4 from '@/assets/tutorial/04-settings-menu.png';
 import step5 from '@/assets/tutorial/05-mac-address.png';
