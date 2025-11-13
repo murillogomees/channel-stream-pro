@@ -23,6 +23,7 @@ const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
 const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
 const AppActivation = lazy(() => import("./pages/AppActivation"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
+const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSettings"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -54,6 +55,7 @@ const App = () => (
           <Route path="/admin/app-users" element={<AdminAppUsers />} />
           <Route path="/admin/m3u-lists" element={<AdminM3ULists />} />
           <Route path="/admin/variables" element={<AdminVariables />} />
+          <Route path="/admin/notification-settings" element={<AdminNotificationSettings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

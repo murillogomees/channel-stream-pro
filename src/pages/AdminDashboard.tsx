@@ -328,6 +328,15 @@ const AdminDashboard = () => {
                     <Variable className="h-4 w-4 mr-2" />
                     Variáveis
                   </Button>
+
+                  <Button 
+                    onClick={() => navigate('/admin/notification-settings')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Config. Notificações
+                  </Button>
                   
                   <Button 
                     onClick={() => navigate('/admin/notificacoes')}
