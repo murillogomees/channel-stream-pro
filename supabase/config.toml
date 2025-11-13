@@ -1,1 +1,4 @@
 project_id = "fcmwpbgdehtuqxcjqmxi"
+
+[functions.notify-prospect]
+verify_jwt = false

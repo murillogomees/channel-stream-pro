@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Save, Phone, Mail, Bell } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Phone, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ const AdminNotificationSettings = () => {
   const [phones, setPhones] = useState<NotificationPhone[]>([]);
   const [newPhone, setNewPhone] = useState("");
   const [newName, setNewName] = useState("");
-  const [notificationEmail, setNotificationEmail] = useState("");
 
   // Carregar configurações do localStorage
   useEffect(() => {
@@ -32,7 +31,6 @@ const AdminNotificationSettings = () => {
       try {
         const data = JSON.parse(stored);
         setPhones(data.phones || []);
-        setNotificationEmail(data.email || "");
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
       }
@@ -48,14 +46,13 @@ const AdminNotificationSettings = () => {
         createdAt: new Date().toISOString()
       };
       setPhones([defaultPhone]);
-      saveToStorage([defaultPhone], "");
+      saveToStorage([defaultPhone]);
     }
   }, []);
 
-  const saveToStorage = (phonesData: NotificationPhone[], email: string) => {
+  const saveToStorage = (phonesData: NotificationPhone[]) => {
     localStorage.setItem('admin_notification_settings', JSON.stringify({
       phones: phonesData,
-      email: email,
       updatedAt: new Date().toISOString()
     }));
   };
@@ -93,7 +90,7 @@ const AdminNotificationSettings = () => {
 
     const updatedPhones = [...phones, newPhoneData];
     setPhones(updatedPhones);
-    saveToStorage(updatedPhones, notificationEmail);
+    saveToStorage(updatedPhones);
 
     setNewPhone("");
     setNewName("");
@@ -105,25 +102,15 @@ const AdminNotificationSettings = () => {
       p.id === id ? { ...p, active: !p.active } : p
     );
     setPhones(updatedPhones);
-    saveToStorage(updatedPhones, notificationEmail);
+    saveToStorage(updatedPhones);
     toast.success("Status atualizado!");
   };
 
   const handleDelete = (id: string) => {
     const updatedPhones = phones.filter(p => p.id !== id);
     setPhones(updatedPhones);
-    saveToStorage(updatedPhones, notificationEmail);
+    saveToStorage(updatedPhones);
     toast.success("Número removido!");
-  };
-
-  const handleSaveEmail = () => {
-    if (notificationEmail && !notificationEmail.includes('@')) {
-      toast.error("Digite um email válido");
-      return;
-    }
-
-    saveToStorage(phones, notificationEmail);
-    toast.success("Email de notificação salvo!");
   };
 
   const formatPhoneDisplay = (phone: string) => {
@@ -195,34 +182,6 @@ const AdminNotificationSettings = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Email de Notificação */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" />
-              <CardTitle>Email de Notificação</CardTitle>
-            </div>
-            <CardDescription>
-              Email que receberá cópia das notificações importantes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="admin@iptvlink.com.br"
-                value={notificationEmail}
-                onChange={(e) => setNotificationEmail(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleSaveEmail}>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Adicionar Novo Número */}
         <Card>
