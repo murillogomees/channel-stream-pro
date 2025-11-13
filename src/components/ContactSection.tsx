@@ -6,7 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 const ContactSection = () => {
   const { settings } = useSettings();
   
-  const whatsappNumber = "5561314258880";
+  const whatsappNumber = "556131425880";
   const whatsappMessage = "Olá! Gostaria de saber mais sobre os planos IPTV.";
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
   
