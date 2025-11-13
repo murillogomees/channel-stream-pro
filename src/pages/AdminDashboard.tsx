@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio, MonitorPlay } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
@@ -382,6 +382,47 @@ const AdminDashboard = () => {
                     Notificações
                   </Button>
                 </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* SmartOne IPTV Integration */}
+          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
+                onClick={() => navigate('/admin/smartone-config')}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
+              <div className="lg:col-span-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
+                  <h3 className="text-lg sm:text-xl font-bold">SmartOne IPTV</h3>
+                </div>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  Configure a integração automática com a API do SmartOne para criação de playlists
+                </p>
+              </div>
+              
+              <div className="lg:col-span-1 flex items-center justify-center">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Settings className="h-10 w-10 sm:h-12 sm:w-12 text-blue-500/60" />
+                  <div>
+                    <p className="font-semibold text-base sm:text-lg">Integração Automática</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Criação automática de playlists
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
+                <Button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/admin/smartone-config');
+                  }}
+                  className="w-full lg:w-auto"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurar SmartOne
+                </Button>
               </div>
             </div>
           </Card>
