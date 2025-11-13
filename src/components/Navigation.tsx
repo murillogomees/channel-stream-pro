@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Tv, Phone, MessageCircle } from "lucide-react";
+import { Menu, X, User, Phone, MessageCircle } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
 import logoWhite from "@/assets/logo-white.png";
 const Navigation = () => {
@@ -44,7 +44,10 @@ const Navigation = () => {
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            
+            <Button variant="outline" size="sm" onClick={() => window.location.href = '/auth'}>
+              <User className="h-4 w-4" />
+              Login
+            </Button>
             <Button variant="default" size="sm" onClick={() => window.open('https://wa.me/556131425880', '_blank')}>
               <MessageCircle className="h-4 w-4" />
               WhatsApp
@@ -64,11 +67,11 @@ const Navigation = () => {
                   {item.label}
                 </a>)}
               <div className="px-4 pt-4 space-y-2">
-                <Button variant="outline" size="sm" className="w-full">
-                  <Phone className="h-4 w-4" />
-                  Contato
+                <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/auth'}>
+                  <User className="h-4 w-4" />
+                  Login
                 </Button>
-                <Button variant="default" size="sm" className="w-full">
+                <Button variant="default" size="sm" className="w-full" onClick={() => window.open('https://wa.me/556131425880', '_blank')}>
                   <MessageCircle className="h-4 w-4" />
                   WhatsApp
                 </Button>
