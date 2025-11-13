@@ -37,9 +37,7 @@ import { useLocalAuth } from '@/hooks/useLocalAuth';
 interface M3UList {
   id: string;
   name: string;
-  filename: string;
   file_url: string;
-  file_size: number | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -348,10 +346,10 @@ export default function AdminM3ULists() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">{list.filename}</span>
+                        <span className="text-sm">{list.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{formatFileSize(list.file_size)}</TableCell>
+                    <TableCell>URL: {list.file_url.substring(0, 40)}...</TableCell>
                     <TableCell>
                       <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
                         {list.status === 'active' ? 'Ativa' : 'Inativa'}

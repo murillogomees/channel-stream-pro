@@ -21,9 +21,8 @@ interface AppUser {
   device_id: string;
   activated_at: string;
   expires_at: string;
-  status: 'active' | 'suspended' | 'expired';
-  device_info: any;
-  last_access_at: string;
+  status: 'active' | 'suspended' | 'expired' | 'trial';
+  mac_address: string | null;
   subscription_plans: {
     name: string;
   } | null;
@@ -250,7 +249,7 @@ export default function AdminAppUsers() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {user.last_access_at ? format(new Date(user.last_access_at), 'dd/MM/yyyy HH:mm') : '-'}
+                    {format(new Date(user.activated_at), 'dd/MM/yyyy HH:mm')}
                   </TableCell>
                   <TableCell className="text-right">
                     {user.status === 'active' ? (
