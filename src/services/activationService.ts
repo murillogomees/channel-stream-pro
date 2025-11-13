@@ -62,7 +62,7 @@ export async function getDeviceId(): Promise<string> {
 export async function validateActivationKey(key: string): Promise<ActivationResult> {
   try {
     const { data, error } = await supabase.rpc('validate_activation_key', {
-      p_key: key.toUpperCase()
+      activation_key: key.toUpperCase()
     });
 
     if (error) {
@@ -77,7 +77,7 @@ export async function validateActivationKey(key: string): Promise<ActivationResu
     const result = data[0];
     
     if (!result.valid) {
-      return { success: false, error: result.error_message };
+      return { success: false, error: 'Chave inválida ou expirada' };
     }
 
     return { success: true };
@@ -93,12 +93,10 @@ export async function validateActivationKey(key: string): Promise<ActivationResu
 export async function activateDevice(activationKey: string): Promise<ActivationResult> {
   try {
     const deviceId = await getDeviceId();
-    const deviceInfo = await getDeviceInfo();
 
     const { data, error } = await supabase.rpc('activate_device', {
-      p_activation_key: activationKey.toUpperCase(),
-      p_device_id: deviceId,
-      p_device_info: deviceInfo
+      activation_key: activationKey.toUpperCase(),
+      device_id: deviceId
     });
 
     if (error) {
@@ -113,15 +111,15 @@ export async function activateDevice(activationKey: string): Promise<ActivationR
     const result = data[0];
     
     if (!result.success) {
-      return { success: false, error: result.error_message };
+      return { success: false, error: result.message };
     }
 
     // Criar sessão
     const session: DeviceSession = {
       deviceId,
-      userId: result.user_id,
+      userId: deviceId, // Usar device_id como userId
       expiresAt: result.expires_at,
-      m3uUrl: result.m3u_url,
+      m3uUrl: '', // M3U URL será obtido do plano
       activatedAt: new Date().toISOString()
     };
 
@@ -143,7 +141,7 @@ export async function checkSubscription(): Promise<SubscriptionStatus> {
     const deviceId = await getDeviceId();
 
     const { data, error } = await supabase.rpc('check_device_subscription', {
-      p_device_id: deviceId
+      device_id: deviceId
     });
 
     if (error) {
@@ -158,12 +156,12 @@ export async function checkSubscription(): Promise<SubscriptionStatus> {
     const result = data[0];
 
     return {
-      active: result.active,
-      userId: result.user_id,
+      active: result.is_active,
+      userId: deviceId,
       expiresAt: result.expires_at,
       daysRemaining: result.days_remaining,
-      m3uUrl: result.m3u_url,
-      status: result.status
+      m3uUrl: '', // M3U URL será obtido do plano
+      status: result.is_active ? 'active' : 'expired'
     };
   } catch (error) {
     console.error('Subscription check exception:', error);
