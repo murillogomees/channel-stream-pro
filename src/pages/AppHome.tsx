@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 export default function AppHome() {
   const navigate = useNavigate();
-  const { session, subscriptionStatus, isAuthenticated, isLoading, logout } = useAppAuth();
+  const { session, isAuthenticated, isLoading, logout } = useAppAuth();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isTVMode, setIsTVMode] = useState(false);
@@ -42,7 +42,7 @@ export default function AppHome() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate('/');
+      navigate('/app/login');
     }
   }, [isLoading, isAuthenticated, navigate]);
 
@@ -60,9 +60,9 @@ export default function AppHome() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    logout();
     toast.success('Desconectado com sucesso');
-    navigate('/');
+    navigate('/app/login');
   };
 
   if (isLoading || channelsLoading) {
