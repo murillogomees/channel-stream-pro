@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
-import heroBackground from "@/assets/hero-bg.jpg";
 import { useSettingsContext } from "@/context/SettingsContext";
 import logoWhite from "@/assets/logo-white.png";
 
