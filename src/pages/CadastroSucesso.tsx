@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Home, MessageCircle } from 'lucide-react';
+import { CheckCircle2, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
 import VideoTutorial from '@/components/VideoTutorial';
 
 export default function CadastroSucesso() {
@@ -154,6 +154,14 @@ export default function CadastroSucesso() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
           <Button 
+            size="lg"
+            className="flex-1"
+            onClick={() => navigate('/dashboard')}
+          >
+            <LayoutDashboard className="mr-2 h-5 w-5" />
+            Acessar Meu Dashboard
+          </Button>
+          <Button 
             size="lg" 
             variant="secondary"
             className="flex-1 bg-primary/10 hover:bg-primary hover:text-primary-foreground"
@@ -161,13 +169,6 @@ export default function CadastroSucesso() {
           >
             <Home className="mr-2 h-5 w-5" />
             Voltar ao Início
-          </Button>
-          <Button 
-            size="lg"
-            className="flex-1"
-            onClick={() => navigate('/tutorial')}
-          >
-            Ver Tutorial Novamente
           </Button>
         </div>
       </div>
