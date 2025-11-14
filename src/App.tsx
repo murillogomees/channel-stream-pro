@@ -34,6 +34,7 @@ const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
+const AdminUserRoles = lazy(() => import("./pages/AdminUserRoles"));
 const Auth = lazy(() => import("./pages/Auth"));
 
 const AutoNotificationProvider = () => {
@@ -78,6 +79,7 @@ const App = () => (
           <Route path="/admin/smartone-config" element={<AdminSmartOneConfig />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/admin/system-health" element={<AdminSystemHealth />} />
+          <Route path="/admin/user-roles" element={<AdminUserRoles />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

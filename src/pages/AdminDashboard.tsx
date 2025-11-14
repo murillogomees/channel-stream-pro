@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio, MonitorPlay, PieChart } from "lucide-react";
+import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio, MonitorPlay, PieChart, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useLocalAuth } from "@/hooks/useLocalAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useClientes } from "@/hooks/useClientes";
 import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, logout } = useLocalAuth();
+  const { isAdmin, loading, logout } = useSupabaseAuth();
   const { getStats } = useClientes();
   const stats = getStats();
   const { config, saveConfig, isConfigured } = useWhatsAppConfig();
@@ -23,10 +23,15 @@ const AdminDashboard = () => {
   const [authkey, setAuthkey] = useState('');
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate('/admin/login');
+    if (!loading && !isAdmin) {
+      toast({
+        title: "Acesso negado",
+        description: "Você não tem permissão de administrador.",
+        variant: "destructive",
+      });
+      navigate('/auth');
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAdmin, loading, navigate, toast]);
 
   useEffect(() => {
     setAppkey(config.appkey);
@@ -42,13 +47,13 @@ const AdminDashboard = () => {
     });
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast({
       title: "Logout realizado",
       description: "Você foi desconectado com sucesso.",
     });
-    navigate('/admin/login');
+    navigate('/auth');
   };
 
   const handleClearCache = () => {
@@ -98,7 +103,7 @@ const AdminDashboard = () => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAdmin) {
     return null;
   }
 
@@ -198,6 +203,15 @@ const AdminDashboard = () => {
               
               <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
                 <div className="flex flex-col w-full lg:w-auto gap-2">
+                  <Button 
+                    onClick={() => navigate('/admin/user-roles')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Gerenciar Roles
+                  </Button>
+
                   <Button 
                     onClick={() => navigate('/admin/m3u-lists')} 
                     variant="outline"
