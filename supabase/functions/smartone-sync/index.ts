@@ -1,61 +1,43 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface SmartOneSyncRequest {
-  mac: string;
-  usuario: string;
-  senha: string;
-  clienteNome: string;
-}
+const syncRequestSchema = z.object({
+  mac: z.string().trim().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, "MAC address inválido"),
+  usuario: z.string().trim().min(3).max(100),
+  senha: z.string().trim().min(4).max(100),
+  clienteNome: z.string().trim().min(2).max(200),
+});
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { mac, usuario, senha, clienteNome }: SmartOneSyncRequest = await req.json();
+    const body = await req.json();
+    const validated = syncRequestSchema.parse(body);
+    const { mac, usuario, senha, clienteNome } = validated;
 
-    console.log('SmartOne sync request:', { mac, usuario, clienteNome });
+    console.log('[smartone-sync] Request:', { mac, usuario, clienteNome });
 
-    // Validar dados obrigatórios
-    if (!mac || !usuario || !senha) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Dados obrigatórios faltando: MAC, usuário e senha são necessários' 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Buscar configurações do SmartOne dos secrets
     const SMARTONE_API_BASE_URL = Deno.env.get('SMARTONE_API_BASE_URL');
     const SMARTONE_CLIENT_API = Deno.env.get('SMARTONE_CLIENT_API');
     const SMARTONE_KEY_API = Deno.env.get('SMARTONE_KEY_API');
 
     if (!SMARTONE_API_BASE_URL || !SMARTONE_CLIENT_API || !SMARTONE_KEY_API) {
-      console.error('SmartOne credentials not configured');
+      console.error('[smartone-sync] Credentials not configured');
       return new Response(
-        JSON.stringify({ 
-          error: 'Configuração do SmartOne incompleta. Verifique as credenciais.' 
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Configuração do SmartOne incompleta' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Buscar a lista M3U padrão do banco de dados
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -68,104 +50,63 @@ serve(async (req) => {
       .eq('status', 'active')
       .maybeSingle();
 
-    if (dbError) {
-      console.error('Error fetching default M3U list:', dbError);
+    if (dbError || !defaultList) {
+      console.error('[smartone-sync] M3U list error');
       return new Response(
-        JSON.stringify({ 
-          error: 'Erro ao buscar lista M3U padrão do banco de dados',
-          details: dbError.message 
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Lista M3U padrão não encontrada' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!defaultList) {
-      console.error('No default M3U list found');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Nenhuma lista M3U padrão encontrada. Configure uma lista como padrão em /admin/m3u-lists' 
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Usar a URL da lista M3U padrão do banco
-    const m3uUrl = defaultList.file_url;
-    console.log('Using default M3U list URL:', m3uUrl);
-
-    // Chamar API do SmartOne
-    console.log('Calling SmartOne API:', SMARTONE_API_BASE_URL);
+    console.log('[smartone-sync] Calling SmartOne API');
     
     const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_api: SMARTONE_CLIENT_API,
         key_api: SMARTONE_KEY_API,
         mac: mac,
-        m3u_url: m3uUrl,
-        name: clienteNome || 'Cliente',
+        m3u_url: defaultList.file_url,
+        name: clienteNome,
       }),
     });
 
     const responseText = await smartoneResponse.text();
-    console.log('SmartOne response status:', smartoneResponse.status);
-    console.log('SmartOne response body:', responseText);
-
     let smartoneData;
+    
     try {
       smartoneData = JSON.parse(responseText);
     } catch {
-      smartoneData = { raw: responseText };
+      smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
     }
 
-    if (!smartoneResponse.ok) {
-      console.error('SmartOne API error:', smartoneData);
+    if (smartoneResponse.ok && smartoneData.success) {
+      console.log('[smartone-sync] Success');
       return new Response(
-        JSON.stringify({ 
-          error: `Erro na API SmartOne: ${smartoneData.message || smartoneData.error || 'Erro desconhecido'}`,
-          details: smartoneData 
-        }),
-        {
-          status: smartoneResponse.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ success: true, message: 'Playlist criada com sucesso', data: smartoneData }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      console.error('[smartone-sync] Failed:', smartoneData);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Falha ao sincronizar', details: smartoneData }),
+        { status: smartoneResponse.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    console.error('[smartone-sync] Error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: 'Dados inválidos', details: error.errors.map(e => e.message) }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('SmartOne sync successful:', smartoneData);
-
     return new Response(
-      JSON.stringify({
-        success: true,
-        playlistId: smartoneData.id || smartoneData.playlist_id || 'N/A',
-        data: smartoneData,
-        m3uUrl: m3uUrl, // Retornar a URL usada para referência
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  } catch (error: any) {
-    console.error('Error in smartone-sync function:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Erro interno ao processar sincronização',
-        details: error.toString()
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: 'Erro interno', details: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

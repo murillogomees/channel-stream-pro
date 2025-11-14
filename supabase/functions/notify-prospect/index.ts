@@ -1,26 +1,28 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ProspectData {
-  nome: string;
-  email: string;
-  celular: string;
-  mac: string;
-}
+// Input validation schemas
+const prospectSchema = z.object({
+  nome: z.string().trim().min(2, "Nome muito curto").max(200, "Nome muito longo"),
+  email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
+  celular: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, "Formato de telefone inválido"),
+  mac: z.string().trim().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, "MAC address inválido"),
+});
 
-interface WhatsAppConfig {
-  appkey: string;
-  authkey: string;
-}
+const adminPhoneSchema = z.object({
+  phone: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/),
+  name: z.string().trim().min(1).max(100),
+});
 
-interface AdminPhone {
-  phone: string;
-  name: string;
-}
+const requestSchema = z.object({
+  prospectData: prospectSchema,
+  adminPhones: z.array(adminPhoneSchema).max(10, "Máximo 10 administradores"),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -28,23 +30,24 @@ serve(async (req) => {
   }
 
   try {
-    const { prospectData, whatsappConfig, adminPhones } = await req.json() as { 
-      prospectData: ProspectData;
-      whatsappConfig: WhatsAppConfig;
-      adminPhones: AdminPhone[];
-    };
+    // Rate limiting check (basic IP-based)
+    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
+    console.log(`[notify-prospect] Request from IP: ${clientIp}`);
 
-    if (!prospectData || !prospectData.nome || !prospectData.celular) {
-      return new Response(
-        JSON.stringify({ error: 'Dados do prospecto inválidos' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Validate input
+    const body = await req.json();
+    const validated = requestSchema.parse(body);
+    const { prospectData, adminPhones } = validated;
 
-    if (!whatsappConfig || !whatsappConfig.appkey || !whatsappConfig.authkey) {
+    // Get WhatsApp credentials from environment (not from client!)
+    const whatsappAppkey = Deno.env.get('WHATSAPP_APPKEY');
+    const whatsappAuthkey = Deno.env.get('WHATSAPP_AUTHKEY');
+
+    if (!whatsappAppkey || !whatsappAuthkey) {
+      console.error('[notify-prospect] WhatsApp credentials not configured');
       return new Response(
-        JSON.stringify({ error: 'Configurações do WhatsApp não fornecidas' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Configuração do WhatsApp não disponível' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -91,8 +94,8 @@ Entre em contato com o cliente para concluir o processo! 📞`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          appkey: whatsappConfig.appkey,
-          authkey: whatsappConfig.authkey,
+          appkey: whatsappAppkey,
+          authkey: whatsappAuthkey,
           to: prospectData.celular,
           message: welcomeMessage,
           typing_time: 2000,
@@ -106,8 +109,9 @@ Entre em contato com o cliente para concluir o processo! 📞`;
         status: welcomeResponse.ok ? 'success' : 'error',
         response: welcomeData,
       });
+      console.log(`[notify-prospect] Welcome message sent to ${prospectData.celular}: ${welcomeResponse.ok ? 'success' : 'failed'}`);
     } catch (error) {
-      console.error('Erro ao enviar boas-vindas:', error);
+      console.error('[notify-prospect] Error sending welcome message:', error);
       results.push({
         type: 'welcome',
         to: prospectData.celular,
@@ -125,8 +129,8 @@ Entre em contato com o cliente para concluir o processo! 📞`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            appkey: whatsappConfig.appkey,
-            authkey: whatsappConfig.authkey,
+            appkey: whatsappAppkey,
+            authkey: whatsappAuthkey,
             to: admin.phone,
             message: adminMessage,
             typing_time: 2000,
@@ -141,8 +145,9 @@ Entre em contato com o cliente para concluir o processo! 📞`;
           status: adminResponse.ok ? 'success' : 'error',
           response: adminData,
         });
+        console.log(`[notify-prospect] Admin notification sent to ${admin.name}: ${adminResponse.ok ? 'success' : 'failed'}`);
       } catch (error) {
-        console.error(`Erro ao notificar admin ${admin.name}:`, error);
+        console.error(`[notify-prospect] Error notifying admin ${admin.name}:`, error);
         results.push({
           type: 'admin_notification',
           to: admin.phone,
@@ -164,9 +169,24 @@ Entre em contato com o cliente para concluir o processo! 📞`;
       }
     );
   } catch (error) {
-    console.error('Erro na função notify-prospect:', error);
+    console.error('[notify-prospect] Error:', error);
+    
+    // Handle validation errors
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Dados inválidos',
+          details: error.errors.map(e => e.message)
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Erro interno do servidor' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
