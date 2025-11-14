@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Phone, Mail, Tv, Key, Calendar, LogOut, Edit2, Check, X } from "lucide-react";
+import { Loader2, User, Phone, Mail, Tv, Key, Calendar, LogOut, Edit2, Check, X, Settings } from "lucide-react";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -240,10 +240,16 @@ const ClienteDashboard = () => {
             <h1 className="text-3xl font-bold">Dashboard do Cliente</h1>
             <p className="text-muted-foreground">Bem-vindo, {clienteData.nome}</p>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/settings')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configurações
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
 
         {/* Status Cards */}
