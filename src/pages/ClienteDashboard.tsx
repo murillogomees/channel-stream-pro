@@ -291,6 +291,14 @@ const ClienteDashboard = () => {
                   Vence: {new Date(clienteData.data_vencimento).toLocaleDateString('pt-BR')}
                 </p>
               )}
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="p-0 h-auto mt-2"
+                onClick={() => navigate('/subscription')}
+              >
+                Ver detalhes da assinatura →
+              </Button>
             </CardContent>
           </Card>
         </div>
