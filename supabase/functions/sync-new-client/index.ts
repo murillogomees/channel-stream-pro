@@ -121,6 +121,47 @@ serve(async (req) => {
 
     console.log('Client sync completed successfully');
 
+    // Enviar notificação WhatsApp se sincronização bem-sucedida
+    if (smartoneResponse.ok && smartoneData.success) {
+      try {
+        const whatsappAuthKey = Deno.env.get('WHATSAPP_AUTHKEY');
+        const whatsappAppKey = Deno.env.get('WHATSAPP_APPKEY');
+
+        if (whatsappAuthKey && whatsappAppKey) {
+          const mensagem = `🎉 *Ativação Confirmada!*
+
+Olá ${nome}! Seu acesso ao SmartOne IPTV foi ativado com sucesso!
+
+📺 *Suas Credenciais:*
+• Usuário: ${smartonePayload.username}
+• Senha: ${smartonePayload.password}
+• MAC: ${mac_smart_one}
+
+✅ Seu SmartOne já está configurado e pronto para uso!
+
+📱 Qualquer dúvida, estamos à disposição!`;
+
+          const whatsappPayload = {
+            authkey: whatsappAuthKey,
+            appkey: whatsappAppKey,
+            to: telefone.replace(/\D/g, ''),
+            message: mensagem,
+          };
+
+          await fetch('https://api.textmebot.com/send.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(whatsappPayload),
+          });
+
+          console.log('WhatsApp notification sent successfully');
+        }
+      } catch (whatsappError) {
+        console.error('Error sending WhatsApp notification:', whatsappError);
+        // Não falha a sincronização se WhatsApp falhar
+      }
+    }
+
     return new Response(JSON.stringify({ 
       success: true,
       smartone_status: smartoneResponse.ok ? 'criado' : 'erro',

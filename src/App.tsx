@@ -18,8 +18,6 @@ const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
-const AdminPlans = lazy(() => import("./pages/AdminPlans"));
-const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
 const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 const AppLogin = lazy(() => import("./pages/AppLogin"));
@@ -36,6 +34,7 @@ const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
 const AdminUserRoles = lazy(() => import("./pages/AdminUserRoles"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ClienteCadastro = lazy(() => import("./pages/ClienteCadastro"));
+const AdminSmartOneSync = lazy(() => import("./pages/AdminSmartOneSync"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -67,8 +66,6 @@ const App = () => (
           <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
           <Route path="/admin/perfil" element={<AdminPerfil />} />
           <Route path="/admin/templates" element={<AdminTemplates />} />
-          <Route path="/admin/plans" element={<AdminPlans />} />
-          <Route path="/admin/app-users" element={<AdminAppUsers />} />
           <Route path="/admin/m3u-lists" element={<AdminM3ULists />} />
           <Route path="/admin/variables" element={<AdminVariables />} />
           <Route path="/admin/notification-settings" element={<AdminNotificationSettings />} />
@@ -80,6 +77,7 @@ const App = () => (
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/admin/system-health" element={<AdminSystemHealth />} />
           <Route path="/admin/user-roles" element={<AdminUserRoles />} />
+          <Route path="/admin/smartone-sync" element={<AdminSmartOneSync />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

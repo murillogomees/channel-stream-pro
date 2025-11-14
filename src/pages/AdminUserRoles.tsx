@@ -43,19 +43,16 @@ const AdminUserRoles = () => {
     try {
       setLoading(true);
 
-      // Buscar usuários do auth
       const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
       
       if (authError) throw authError;
 
-      // Buscar roles
-      const { data: rolesData, error: rolesError } = await supabase
+      const { data: rolesData, error: rolesError} = await supabase
         .from('user_roles')
         .select('user_id, role');
 
       if (rolesError) throw rolesError;
 
-      // Combinar dados
       const usersWithRoles: UserWithRole[] = (authUsers || []).map(user => {
         const userRoles = rolesData?.filter(r => r.user_id === user.id).map(r => r.role) || [];
         return {
@@ -87,7 +84,6 @@ const AdminUserRoles = () => {
 
   const handleAddRole = async (userId: string, role: string) => {
     try {
-      // Validar que o role é válido (conforme enum app_role)
       const validRoles = ['admin', 'user'];
       if (!validRoles.includes(role)) {
         throw new Error('Role inválida');
@@ -120,11 +116,11 @@ const AdminUserRoles = () => {
 
   const handleRemoveRole = async (userId: string, role: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_roles')
         .delete()
         .eq('user_id', userId)
-        .eq('role', role as 'admin' | 'user' | 'app_user');
+        .eq('role', role);
 
       if (error) throw error;
 
@@ -148,35 +144,21 @@ const AdminUserRoles = () => {
     user.email.toLowerCase().includes(emailFilter.toLowerCase())
   );
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return null;
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <Shield className="h-6 w-6" />
-              Gerenciar Roles de Usuários
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Adicione ou remova roles de administrador, moderador, etc.
-            </p>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
           </div>
-          <Button variant="outline" onClick={loadUsers}>
+          <Button onClick={loadUsers} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
@@ -185,15 +167,15 @@ const AdminUserRoles = () => {
         <Alert className="mb-6">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            <strong>Atenção:</strong> Roles definem permissões de acesso. Adicione "admin" para dar acesso total ao painel administrativo.
+            Gerencie as permissões dos usuários do sistema. Role 'admin' concede acesso total ao painel administrativo.
           </AlertDescription>
         </Alert>
 
         <Card>
           <CardHeader>
-            <CardTitle>Usuários Registrados</CardTitle>
+            <CardTitle>Gerenciamento de Roles</CardTitle>
             <CardDescription>
-              Total de {users.length} usuário(s)
+              Adicione ou remova roles de usuários cadastrados
             </CardDescription>
           </CardHeader>
           <CardContent>
