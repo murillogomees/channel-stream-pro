@@ -110,15 +110,19 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-6">
-      <Card className="w-full max-w-md bg-gradient-card border-border shadow-elevated">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 p-3 bg-gradient-primary rounded-full w-fit">
-            <Shield className="h-8 w-8 text-primary-foreground" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logo.png" 
+              alt="Logo IPTV" 
+              className="h-20 w-auto object-contain"
+            />
           </div>
-          <CardTitle className="text-2xl text-gradient-primary">Área Administrativa</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Acesso restrito para administradores
+          <CardTitle className="text-2xl">Login Administrativo</CardTitle>
+          <CardDescription>
+            Acesso restrito para administradores do sistema
           </CardDescription>
         </CardHeader>
         <CardContent>
