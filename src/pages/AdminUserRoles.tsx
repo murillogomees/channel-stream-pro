@@ -88,7 +88,7 @@ const AdminUserRoles = () => {
   const handleAddRole = async (userId: string, role: string) => {
     try {
       // Validar que o role é válido (conforme enum app_role)
-      const validRoles = ['admin', 'user', 'app_user'];
+      const validRoles = ['admin', 'user'];
       if (!validRoles.includes(role)) {
         throw new Error('Role inválida');
       }
@@ -97,7 +97,7 @@ const AdminUserRoles = () => {
         .from('user_roles')
         .insert([{ 
           user_id: userId, 
-          role: role as 'admin' | 'user' | 'app_user'
+          role: role as 'admin' | 'user'
         }]);
 
       if (error) throw error;
@@ -260,7 +260,6 @@ const AdminUserRoles = () => {
                               <SelectContent>
                                 <SelectItem value="admin">Admin</SelectItem>
                                 <SelectItem value="user">User</SelectItem>
-                                <SelectItem value="app_user">App User</SelectItem>
                               </SelectContent>
                             </Select>
                             <Button

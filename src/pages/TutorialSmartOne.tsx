@@ -265,9 +265,26 @@ export default function TutorialSmartOne() {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Como Ativar seu SmartOne IPTV</h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-lg mb-6">
             Siga o passo a passo abaixo para instalar o aplicativo e ativar seu acesso
           </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              size="lg"
+              onClick={() => navigate('/cadastro')}
+              className="min-w-[200px]"
+            >
+              Cadastro Simplificado
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => document.getElementById('formulario-completo')?.scrollIntoView({ behavior: 'smooth' })}
+              className="min-w-[200px]"
+            >
+              Formulário Completo Abaixo
+            </Button>
+          </div>
         </div>
 
         {/* Tutorial Steps */}
@@ -311,7 +328,7 @@ export default function TutorialSmartOne() {
         </div>
 
         {/* Registration Form */}
-        <Card className="p-8">
+        <Card className="p-8" id="formulario-completo">
           <h2 className="text-3xl font-bold mb-2">Complete seu Cadastro</h2>
           <p className="text-muted-foreground mb-6">
             Preencha os dados abaixo para ativar seu acesso ao SmartOne IPTV
