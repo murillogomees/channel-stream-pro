@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { smartoneAutoSyncService } from "@/services/smartoneAutoSyncService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ const cadastroSchema = z.object({
   senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
   confirmarSenha: z.string(),
   telegram: z.string().optional(),
+  macSmartOne: z.string().optional(),
   origemCadastro: z.enum(['Google Ads', 'Facebook', 'Instagram', 'Indicação', 'Website', 'Outro']),
 }).refine((data) => data.senha === data.confirmarSenha, {
   message: "As senhas não coincidem",
@@ -36,6 +38,7 @@ const ClienteCadastro = () => {
     senha: "",
     confirmarSenha: "",
     telegram: "",
+    macSmartOne: "",
     origemCadastro: "Website",
   });
 
@@ -71,7 +74,7 @@ const ClienteCadastro = () => {
       // O trigger handle_new_user criará automaticamente o profile e a role 'user'
       
       // Criar registro de cliente
-      const { error: clienteError } = await (supabase as any)
+      const { data: clienteData, error: clienteError } = await (supabase as any)
         .from('clientes')
         .insert({
           user_id: authData.user.id,
@@ -81,14 +84,48 @@ const ClienteCadastro = () => {
           valor_pago: 0,
           cliente_ativo: false,
           origem_cadastro: validatedData.origemCadastro,
-        });
+          mac_smart_one: validatedData.macSmartOne?.toUpperCase() || null,
+        })
+        .select()
+        .single();
 
       if (clienteError) throw clienteError;
 
-      toast({
-        title: "Cadastro realizado com sucesso!",
-        description: "Verifique seu WhatsApp para receber as instruções de ativação.",
-      });
+      // Se forneceu MAC, sincronizar com SmartOne automaticamente
+      if (validatedData.macSmartOne) {
+        console.log('MAC fornecido, iniciando sincronização com SmartOne...');
+        
+        const syncResult = await smartoneAutoSyncService.syncAfterRegistration(
+          authData.user.id,
+          clienteData.id,
+          {
+            nome: validatedData.nome,
+            telefone: validatedData.telefone,
+            email: validatedData.email,
+          },
+          {
+            mac_smart_one: validatedData.macSmartOne.toUpperCase(),
+          }
+        );
+
+        if (syncResult.success) {
+          toast({
+            title: "Cadastro e ativação realizados!",
+            description: "Seu acesso ao SmartOne IPTV foi ativado automaticamente.",
+          });
+        } else {
+          toast({
+            title: "Cadastro realizado",
+            description: "Cadastro OK, mas houve um problema na ativação. Entre em contato com o suporte.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Verifique seu WhatsApp para receber as instruções de ativação.",
+        });
+      }
 
       navigate('/cadastro-sucesso');
       
@@ -175,6 +212,19 @@ const ClienteCadastro = () => {
                 onChange={(e) => setFormData({ ...formData, telegram: e.target.value })}
                 placeholder="@seuusuario"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="macSmartOne">Endereço MAC do SmartOne (opcional)</Label>
+              <Input
+                id="macSmartOne"
+                value={formData.macSmartOne}
+                onChange={(e) => setFormData({ ...formData, macSmartOne: e.target.value.toUpperCase() })}
+                placeholder="00:1A:79:XX:XX:XX"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se você já tem o endereço MAC, informe agora para ativar automaticamente
+              </p>
             </div>
 
             <div className="space-y-2">
