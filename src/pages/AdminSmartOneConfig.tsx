@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLocalAuth } from '@/hooks/useLocalAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function AdminSmartOneConfig() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAuthenticated, loading: authLoading } = useLocalAuth();
+  const { isAdmin, loading: authLoading } = useSupabaseAuth();
   
   const [enabled, setEnabled] = useState(true);
   const [baseUrl, setBaseUrl] = useState('');
@@ -31,13 +31,13 @@ export default function AdminSmartOneConfig() {
   const webhookUrl = webhookService.getWebhookUrl();
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/admin/login');
+    if (!authLoading && !isAdmin) {
+      navigate('/auth');
       return;
     }
 
     loadConfig();
-  }, [authLoading, isAuthenticated, navigate]);
+  }, [authLoading, isAdmin, navigate]);
 
   const loadConfig = async () => {
     try {
@@ -184,8 +184,12 @@ export default function AdminSmartOneConfig() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (authLoading || !isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
   }
 
   return (

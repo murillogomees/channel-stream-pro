@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLocalAuth } from '@/hooks/useLocalAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useClientes } from '@/hooks/useClientes';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
@@ -41,7 +41,7 @@ import { getWhatsAppService } from '@/services/whatsapp';
 export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAuthenticated, loading } = useLocalAuth();
+  const { isAdmin, loading } = useSupabaseAuth();
   const { clientes } = useClientes();
   const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
   const { logs, addLog, clearLogs, getRecentLogs, exportToCSV } = useNotificationLogs();
@@ -72,10 +72,10 @@ export default function AdminNotificacoes() {
   const nextRunTime = getNextRunTime();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate('/admin/login');
+    if (!loading && !isAdmin) {
+      navigate('/auth');
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAdmin, loading, navigate]);
 
   // Validar número de teste quando mudar
   useEffect(() => {
@@ -143,8 +143,12 @@ export default function AdminNotificacoes() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (loading || !isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
   }
 
   const handleSendManual = async () => {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLocalAuth } from '@/hooks/useLocalAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useClientes } from '@/hooks/useClientes';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ const situacaoColors: Record<string, string> = {
 export default function AdminClientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAuthenticated, loading } = useLocalAuth();
+  const { isAdmin, loading } = useSupabaseAuth();
   const { clientes, deleteCliente } = useClientes();
   const { isConfigured } = useWhatsAppConfig();
   const { addLog } = useNotificationLogs();
@@ -76,8 +76,8 @@ export default function AdminClientes() {
     );
   }
 
-  if (!isAuthenticated) {
-    navigate('/admin/login');
+  if (!isAdmin) {
+    navigate('/auth');
     return null;
   }
 

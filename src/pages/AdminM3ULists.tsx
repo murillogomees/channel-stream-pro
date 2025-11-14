@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useLocalAuth } from '@/hooks/useLocalAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 interface M3UList {
   id: string;
@@ -46,7 +46,7 @@ interface M3UList {
 
 export default function AdminM3ULists() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading: authLoading } = useLocalAuth();
+  const { isAdmin, loading: authLoading } = useSupabaseAuth();
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -55,16 +55,16 @@ export default function AdminM3ULists() {
   const [listName, setListName] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/admin/login');
+    if (!authLoading && !isAdmin) {
+      navigate('/auth');
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAdmin, authLoading, navigate]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAdmin) {
       loadLists();
     }
-  }, [isAuthenticated]);
+  }, [isAdmin]);
 
   const loadLists = async () => {
     try {
@@ -250,8 +250,12 @@ export default function AdminM3ULists() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (authLoading || !isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
   }
 
   return (
