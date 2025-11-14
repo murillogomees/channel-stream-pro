@@ -19,7 +19,6 @@ const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
 const AdminPlans = lazy(() => import("./pages/AdminPlans"));
-const AdminActivationKeys = lazy(() => import("./pages/AdminActivationKeys"));
 const AdminAppUsers = lazy(() => import("./pages/AdminAppUsers"));
 const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
@@ -36,6 +35,7 @@ const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
 const AdminUserRoles = lazy(() => import("./pages/AdminUserRoles"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ClienteCadastro = lazy(() => import("./pages/ClienteCadastro"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -53,6 +53,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/cadastro" element={<ClienteCadastro />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/app/login" element={<AppLogin />} />
@@ -67,7 +68,6 @@ const App = () => (
           <Route path="/admin/perfil" element={<AdminPerfil />} />
           <Route path="/admin/templates" element={<AdminTemplates />} />
           <Route path="/admin/plans" element={<AdminPlans />} />
-          <Route path="/admin/activation-keys" element={<AdminActivationKeys />} />
           <Route path="/admin/app-users" element={<AdminAppUsers />} />
           <Route path="/admin/m3u-lists" element={<AdminM3ULists />} />
           <Route path="/admin/variables" element={<AdminVariables />} />
