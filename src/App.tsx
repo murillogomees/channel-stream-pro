@@ -37,6 +37,7 @@ const ClienteCadastro = lazy(() => import("./pages/ClienteCadastro"));
 const AdminSmartOneSync = lazy(() => import("./pages/AdminSmartOneSync"));
 const ClienteDashboard = lazy(() => import("./pages/ClienteDashboard"));
 const ClienteSettings = lazy(() => import("./pages/ClienteSettings"));
+const ClienteSubscription = lazy(() => import("./pages/ClienteSubscription"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/cadastro" element={<ClienteCadastro />} />
           <Route path="/dashboard" element={<ClienteDashboard />} />
           <Route path="/settings" element={<ClienteSettings />} />
+          <Route path="/subscription" element={<ClienteSubscription />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/app/login" element={<AppLogin />} />
