@@ -84,7 +84,7 @@ const AdminUserRoles = () => {
 
   const handleAddRole = async (userId: string, role: string) => {
     try {
-      const validRoles = ['admin', 'user'];
+      const validRoles = ['admin', 'client'];
       if (!validRoles.includes(role)) {
         throw new Error('Role inválida');
       }
@@ -93,7 +93,7 @@ const AdminUserRoles = () => {
         .from('user_roles')
         .insert([{ 
           user_id: userId, 
-          role: role as 'admin' | 'user'
+          role: role as 'admin' | 'client'
         }]);
 
       if (error) throw error;
@@ -241,7 +241,7 @@ const AdminUserRoles = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="client">Cliente</SelectItem>
                               </SelectContent>
                             </Select>
                             <Button
