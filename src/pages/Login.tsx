@@ -25,7 +25,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      const from = (location.state as any)?.from?.pathname || (isAdmin ? '/dashboard' : '/conta');
+      const from = (location.state as any)?.from?.pathname || (isAdmin ? '/admin/dashboard' : '/conta');
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, isAdmin, authLoading, navigate, location]);
