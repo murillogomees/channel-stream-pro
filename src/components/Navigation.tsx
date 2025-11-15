@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, User, Phone, MessageCircle, LayoutDashboard } from "lucide-react";
 import { useSettingsContext } from "@/context/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import logoWhite from "@/assets/logo-white.png";
+import logoWhite from "@/assets/logo-white-nav.webp";
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -28,8 +28,8 @@ const Navigation = () => {
               src={logoWhite}
               alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
               className="h-8 md:h-9 lg:h-10 w-auto select-none"
-              width="431"
-              height="164"
+              width="200"
+              height="76"
               loading="eager"
               decoding="async"
               role="img"

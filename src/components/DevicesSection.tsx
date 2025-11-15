@@ -2,12 +2,12 @@ import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
-import androidIconWebP from "@/assets/icons/android-device-opt.webp";
-import iosIconWebP from "@/assets/icons/ios-device-opt.webp";
-import windowsIconWebP from "@/assets/icons/windows-device-opt.webp";
-import macIconWebP from "@/assets/icons/mac-device-opt.webp";
-import tabletIconWebP from "@/assets/icons/tablet-device-opt.webp";
-import smarttvIconWebP from "@/assets/icons/smarttv-device-opt.webp";
+import androidIconWebP from "@/assets/icons/android-device-sm.webp";
+import iosIconWebP from "@/assets/icons/ios-device-sm.webp";
+import windowsIconWebP from "@/assets/icons/windows-device-sm.webp";
+import macIconWebP from "@/assets/icons/mac-device-sm.webp";
+import tabletIconWebP from "@/assets/icons/tablet-device-sm.webp";
+import smarttvIconWebP from "@/assets/icons/smarttv-device-sm.webp";
 
 const DevicesSection = () => {
   const { settings } = useSettingsContext();
@@ -85,8 +85,8 @@ const DevicesSection = () => {
                       src={deviceImageWebP} 
                       alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
                       className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                      width="80"
-                      height="80"
+                      width="160"
+                      height="160"
                       loading="lazy"
                       decoding="async"
                       aria-hidden="true"
