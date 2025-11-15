@@ -65,7 +65,7 @@
   },
   "assets": {
     "logo": "/logo.png",
-    "heroImage": "/src/assets/hero-bg.jpg",
+    "heroImage": "/placeholder.svg",
     "fallback": "/placeholder.svg"
   },
   "icons": {
@@ -446,7 +446,7 @@
     "openGraph": {
       "title": "IPTV LINK - Entretenimento sem limites",
       "description": "Mais de 172.000 canais em HD/4K, filmes e séries premium. Teste grátis!",
-      "image": "/src/assets/hero-bg.jpg"
+      "image": "/logo.png"
     }
   }
 }
