@@ -19,17 +19,26 @@ export const useAuth = () => {
       if (adminError) {
         // Se erro for relacionado a role inválida no JWT, mostrar erro claro
         if (adminError.code === '42704' || adminError.message?.includes('role') || adminError.code === '22023') {
-          console.error('❌ JWT contém role inválida. Vá em Supabase → Authentication → Hooks e remova qualquer hook que seta claims.role para "admin".');
+          console.error('❌ JWT contém role inválida. Vá em Supabase → Authentication → Hooks e remova qualquer hook que seta claims.role para "admin".', adminError);
           return null; // Não assumir nenhum role
         }
+        // Erro transitório do PostgREST (schema cache)
+        if ((adminError as any)?.code === 'PGRST002' || adminError.message?.includes('schema cache')) {
+          console.warn('PostgREST indisponível ao checar role (PGRST002). Tentando novamente...');
+          return null; // sinaliza para retentar
+        }
         console.error('Error checking admin role:', adminError);
-        return 'client';
+        return null;
       }
       
       return isAdmin ? 'admin' : 'client';
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'PGRST002' || error?.message?.includes('schema cache')) {
+        console.warn('PostgREST indisponível ao checar role (PGRST002). Tentando novamente...');
+        return null;
+      }
       console.error('Error fetching user role:', error);
-      return 'client';
+      return null;
     }
   }, []);
 
@@ -38,8 +47,26 @@ export const useAuth = () => {
     setUser(currentSession?.user ?? null);
     
     if (currentSession?.user) {
-      const userRole = await fetchUserRole(currentSession.user.id);
-      setRole(userRole);
+      // 1) Preferir claim do JWT adicionada pelo hook (claims.user_role)
+      const userRoleClaim = (currentSession.user.user_metadata as any)?.user_role as string | undefined;
+      if (userRoleClaim === 'admin' || userRoleClaim === 'client') {
+        setRole(userRoleClaim as UserRole);
+        setLoading(false);
+        return;
+      }
+
+      // 2) Fallback para RPC com pequenas retentativas em caso de indisponibilidade
+      setLoading(true);
+      const attempt = async (retries = 2): Promise<UserRole> => {
+        const r = await fetchUserRole(currentSession.user!.id);
+        if (r !== null) return r;
+        if (retries <= 0) return null;
+        await new Promise((res) => setTimeout(res, 500));
+        return attempt(retries - 1);
+      };
+
+      const finalRole = await attempt();
+      setRole(finalRole);
     } else {
       setRole(null);
     }
