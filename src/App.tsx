@@ -31,6 +31,7 @@ const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
 const AdminUserRoles = lazy(() => import("./pages/AdminUserRoles"));
+const AdminPermissionTest = lazy(() => import("./pages/AdminPermissionTest"));
 const ClienteCadastro = lazy(() => import("./pages/ClienteCadastro"));
 const AdminSmartOneSync = lazy(() => import("./pages/AdminSmartOneSync"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
@@ -77,6 +78,7 @@ const App = () => (
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalytics /></ProtectedRoute>} />
           <Route path="/admin/system-health" element={<ProtectedRoute requireAdmin><AdminSystemHealth /></ProtectedRoute>} />
           <Route path="/admin/user-roles" element={<ProtectedRoute requireAdmin><AdminUserRoles /></ProtectedRoute>} />
+          <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           <Route path="/admin/smartone-sync" element={<ProtectedRoute requireAdmin><AdminSmartOneSync /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />

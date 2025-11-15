@@ -20,6 +20,42 @@ serve(async (req) => {
   }
 
   try {
+    // Verificar autenticação e permissão de admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Autenticação necessária' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Usuário não autenticado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verificar se é admin
+    const { data: isAdmin, error: roleError } = await supabaseClient
+      .rpc('is_admin', { _user_id: user.id });
+
+    if (roleError || !isAdmin) {
+      console.error('[smartone-sync] Permission denied for user:', user.id);
+      return new Response(
+        JSON.stringify({ error: 'Permissão negada. Apenas administradores.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body = await req.json();
     const validated = syncRequestSchema.parse(body);
     const { mac, usuario, senha, clienteNome } = validated;
@@ -38,12 +74,13 @@ serve(async (req) => {
       );
     }
 
-    const supabaseClient = createClient(
+    // Usar service role para operações de banco
+    const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { data: defaultList, error: dbError } = await supabaseClient
+    const { data: defaultList, error: dbError } = await supabaseService
       .from('m3u_lists')
       .select('file_url')
       .eq('is_default', true)

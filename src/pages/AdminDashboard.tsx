@@ -213,6 +213,15 @@ const AdminDashboard = () => {
                   </Button>
 
                   <Button 
+                    onClick={() => navigate('/admin/permission-test')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Testar Permissões
+                  </Button>
+
+                  <Button 
                     onClick={() => navigate('/admin/m3u-lists')} 
                     variant="outline"
                     className="w-full justify-start"
