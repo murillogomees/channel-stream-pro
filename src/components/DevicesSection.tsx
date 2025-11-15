@@ -1,35 +1,19 @@
 import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import devicesImage from "@/assets/devices-mockup.jpg";
-import devicesImageWebP from "@/assets/devices-mockup.webp";
-import androidIcon from "@/assets/icons/android-device.png";
-import androidIconWebP from "@/assets/icons/android-device.webp";
-import iosIcon from "@/assets/icons/ios-device.png";
-import iosIconWebP from "@/assets/icons/ios-device.webp";
-import windowsIcon from "@/assets/icons/windows-device.png";
-import windowsIconWebP from "@/assets/icons/windows-device.webp";
-import macIcon from "@/assets/icons/mac-device.png";
-import macIconWebP from "@/assets/icons/mac-device.webp";
-import tabletIcon from "@/assets/icons/tablet-device.png";
-import tabletIconWebP from "@/assets/icons/tablet-device.webp";
-import smarttvIcon from "@/assets/icons/smarttv-device.png";
-import smarttvIconWebP from "@/assets/icons/smarttv-device.webp";
+import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
+import androidIconWebP from "@/assets/icons/android-device-opt.webp";
+import iosIconWebP from "@/assets/icons/ios-device-opt.webp";
+import windowsIconWebP from "@/assets/icons/windows-device-opt.webp";
+import macIconWebP from "@/assets/icons/mac-device-opt.webp";
+import tabletIconWebP from "@/assets/icons/tablet-device-opt.webp";
+import smarttvIconWebP from "@/assets/icons/smarttv-device-opt.webp";
 
 const DevicesSection = () => {
   const { settings } = useSettingsContext();
   const devicesConfig = settings.devices;
 
   if (!devicesConfig) return null;
-
-  const deviceImageMap: Record<string, string> = {
-    android: androidIcon,
-    ios: iosIcon,
-    windows: windowsIcon,
-    mac: macIcon,
-    tablet: tabletIcon,
-    smarttv: smarttvIcon,
-  };
 
   const deviceImageMapWebP: Record<string, string> = {
     android: androidIconWebP,
@@ -58,20 +42,17 @@ const DevicesSection = () => {
 
         {/* Devices Image */}
         <div className="mb-16 rounded-2xl overflow-hidden shadow-2xl">
-          <picture>
-            <source srcSet={devicesImageWebP} type="image/webp" />
-            <img
-              src={devicesImage}
-              alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
-              className="w-full h-auto object-cover"
-              width="1920"
-              height="1080"
-              loading="lazy"
-              decoding="async"
-              role="img"
-              aria-label="Demonstração de compatibilidade do IPTV LINK em múltiplos dispositivos"
-            />
-          </picture>
+          <img
+            src={devicesImageWebP}
+            alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
+            className="w-full h-auto object-cover"
+            width="1440"
+            height="810"
+            loading="lazy"
+            decoding="async"
+            role="img"
+            aria-label="Demonstração de compatibilidade do IPTV LINK em múltiplos dispositivos"
+          />
         </div>
 
         {/* Platform Icons Grid */}
@@ -79,7 +60,6 @@ const DevicesSection = () => {
           {devicesConfig.platforms
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
-              const deviceImage = deviceImageMap[platform.id];
               const deviceImageWebP = deviceImageMapWebP[platform.id];
               
               return (
