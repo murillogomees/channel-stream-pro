@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { z } from "zod";
+import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from "@/utils/passwordSecurity";
 
 const cadastroSchema = z.object({
   nome: z.string().trim().min(3, "Nome deve ter no mínimo 3 caracteres").max(200, "Nome muito longo"),
@@ -67,6 +68,23 @@ const ClienteCadastro = () => {
 
       if (authError) {
         console.error('[ClienteCadastro] Auth error:', authError);
+        
+        // Tratamento específico para senha comprometida
+        if (isCompromisedPasswordError(authError)) {
+          const suggestions = generatePasswordSuggestions();
+          toast({
+            title: "Senha comprometida",
+            description: getCompromisedPasswordMessage(),
+            variant: "destructive",
+          });
+          toast({
+            title: "Sugestões de senha forte",
+            description: `Experimente uma destas: ${suggestions[0]}, ${suggestions[1]}`,
+          });
+          setLoading(false);
+          return;
+        }
+        
         throw new Error(authError.message || 'Erro ao criar conta');
       }
 

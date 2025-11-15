@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from "@/utils/passwordSecurity";
 
 const loginSchema = z.object({
   email: z.string()
@@ -140,7 +141,24 @@ const Auth = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Tratamento específico para senha comprometida
+        if (isCompromisedPasswordError(error)) {
+          const suggestions = generatePasswordSuggestions();
+          toast({
+            title: "Senha comprometida",
+            description: getCompromisedPasswordMessage(),
+            variant: "destructive",
+          });
+          toast({
+            title: "Sugestões de senha forte",
+            description: `Experimente: ${suggestions.join(', ')}`,
+          });
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: "Cadastro realizado com sucesso",

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { z } from 'zod';
+import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from '@/utils/passwordSecurity';
 
 const profileSchema = z.object({
   nome: z.string().trim().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100, 'Nome muito longo'),
@@ -204,7 +205,16 @@ export default function ClienteSettings() {
         password: validated.newPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Tratamento específico para senha comprometida
+        if (isCompromisedPasswordError(error)) {
+          const suggestions = generatePasswordSuggestions();
+          toast.error(getCompromisedPasswordMessage());
+          toast.info(`Sugestões: ${suggestions[0]}, ${suggestions[1]}`);
+          return;
+        }
+        throw error;
+      }
 
       toast.success('Senha atualizada com sucesso!');
       setCurrentPassword('');
