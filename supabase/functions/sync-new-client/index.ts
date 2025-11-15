@@ -24,8 +24,44 @@ serve(async (req) => {
   }
 
   try {
+    // Verificar autenticação e permissão de admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Autenticação necessária' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Cliente para verificar autenticação
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Usuário não autenticado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verificar se é admin
+    const { data: isAdmin, error: roleError } = await supabaseAuth
+      .rpc('is_admin', { _user_id: user.id });
+
+    if (roleError || !isAdmin) {
+      console.error('[sync-new-client] Permission denied for user:', user.id);
+      return new Response(
+        JSON.stringify({ error: 'Permissão negada. Apenas administradores.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const smartoneApiBase = Deno.env.get('SMARTONE_API_BASE_URL')!;
     const smartoneClientApi = Deno.env.get('SMARTONE_CLIENT_API')!;
     const smartoneKeyApi = Deno.env.get('SMARTONE_KEY_API')!;
