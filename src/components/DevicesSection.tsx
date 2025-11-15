@@ -81,19 +81,16 @@ const DevicesSection = () => {
                   }}
                 >
                   <div className="w-20 h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
-                    <picture>
-                      <source srcSet={deviceImageWebP} type="image/webp" />
-                      <img 
-                        src={deviceImage} 
-                        alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
-                        className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                        width="80"
-                        height="80"
-                        loading="lazy"
-                        decoding="async"
-                        aria-hidden="true"
-                      />
-                    </picture>
+                    <img 
+                      src={deviceImageWebP} 
+                      alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                      width="80"
+                      height="80"
+                      loading="lazy"
+                      decoding="async"
+                      aria-hidden="true"
+                    />
                   </div>
                   <span className="text-sm font-semibold text-center group-hover:text-primary transition-colors">
                     {platform.name}
