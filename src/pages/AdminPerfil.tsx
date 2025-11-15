@@ -6,13 +6,13 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, User, Lock, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const AdminPerfil = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, isAdmin, loading, logout } = useSupabaseAuth();
+  const { user, isAdmin, loading, signOut: logout } = useAuth();
   
   const [email, setEmail] = useState("");
   const [novaSenha, setNovaSenha] = useState("");

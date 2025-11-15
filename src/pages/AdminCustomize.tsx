@@ -6,13 +6,13 @@ import { ArrowLeft, Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSettingsContext } from "@/context/SettingsContext";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from '@/contexts/AuthContext';
 
 const AdminCustomize = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings, updateSettings, resetSettings, lastUpdated } = useSettingsContext();
-  const { isAdmin, loading: authLoading } = useSupabaseAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [jsonConfig, setJsonConfig] = useState("");
   const [loading, setSaving] = useState(false);
 

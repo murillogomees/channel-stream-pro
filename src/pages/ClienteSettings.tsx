@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, Save, KeyRound, Mail, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { z } from 'zod';
 
 const profileSchema = z.object({
@@ -32,7 +32,7 @@ const passwordSchema = z.object({
 
 export default function ClienteSettings() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, logout } = useSupabaseAuth();
+  const { user, loading: authLoading, signOut: logout } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

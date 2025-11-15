@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio, MonitorPlay, PieChart, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useClientes } from "@/hooks/useClientes";
 import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAdmin, loading, logout } = useSupabaseAuth();
+  const { isAdmin, loading, signOut: logout } = useAuth();
   const { getStats } = useClientes();
   const stats = getStats();
   const { config, saveConfig, isConfigured } = useWhatsAppConfig();
