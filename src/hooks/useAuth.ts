@@ -12,11 +12,16 @@ export const useAuth = () => {
 
   const fetchUserRole = useCallback(async (userId: string): Promise<UserRole> => {
     try {
-      // Usar a função has_role para verificar se é admin
+      // Verificar se é admin usando a função has_role
       const { data: isAdmin, error: adminError } = await supabase
         .rpc('has_role', { _user_id: userId, _role: 'admin' });
       
       if (adminError) {
+        // Se erro for relacionado a role inválida no JWT, mostrar erro claro
+        if (adminError.code === '42704' || adminError.message?.includes('role') || adminError.code === '22023') {
+          console.error('❌ JWT contém role inválida. Vá em Supabase → Authentication → Hooks e remova qualquer hook que seta claims.role para "admin".');
+          return null; // Não assumir nenhum role
+        }
         console.error('Error checking admin role:', adminError);
         return 'client';
       }
