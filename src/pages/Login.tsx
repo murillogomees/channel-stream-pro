@@ -1,3 +1,11 @@
+/**
+ * PÁGINA DE LOGIN UNIFICADA
+ * 
+ * Autentica usuários e redireciona baseado em roles:
+ * - Admin/Super Admin → /admin/dashboard
+ * - Client → /conta
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -7,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Tv, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { z } from 'zod';
 
 const loginSchema = z.object({

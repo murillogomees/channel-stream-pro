@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useClientes } from '@/hooks/useClientes';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
@@ -41,7 +41,7 @@ import { getWhatsAppService } from '@/services/whatsapp';
 export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading } = useSupabaseAuth();
+  const { isAdmin, loading } = useAuth();
   const { clientes } = useClientes();
   const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
   const { logs, addLog, clearLogs, getRecentLogs, exportToCSV } = useNotificationLogs();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function AdminSmartOneConfig() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading: authLoading } = useSupabaseAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   
   const [enabled, setEnabled] = useState(true);
   const [baseUrl, setBaseUrl] = useState('');

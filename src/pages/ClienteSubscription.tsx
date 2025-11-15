@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, addMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -89,7 +89,7 @@ const PLANS = [
 
 export default function ClienteSubscription() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useSupabaseAuth();
+  const { user, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [clienteData, setClienteData] = useState<ClienteData | null>(null);

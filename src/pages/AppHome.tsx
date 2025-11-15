@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppAuth } from '@/hooks/useAppAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useChannels } from '@/hooks/useChannels';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 export default function AppHome() {
   const navigate = useNavigate();
-  const { session, isAuthenticated, isLoading, logout } = useAppAuth();
+  const { user, isAuthenticated, loading: isLoading, signOut: logout } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isTVMode, setIsTVMode] = useState(false);
@@ -25,7 +25,7 @@ export default function AppHome() {
     setSelectedCategory,
     loading: channelsLoading,
     error: channelsError,
-  } = useChannels(session?.m3uUrl);
+  } = useChannels(user?.clienteData?.usuario_m3u);
 
   const { focusedId } = useTVNavigation(isTVMode);
 

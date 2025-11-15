@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface M3UList {
   id: string;
@@ -46,7 +46,7 @@ interface M3UList {
 
 export default function AdminM3ULists() {
   const navigate = useNavigate();
-  const { isAdmin, loading: authLoading } = useSupabaseAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

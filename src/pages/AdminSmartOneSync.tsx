@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { smartoneAutoSyncService } from "@/services/smartoneAutoSyncService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ interface ClienteComPerfil {
 }
 
 const AdminSmartOneSync = () => {
-  const { isAdmin, loading: authLoading } = useSupabaseAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteComPerfil[]>([]);
