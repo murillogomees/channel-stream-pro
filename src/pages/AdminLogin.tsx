@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { isCompromisedPasswordError, getCompromisedPasswordMessage } from "@/utils/passwordSecurity";
 
 const loginSchema = z.object({
   email: z.string()
@@ -98,11 +99,21 @@ const AdminLogin = () => {
       } else {
         const err = error as any;
         console.error("[AdminLogin] Supabase auth error:", err);
-        toast({
-          title: "Erro no login",
-          description: err?.message || "Credenciais inválidas ou erro de conexão.",
-          variant: "destructive",
-        });
+        
+        // Tratamento específico para senha comprometida
+        if (isCompromisedPasswordError(err)) {
+          toast({
+            title: "Senha comprometida",
+            description: getCompromisedPasswordMessage(),
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro no login",
+            description: err?.message || "Credenciais inválidas ou erro de conexão.",
+            variant: "destructive",
+          });
+        }
       }
     } finally {
       setLoading(false);
