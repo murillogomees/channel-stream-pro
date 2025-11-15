@@ -12,26 +12,47 @@ export const useAuth = () => {
 
   const fetchUserRole = useCallback(async (userId: string): Promise<UserRole> => {
     try {
-      // Verificar se é admin usando a função has_role
+      // 1) Verificar se é admin usando a função has_role (preferida)
       const { data: isAdmin, error: adminError } = await supabase
         .rpc('has_role', { _user_id: userId, _role: 'admin' });
-      
-      if (adminError) {
-        // Se erro for relacionado a role inválida no JWT, mostrar erro claro
-        if (adminError.code === '42704' || adminError.message?.includes('role') || adminError.code === '22023') {
-          console.error('❌ JWT contém role inválida. Vá em Supabase → Authentication → Hooks e remova qualquer hook que seta claims.role para "admin".', adminError);
-          return null; // Não assumir nenhum role
+
+      if (!adminError) {
+        return isAdmin ? 'admin' : 'client';
+      }
+
+      // Se erro for relacionado a role inválida no JWT, mostrar erro claro e não assumir role
+      if (adminError.code === '42704' || adminError.message?.includes('role') || adminError.code === '22023') {
+        console.error('❌ JWT contém role inválida. Vá em Supabase → Authentication → Hooks e remova qualquer hook que seta claims.role para "admin".', adminError);
+        return null; // Não assumir nenhum role
+      }
+      // Erro transitório do PostgREST (schema cache)
+      if ((adminError as any)?.code === 'PGRST002' || adminError.message?.includes('schema cache')) {
+        console.warn('PostgREST indisponível ao checar role (PGRST002). Tentando novamente...');
+        return null; // sinaliza para retentar
+      }
+
+      console.warn('RPC has_role falhou, aplicando fallback via tabela user_roles:', adminError);
+
+      // 2) Fallback seguro: consultar diretamente a tabela user_roles (RLS permite visualizar o próprio registro)
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles' as any)
+        .select('role')
+        .eq('user_id', userId);
+
+      if (rolesError) {
+        if ((rolesError as any)?.code === 'PGRST002' || rolesError.message?.includes('schema cache')) {
+          console.warn('PostgREST indisponível ao consultar user_roles (PGRST002). Retentativa necessária...');
+          return null;
         }
-        // Erro transitório do PostgREST (schema cache)
-        if ((adminError as any)?.code === 'PGRST002' || adminError.message?.includes('schema cache')) {
-          console.warn('PostgREST indisponível ao checar role (PGRST002). Tentando novamente...');
-          return null; // sinaliza para retentar
-        }
-        console.error('Error checking admin role:', adminError);
+        console.error('Erro ao consultar user_roles como fallback:', rolesError);
         return null;
       }
-      
-      return isAdmin ? 'admin' : 'client';
+
+      const hasAdmin = roles?.some((r: any) => r.role === 'admin');
+      const hasClient = roles?.some((r: any) => r.role === 'client');
+      if (hasAdmin) return 'admin';
+      if (hasClient) return 'client';
+      return null;
     } catch (error: any) {
       if (error?.code === 'PGRST002' || error?.message?.includes('schema cache')) {
         console.warn('PostgREST indisponível ao checar role (PGRST002). Tentando novamente...');
@@ -57,11 +78,11 @@ export const useAuth = () => {
 
       // 2) Fallback para RPC com pequenas retentativas em caso de indisponibilidade
       setLoading(true);
-      const attempt = async (retries = 2): Promise<UserRole> => {
+      const attempt = async (retries = 3): Promise<UserRole> => {
         const r = await fetchUserRole(currentSession.user!.id);
         if (r !== null) return r;
         if (retries <= 0) return null;
-        await new Promise((res) => setTimeout(res, 500));
+        await new Promise((res) => setTimeout(res, 700));
         return attempt(retries - 1);
       };
 
