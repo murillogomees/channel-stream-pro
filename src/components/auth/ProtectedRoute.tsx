@@ -29,11 +29,11 @@ export const ProtectedRoute = ({
   }
 
   if (requireAdmin && !isAdmin) {
-    return <Navigate to="/conta" replace />;
+    return <Navigate to="/403" state={{ required: 'admin', has: isClient ? 'client' : 'none' }} replace />;
   }
 
   if (requireClient && !isClient) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/403" state={{ required: 'client', has: isAdmin ? 'admin' : 'none' }} replace />;
   }
 
   return <>{children}</>;

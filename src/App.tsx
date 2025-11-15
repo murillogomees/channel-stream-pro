@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Forbidden = lazy(() => import("./pages/Forbidden"));
 const Login = lazy(() => import("./pages/Login"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminCustomize = lazy(() => import("./pages/AdminCustomize"));
@@ -84,6 +85,9 @@ const App = () => (
           <Route path="/settings" element={<Navigate to="/conta" replace />} />
           <Route path="/subscription" element={<Navigate to="/conta" replace />} />
           <Route path="/app" element={<Navigate to="/conta" replace />} />
+          
+          {/* Access denied */}
+          <Route path="/403" element={<Forbidden />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
