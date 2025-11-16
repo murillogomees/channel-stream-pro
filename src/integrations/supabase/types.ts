@@ -614,6 +614,92 @@ export type Database = {
         }
         Relationships: []
       }
+      security_alert_deliveries: {
+        Row: {
+          admin_phone_id: string
+          confirmed_at: string | null
+          created_at: string | null
+          delivery_status: string | null
+          error_message: string | null
+          escalated: boolean | null
+          escalated_at: string | null
+          id: string
+          security_event_id: string
+          sent_at: string
+        }
+        Insert: {
+          admin_phone_id: string
+          confirmed_at?: string | null
+          created_at?: string | null
+          delivery_status?: string | null
+          error_message?: string | null
+          escalated?: boolean | null
+          escalated_at?: string | null
+          id?: string
+          security_event_id: string
+          sent_at?: string
+        }
+        Update: {
+          admin_phone_id?: string
+          confirmed_at?: string | null
+          created_at?: string | null
+          delivery_status?: string | null
+          error_message?: string | null
+          escalated?: boolean | null
+          escalated_at?: string | null
+          id?: string
+          security_event_id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_alert_deliveries_admin_phone_id_fkey"
+            columns: ["admin_phone_id"]
+            isOneToOne: false
+            referencedRelation: "admin_phones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_alert_escalation_rules: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          escalation_action: string
+          event_type: string
+          id: string
+          rule_name: string
+          secondary_admin_ids: string[] | null
+          severity_level: string
+          time_window_minutes: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          escalation_action?: string
+          event_type: string
+          id?: string
+          rule_name: string
+          secondary_admin_ids?: string[] | null
+          severity_level: string
+          time_window_minutes?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          escalation_action?: string
+          event_type?: string
+          id?: string
+          rule_name?: string
+          secondary_admin_ids?: string[] | null
+          severity_level?: string
+          time_window_minutes?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       security_alert_templates: {
         Row: {
           created_at: string | null
