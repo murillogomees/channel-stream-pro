@@ -54,28 +54,30 @@ const ClienteCadastro = () => {
       
       console.log('[ClienteCadastro] Starting registration for:', validated.email);
       
-      // Step 2: Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: validated.email,
-        password: validated.senha,
-        options: {
-          data: {
-            nome: validated.nome,
-            telefone: validated.telefone,
-          },
-          emailRedirectTo: `${window.location.origin}/`,
-        },
+      // Step 2: Create user via edge function with HIBP validation
+      console.log('[ClienteCadastro] Calling validate-password-signup edge function');
+      
+      const { data: signupData, error: functionError } = await supabase.functions.invoke('validate-password-signup', {
+        body: {
+          email: validated.email,
+          password: validated.senha,
+          nome: validated.nome,
+          telefone: validated.telefone,
+        }
       });
 
-      if (authError) {
-        console.error('[ClienteCadastro] Auth error:', authError);
-        
+      if (functionError) {
+        console.error('[ClienteCadastro] Edge function error:', functionError);
+        throw new Error(functionError.message || 'Erro ao processar cadastro');
+      }
+
+      if (signupData?.error) {
         // Tratamento específico para senha comprometida
-        if (isCompromisedPasswordError(authError)) {
+        if (signupData.code === 'auth/compromised_password') {
           const suggestions = generatePasswordSuggestions();
           toast({
             title: "Senha comprometida",
-            description: getCompromisedPasswordMessage(),
+            description: signupData.error,
             variant: "destructive",
           });
           toast({
@@ -85,22 +87,33 @@ const ClienteCadastro = () => {
           setLoading(false);
           return;
         }
-        
-        throw new Error(authError.message || 'Erro ao criar conta');
+        throw new Error(signupData.error);
       }
 
-      if (!authData.user) {
+      if (!signupData?.user) {
         throw new Error('Falha ao criar usuário. Tente novamente.');
       }
 
-      console.log('[ClienteCadastro] User created:', authData.user.id);
+      console.log('[ClienteCadastro] User created:', signupData.user.id);
+
+      // Autenticar com a sessão criada pela edge function
+      if (signupData?.session) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: signupData.session.access_token,
+          refresh_token: signupData.session.refresh_token
+        });
+
+        if (setSessionError) {
+          console.error('[ClienteCadastro] Error setting session:', setSessionError);
+        }
+      }
 
       // Step 3: Wait briefly for trigger to create profile
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Step 4: Create cliente record linked to user profile
       const clienteData = {
-        user_id: authData.user.id,
+        user_id: signupData.user.id,
         nome: validated.nome,
         telefone: validated.telefone,
         email: validated.email,
@@ -134,7 +147,7 @@ const ClienteCadastro = () => {
         try {
           const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-new-client', {
             body: {
-              user_id: authData.user.id,
+              user_id: signupData.user.id,
               cliente_id: cliente.id,
               nome: validated.nome,
               telefone: validated.telefone,

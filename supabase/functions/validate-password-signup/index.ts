@@ -1,0 +1,155 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Hash password using SHA-1 for HIBP API
+async function sha1Hash(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+// Check password against HIBP using k-anonymity
+async function checkPasswordCompromised(password: string): Promise<boolean> {
+  try {
+    const hash = await sha1Hash(password);
+    const prefix = hash.substring(0, 5);
+    const suffix = hash.substring(5);
+
+    console.log(`[HIBP] Checking password hash prefix: ${prefix}`);
+
+    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'User-Agent': 'Supabase-Edge-Function' }
+    });
+
+    if (!response.ok) {
+      console.error(`[HIBP] API error: ${response.status}`);
+      return false; // Fail open - don't block if API is down
+    }
+
+    const text = await response.text();
+    const hashes = text.split('\n');
+    
+    for (const line of hashes) {
+      const [hashSuffix] = line.split(':');
+      if (hashSuffix === suffix) {
+        console.log('[HIBP] Password found in breach database');
+        return true;
+      }
+    }
+
+    console.log('[HIBP] Password is safe');
+    return false;
+  } catch (error) {
+    console.error('[HIBP] Error checking password:', error);
+    return false; // Fail open
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { email, password, nome, telefone } = await req.json();
+
+    console.log(`[Auth] Starting signup for email: ${email}`);
+
+    // Validate input
+    if (!email || !password) {
+      return new Response(
+        JSON.stringify({ error: 'Email e senha são obrigatórios' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check password strength
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'Senha deve ter no mínimo 8 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if password is compromised
+    const isCompromised = await checkPasswordCompromised(password);
+    if (isCompromised) {
+      console.log('[Auth] Blocking compromised password');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Esta senha foi encontrada em vazamentos de dados. Por favor, escolha uma senha diferente.',
+          code: 'auth/compromised_password'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        nome: nome || email,
+        telefone: telefone || null
+      }
+    });
+
+    if (authError) {
+      console.error('[Auth] Error creating user:', authError);
+      return new Response(
+        JSON.stringify({ error: authError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[Auth] User created successfully: ${authData.user.id}`);
+
+    // Sign in the user to get session
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (sessionError) {
+      console.error('[Auth] Error creating session:', sessionError);
+      return new Response(
+        JSON.stringify({ error: sessionError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        user: authData.user,
+        session: sessionData.session,
+        message: 'Cadastro realizado com sucesso!'
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error) {
+    console.error('[Auth] Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Erro ao processar cadastro' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

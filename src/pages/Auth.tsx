@@ -128,42 +128,56 @@ const Auth = () => {
         confirmPassword 
       });
 
-      const redirectUrl = `${window.location.origin}/`;
+      console.log('[Auth] Calling validate-password-signup edge function');
 
-      // Faz cadastro via Supabase Auth
-      const { error } = await supabase.auth.signUp({
-        email: validated.email,
-        password: validated.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            name: validated.name,
-          }
+      // Chama edge function para validação HIBP server-side
+      const { data, error } = await supabase.functions.invoke('validate-password-signup', {
+        body: {
+          email: validated.email,
+          password: validated.password,
+          nome: validated.name,
         }
       });
 
       if (error) {
+        console.error('[Auth] Edge function error:', error);
+        throw new Error(error.message || 'Erro ao processar cadastro');
+      }
+
+      if (data?.error) {
         // Tratamento específico para senha comprometida
-        if (isCompromisedPasswordError(error)) {
+        if (data.code === 'auth/compromised_password') {
           const suggestions = generatePasswordSuggestions();
           toast({
             title: "Senha comprometida",
-            description: getCompromisedPasswordMessage(),
+            description: data.error,
             variant: "destructive",
           });
           toast({
             title: "Sugestões de senha forte",
-            description: `Experimente: ${suggestions.join(', ')}`,
+            description: `Experimente uma destas: ${suggestions[0]}, ${suggestions[1]}`,
           });
           setLoading(false);
           return;
         }
-        throw error;
+        throw new Error(data.error);
+      }
+
+      // Autenticar com a sessão criada pela edge function
+      if (data?.session) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        });
+
+        if (setSessionError) {
+          console.error('[Auth] Error setting session:', setSessionError);
+        }
       }
 
       toast({
         title: "Cadastro realizado com sucesso",
-        description: "Verifique seu email para confirmar o cadastro.",
+        description: "Redirecionando...",
       });
       
       // Limpa formulário
