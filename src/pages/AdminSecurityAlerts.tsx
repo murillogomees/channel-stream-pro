@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Phone, Save, Plus, Trash2 } from "lucide-react";
+import { Bell, Phone, Save, Plus, Trash2, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SecurityAlertTemplate, TEMPLATE_VARIABLES, EventType } from "@/types/securityAlert";
+import { Badge } from "@/components/ui/badge";
 
 interface AdminPhone {
   id: string;
@@ -30,8 +33,10 @@ interface AlertConfig {
 export default function AdminSecurityAlerts() {
   const [admins, setAdmins] = useState<AdminPhone[]>([]);
   const [configs, setConfigs] = useState<AlertConfig[]>([]);
+  const [templates, setTemplates] = useState<SecurityAlertTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [newAdmin, setNewAdmin] = useState({ name: '', phone: '' });
+  const [editingTemplate, setEditingTemplate] = useState<SecurityAlertTemplate | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,7 +45,7 @@ export default function AdminSecurityAlerts() {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchAdmins(), fetchConfigs()]);
+    await Promise.all([fetchAdmins(), fetchConfigs(), fetchTemplates()]);
     setLoading(false);
   };
 
@@ -77,7 +82,6 @@ export default function AdminSecurityAlerts() {
       return;
     }
 
-    // Cast notification_channels from Json to string[]
     const typedData = (data || []).map(config => ({
       ...config,
       notification_channels: Array.isArray(config.notification_channels) 
@@ -86,6 +90,24 @@ export default function AdminSecurityAlerts() {
     })) as AlertConfig[];
 
     setConfigs(typedData);
+  };
+
+  const fetchTemplates = async () => {
+    const { data, error } = await supabase
+      .from('security_alert_templates')
+      .select('*')
+      .order('event_type');
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao carregar templates",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTemplates(data || []);
   };
 
   const addAdmin = async () => {
@@ -161,10 +183,10 @@ export default function AdminSecurityAlerts() {
     fetchAdmins();
   };
 
-  const updateConfig = async (id: string, updates: Partial<AlertConfig>) => {
+  const toggleConfig = async (id: string, currentEnabled: boolean) => {
     const { error } = await supabase
       .from('security_alert_config')
-      .update(updates)
+      .update({ enabled: !currentEnabled })
       .eq('id', id);
 
     if (error) {
@@ -184,15 +206,61 @@ export default function AdminSecurityAlerts() {
     fetchConfigs();
   };
 
-  const getEventTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      failed_login: 'Login Falhou',
-      permission_change: 'Mudança de Permissão',
-      suspicious_activity: 'Atividade Suspeita',
-      rate_limit_exceeded: 'Limite Excedido',
-      unauthorized_access: 'Acesso Não Autorizado'
-    };
-    return labels[type] || type;
+  const saveTemplate = async () => {
+    if (!editingTemplate) return;
+
+    const { error } = await supabase
+      .from('security_alert_templates')
+      .update({
+        template_name: editingTemplate.template_name,
+        message_template: editingTemplate.message_template,
+        enabled: editingTemplate.enabled,
+      })
+      .eq('id', editingTemplate.id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar template",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Sucesso",
+      description: "Template atualizado com sucesso",
+    });
+
+    setEditingTemplate(null);
+    fetchTemplates();
+  };
+
+  const toggleTemplate = async (id: string, currentEnabled: boolean) => {
+    const { error } = await supabase
+      .from('security_alert_templates')
+      .update({ enabled: !currentEnabled })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar template",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    fetchTemplates();
+  };
+
+  const insertVariable = (variable: string) => {
+    if (!editingTemplate) return;
+    
+    setEditingTemplate({
+      ...editingTemplate,
+      message_template: editingTemplate.message_template + variable
+    });
   };
 
   if (loading) {
@@ -205,178 +273,247 @@ export default function AdminSecurityAlerts() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Bell className="h-8 w-8" />
-          Alertas de Segurança WhatsApp
-        </h1>
-        <p className="text-muted-foreground">
-          Configure notificações automáticas para eventos críticos de segurança
-        </p>
+      <div className="flex items-center gap-2">
+        <Bell className="h-8 w-8" />
+        <h1 className="text-3xl font-bold">Alertas de Segurança por WhatsApp</h1>
       </div>
 
-      {/* Admins para Notificação */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5" />
-            Administradores
-          </CardTitle>
-          <CardDescription>
-            Números de WhatsApp que receberão alertas de segurança
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Add new admin */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                placeholder="Nome do admin"
-                value={newAdmin.name}
-                onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                placeholder="Telefone (5561999999999)"
-                value={newAdmin.phone}
-                onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
-              />
-            </div>
-            <Button onClick={addAdmin}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar
-            </Button>
-          </div>
+      <Tabs defaultValue="admins" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="admins">
+            <Phone className="h-4 w-4 mr-2" />
+            Admins
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Bell className="h-4 w-4 mr-2" />
+            Configurações
+          </TabsTrigger>
+          <TabsTrigger value="templates">
+            <FileText className="h-4 w-4 mr-2" />
+            Templates
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Admin list */}
-          <div className="space-y-2">
-            {admins.map((admin) => (
-              <div
-                key={admin.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={admin.active}
-                    onCheckedChange={() => toggleAdmin(admin.id, admin.active)}
+        <TabsContent value="admins" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Administradores</CardTitle>
+              <CardDescription>
+                Números de WhatsApp que receberão alertas de segurança
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Nome do admin"
+                    value={newAdmin.name}
+                    onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
                   />
+                </div>
+                <div className="flex-1">
+                  <Input
+                    placeholder="Telefone (5561999999999)"
+                    value={newAdmin.phone}
+                    onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
+                  />
+                </div>
+                <Button onClick={addAdmin}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {admins.map((admin) => (
+                <div key={admin.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{admin.name}</p>
                     <p className="text-sm text-muted-foreground">{admin.phone}</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={admin.active}
+                      onCheckedChange={() => toggleAdmin(admin.id, admin.active)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteAdmin(admin.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteAdmin(admin.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            {admins.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">
-                Nenhum admin cadastrado
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Alert Configurations */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Configurações de Alertas</CardTitle>
-          <CardDescription>
-            Configure quando e como os alertas devem ser disparados
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {configs.map((config) => (
-            <div
-              key={config.id}
-              className="p-4 border rounded-lg space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">{config.alert_name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {getEventTypeLabel(config.event_type)}
-                  </p>
+        <TabsContent value="config" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações de Alertas</CardTitle>
+              <CardDescription>
+                Configure quando os alertas devem ser disparados
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {configs.map((config) => (
+                <div key={config.id} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">{config.alert_name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Tipo: {config.event_type}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={config.enabled}
+                      onCheckedChange={() => toggleConfig(config.id, config.enabled)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <Label className="text-xs">Threshold</Label>
+                      <p className="font-medium">{config.threshold} eventos</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Janela de Tempo</Label>
+                      <p className="font-medium">{config.time_window_minutes} min</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Severidade</Label>
+                      <p className="font-medium capitalize">{config.severity_level}</p>
+                    </div>
+                  </div>
                 </div>
-                <Switch
-                  checked={config.enabled}
-                  onCheckedChange={(checked) =>
-                    updateConfig(config.id, { enabled: checked })
-                  }
-                />
-              </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Limite de Eventos</Label>
+        <TabsContent value="templates" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Templates de Mensagens</CardTitle>
+              <CardDescription>
+                Personalize as mensagens de alerta por tipo de evento
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {templates.map((template) => (
+                <div key={template.id} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">{template.template_name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline">{template.event_type}</Badge>
+                        <Badge variant={template.enabled ? "default" : "secondary"}>
+                          {template.enabled ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Switch
+                        checked={template.enabled}
+                        onCheckedChange={() => toggleTemplate(template.id, template.enabled)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingTemplate(template)}
+                      >
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {editingTemplate && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Editar Template: {editingTemplate.template_name}</CardTitle>
+                <CardDescription>
+                  Personalize a mensagem usando as variáveis disponíveis
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome do Template</Label>
                   <Input
-                    type="number"
-                    value={config.threshold}
+                    value={editingTemplate.template_name}
                     onChange={(e) =>
-                      updateConfig(config.id, { threshold: parseInt(e.target.value) })
-                    }
-                    disabled={!config.enabled}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Número de eventos para disparar alerta
-                  </p>
-                </div>
-
-                <div>
-                  <Label>Janela de Tempo (minutos)</Label>
-                  <Input
-                    type="number"
-                    value={config.time_window_minutes}
-                    onChange={(e) =>
-                      updateConfig(config.id, {
-                        time_window_minutes: parseInt(e.target.value)
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        template_name: e.target.value,
                       })
                     }
-                    disabled={!config.enabled}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Período para contar eventos
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Variáveis Disponíveis</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {TEMPLATE_VARIABLES.common.map((v) => (
+                      <Button
+                        key={v.var}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insertVariable(v.var)}
+                        title={v.description}
+                      >
+                        {v.var}
+                      </Button>
+                    ))}
+                    {TEMPLATE_VARIABLES[editingTemplate.event_type as EventType]?.map((v) => (
+                      <Button
+                        key={v.var}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insertVariable(v.var)}
+                        title={v.description}
+                      >
+                        {v.var}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Mensagem do Template</Label>
+                  <Textarea
+                    value={editingTemplate.message_template}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        message_template: e.target.value,
+                      })
+                    }
+                    rows={12}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use as variáveis acima clicando nelas para inseri-las no template
                   </p>
                 </div>
-              </div>
 
-              <div>
-                <Label>Severidade</Label>
-                <Select
-                  value={config.severity_level}
-                  onValueChange={(value) =>
-                    updateConfig(config.id, { severity_level: value })
-                  }
-                  disabled={!config.enabled}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="warning">Warning</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ))}
-
-          {configs.length === 0 && (
-            <p className="text-center text-muted-foreground py-4">
-              Nenhuma configuração encontrada
-            </p>
+                <div className="flex gap-2">
+                  <Button onClick={saveTemplate}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Template
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingTemplate(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
