@@ -60,7 +60,19 @@ serve(async (req) => {
     const validated = syncRequestSchema.parse(body);
     const { mac, usuario, senha, clienteNome } = validated;
 
-    console.log('[smartone-sync] Request:', { mac, usuario, clienteNome });
+    // Hash sensitive data for logging
+    const hashData = async (data: string): Promise<string> => {
+      const encoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8);
+    };
+
+    console.log('[smartone-sync] Request:', { 
+      macHash: await hashData(mac),
+      userId: user.id,
+      timestamp: Date.now()
+    });
 
     const SMARTONE_API_BASE_URL = Deno.env.get('SMARTONE_API_BASE_URL');
     const SMARTONE_CLIENT_API = Deno.env.get('SMARTONE_CLIENT_API');

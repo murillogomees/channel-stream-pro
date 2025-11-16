@@ -96,7 +96,13 @@ serve(async (req) => {
 });
 
 async function processWebhook(payload: z.infer<typeof webhookSchema>) {
-  console.log(`[smartone-webhook] Processing ${payload.event} for MAC: ${payload.mac}`);
+  // Hash MAC address for logging
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(payload.mac));
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const macHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8);
+  
+  console.log(`[smartone-webhook] Processing ${payload.event} for MAC hash: ${macHash}`);
   
   switch (payload.event) {
     case 'playlist.created':
