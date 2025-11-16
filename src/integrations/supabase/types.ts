@@ -434,6 +434,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rls_policy_backups: {
+        Row: {
+          created_at: string | null
+          id: string
+          policy_name: string | null
+          policy_using: string | null
+          policy_with_check: string | null
+          schema_name: string | null
+          table_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          policy_name?: string | null
+          policy_using?: string | null
+          policy_with_check?: string | null
+          schema_name?: string | null
+          table_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          policy_name?: string | null
+          policy_using?: string | null
+          policy_with_check?: string | null
+          schema_name?: string | null
+          table_name?: string | null
+        }
+        Relationships: []
+      }
       role_audit_log: {
         Row: {
           action: string
@@ -489,6 +519,7 @@ export type Database = {
     Functions: {
       cleanup_old_metrics: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      get_auth_uid: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -496,6 +527,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { uid: string }; Returns: boolean }
     }
     Enums: {
       app_role: "client" | "admin"

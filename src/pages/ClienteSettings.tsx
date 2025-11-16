@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { z } from 'zod';
 import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from '@/utils/passwordSecurity';
+import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 
 const profileSchema = z.object({
   nome: z.string().trim().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100, 'Nome muito longo'),
@@ -369,6 +370,7 @@ export default function ClienteSettings() {
                     disabled={updatingPassword}
                     required
                   />
+                  <PasswordStrengthIndicator password={newPassword} />
                 </div>
                 <div>
                   <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
