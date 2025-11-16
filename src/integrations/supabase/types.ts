@@ -219,6 +219,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ip_blacklist: {
+        Row: {
+          auto_blocked: boolean | null
+          blocked_at: string
+          blocked_by: string | null
+          expires_at: string | null
+          failed_attempts: number | null
+          id: string
+          ip_address: string
+          last_attempt_at: string | null
+          notes: string | null
+          reason: string
+          severity: string
+          unblocked_at: string | null
+          unblocked_by: string | null
+        }
+        Insert: {
+          auto_blocked?: boolean | null
+          blocked_at?: string
+          blocked_by?: string | null
+          expires_at?: string | null
+          failed_attempts?: number | null
+          id?: string
+          ip_address: string
+          last_attempt_at?: string | null
+          notes?: string | null
+          reason: string
+          severity?: string
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Update: {
+          auto_blocked?: boolean | null
+          blocked_at?: string
+          blocked_by?: string | null
+          expires_at?: string | null
+          failed_attempts?: number | null
+          id?: string
+          ip_address?: string
+          last_attempt_at?: string | null
+          notes?: string | null
+          reason?: string
+          severity?: string
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Relationships: []
+      }
       m3u_lists: {
         Row: {
           created_at: string | null
@@ -518,6 +566,54 @@ export type Database = {
         }
         Relationships: []
       }
+      security_alert_config: {
+        Row: {
+          alert_name: string
+          created_at: string
+          enabled: boolean | null
+          event_type: string
+          id: string
+          last_triggered_at: string | null
+          notification_channels: Json | null
+          recipient_admin_ids: string[] | null
+          severity_level: string
+          threshold: number
+          time_window_minutes: number
+          trigger_count: number | null
+          updated_at: string
+        }
+        Insert: {
+          alert_name: string
+          created_at?: string
+          enabled?: boolean | null
+          event_type: string
+          id?: string
+          last_triggered_at?: string | null
+          notification_channels?: Json | null
+          recipient_admin_ids?: string[] | null
+          severity_level?: string
+          threshold?: number
+          time_window_minutes?: number
+          trigger_count?: number | null
+          updated_at?: string
+        }
+        Update: {
+          alert_name?: string
+          created_at?: string
+          enabled?: boolean | null
+          event_type?: string
+          id?: string
+          last_triggered_at?: string | null
+          notification_channels?: Json | null
+          recipient_admin_ids?: string[] | null
+          severity_level?: string
+          threshold?: number
+          time_window_minutes?: number
+          trigger_count?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_events: {
         Row: {
           created_at: string
@@ -589,11 +685,45 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_block_ip: {
+        Args: {
+          _event_type: string
+          _ip_address: string
+          _threshold?: number
+          _window_minutes?: number
+        }
+        Returns: boolean
+      }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       get_auth_uid: { Args: never; Returns: string }
+      get_security_analytics: {
+        Args: { _days?: number }
+        Returns: {
+          critical_count: number
+          date: string
+          failed_logins: number
+          permission_changes: number
+          rate_limit_exceeded: number
+          suspicious_activities: number
+          total_events: number
+          unauthorized_access: number
+          warning_count: number
+        }[]
+      }
+      get_top_threat_ips: {
+        Args: { _limit?: number }
+        Returns: {
+          event_count: number
+          failed_logins: number
+          ip_address: string
+          is_blocked: boolean
+          last_event: string
+          suspicious_activities: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -36,6 +36,8 @@ const ClienteCadastro = lazy(() => import("./pages/ClienteCadastro"));
 const AdminSmartOneSync = lazy(() => import("./pages/AdminSmartOneSync"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 const AdminSecurityMonitor = lazy(() => import("./pages/AdminSecurityMonitor"));
+const AdminSecurityAnalytics = lazy(() => import("./pages/AdminSecurityAnalytics"));
+const AdminIPBlocking = lazy(() => import("./pages/AdminIPBlocking"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -80,6 +82,8 @@ const App = () => (
           <Route path="/admin/system-health" element={<ProtectedRoute requireAdmin><AdminSystemHealth /></ProtectedRoute>} />
           <Route path="/admin/user-roles" element={<ProtectedRoute requireAdmin><AdminUserRoles /></ProtectedRoute>} />
           <Route path="/admin/security-monitor" element={<ProtectedRoute requireAdmin><AdminSecurityMonitor /></ProtectedRoute>} />
+          <Route path="/admin/security-analytics" element={<ProtectedRoute requireAdmin><AdminSecurityAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/ip-blocking" element={<ProtectedRoute requireAdmin><AdminIPBlocking /></ProtectedRoute>} />
           <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           <Route path="/admin/smartone-sync" element={<ProtectedRoute requireAdmin><AdminSmartOneSync /></ProtectedRoute>} />
           

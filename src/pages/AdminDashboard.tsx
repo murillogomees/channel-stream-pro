@@ -222,6 +222,24 @@ const AdminDashboard = () => {
                   </Button>
 
                   <Button 
+                    onClick={() => navigate('/admin/security-analytics')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <PieChart className="h-4 w-4 mr-2" />
+                    Analytics de Segurança
+                  </Button>
+
+                  <Button 
+                    onClick={() => navigate('/admin/ip-blocking')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Bloqueio de IPs
+                  </Button>
+
+                  <Button 
                     onClick={() => navigate('/admin/permission-test')} 
                     variant="outline"
                     className="w-full justify-start"
