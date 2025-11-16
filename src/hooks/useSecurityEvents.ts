@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { securityMonitoringService, SecurityEvent } from '@/services/securityMonitoringService';
 import { useToast } from '@/hooks/use-toast';
+import { getSecurityWhatsAppAlertService } from '@/services/securityWhatsAppAlertService';
 
 export const useSecurityEvents = (autoRefresh: boolean = true) => {
   const [events, setEvents] = useState<SecurityEvent[]>([]);
@@ -62,8 +63,14 @@ export const useSecurityEvents = (autoRefresh: boolean = true) => {
             schema: 'public',
             table: 'security_events'
           },
-          (payload) => {
+          async (payload) => {
             const newEvent = payload.new as SecurityEvent;
+            
+            // Process event for WhatsApp alerts
+            const alertService = getSecurityWhatsAppAlertService();
+            alertService.processSecurityEvent(newEvent).catch(error => {
+              console.error('[SecurityAlert] Erro ao processar evento:', error);
+            });
             
             // Show toast for critical events
             if (newEvent.severity === 'critical') {
