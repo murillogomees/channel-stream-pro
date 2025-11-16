@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
@@ -30,9 +31,66 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting check (basic IP-based)
     const requestId = crypto.randomUUID();
     console.log(`[notify-prospect] Request ID: ${requestId}`);
+
+    // Rate limiting: 10 requests per minute per IP
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0); // Start of current minute
+    
+    const { data: existing, error: rateLimitError } = await supabaseService
+      .from('rate_limit_tracking')
+      .select('request_count')
+      .eq('identifier', clientIp)
+      .eq('endpoint', 'notify-prospect')
+      .gte('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    if (rateLimitError) {
+      console.error('[notify-prospect] Rate limit check error:', rateLimitError);
+    }
+
+    const currentCount = existing?.request_count || 0;
+    const rateLimit = 10; // requests per minute
+
+    if (currentCount >= rateLimit) {
+      console.warn(`[notify-prospect] Rate limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Taxa de requisições excedida. Tente novamente em alguns minutos.',
+          retryAfter: 60 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '60'
+          } 
+        }
+      );
+    }
+
+    // Update rate limit counter
+    await supabaseService
+      .from('rate_limit_tracking')
+      .upsert({
+        identifier: clientIp,
+        endpoint: 'notify-prospect',
+        request_count: currentCount + 1,
+        window_start: windowStart.toISOString()
+      }, {
+        onConflict: 'identifier,endpoint,window_start'
+      });
 
     // Validate input
     const body = await req.json();

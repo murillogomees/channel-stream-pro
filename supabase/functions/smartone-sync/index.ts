@@ -56,6 +56,55 @@ serve(async (req) => {
       );
     }
 
+    // Rate limiting: 30 requests per minute per user (higher for admins)
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0);
+    
+    const { data: existing } = await supabaseService
+      .from('rate_limit_tracking')
+      .select('request_count')
+      .eq('identifier', user.id)
+      .eq('endpoint', 'smartone-sync')
+      .gte('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    const currentCount = existing?.request_count || 0;
+    const rateLimit = 30;
+
+    if (currentCount >= rateLimit) {
+      console.warn(`[smartone-sync] Rate limit exceeded for user: ${user.id}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Taxa de requisições excedida. Tente novamente em alguns minutos.',
+          retryAfter: 60 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '60'
+          } 
+        }
+      );
+    }
+
+    await supabaseService
+      .from('rate_limit_tracking')
+      .upsert({
+        identifier: user.id,
+        endpoint: 'smartone-sync',
+        request_count: currentCount + 1,
+        window_start: windowStart.toISOString()
+      }, {
+        onConflict: 'identifier,endpoint,window_start'
+      });
+
     const body = await req.json();
     const validated = syncRequestSchema.parse(body);
     const { mac, usuario, senha, clienteNome } = validated;

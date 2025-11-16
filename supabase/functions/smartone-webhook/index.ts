@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
@@ -35,6 +36,59 @@ serve(async (req) => {
         { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Rate limiting: 100 requests per minute per IP (webhooks can be frequent)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0);
+    
+    const { data: existing } = await supabaseService
+      .from('rate_limit_tracking')
+      .select('request_count')
+      .eq('identifier', clientIp)
+      .eq('endpoint', 'smartone-webhook')
+      .gte('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    const currentCount = existing?.request_count || 0;
+    const rateLimit = 100;
+
+    if (currentCount >= rateLimit) {
+      console.warn(`[smartone-webhook] Rate limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Taxa de requisições excedida',
+          retryAfter: 60 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '60'
+          } 
+        }
+      );
+    }
+
+    await supabaseService
+      .from('rate_limit_tracking')
+      .upsert({
+        identifier: clientIp,
+        endpoint: 'smartone-webhook',
+        request_count: currentCount + 1,
+        window_start: windowStart.toISOString()
+      }, {
+        onConflict: 'identifier,endpoint,window_start'
+      });
 
     const WEBHOOK_SECRET = Deno.env.get('SMARTONE_WEBHOOK_SECRET');
     const body = await req.text();
