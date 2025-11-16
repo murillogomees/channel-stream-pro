@@ -26,6 +26,9 @@ import { Switch } from '@/components/ui/switch';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DatePicker } from '@/components/ui/date-picker';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { format, parseISO } from 'date-fns';
 
 // Schema de validação com segurança contra XSS e injeção
 const clienteSchema = z.object({
@@ -345,7 +348,14 @@ export default function AdminClienteForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone</Label>
-                  <Input id="telefone" {...register('telefone')} />
+                  <PhoneInput
+                    id="telefone"
+                    value={watch('telefone')}
+                    onChange={(value) => setValue('telefone', value)}
+                    mask="brazilian"
+                    placeholder="(11) 99999-9999"
+                  />
+                  {errors.telefone && <p className="text-sm text-destructive">{errors.telefone.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -394,22 +404,23 @@ export default function AdminClienteForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="dataContratacao">Data de Contratação</Label>
-                  <Input 
-                    id="dataContratacao" 
-                    type="date" 
-                    value={watch('dataContratacao') || ''}
-                    onChange={(e) => setValue('dataContratacao', e.target.value)}
+                  <DatePicker
+                    date={watch('dataContratacao') ? parseISO(watch('dataContratacao')) : undefined}
+                    onDateChange={(date) => setValue('dataContratacao', date ? format(date, 'yyyy-MM-dd') : '')}
+                    placeholder="Selecione a data de contratação"
+                    disableFuture
                   />
+                  {errors.dataContratacao && <p className="text-sm text-destructive">{errors.dataContratacao.message}</p>}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="dataVencimento">Data de Vencimento</Label>
-                  <Input 
-                    id="dataVencimento" 
-                    type="date" 
-                    value={watch('dataVencimento') || ''}
-                    onChange={(e) => setValue('dataVencimento', e.target.value)}
+                  <DatePicker
+                    date={watch('dataVencimento') ? parseISO(watch('dataVencimento')) : undefined}
+                    onDateChange={(date) => setValue('dataVencimento', date ? format(date, 'yyyy-MM-dd') : '')}
+                    placeholder="Selecione a data de vencimento"
                   />
+                  {errors.dataVencimento && <p className="text-sm text-destructive">{errors.dataVencimento.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -424,11 +435,11 @@ export default function AdminClienteForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="dataUltimoPagamento">Data do Último Pagamento</Label>
-                  <Input 
-                    id="dataUltimoPagamento" 
-                    type="date" 
-                    value={watch('dataUltimoPagamento') || ''}
-                    onChange={(e) => setValue('dataUltimoPagamento', e.target.value)}
+                  <DatePicker
+                    date={watch('dataUltimoPagamento') ? parseISO(watch('dataUltimoPagamento')) : undefined}
+                    onDateChange={(date) => setValue('dataUltimoPagamento', date ? format(date, 'yyyy-MM-dd') : '')}
+                    placeholder="Selecione a data do último pagamento"
+                    disableFuture
                   />
                 </div>
 

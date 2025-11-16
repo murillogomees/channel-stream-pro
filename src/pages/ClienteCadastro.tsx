@@ -11,10 +11,11 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { z } from "zod";
 import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from "@/utils/passwordSecurity";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 const cadastroSchema = z.object({
   nome: z.string().trim().min(3, "Nome deve ter no mínimo 3 caracteres").max(200, "Nome muito longo"),
-  telefone: z.string().trim().min(10, "Telefone inválido").regex(/^\+?[1-9]\d{1,14}$/, "Formato de telefone inválido"),
+  telefone: z.string().trim().min(10, "Telefone inválido").max(15, "Telefone inválido"),
   email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
   senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(100, "Senha muito longa"),
   confirmarSenha: z.string(),
@@ -280,16 +281,17 @@ const ClienteCadastro = () => {
 
             <div className="space-y-2">
               <Label htmlFor="telefone">WhatsApp * (com DDD)</Label>
-              <Input
+              <PhoneInput
                 id="telefone"
                 value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                placeholder="+5511999999999"
+                onChange={(value) => setFormData({ ...formData, telefone: value })}
+                mask="brazilian"
+                placeholder="(11) 99999-9999"
                 disabled={loading}
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Use formato internacional: +55 11 99999-9999
+                Número do WhatsApp para contato e envio de credenciais
               </p>
             </div>
 

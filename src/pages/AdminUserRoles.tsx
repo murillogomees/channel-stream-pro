@@ -13,8 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Shield, UserPlus, Trash2, RefreshCw, History, Filter, CheckSquare, XSquare } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface UserWithRole {
   id: string;
@@ -386,10 +387,11 @@ const AdminUserRoles = () => {
                     </div>
                     <div>
                       <label className="text-sm text-muted-foreground mb-1 block">Data de Cadastro</label>
-                      <Input
-                        type="date"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
+                      <DatePicker
+                        date={dateFilter ? parseISO(dateFilter) : undefined}
+                        onDateChange={(date) => setDateFilter(date ? format(date, 'yyyy-MM-dd') : '')}
+                        placeholder="Filtrar por data"
+                        className="w-full"
                       />
                     </div>
                   </div>
@@ -575,10 +577,11 @@ const AdminUserRoles = () => {
                     </div>
                     <div>
                       <label className="text-sm text-muted-foreground mb-1 block">Data</label>
-                      <Input
-                        type="date"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
+                      <DatePicker
+                        date={dateFilter ? parseISO(dateFilter) : undefined}
+                        onDateChange={(date) => setDateFilter(date ? format(date, 'yyyy-MM-dd') : '')}
+                        placeholder="Filtrar por data"
+                        className="w-full"
                       />
                     </div>
                   </div>
