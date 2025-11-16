@@ -213,6 +213,15 @@ const AdminDashboard = () => {
                   </Button>
 
                   <Button 
+                    onClick={() => navigate('/admin/security-monitor')} 
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Monitor de Segurança
+                  </Button>
+
+                  <Button 
                     onClick={() => navigate('/admin/permission-test')} 
                     variant="outline"
                     className="w-full justify-start"
