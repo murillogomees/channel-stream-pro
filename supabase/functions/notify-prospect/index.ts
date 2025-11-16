@@ -31,8 +31,8 @@ serve(async (req) => {
 
   try {
     // Rate limiting check (basic IP-based)
-    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
-    console.log(`[notify-prospect] Request from IP: ${clientIp}`);
+    const requestId = crypto.randomUUID();
+    console.log(`[notify-prospect] Request ID: ${requestId}`);
 
     // Validate input
     const body = await req.json();
@@ -109,7 +109,7 @@ Entre em contato com o cliente para concluir o processo! 📞`;
         status: welcomeResponse.ok ? 'success' : 'error',
         response: welcomeData,
       });
-      console.log(`[notify-prospect] Welcome message sent to ${prospectData.celular}: ${welcomeResponse.ok ? 'success' : 'failed'}`);
+      console.log(`[notify-prospect] Welcome message status: ${welcomeResponse.ok ? 'success' : 'failed'}`);
     } catch (error) {
       console.error('[notify-prospect] Error sending welcome message:', error);
       results.push({
@@ -145,9 +145,9 @@ Entre em contato com o cliente para concluir o processo! 📞`;
           status: adminResponse.ok ? 'success' : 'error',
           response: adminData,
         });
-        console.log(`[notify-prospect] Admin notification sent to ${admin.name}: ${adminResponse.ok ? 'success' : 'failed'}`);
+        console.log(`[notify-prospect] Admin notification status: ${adminResponse.ok ? 'success' : 'failed'}`);
       } catch (error) {
-        console.error(`[notify-prospect] Error notifying admin ${admin.name}:`, error);
+        console.error(`[notify-prospect] Error notifying admin:`, error.message);
         results.push({
           type: 'admin_notification',
           to: admin.phone,
