@@ -7,8 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClientes } from '@/hooks/useClientes';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
-import { sendWelcomeMessage } from '@/services/eventNotificationService';
-import { sendClientUpdateMessage } from '@/services/clientUpdateNotificationService';
+import { UpdateNotificationHandler } from '@/services/notifications';
 import { smartoneService } from '@/services/smartoneService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -230,7 +229,8 @@ export default function AdminClienteForm() {
             dataUltimaEdicao: new Date().toISOString(),
           };
 
-          const enviado = await sendClientUpdateMessage(
+          const updateHandler = new UpdateNotificationHandler();
+          const enviado = await updateHandler.sendUpdateNotification(
             clienteAtualizado,
             clienteOriginal,
             addLog

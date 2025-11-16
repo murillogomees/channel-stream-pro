@@ -1,8 +1,7 @@
 import { Cliente } from '@/types/cliente';
-import { WhatsAppConfig, WhatsappTemplate } from '@/types/whatsapp';
+import { WhatsAppConfig } from '@/types/whatsapp';
 import { LastRunState } from '@/types/notificationHistory';
-import { loadTemplates, getDaysUntilDue, sendNotification } from './notificationScheduler';
-import { PaymentDetectionService } from './paymentDetectionService';
+import { PaymentDetector, EventNotificationHandler, DueDateNotificationHandler } from './notifications';
 import { NotificationErrorHandler } from './notificationErrorHandler';
 import { RateLimiter } from '@/utils/rateLimiter';
 
@@ -109,11 +108,11 @@ export class AutoNotificationScheduler {
       console.log(`📋 Total de clientes: ${clientes.length}`);
 
       // 5. Detectar pagamentos
-      const paymentService = new PaymentDetectionService();
-      paymentService.loadPreviousData();
+      const paymentDetector = new PaymentDetector();
+      paymentDetector.loadPreviousData();
       
-      const paidClients = paymentService.hasPreviousData() 
-        ? paymentService.detectPayments(clientes)
+      const paidClients = paymentDetector.hasPreviousData() 
+        ? paymentDetector.detectPayments(clientes)
         : [];
 
       // 6. Limpar histórico de clientes que pagaram
@@ -123,12 +122,12 @@ export class AutoNotificationScheduler {
       }
 
       // 7. Salvar snapshot atual
-      paymentService.saveCurrentData(clientes);
+      paymentDetector.saveCurrentData(clientes);
 
       // 8. Processar eventos especiais (boas-vindas e renovações)
-      const { processEventNotifications } = await import('./eventNotificationService');
+      const eventHandler = new EventNotificationHandler();
       const { addLog } = this.getNotificationLogs();
-      const eventResult = await processEventNotifications(clientes, paidClients, addLog);
+      const eventResult = await eventHandler.processEvents(clientes, paidClients, addLog);
       console.log(`🎉 Eventos processados: ${eventResult.welcomeSent} boas-vindas, ${eventResult.renewalSent} renovações`);
 
       // 9. Processar notificações de vencimento
@@ -152,83 +151,51 @@ export class AutoNotificationScheduler {
   }
 
   private async processNotifications(clientes: Cliente[], config: WhatsAppConfig) {
-    const rateLimiter = new RateLimiter();
-    const { hasSentToday, addNotificationRecord } = this.getNotificationHistory();
+    const dueDateHandler = new DueDateNotificationHandler();
     const { addLog } = this.getNotificationLogs();
+    const { hasNotification, addNotification } = this.getNotificationHistory();
+    const notificationLogs = this.getNotificationLogs().logs;
+    const rateLimiter = new RateLimiter(10, 60000);
 
     let sent = 0;
     let errors = 0;
 
-    const notifications: Array<{
-      cliente: Cliente;
-      template: WhatsappTemplate;
-      daysUntilDue: number;
-    }> = [];
-
-    // Carregar templates atualizados
-    const templates = loadTemplates();
-
-    // Coletar todas as notificações de vencimento a enviar
     for (const cliente of clientes) {
       if (!cliente.dataVencimento) continue;
 
-      const daysUntilDue = getDaysUntilDue(cliente.dataVencimento);
+      for (const daysBeforeDue of config.daysToNotify) {
+        const shouldSend = dueDateHandler.shouldSendNotification(cliente, daysBeforeDue, notificationLogs);
+        
+        if (!shouldSend) continue;
 
-      // Encontrar template de vencimento correspondente
-      const template = templates.find(
-        t => t.eventType === 'expiration' && t.daysBeforeDue === daysUntilDue
-      );
-      if (!template) continue;
+        const alreadySent = hasNotification(cliente.id, cliente.dataVencimento, daysBeforeDue);
+        if (alreadySent) continue;
 
-      // Verificar se está nos dias configurados para notificar
-      if (!config.daysToNotify.includes(daysUntilDue)) continue;
+        try {
+          await rateLimiter.checkLimit('notifications');
 
-      // Verificar se já enviou hoje
-      if (hasSentToday(cliente.id, daysUntilDue)) {
-        console.log(`⏭️ Já enviou para ${cliente.nome} (${daysUntilDue} dias)`);
-        continue;
-      }
+          const success = await dueDateHandler.sendDueDateNotification(cliente, daysBeforeDue, addLog);
 
-      notifications.push({ cliente, template, daysUntilDue });
-    }
-
-    console.log(`📤 ${notifications.length} notificações de vencimento a enviar`);
-
-    // Broadcast batch started
-    if (notifications.length > 0) {
-      try {
-        const { getRealtimeService } = await import('./realtimeNotificationService');
-        const realtimeService = getRealtimeService();
-        await realtimeService.broadcastBatchStarted(notifications.length);
-      } catch (e) {
-        console.error('Erro ao enviar evento realtime batch started:', e);
-      }
-    }
-
-    // Enviar com rate limiting
-    for (const { cliente, template, daysUntilDue } of notifications) {
-      try {
-        await rateLimiter.add(async () => {
-          try {
-            // Preparar variáveis extras
-            const extraVars: Record<string, string> = {
-              linkPagamento: 'https://exemplo.com/pagar', // Pode ser configurável
-              telefone: cliente.telefone || '',
-            };
-
-            const result = await sendNotification(cliente, template, addLog, extraVars);
-            
-            addNotificationRecord(
-              cliente.id,
-              cliente.dataVencimento!,
-              daysUntilDue,
-              template.id,
-              true
-            );
-
+          if (success) {
             sent++;
-            console.log(`✅ Enviado para ${cliente.nome}: ${template.name}`);
-            return result;
+            addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, true);
+          } else {
+            errors++;
+            addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, false);
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (error) {
+          console.error(`Erro ao enviar para ${cliente.nome}:`, error);
+          this.errorHandler.logError(cliente, error as Error);
+          errors++;
+          addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, false);
+        }
+      }
+    }
+
+    return { sent, errors };
+  }
           } catch (error) {
             this.errorHandler.logError(cliente, error as Error);
             
