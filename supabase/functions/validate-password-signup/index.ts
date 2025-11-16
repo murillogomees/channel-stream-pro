@@ -2,6 +2,43 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
+// Helper to log security events
+async function logSecurityEvent(
+  supabase: any,
+  eventType: string,
+  severity: string,
+  ipAddress: string,
+  details: any
+) {
+  try {
+    await supabase.from('security_events').insert({
+      event_type: eventType,
+      severity,
+      ip_address: ipAddress,
+      event_details: details
+    });
+  } catch (error) {
+    console.error('[Security] Failed to log event:', error);
+  }
+}
+
+// Helper to check if IP is blocked
+async function checkIPBlocked(supabase: any, ipAddress: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('ip_blacklist')
+      .select('id')
+      .eq('ip_address', ipAddress)
+      .is('unblocked_at', null)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .maybeSingle();
+
+    return !error && !!data;
+  } catch {
+    return false;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -59,15 +96,35 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting: 5 requests per minute per IP (strict to prevent brute force)
+    // Get client IP
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
                      req.headers.get('x-real-ip') || 
                      'unknown';
-    
+
+    // Create service client for security checks
     const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Check if IP is blocked
+    const isBlocked = await checkIPBlocked(supabaseService, clientIp);
+    if (isBlocked) {
+      await logSecurityEvent(
+        supabaseService,
+        'unauthorized_access',
+        'warning',
+        clientIp,
+        { endpoint: 'validate-password-signup', reason: 'blocked_ip' }
+      );
+
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting: 5 requests per minute per IP (strict to prevent brute force)
 
     const windowStart = new Date();
     windowStart.setSeconds(0, 0);

@@ -2,6 +2,45 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
+// Helper to log security events
+async function logSecurityEvent(
+  supabase: any,
+  eventType: string,
+  severity: string,
+  ipAddress: string,
+  userId: string | undefined,
+  details: any
+) {
+  try {
+    await supabase.from('security_events').insert({
+      event_type: eventType,
+      severity,
+      ip_address: ipAddress,
+      user_id: userId,
+      event_details: details
+    });
+  } catch (error) {
+    console.error('[Security] Failed to log event:', error);
+  }
+}
+
+// Helper to check if IP is blocked
+async function checkIPBlocked(supabase: any, ipAddress: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('ip_blacklist')
+      .select('id')
+      .eq('ip_address', ipAddress)
+      .is('unblocked_at', null)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .maybeSingle();
+
+    return !error && !!data;
+  } catch {
+    return false;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,7 +59,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verificar autenticação e permissão de admin
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -28,6 +66,11 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Get client IP
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -38,6 +81,21 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     
     if (userError || !user) {
+      // Log failed authentication
+      const supabaseService = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      await logSecurityEvent(
+        supabaseService,
+        'unauthorized_access',
+        'warning',
+        clientIp,
+        undefined,
+        { endpoint: 'smartone-sync', reason: 'invalid_token' }
+      );
+
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -50,17 +108,52 @@ serve(async (req) => {
 
     if (roleError || !isAdmin) {
       console.error('[smartone-sync] Permission denied for user:', user.id);
+      
+      // Log unauthorized admin access attempt
+      const supabaseService = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      await logSecurityEvent(
+        supabaseService,
+        'unauthorized_access',
+        'warning',
+        clientIp,
+        user.id,
+        { endpoint: 'smartone-sync', reason: 'not_admin', userId: user.id }
+      );
+
       return new Response(
         JSON.stringify({ error: 'Permissão negada. Apenas administradores.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Rate limiting: 30 requests per minute per user (higher for admins)
+    // Check if IP is blocked (admin should rarely be blocked, but check anyway)
     const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+
+    const isBlocked = await checkIPBlocked(supabaseService, clientIp);
+    if (isBlocked) {
+      await logSecurityEvent(
+        supabaseService,
+        'unauthorized_access',
+        'critical',
+        clientIp,
+        user.id,
+        { endpoint: 'smartone-sync', reason: 'blocked_ip' }
+      );
+
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting: 30 requests per minute per user (higher for admins)
 
     const windowStart = new Date();
     windowStart.setSeconds(0, 0);
