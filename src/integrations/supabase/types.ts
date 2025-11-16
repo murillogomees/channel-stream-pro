@@ -614,6 +614,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_alert_templates: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          event_type: string
+          id: string
+          message_template: string
+          template_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          event_type: string
+          id?: string
+          message_template: string
+          template_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          event_type?: string
+          id?: string
+          message_template?: string
+          template_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       security_events: {
         Row: {
           created_at: string

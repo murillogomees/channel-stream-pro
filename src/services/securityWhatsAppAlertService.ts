@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppAdapter } from "./notifications/core/WhatsAppAdapter";
 import { SecurityEvent } from "./securityMonitoringService";
+import { SecurityAlertTemplate } from "@/types/securityAlert";
 
 interface AdminPhone {
   id: string;
@@ -86,7 +87,7 @@ class SecurityWhatsAppAlertService {
         return;
       }
 
-      const message = this.formatAlertMessage(event);
+      const message = await this.formatAlertMessage(event);
 
       // Envia para todos os admins ativos em paralelo
       const sendPromises = admins.map(admin => 
@@ -123,9 +124,78 @@ class SecurityWhatsAppAlertService {
   }
 
   /**
-   * Formata mensagem de alerta
+   * Formata mensagem de alerta usando template customizado
    */
-  private formatAlertMessage(event: SecurityEvent): string {
+  private async formatAlertMessage(event: SecurityEvent): Promise<string> {
+    // Busca template customizado
+    const template = await this.getTemplate(event.event_type);
+    
+    if (!template) {
+      // Fallback para mensagem padrão se não houver template
+      return this.formatDefaultMessage(event);
+    }
+
+    // Substitui variáveis no template
+    return this.fillTemplate(template.message_template, event);
+  }
+
+  /**
+   * Busca template para tipo de evento
+   */
+  private async getTemplate(eventType: string): Promise<SecurityAlertTemplate | null> {
+    try {
+      const { data, error } = await supabase
+        .from('security_alert_templates')
+        .select('*')
+        .eq('event_type', eventType)
+        .eq('enabled', true)
+        .single();
+
+      if (error) {
+        console.log('[SecurityAlert] Template não encontrado para', eventType);
+        return null;
+      }
+
+      return data as SecurityAlertTemplate;
+    } catch (error) {
+      console.error('[SecurityAlert] Erro ao buscar template:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Preenche template com dados do evento
+   */
+  private fillTemplate(template: string, event: SecurityEvent): string {
+    const timestamp = new Date(event.created_at).toLocaleString('pt-BR');
+    
+    let message = template;
+    
+    // Variáveis comuns
+    message = message.replace(/{timestamp}/g, timestamp);
+    message = message.replace(/{severity}/g, event.severity.toUpperCase());
+    message = message.replace(/{ip_address}/g, event.ip_address || 'N/A');
+    message = message.replace(/{event_type}/g, this.getEventTypeLabel(event.event_type));
+
+    // Variáveis específicas por tipo
+    if (event.event_details) {
+      const details = event.event_details as any;
+      
+      message = message.replace(/{email}/g, details.email || 'N/A');
+      message = message.replace(/{old_role}/g, details.old_role || 'N/A');
+      message = message.replace(/{new_role}/g, details.new_role || 'N/A');
+      message = message.replace(/{description}/g, details.description || 'N/A');
+      message = message.replace(/{endpoint}/g, details.endpoint || 'N/A');
+      message = message.replace(/{resource}/g, details.resource || 'N/A');
+    }
+
+    return message;
+  }
+
+  /**
+   * Mensagem padrão (fallback)
+   */
+  private formatDefaultMessage(event: SecurityEvent): string {
     const timestamp = new Date(event.created_at).toLocaleString('pt-BR');
     const severityEmoji = event.severity === 'critical' ? '🚨' : '⚠️';
     
@@ -138,45 +208,7 @@ class SecurityWhatsAppAlertService {
       message += `*IP:* ${event.ip_address}\n`;
     }
 
-    // Detalhes específicos por tipo de evento
-    switch (event.event_type) {
-      case 'failed_login':
-        if (event.event_details?.email) {
-          message += `*Email:* ${event.event_details.email}\n`;
-        }
-        message += `\n⚠️ Múltiplas tentativas de login falharam.`;
-        break;
-
-      case 'permission_change':
-        if (event.event_details?.old_role && event.event_details?.new_role) {
-          message += `*Mudança:* ${event.event_details.old_role} → ${event.event_details.new_role}\n`;
-        }
-        message += `\n🔐 Permissões de usuário foram alteradas.`;
-        break;
-
-      case 'suspicious_activity':
-        if (event.event_details?.description) {
-          message += `*Descrição:* ${event.event_details.description}\n`;
-        }
-        message += `\n🕵️ Atividade suspeita detectada no sistema.`;
-        break;
-
-      case 'rate_limit_exceeded':
-        if (event.event_details?.endpoint) {
-          message += `*Endpoint:* ${event.event_details.endpoint}\n`;
-        }
-        message += `\n⏱️ Limite de requisições excedido.`;
-        break;
-
-      case 'unauthorized_access':
-        if (event.event_details?.resource) {
-          message += `*Recurso:* ${event.event_details.resource}\n`;
-        }
-        message += `\n🚫 Tentativa de acesso não autorizado.`;
-        break;
-    }
-
-    message += `\n\n_Acesse o painel de segurança para mais detalhes._`;
+    message += `\n_Acesse o painel de segurança para mais detalhes._`;
 
     return message;
   }
