@@ -19,3 +19,7 @@ verify_jwt = false
 # Public endpoint for secure signup with HIBP validation
 [functions.validate-password-signup]
 verify_jwt = false
+
+# Cron job for escalating security alerts - public for cron access
+[functions.escalate-security-alerts]
+verify_jwt = false

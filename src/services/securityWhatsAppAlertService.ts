@@ -22,6 +22,16 @@ interface AlertConfig {
   notification_channels: string[];
 }
 
+interface AlertDelivery {
+  id: string;
+  security_event_id: string;
+  admin_phone_id: string;
+  sent_at: string;
+  confirmed_at?: string;
+  escalated: boolean;
+  delivery_status: string;
+}
+
 class SecurityWhatsAppAlertService {
   private whatsAppAdapter: WhatsAppAdapter;
   private alertCooldown = 10 * 60 * 1000; // 10 minutos entre alertas do mesmo tipo
@@ -116,10 +126,55 @@ class SecurityWhatsAppAlertService {
     try {
       await this.whatsAppAdapter.sendText(admin.phone, message);
       
-      // Log do envio
+      // Registra entrega para tracking de confirmação
+      await this.recordDelivery(event.id, admin.id, 'sent');
+      
       console.log(`[SecurityAlert] Alerta enviado para ${admin.name} (${admin.phone})`);
     } catch (error) {
+      await this.recordDelivery(event.id, admin.id, 'failed', error as Error);
       console.error(`[SecurityAlert] Falha ao enviar para ${admin.name}:`, error);
+    }
+  }
+
+  /**
+   * Registra entrega de alerta
+   */
+  private async recordDelivery(
+    eventId: string,
+    adminId: string,
+    status: string,
+    error?: Error
+  ): Promise<void> {
+    try {
+      await supabase
+        .from('security_alert_deliveries')
+        .insert({
+          security_event_id: eventId,
+          admin_phone_id: adminId,
+          delivery_status: status,
+          error_message: error?.message,
+        });
+    } catch (error) {
+      console.error('[SecurityAlert] Erro ao registrar entrega:', error);
+    }
+  }
+
+  /**
+   * Confirma recebimento de alerta (webhook ou API)
+   */
+  async confirmDelivery(deliveryId: string): Promise<void> {
+    try {
+      await supabase
+        .from('security_alert_deliveries')
+        .update({ 
+          confirmed_at: new Date().toISOString(),
+          delivery_status: 'confirmed'
+        })
+        .eq('id', deliveryId);
+      
+      console.log(`[SecurityAlert] Entrega confirmada: ${deliveryId}`);
+    } catch (error) {
+      console.error('[SecurityAlert] Erro ao confirmar entrega:', error);
     }
   }
 
