@@ -59,6 +59,59 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting: 5 requests per minute per IP (strict to prevent brute force)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0);
+    
+    const { data: existing } = await supabaseService
+      .from('rate_limit_tracking')
+      .select('request_count')
+      .eq('identifier', clientIp)
+      .eq('endpoint', 'validate-password-signup')
+      .gte('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    const currentCount = existing?.request_count || 0;
+    const rateLimit = 5;
+
+    if (currentCount >= rateLimit) {
+      console.warn(`[Auth] Rate limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Muitas tentativas de cadastro. Tente novamente em alguns minutos.',
+          retryAfter: 60 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '60'
+          } 
+        }
+      );
+    }
+
+    await supabaseService
+      .from('rate_limit_tracking')
+      .upsert({
+        identifier: clientIp,
+        endpoint: 'validate-password-signup',
+        request_count: currentCount + 1,
+        window_start: windowStart.toISOString()
+      }, {
+        onConflict: 'identifier,endpoint,window_start'
+      });
+
     const { email, password, nome, telefone } = await req.json();
 
     console.log(`[Auth] Starting signup for email: ${email}`);

@@ -62,11 +62,56 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Rate limiting: 30 requests per minute per user (higher for admins)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0);
+    
+    const { data: existing } = await supabase
+      .from('rate_limit_tracking')
+      .select('request_count')
+      .eq('identifier', user.id)
+      .eq('endpoint', 'sync-new-client')
+      .gte('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    const currentCount = existing?.request_count || 0;
+    const rateLimit = 30;
+
+    if (currentCount >= rateLimit) {
+      console.warn(`[sync-new-client] Rate limit exceeded for user: ${user.id}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Taxa de requisições excedida. Tente novamente em alguns minutos.',
+          retryAfter: 60 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': '60'
+          } 
+        }
+      );
+    }
+
+    await supabase
+      .from('rate_limit_tracking')
+      .upsert({
+        identifier: user.id,
+        endpoint: 'sync-new-client',
+        request_count: currentCount + 1,
+        window_start: windowStart.toISOString()
+      }, {
+        onConflict: 'identifier,endpoint,window_start'
+      });
+
     const smartoneApiBase = Deno.env.get('SMARTONE_API_BASE_URL')!;
     const smartoneClientApi = Deno.env.get('SMARTONE_CLIENT_API')!;
     const smartoneKeyApi = Deno.env.get('SMARTONE_KEY_API')!;
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const body = await req.json();
     const validated = clientSchema.parse(body);
