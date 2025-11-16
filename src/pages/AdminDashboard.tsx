@@ -58,12 +58,20 @@ const AdminDashboard = () => {
 
   const handleClearCache = () => {
     try {
-      // Limpar localStorage (exceto autenticação)
-      const authData = localStorage.getItem('adminAuth');
+      // Limpar apenas cache de aplicação, nunca dados de autenticação
+      const keysToKeep = ['supabase.auth.token'];
+      const tempStorage: Record<string, string> = {};
+      
+      keysToKeep.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value) tempStorage[key] = value;
+      });
+      
       localStorage.clear();
-      if (authData) {
-        localStorage.setItem('adminAuth', authData);
-      }
+      
+      Object.entries(tempStorage).forEach(([key, value]) => {
+        localStorage.setItem(key, value);
+      });
 
       // Limpar sessionStorage
       sessionStorage.clear();

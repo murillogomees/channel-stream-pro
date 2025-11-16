@@ -24,7 +24,7 @@ export interface MetricsSnapshotRecord {
   latency_history: number[];
   total_events_sent: number;
   total_events_received: number;
-  failed_events: number;
+  events_failed?: number;
   current_status: string;
   fallback_mode_activations: number;
   created_at?: string;
@@ -112,7 +112,7 @@ class MetricsPersistenceService {
         latency_history: metrics.latencyHistory,
         total_events_sent: metrics.totalEventsSent,
         total_events_received: metrics.totalEventsReceived,
-        failed_events: metrics.failedEvents,
+        events_failed: metrics.failedEvents || 0,
         current_status: metrics.currentStatus,
         fallback_mode_activations: metrics.fallbackModeActivations,
       };
