@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from "@/utils/passwordSecurity";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 
 const loginSchema = z.object({
   email: z.string()
@@ -306,6 +307,7 @@ const Auth = () => {
                         required
                       />
                     </div>
+                    <PasswordStrengthIndicator password={signupPassword} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirm-password" className="text-foreground">Confirmar senha</Label>

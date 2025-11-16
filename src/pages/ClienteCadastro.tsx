@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { z } from "zod";
 import { isCompromisedPasswordError, getCompromisedPasswordMessage, generatePasswordSuggestions } from "@/utils/passwordSecurity";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 
 const cadastroSchema = z.object({
   nome: z.string().trim().min(3, "Nome deve ter no mínimo 3 caracteres").max(200, "Nome muito longo"),
@@ -319,6 +320,7 @@ const ClienteCadastro = () => {
                 disabled={loading}
                 required
               />
+              <PasswordStrengthIndicator password={formData.senha} />
             </div>
 
             <div className="space-y-2">
