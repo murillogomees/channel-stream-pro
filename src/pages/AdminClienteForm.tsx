@@ -282,32 +282,9 @@ export default function AdminClienteForm() {
         }
       }
 
-      // Enviar mensagem de boas-vindas se checkbox estiver marcado
+      // Boas-vindas serão enviadas automaticamente pelo EventNotificationHandler
       if (enviarWhatsApp) {
-        try {
-          const clienteCompleto: Cliente = {
-            ...clienteData,
-            id: novoCliente.id,
-            dataCadastro: novoCliente.dataCadastro,
-            dataUltimaEdicao: novoCliente.dataUltimaEdicao,
-          };
-
-          const enviado = await sendWelcomeMessage(clienteCompleto, addLog);
-          
-          if (enviado) {
-            toast({
-              title: 'Mensagem de boas-vindas enviada',
-              description: `WhatsApp enviado para ${clienteData.nome}`,
-            });
-          }
-        } catch (error) {
-          console.error('Erro ao enviar mensagem de boas-vindas:', error);
-          toast({
-            title: 'Aviso',
-            description: 'Cliente cadastrado, mas houve erro ao enviar mensagem de boas-vindas.',
-            variant: 'destructive',
-          });
-        }
+        console.log('Boas-vindas serão enviadas automaticamente pelo sistema');
       }
     }
     navigate('/admin/clientes');
