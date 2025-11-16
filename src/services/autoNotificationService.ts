@@ -6,7 +6,7 @@ import { NotificationErrorHandler } from './notificationErrorHandler';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 const LAST_RUN_KEY = 'auto_notification_last_run';
-const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutos - verificar com mais frequência
+const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
 export class AutoNotificationScheduler {
   private intervalId: NodeJS.Timeout | null = null;
@@ -46,7 +46,6 @@ export class AutoNotificationScheduler {
       this.checkAndSend();
     }, CHECK_INTERVAL);
 
-    // Executar uma verificação imediatamente ao iniciar
     setTimeout(() => this.checkAndSend(), 5000);
   }
 
@@ -67,7 +66,6 @@ export class AutoNotificationScheduler {
     this.isRunning = true;
 
     try {
-      // 1. Buscar configurações
       const config = this.getConfig();
       if (!config.autoSendEnabled) {
         console.log('⚫ Envio automático desabilitado');
@@ -81,20 +79,17 @@ export class AutoNotificationScheduler {
         return;
       }
 
-      // 2. Verificar horário - deve executar exatamente no horário configurado
       const now = new Date();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
-      
-      // Só executar se estiver na hora certa (entre :00 e :05)
+
       if (currentHour !== config.sendHour || currentMinute > 5) {
         console.log(`⏰ Fora do horário de envio. Atual: ${currentHour}:${currentMinute}, Configurado: ${config.sendHour}:00`);
         this.isRunning = false;
         return;
       }
 
-      // 3. Verificar se já executou hoje
-      const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = now.toISOString().split('T')[0];
       if (this.lastRunState?.lastRunDate === today) {
         console.log('✅ Já executou envio automático hoje');
         this.isRunning = false;
@@ -103,46 +98,40 @@ export class AutoNotificationScheduler {
 
       console.log(`🎯 Iniciando envio automático às ${currentHour}h`);
 
-      // 4. Buscar clientes
       const clientes = this.getClientes();
       console.log(`📋 Total de clientes: ${clientes.length}`);
 
-      // 5. Detectar pagamentos
       const paymentDetector = new PaymentDetector();
       paymentDetector.loadPreviousData();
-      
-      const paidClients = paymentDetector.hasPreviousData() 
+
+      const paidClients = paymentDetector.hasPreviousData()
         ? paymentDetector.detectPayments(clientes)
         : [];
 
-      // 6. Limpar histórico de clientes que pagaram
+      console.log(`💰 Pagamentos detectados: ${paidClients.length}`);
+
       const { clearClientHistory } = this.getNotificationHistory();
       for (const cliente of paidClients) {
         clearClientHistory(cliente.id);
       }
 
-      // 7. Salvar snapshot atual
       paymentDetector.saveCurrentData(clientes);
 
-      // 8. Processar eventos especiais (boas-vindas e renovações)
       const eventHandler = new EventNotificationHandler();
       const { addLog } = this.getNotificationLogs();
       const eventResult = await eventHandler.processEvents(clientes, paidClients, addLog);
       console.log(`🎉 Eventos processados: ${eventResult.welcomeSent} boas-vindas, ${eventResult.renewalSent} renovações`);
 
-      // 9. Processar notificações de vencimento
       const result = await this.processNotifications(clientes, config);
 
-      // 10. Salvar estado de execução
       this.saveLastRunState({
-        lastRunDate: now.toISOString().split('T')[0],
-        lastRunHour: config.sendHour,
-        totalSent: result.sent + eventResult.welcomeSent + eventResult.renewalSent,
+        lastRunDate: today,
+        lastRunHour: currentHour,
+        totalSent: result.sent,
         errors: result.errors,
       });
 
-      console.log(`✅ Envio automático concluído: ${result.sent} vencimentos, ${eventResult.welcomeSent} boas-vindas, ${eventResult.renewalSent} renovações, ${result.errors} erros`);
-
+      console.log(`✅ Envio automático concluído: ${result.sent} enviados, ${result.errors} erros`);
     } catch (error) {
       console.error('❌ Erro no envio automático:', error);
     } finally {
@@ -150,12 +139,12 @@ export class AutoNotificationScheduler {
     }
   }
 
-  private async processNotifications(clientes: Cliente[], config: WhatsAppConfig) {
+  private async processNotifications(clientes: Cliente[], config: WhatsAppConfig): Promise<{ sent: number; errors: number }> {
     const dueDateHandler = new DueDateNotificationHandler();
     const { addLog } = this.getNotificationLogs();
     const { hasNotification, addNotification } = this.getNotificationHistory();
     const notificationLogs = this.getNotificationLogs().logs;
-    const rateLimiter = new RateLimiter(10, 60000);
+    const rateLimiter = new RateLimiter();
 
     let sent = 0;
     let errors = 0;
@@ -165,26 +154,24 @@ export class AutoNotificationScheduler {
 
       for (const daysBeforeDue of config.daysToNotify) {
         const shouldSend = dueDateHandler.shouldSendNotification(cliente, daysBeforeDue, notificationLogs);
-        
+
         if (!shouldSend) continue;
 
         const alreadySent = hasNotification(cliente.id, cliente.dataVencimento, daysBeforeDue);
         if (alreadySent) continue;
 
         try {
-          await rateLimiter.checkLimit('notifications');
+          await rateLimiter.add(async () => {
+            const success = await dueDateHandler.sendDueDateNotification(cliente, daysBeforeDue, addLog);
 
-          const success = await dueDateHandler.sendDueDateNotification(cliente, daysBeforeDue, addLog);
-
-          if (success) {
-            sent++;
-            addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, true);
-          } else {
-            errors++;
-            addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, false);
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 2000));
+            if (success) {
+              sent++;
+              addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, true);
+            } else {
+              errors++;
+              addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, false);
+            }
+          });
         } catch (error) {
           console.error(`Erro ao enviar para ${cliente.nome}:`, error);
           this.errorHandler.logError(cliente, error as Error);
@@ -196,131 +183,98 @@ export class AutoNotificationScheduler {
 
     return { sent, errors };
   }
-          } catch (error) {
-            this.errorHandler.logError(cliente, error as Error);
-            
-            addNotificationRecord(
-              cliente.id,
-              cliente.dataVencimento!,
-              daysUntilDue,
-              template.id,
-              false
-            );
-
-            errors++;
-            console.error(`❌ Erro ao enviar para ${cliente.nome}:`, error);
-            throw error;
-          }
-        });
-      } catch (error) {
-        // Erro já foi logado dentro do rateLimiter
-      }
-    }
-
-    // Broadcast batch completed
-    if (notifications.length > 0) {
-      try {
-        const { getRealtimeService } = await import('./realtimeNotificationService');
-        const realtimeService = getRealtimeService();
-        await realtimeService.broadcastBatchCompleted(sent, errors);
-      } catch (e) {
-        console.error('Erro ao enviar evento realtime batch completed:', e);
-      }
-    }
-
-    return { sent, errors };
-  }
 
   private getConfig(): WhatsAppConfig {
     const stored = localStorage.getItem('whatsapp_config');
-    if (stored) {
-      return JSON.parse(stored);
+    if (!stored) {
+      return {
+        appkey: '',
+        authkey: '',
+        enabled: false,
+        autoSendEnabled: false,
+        sendHour: 9,
+        daysToNotify: [],
+        testPhoneNumber: '',
+        testContacts: [],
+      };
     }
-    return {
-      appkey: '',
-      authkey: '',
-      enabled: false,
-      autoSendEnabled: false,
-      sendHour: 10,
-      daysToNotify: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-      testPhoneNumber: '5561996975924',
-      testContacts: [],
-    };
+    return JSON.parse(stored);
   }
 
   private getClientes(): Cliente[] {
     const stored = localStorage.getItem('clientes');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    return [];
+    return stored ? JSON.parse(stored) : [];
   }
 
   private getNotificationHistory() {
-    // Importar dinamicamente para evitar circular dependency
-    const stored = localStorage.getItem('notification_history');
-    const history = stored ? JSON.parse(stored) : {};
+    const HISTORY_KEY = 'notification_history';
 
     return {
-      hasSentToday: (clienteId: string, daysBeforeDue: number) => {
+      hasNotification: (clienteId: string, dataVencimento: string, daysBeforeDue: number): boolean => {
+        const stored = localStorage.getItem(HISTORY_KEY);
+        if (!stored) return false;
+
+        const history = JSON.parse(stored);
         const clientHistory = history[clienteId];
-        if (!clientHistory) return false;
 
-        const today = new Date().toISOString().split('T')[0];
-        return clientHistory.notificacoesEnviadas.some((record: any) => {
-          const recordDate = new Date(record.sentAt).toISOString().split('T')[0];
-          return recordDate === today && record.daysBeforeDue === daysBeforeDue && record.success;
-        });
-      },
-      addNotificationRecord: (
-        clienteId: string,
-        dataVencimento: string,
-        daysBeforeDue: number,
-        templateId: string,
-        success: boolean
-      ) => {
-        const clientHistory = history[clienteId] || {
-          clienteId,
-          dataVencimentoAtual: dataVencimento,
-          notificacoesEnviadas: [],
-        };
-
-        if (clientHistory.dataVencimentoAtual !== dataVencimento) {
-          clientHistory.notificacoesEnviadas = [];
-          clientHistory.dataVencimentoAtual = dataVencimento;
+        if (!clientHistory || clientHistory.dataVencimentoAtual !== dataVencimento) {
+          return false;
         }
 
-        clientHistory.notificacoesEnviadas.push({
+        return clientHistory.notificacoesEnviadas.some((n: any) => n.daysBeforeDue === daysBeforeDue);
+      },
+
+      addNotification: (clienteId: string, dataVencimento: string, daysBeforeDue: number, success: boolean) => {
+        const stored = localStorage.getItem(HISTORY_KEY);
+        const history = stored ? JSON.parse(stored) : {};
+
+        if (!history[clienteId] || history[clienteId].dataVencimentoAtual !== dataVencimento) {
+          history[clienteId] = {
+            clienteId,
+            dataVencimentoAtual: dataVencimento,
+            notificacoesEnviadas: [],
+          };
+        }
+
+        history[clienteId].notificacoesEnviadas.push({
           daysBeforeDue,
           sentAt: new Date().toISOString(),
-          templateId,
           success,
         });
 
-        history[clienteId] = clientHistory;
-        localStorage.setItem('notification_history', JSON.stringify(history));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       },
+
       clearClientHistory: (clienteId: string) => {
+        const stored = localStorage.getItem(HISTORY_KEY);
+        if (!stored) return;
+
+        const history = JSON.parse(stored);
         delete history[clienteId];
-        localStorage.setItem('notification_history', JSON.stringify(history));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       },
     };
   }
 
   private getNotificationLogs() {
-    return {
-      addLog: (log: any) => {
-        const stored = localStorage.getItem('notification_logs');
-        const logs = stored ? JSON.parse(stored) : [];
-        
-        const newLog = {
-          ...log,
-          id: crypto.randomUUID(),
-          dataEnvio: new Date().toISOString(),
-        };
+    const LOGS_KEY = 'notification_logs';
 
-        logs.unshift(newLog);
-        localStorage.setItem('notification_logs', JSON.stringify(logs.slice(0, 1000)));
+    return {
+      logs: (() => {
+        const stored = localStorage.getItem(LOGS_KEY);
+        return stored ? JSON.parse(stored) : [];
+      })(),
+
+      addLog: (log: any) => {
+        const stored = localStorage.getItem(LOGS_KEY);
+        const logs = stored ? JSON.parse(stored) : [];
+        logs.unshift(log);
+
+        if (logs.length > 1000) {
+          logs.splice(1000);
+        }
+
+        localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
       },
     };
   }
@@ -333,16 +287,18 @@ export class AutoNotificationScheduler {
     return this.lastRunState;
   }
 
-  getNextRunTime(config: WhatsAppConfig): Date {
-    const now = new Date();
-    const next = new Date();
-    next.setHours(config.sendHour, 0, 0, 0);
+  getNextRunTime(config: WhatsAppConfig): Date | null {
+    if (!config.autoSendEnabled) return null;
 
-    if (next <= now) {
-      next.setDate(next.getDate() + 1);
+    const now = new Date();
+    const nextRun = new Date();
+    nextRun.setHours(config.sendHour, 0, 0, 0);
+
+    if (nextRun <= now) {
+      nextRun.setDate(nextRun.getDate() + 1);
     }
 
-    return next;
+    return nextRun;
   }
 
   getErrorHandler(): NotificationErrorHandler {
