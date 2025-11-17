@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -55,11 +55,13 @@ export default function AdminM3ULists() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingList, setEditingList] = useState<M3UList | null>(null);
   const [listName, setListName] = useState('');
   const [listUrl, setListUrl] = useState('');
   const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
   const [priority, setPriority] = useState(0);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isTestingUrl, setIsTestingUrl] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -125,6 +127,76 @@ export default function AdminM3ULists() {
     }
   };
 
+  const testUrlConnectivity = async () => {
+    if (!listUrl.trim()) {
+      toast.error('Informe uma URL para testar');
+      return;
+    }
+
+    const validation = m3uUrlSchema.safeParse({
+      name: listName || 'temp',
+      url: listUrl
+    });
+
+    if (!validation.success) {
+      toast.error('URL inválida', {
+        description: 'Corrija a URL antes de testar a conectividade'
+      });
+      return;
+    }
+
+    try {
+      setIsTestingUrl(true);
+      
+      // Tentar fazer requisição HEAD para verificar se o endpoint está acessível
+      const response = await fetch(listUrl, {
+        method: 'HEAD',
+        mode: 'no-cors', // Evitar problemas com CORS
+      });
+
+      toast.success('URL acessível!', {
+        description: 'O endpoint M3U está disponível e pode ser usado'
+      });
+    } catch (error: any) {
+      console.error('Erro ao testar URL:', error);
+      toast.warning('Não foi possível verificar a conectividade', {
+        description: 'A URL pode estar protegida por CORS. Você ainda pode salvá-la, mas recomendamos verificar manualmente se funciona.'
+      });
+    } finally {
+      setIsTestingUrl(false);
+    }
+  };
+
+  const handleOpenDialog = (list?: M3UList) => {
+    if (list) {
+      // Modo edição
+      setEditingList(list);
+      setListName(list.name);
+      setListUrl(list.file_url);
+      setPlanType(list.plan_type as any || 'teste');
+      setPriority(list.priority || 0);
+    } else {
+      // Modo criação
+      setEditingList(null);
+      setListName('');
+      setListUrl('');
+      setPlanType('teste');
+      setPriority(0);
+    }
+    setValidationError(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingList(null);
+    setListName('');
+    setListUrl('');
+    setPlanType('teste');
+    setPriority(0);
+    setValidationError(null);
+  };
+
   const handleSaveList = async () => {
     // Validações
     const validation = m3uUrlSchema.safeParse({
@@ -143,41 +215,56 @@ export default function AdminM3ULists() {
     try {
       setIsSaving(true);
 
-      // Criar registro no banco de dados com URL direta
-      const { data: insertData, error: insertError } = await supabase
-        .from('m3u_lists')
-        .insert([
-          {
+      if (editingList) {
+        // Modo edição
+        const { error: updateError } = await supabase
+          .from('m3u_lists')
+          .update({
             name: listName.trim(),
             file_url: listUrl.trim(),
-            status: 'active',
             plan_type: planType,
             priority: priority,
-          }
-        ])
-        .select()
-        .single();
+          })
+          .eq('id', editingList.id);
 
-      if (insertError) {
-        console.error('Erro ao criar registro:', insertError);
-        throw new Error(`Falha ao registrar lista: ${insertError.message}`);
+        if (updateError) {
+          console.error('Erro ao atualizar registro:', updateError);
+          throw new Error(`Falha ao atualizar lista: ${updateError.message}`);
+        }
+
+        toast.success('Lista M3U atualizada com sucesso!', {
+          description: `${listName} foi atualizada`
+        });
+      } else {
+        // Modo criação
+        const { error: insertError } = await supabase
+          .from('m3u_lists')
+          .insert([
+            {
+              name: listName.trim(),
+              file_url: listUrl.trim(),
+              status: 'active',
+              plan_type: planType,
+              priority: priority,
+            }
+          ]);
+
+        if (insertError) {
+          console.error('Erro ao criar registro:', insertError);
+          throw new Error(`Falha ao registrar lista: ${insertError.message}`);
+        }
+
+        toast.success('Lista M3U criada com sucesso!', {
+          description: `${listName} foi adicionada ao sistema`
+        });
       }
-
-      toast.success('Lista M3U criada com sucesso!', {
-        description: `${listName} foi adicionada ao sistema`
-      });
       
-      setIsDialogOpen(false);
-      setListName('');
-      setListUrl('');
-      setPlanType('teste');
-      setPriority(0);
-      setValidationError(null);
+      handleCloseDialog();
       loadLists();
     } catch (error: any) {
-      console.error('Error creating M3U list:', error);
+      console.error('Error saving M3U list:', error);
       
-      let errorMessage = 'Erro desconhecido ao criar lista';
+      let errorMessage = 'Erro desconhecido ao salvar lista';
       
       if (error.message) {
         errorMessage = error.message;
@@ -196,7 +283,7 @@ export default function AdminM3ULists() {
         errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
       }
 
-      toast.error('Erro ao criar lista M3U', {
+      toast.error(`Erro ao ${editingList ? 'atualizar' : 'criar'} lista M3U`, {
         description: errorMessage,
         duration: 5000,
       });
@@ -318,7 +405,7 @@ export default function AdminM3ULists() {
           <Button variant="outline" onClick={() => navigate('/admin/dashboard')}>
             Voltar
           </Button>
-          <Button onClick={() => setIsDialogOpen(true)}>
+          <Button onClick={() => handleOpenDialog()}>
             <Plus className="w-4 h-4 mr-2" />
             Nova Lista
           </Button>
@@ -427,6 +514,14 @@ export default function AdminM3ULists() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleOpenDialog(list)}
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleToggleStatus(list.id, list.status)}
                           title={list.status === 'active' ? 'Desativar' : 'Ativar'}
                         >
@@ -454,72 +549,120 @@ export default function AdminM3ULists() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Nova Lista M3U</DialogTitle>
+            <DialogTitle>{editingList ? 'Editar' : 'Nova'} Lista M3U</DialogTitle>
             <DialogDescription>
-              Faça upload de um arquivo M3U ou M3U8 com a lista de canais
+              {editingList ? 'Edite os dados da lista M3U' : 'Adicione uma nova lista M3U informando a URL direta do arquivo'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="listName">Nome da Lista</Label>
+              <Label htmlFor="name">Nome da Lista *</Label>
               <Input
-                id="listName"
+                id="name"
                 value={listName}
                 onChange={(e) => setListName(e.target.value)}
-                placeholder="Ex: Canais Premium HD"
+                placeholder="Ex: Lista Premium HD"
+                maxLength={100}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="planType">Tipo de Plano</Label>
-              <select
-                id="planType"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={planType}
-                onChange={(e) => setPlanType(e.target.value as any)}
-              >
-                <option value="teste">Teste (Trial/Gratuito)</option>
-                <option value="basico">Básico (Mensal/Trimestral)</option>
-                <option value="premium">Premium (Semestral/Anual)</option>
-              </select>
+              <Label htmlFor="url">URL da Lista M3U *</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="url"
+                    type="url"
+                    value={listUrl}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    placeholder="https://exemplo.com/lista.m3u"
+                    className="pl-9"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={testUrlConnectivity}
+                  disabled={isTestingUrl || !listUrl.trim() || !!validationError}
+                  title="Testar conectividade"
+                >
+                  {isTestingUrl ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              
+              {validationError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{validationError}</AlertDescription>
+                </Alert>
+              )}
+              
+              {listUrl && !validationError && listUrl.trim().length > 10 && (
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 rounded-lg">
+                  <p className="text-sm text-green-900 dark:text-green-100">
+                    ✓ URL válida
+                  </p>
+                </div>
+              )}
+              
               <p className="text-xs text-muted-foreground">
-                Clientes receberão esta lista automaticamente baseado no plano contratado
+                A URL deve apontar para um arquivo .m3u ou .m3u8. Esta URL será usada para cadastrar a playlist no SmartOne IPTV.
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="priority">Prioridade (0-100)</Label>
+              <Label htmlFor="planType">Tipo de Plano *</Label>
+              <Select value={planType} onValueChange={(value: any) => setPlanType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o plano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="teste">Teste (Trial)</SelectItem>
+                  <SelectItem value="basico">Básico</SelectItem>
+                  <SelectItem value="premium">Premium</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define qual tipo de cliente terá acesso a esta lista
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="priority">Prioridade</Label>
               <Input
                 id="priority"
                 type="number"
                 min="0"
-                max="100"
                 value={priority}
                 onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
                 placeholder="0"
               />
               <p className="text-xs text-muted-foreground">
-                Maior prioridade = preferida quando múltiplas listas estão disponíveis para o mesmo plano
+                Listas com maior prioridade são selecionadas primeiro
               </p>
             </div>
 
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Importante:</strong> Certifique-se de que a URL está acessível publicamente e aponta para um arquivo M3U válido. Esta URL será utilizada para cadastrar playlists no SmartOne IPTV.
+              </AlertDescription>
+            </Alert>
           </div>
 
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setIsDialogOpen(false);
-                setListName('');
-                setListUrl('');
-                setPlanType('teste');
-                setPriority(0);
-                setValidationError(null);
-              }}
+              onClick={handleCloseDialog}
               disabled={isSaving}
             >
               Cancelar
@@ -529,7 +672,7 @@ export default function AdminM3ULists() {
               disabled={isSaving || !listName.trim() || !listUrl.trim() || !!validationError}
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSaving ? 'Salvando...' : 'Salvar Lista'}
+              {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
             </Button>
           </DialogFooter>
         </DialogContent>
