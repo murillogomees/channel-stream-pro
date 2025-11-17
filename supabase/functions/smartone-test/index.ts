@@ -125,16 +125,47 @@ Deno.serve(async (req) => {
         }
       );
 
-      const responseData = await smartoneResponse.json();
+      // Verificar Content-Type antes de fazer parse
+      const contentType = smartoneResponse.headers.get('content-type');
+      console.log('Response status:', smartoneResponse.status, 'Content-Type:', contentType);
       
       if (!smartoneResponse.ok) {
-        console.error('SmartOne API error:', responseData);
+        // Se não for JSON, pegar o texto da resposta
+        const responseText = contentType?.includes('application/json') 
+          ? JSON.stringify(await smartoneResponse.json())
+          : await smartoneResponse.text();
+        
+        console.error('SmartOne API error:', {
+          status: smartoneResponse.status,
+          statusText: smartoneResponse.statusText,
+          contentType,
+          response: responseText.substring(0, 500), // Primeiros 500 caracteres
+        });
+        
         return new Response(
           JSON.stringify({ 
-            error: responseData.message || 'Erro ao criar playlist no SmartOne',
-            details: responseData,
+            error: `Erro ${smartoneResponse.status}: ${smartoneResponse.statusText}`,
+            details: `A API retornou: ${contentType}. Verifique se a URL base e credenciais estão corretas.`,
+            response: responseText.substring(0, 200),
           }),
           { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Se sucesso, fazer parse do JSON
+      let responseData;
+      try {
+        responseData = contentType?.includes('application/json') 
+          ? await smartoneResponse.json()
+          : { message: await smartoneResponse.text() };
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erro ao processar resposta da API',
+            details: 'A API não retornou um JSON válido',
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -172,16 +203,44 @@ Deno.serve(async (req) => {
         }
       );
 
-      const responseData = await smartoneResponse.json();
-
+      // Verificar Content-Type antes de fazer parse
+      const contentType = smartoneResponse.headers.get('content-type');
+      console.log('Update response status:', smartoneResponse.status, 'Content-Type:', contentType);
+      
       if (!smartoneResponse.ok) {
-        console.error('SmartOne API error:', responseData);
+        const responseText = contentType?.includes('application/json') 
+          ? JSON.stringify(await smartoneResponse.json())
+          : await smartoneResponse.text();
+        
+        console.error('SmartOne API error:', {
+          status: smartoneResponse.status,
+          statusText: smartoneResponse.statusText,
+          response: responseText.substring(0, 500),
+        });
+        
         return new Response(
           JSON.stringify({ 
-            error: responseData.message || 'Erro ao atualizar playlist no SmartOne',
-            details: responseData,
+            error: `Erro ${smartoneResponse.status}: ${smartoneResponse.statusText}`,
+            details: `A API retornou: ${contentType}. Verifique se o playlist ID é válido.`,
+            response: responseText.substring(0, 200),
           }),
           { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let responseData;
+      try {
+        responseData = contentType?.includes('application/json') 
+          ? await smartoneResponse.json()
+          : { message: await smartoneResponse.text() };
+      } catch (parseError) {
+        console.error('Error parsing update response:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erro ao processar resposta da API',
+            details: 'A API não retornou um JSON válido',
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
