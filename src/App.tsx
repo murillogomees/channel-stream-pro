@@ -50,6 +50,7 @@ const AdminAuthStatus = lazy(() => import("./pages/AdminAuthStatus"));
 const AdminRoleAudit = lazy(() => import("./pages/AdminRoleAudit"));
 const Admin2FASettings = lazy(() => import("./pages/Admin2FASettings"));
 const AdminSuspiciousLogins = lazy(() => import("./pages/AdminSuspiciousLogins"));
+const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -110,6 +111,7 @@ const App = () => (
           <Route path="/admin/role-audit" element={<ProtectedRoute requireAdmin><AdminRoleAudit /></ProtectedRoute>} />
           <Route path="/admin/2fa-settings" element={<ProtectedRoute requireAdmin><Admin2FASettings /></ProtectedRoute>} />
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
+          <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
           <Route path="/admin/role-audit" element={<ProtectedRoute requireAdmin><AdminRoleAudit /></ProtectedRoute>} />
           <Route path="/admin/2fa-settings" element={<ProtectedRoute requireAdmin><Admin2FASettings /></ProtectedRoute>} />
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
