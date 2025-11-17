@@ -1,4 +1,4 @@
-import { Moon, Sun, FileText, Contrast } from 'lucide-react';
+import { Moon, Sun, FileText, Contrast, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useTheme, Theme } from '@/contexts/ThemeContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,14 +31,17 @@ const themes: { value: Theme; label: string; icon: React.ReactNode; description:
 ];
 
 export const ThemeSelector = () => {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, isSyncing } = useTheme();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tema da Interface</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Tema da Interface
+          {isSyncing && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        </CardTitle>
         <CardDescription>
-          Escolha o tema visual que melhor se adapta ao seu ambiente e preferências
+          Escolha o tema visual que melhor se adapta ao seu ambiente e preferências. Suas preferências são sincronizadas entre dispositivos.
         </CardDescription>
       </CardHeader>
       <CardContent>
