@@ -291,6 +291,8 @@ class SmartoneService {
         success: false,
         nome: playlist.nome,
         mac: normalizedMac,
+        m3uUrl: playlist.m3uUrl, // Salvar URL fornecida pelo usuário
+        descricao: playlist.descricao,
         error: error.message,
         timestamp: new Date().toISOString(),
         rawResponse: error,
@@ -304,7 +306,7 @@ class SmartoneService {
       playlistId: data.playlistId || data.id,
       nome: playlist.nome,
       mac: normalizedMac,
-      m3uUrl: data.m3uUrl,
+      m3uUrl: data.m3uUrl || playlist.m3uUrl, // Usar a URL da resposta ou a fornecida
       descricao: playlist.descricao,
       timestamp: new Date().toISOString(),
       rawResponse: data,
@@ -363,6 +365,8 @@ class SmartoneService {
           playlistId,
           nome: playlist.nome,
           mac: normalizedMac,
+          m3uUrl: playlist.m3uUrl, // Salvar URL fornecida pelo usuário
+          descricao: playlist.descricao,
           error: error.message,
           timestamp: new Date().toISOString(),
         };
@@ -375,7 +379,7 @@ class SmartoneService {
         playlistId,
         nome: playlist.nome,
         mac: normalizedMac,
-        m3uUrl: data.m3uUrl,
+        m3uUrl: data.m3uUrl || playlist.m3uUrl, // Usar a URL da resposta ou a fornecida
         descricao: playlist.descricao,
         timestamp: new Date().toISOString(),
         rawResponse: data,
@@ -388,6 +392,8 @@ class SmartoneService {
         playlistId,
         nome: playlist.nome,
         mac: normalizedMac,
+        m3uUrl: playlist.m3uUrl, // Salvar URL fornecida pelo usuário
+        descricao: playlist.descricao,
         error: error.message,
         timestamp: new Date().toISOString(),
       };
