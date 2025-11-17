@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GlobalSearch } from "@/components/admin/GlobalSearch";
+import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
+import { RecentActivities } from "@/components/admin/RecentActivities";
 import { 
   Users, Bell, Smartphone, Shield, BarChart3, Settings, 
   LogOut, User, Palette, FileText, Variable, MessageSquare,
@@ -131,6 +134,7 @@ const AdminDashboard = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <GlobalSearch />
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')}>
                 <User className="h-4 w-4 mr-2" />
                 Perfil
@@ -145,29 +149,39 @@ const AdminDashboard = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        {/* Quick Stats */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Visão Geral</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <QuickStat
-              icon={<Users className="h-5 w-5" />}
-              label="Total de Clientes"
-              value={stats.total}
-            />
-            <QuickStat
-              icon={<Clock className="h-5 w-5" />}
-              label="Vencendo em 5 dias"
-              value={stats.vencendoProximos5Dias}
-              variant="warning"
-            />
-            <QuickStat
-              icon={<AlertTriangle className="h-5 w-5" />}
-              label="Ativos Vencidos"
-              value={stats.ativosVencidos}
-              variant="danger"
-            />
+        {/* Quick Stats & Shortcuts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2 space-y-6">
+            <section>
+              <h2 className="text-lg font-semibold mb-4">Visão Geral</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <QuickStat
+                  icon={<Users className="h-5 w-5" />}
+                  label="Total de Clientes"
+                  value={stats.total}
+                />
+                <QuickStat
+                  icon={<Clock className="h-5 w-5" />}
+                  label="Vencendo em 5 dias"
+                  value={stats.vencendoProximos5Dias}
+                  variant="warning"
+                />
+                <QuickStat
+                  icon={<AlertTriangle className="h-5 w-5" />}
+                  label="Ativos Vencidos"
+                  value={stats.ativosVencidos}
+                  variant="danger"
+                />
+              </div>
+            </section>
+            
+            <QuickShortcuts />
           </div>
-        </section>
+
+          <div className="lg:col-span-1">
+            <RecentActivities />
+          </div>
+        </div>
 
         {/* Gestão de Clientes */}
         <section className="mb-8">

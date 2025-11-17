@@ -41,3 +41,7 @@ verify_jwt = false
 # Admin-only function for checking playlist health - requires authentication
 [functions.check-playlist-health]
 verify_jwt = true
+
+# Cron job for alerting about inactive playlists - public for cron access
+[functions.alert-inactive-playlists]
+verify_jwt = false

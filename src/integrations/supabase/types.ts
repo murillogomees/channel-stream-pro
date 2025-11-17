@@ -26,6 +26,39 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_logs: {
+        Row: {
+          action_description: string
+          action_type: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action_description: string
+          action_type: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action_description?: string
+          action_type?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       admin_badge_notifications: {
         Row: {
           admin_id: string
@@ -143,6 +176,39 @@ export type Database = {
           schedule_config?: Json | null
           schedule_enabled?: boolean | null
           telegram_id?: string | null
+        }
+        Relationships: []
+      }
+      admin_shortcuts: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          icon: string
+          id: string
+          order_index: number | null
+          path: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          icon: string
+          id?: string
+          order_index?: number | null
+          path: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string
+          id?: string
+          order_index?: number | null
+          path?: string
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1025,6 +1091,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
@@ -1112,6 +1179,17 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
+      log_activity: {
+        Args: {
+          _action_description: string
+          _action_type: string
+          _entity_id?: string
+          _entity_type?: string
+          _metadata?: Json
+          _user_id: string
+        }
+        Returns: string
+      }
       make_user_admin: { Args: { user_email: string }; Returns: undefined }
       save_monthly_leaderboard: { Args: never; Returns: undefined }
     }
