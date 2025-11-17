@@ -46,6 +46,20 @@ interface M3UList {
   is_default?: boolean;
   plan_type?: 'teste' | 'basico' | 'premium';
   priority?: number;
+  description?: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+interface M3UAuditLog {
+  id: string;
+  m3u_list_id: string;
+  changed_by: string;
+  change_type: 'created' | 'updated' | 'deleted';
+  old_values?: any;
+  new_values?: any;
+  created_at: string;
+  admin_name?: string;
 }
 
 export default function AdminM3ULists() {
@@ -58,10 +72,12 @@ export default function AdminM3ULists() {
   const [editingList, setEditingList] = useState<M3UList | null>(null);
   const [listName, setListName] = useState('');
   const [listUrl, setListUrl] = useState('');
+  const [listDescription, setListDescription] = useState('');
   const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
   const [priority, setPriority] = useState(0);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
+  const [showAuditHistory, setShowAuditHistory] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -97,7 +113,7 @@ export default function AdminM3ULists() {
     }
   };
 
-  // Schema de validação para URL M3U
+  // Schema de validação simplificado (admin é responsável pela URL)
   const m3uUrlSchema = z.object({
     name: z.string()
       .trim()
@@ -105,27 +121,8 @@ export default function AdminM3ULists() {
       .max(100, 'Nome deve ter no máximo 100 caracteres'),
     url: z.string()
       .trim()
-      .url('URL inválida')
-      .regex(/\.(m3u|m3u8)($|\?)/i, 'URL deve apontar para arquivo .m3u ou .m3u8'),
+      .url('URL inválida'),
   });
-
-  const handleUrlChange = (url: string) => {
-    setListUrl(url);
-    setValidationError(null);
-    
-    // Validar URL em tempo real
-    const validation = m3uUrlSchema.safeParse({
-      name: listName || 'temp',
-      url: url
-    });
-
-    if (!validation.success && url.trim()) {
-      const urlError = validation.error.errors.find(e => e.path.includes('url'));
-      if (urlError) {
-        setValidationError(urlError.message);
-      }
-    }
-  };
 
   const testUrlConnectivity = async () => {
     if (!listUrl.trim()) {
@@ -167,23 +164,26 @@ export default function AdminM3ULists() {
     }
   };
 
-  const handleOpenDialog = (list?: M3UList) => {
+  const handleOpenDialog = async (list?: M3UList) => {
     if (list) {
-      // Modo edição
       setEditingList(list);
       setListName(list.name);
       setListUrl(list.file_url);
-      setPlanType(list.plan_type as any || 'teste');
+      setListDescription(list.description || '');
+      setPlanType(list.plan_type || 'teste');
       setPriority(list.priority || 0);
+      await loadAuditHistory(list.id);
+      setShowAuditHistory(true);
     } else {
-      // Modo criação
       setEditingList(null);
       setListName('');
       setListUrl('');
+      setListDescription('');
       setPlanType('teste');
       setPriority(0);
+      setAuditLogs([]);
+      setShowAuditHistory(false);
     }
-    setValidationError(null);
     setIsDialogOpen(true);
   };
 
@@ -192,9 +192,11 @@ export default function AdminM3ULists() {
     setEditingList(null);
     setListName('');
     setListUrl('');
+    setListDescription('');
     setPlanType('teste');
     setPriority(0);
-    setValidationError(null);
+    setAuditLogs([]);
+    setShowAuditHistory(false);
   };
 
   const handleSaveList = async () => {
@@ -579,7 +581,7 @@ export default function AdminM3ULists() {
                     id="url"
                     type="url"
                     value={listUrl}
-                    onChange={(e) => handleUrlChange(e.target.value)}
+                    onChange={(e) => setListUrl(e.target.value)}
                     placeholder="https://exemplo.com/lista.m3u"
                     className="pl-9"
                   />
@@ -588,7 +590,7 @@ export default function AdminM3ULists() {
                   type="button"
                   variant="outline"
                   onClick={testUrlConnectivity}
-                  disabled={isTestingUrl || !listUrl.trim() || !!validationError}
+                  disabled={isTestingUrl || !listUrl.trim()}
                   title="Testar conectividade"
                 >
                   {isTestingUrl ? (
@@ -599,20 +601,9 @@ export default function AdminM3ULists() {
                 </Button>
               </div>
               
-              {validationError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{validationError}</AlertDescription>
-                </Alert>
-              )}
-              
-              {listUrl && !validationError && listUrl.trim().length > 10 && (
-                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 rounded-lg">
-                  <p className="text-sm text-green-900 dark:text-green-100">
-                    ✓ URL válida
-                  </p>
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground">
+                O administrador é responsável por validar se a URL está correta
+              </p>
               
               <p className="text-xs text-muted-foreground">
                 A URL deve apontar para um arquivo .m3u ou .m3u8. Esta URL será usada para cadastrar a playlist no SmartOne IPTV.
@@ -669,7 +660,7 @@ export default function AdminM3ULists() {
             </Button>
             <Button
               onClick={handleSaveList}
-              disabled={isSaving || !listName.trim() || !listUrl.trim() || !!validationError}
+              disabled={isSaving || !listName.trim() || !listUrl.trim()}
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
