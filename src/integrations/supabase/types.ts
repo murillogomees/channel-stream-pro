@@ -212,6 +212,39 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_sessions_log: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          user_agent: string | null
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       automatic_notification_rules: {
         Row: {
           active: boolean | null
@@ -1095,10 +1128,22 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      get_active_sessions: {
+        Args: never
+        Returns: {
+          ip_address: string
+          last_login: string
+          session_duration: unknown
+          user_agent: string
+          user_email: string
+          user_id: string
+        }[]
+      }
       get_admin_performance_stats: {
         Args: { _days?: number }
         Returns: {
@@ -1142,6 +1187,16 @@ export type Database = {
           read_at: string
           sent_at: string
           severity: string
+        }[]
+      }
+      get_auth_statistics: {
+        Args: { _days?: number }
+        Returns: {
+          access_denied: number
+          date: string
+          session_refreshes: number
+          total_logins: number
+          unique_users: number
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
