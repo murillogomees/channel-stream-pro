@@ -13,8 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { AlertCircle, TrendingUp, Clock, CheckCircle2, AlertTriangle, Activity } from "lucide-react";
+import { AlertCircle, TrendingUp, Clock, CheckCircle2, AlertTriangle, Activity, Trophy } from "lucide-react";
 import { getSecurityAlertStatsService, type AlertPerformanceStats, type AdminPerformanceStats } from "@/services/securityAlertStatsService";
+import { getAdminBadgeService } from "@/services/adminBadgeService";
+import { AdminBadges } from "@/components/admin/AdminBadges";
+import type { AdminAchievements } from "@/types/badge";
 
 export default function AdminAlertStats() {
   const [period, setPeriod] = useState<number>(30);
@@ -22,6 +25,7 @@ export default function AdminAlertStats() {
   const [performanceStats, setPerformanceStats] = useState<AlertPerformanceStats | null>(null);
   const [adminStats, setAdminStats] = useState<AdminPerformanceStats[]>([]);
   const [metricsData, setMetricsData] = useState<any[]>([]);
+  const [adminAchievements, setAdminAchievements] = useState<Map<string, AdminAchievements>>(new Map());
 
   useEffect(() => {
     loadStats();
@@ -30,6 +34,7 @@ export default function AdminAlertStats() {
   const loadStats = async () => {
     setLoading(true);
     const service = getSecurityAlertStatsService();
+    const badgeService = getAdminBadgeService();
 
     const [performance, admins, metrics] = await Promise.all([
       service.getAlertPerformanceStats(period),
@@ -40,6 +45,15 @@ export default function AdminAlertStats() {
     setPerformanceStats(performance);
     setAdminStats(admins);
     setMetricsData(metrics);
+
+    // Calcular achievements para cada admin
+    const achievementsMap = new Map<string, AdminAchievements>();
+    admins.forEach((admin, index) => {
+      const achievements = badgeService.generateAchievements(admin, index + 1);
+      achievementsMap.set(admin.admin_id, achievements);
+    });
+    setAdminAchievements(achievementsMap);
+
     setLoading(false);
   };
 
@@ -132,6 +146,10 @@ export default function AdminAlertStats() {
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="admins">Performance por Admin</TabsTrigger>
+          <TabsTrigger value="gamification">
+            <Trophy className="h-4 w-4 mr-2" />
+            Gamificação
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -190,6 +208,7 @@ export default function AdminAlertStats() {
                   <TableRow>
                     <TableHead>Posição</TableHead>
                     <TableHead>Admin</TableHead>
+                    <TableHead>Badges & Conquistas</TableHead>
                     <TableHead className="text-right">Total Alertas</TableHead>
                     <TableHead className="text-right">Taxa Confirmação</TableHead>
                     <TableHead className="text-right">Tempo Resposta</TableHead>
@@ -197,27 +216,37 @@ export default function AdminAlertStats() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminStats.map((admin, index) => (
-                    <TableRow key={admin.admin_id}>
-                      <TableCell className="font-medium">#{index + 1}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{admin.admin_name}</div>
-                          <div className="text-sm text-muted-foreground">{admin.admin_phone}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{admin.total_alerts}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={admin.confirmation_rate >= 80 ? "default" : "secondary"}>
-                          {admin.confirmation_rate}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatTime(admin.avg_response_time_minutes)}
-                      </TableCell>
-                      <TableCell className="text-right">{admin.alerts_with_action}</TableCell>
-                    </TableRow>
-                  ))}
+                  {adminStats.map((admin, index) => {
+                    const achievements = adminAchievements.get(admin.admin_id);
+                    return (
+                      <TableRow key={admin.admin_id}>
+                        <TableCell className="font-medium">
+                          <Badge variant={index === 0 ? "default" : "outline"}>
+                            #{index + 1}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{admin.admin_name}</div>
+                            <div className="text-sm text-muted-foreground">{admin.admin_phone}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {achievements && <AdminBadges achievements={achievements} compact />}
+                        </TableCell>
+                        <TableCell className="text-right">{admin.total_alerts}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={admin.confirmation_rate >= 80 ? "default" : "secondary"}>
+                            {admin.confirmation_rate}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatTime(admin.avg_response_time_minutes)}
+                        </TableCell>
+                        <TableCell className="text-right">{admin.alerts_with_action}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {adminStats.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground">
@@ -229,6 +258,43 @@ export default function AdminAlertStats() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab Gamificação */}
+        <TabsContent value="gamification" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {adminStats.map((admin, index) => {
+              const achievements = adminAchievements.get(admin.admin_id);
+              if (!achievements) return null;
+
+              return (
+                <div key={admin.admin_id} className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{admin.admin_name}</span>
+                        <Badge variant={index === 0 ? "default" : "outline"}>
+                          #{index + 1}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>{admin.admin_phone}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                  <AdminBadges achievements={achievements} />
+                </div>
+              );
+            })}
+          </div>
+
+          {adminStats.length === 0 && (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <p className="text-muted-foreground">
+                  Nenhum dado disponível para o período selecionado
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
