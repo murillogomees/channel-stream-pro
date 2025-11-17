@@ -679,6 +679,7 @@ export type Database = {
           m3u_url: string
           playlist_id: string
           response_time_ms: number | null
+          snoozed_until: string | null
           status: string
         }
         Insert: {
@@ -691,6 +692,7 @@ export type Database = {
           m3u_url: string
           playlist_id: string
           response_time_ms?: number | null
+          snoozed_until?: string | null
           status?: string
         }
         Update: {
@@ -703,6 +705,7 @@ export type Database = {
           m3u_url?: string
           playlist_id?: string
           response_time_ms?: number | null
+          snoozed_until?: string | null
           status?: string
         }
         Relationships: [

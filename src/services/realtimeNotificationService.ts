@@ -6,7 +6,7 @@ import { getAdminAlertService } from './adminAlertService';
 import { getMetricsPersistenceService } from './metricsPersistenceService';
 
 export interface RealtimeNotificationEvent {
-  type: 'notification_sent' | 'notification_failed' | 'batch_started' | 'batch_completed';
+  type: 'notification_sent' | 'notification_failed' | 'batch_started' | 'batch_completed' | 'playlist_inactive_alert';
   timestamp: string;
   data: {
     clienteId?: string;

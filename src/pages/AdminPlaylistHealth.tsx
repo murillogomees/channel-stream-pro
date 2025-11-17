@@ -3,11 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { playlistHealthService, PlaylistHealthStats } from '@/services/playlistHealthService';
+import { playlistHealthService, PlaylistHealthStats, PlaylistHealthCheck } from '@/services/playlistHealthService';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function AdminPlaylistHealth() {
   const navigate = useNavigate();
@@ -15,6 +22,7 @@ export default function AdminPlaylistHealth() {
   const { isAdmin, loading: authLoading } = useAuth();
   
   const [stats, setStats] = useState<PlaylistHealthStats | null>(null);
+  const [allChecks, setAllChecks] = useState<PlaylistHealthCheck[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -30,8 +38,12 @@ export default function AdminPlaylistHealth() {
   const loadStats = async () => {
     setIsLoading(true);
     try {
-      const data = await playlistHealthService.getHealthStats();
-      setStats(data);
+      const [statsData, checksData] = await Promise.all([
+        playlistHealthService.getHealthStats(),
+        playlistHealthService.getAllHealthChecks(),
+      ]);
+      setStats(statsData);
+      setAllChecks(checksData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
       toast({
@@ -41,6 +53,58 @@ export default function AdminPlaylistHealth() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSnooze = async (playlistId: string, hours: number) => {
+    try {
+      const result = await playlistHealthService.snoozePlaylist(playlistId, hours);
+      
+      if (result.success) {
+        toast({
+          title: 'Alertas pausados',
+          description: result.message,
+        });
+        await loadStats();
+      } else {
+        toast({
+          title: 'Erro',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUnsnooze = async (playlistId: string) => {
+    try {
+      const result = await playlistHealthService.unsnoozePlaylist(playlistId);
+      
+      if (result.success) {
+        toast({
+          title: 'Alertas reativados',
+          description: result.message,
+        });
+        await loadStats();
+      } else {
+        toast({
+          title: 'Erro',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -207,6 +271,92 @@ export default function AdminPlaylistHealth() {
           </CardContent>
         </Card>
 
+        {/* Lista de Playlists com Gerenciamento de Snooze */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Gerenciar Alertas das Playlists</CardTitle>
+            <CardDescription>
+              Pausar ou reativar alertas para playlists específicas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {allChecks.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Nenhuma playlist encontrada
+                </p>
+              ) : (
+                allChecks.map((check) => {
+                  const isSnoozed = check.snoozed_until && new Date(check.snoozed_until) > new Date();
+                  const statusIcon = check.status === 'active' ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : check.status === 'inactive' ? (
+                    <XCircle className="h-5 w-5 text-orange-500" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  );
+
+                  return (
+                    <div key={check.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          {statusIcon}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium">{check.playlist_id}</p>
+                              {isSnoozed && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <BellOff className="h-3 w-3 mr-1" />
+                                  Pausado
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{check.m3u_url}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Última verificação: {new Date(check.last_checked_at).toLocaleString('pt-BR')}
+                            </p>
+                            {isSnoozed && check.snoozed_until && (
+                              <p className="text-xs text-orange-600 mt-1">
+                                Alertas pausados até: {new Date(check.snoozed_until).toLocaleString('pt-BR')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isSnoozed ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUnsnooze(check.playlist_id)}
+                            >
+                              <Bell className="h-4 w-4 mr-1" />
+                              Reativar Alertas
+                            </Button>
+                          ) : (
+                            <Select onValueChange={(value) => handleSnooze(check.playlist_id, parseInt(value))}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Pausar alertas" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Por 1 hora</SelectItem>
+                                <SelectItem value="4">Por 4 horas</SelectItem>
+                                <SelectItem value="12">Por 12 horas</SelectItem>
+                                <SelectItem value="24">Por 24 horas</SelectItem>
+                                <SelectItem value="72">Por 3 dias</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Informações */}
         <Card>
           <CardHeader>
@@ -237,6 +387,15 @@ export default function AdminPlaylistHealth() {
                   <span><strong>Erro:</strong> Não foi possível acessar a URL (timeout, rede, etc)</span>
                 </li>
               </ul>
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Gerenciamento de Alertas</h3>
+              <p className="text-sm text-muted-foreground">
+                Você pode pausar alertas de playlists específicas por um período determinado. Durante o snooze,
+                o sistema continuará monitorando as playlists, mas não enviará notificações. Os alertas são
+                reativados automaticamente após o período escolhido.
+              </p>
             </div>
 
             <div>

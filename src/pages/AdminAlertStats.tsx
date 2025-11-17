@@ -1,372 +1,292 @@
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Activity, TrendingUp, Clock, CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  getSecurityAlertStatsService, 
+  AlertPerformanceStats, 
+  AdminPerformanceStats 
+} from '@/services/securityAlertStatsService';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { AlertCircle, TrendingUp, Clock, CheckCircle2, AlertTriangle, Activity, Trophy, Users } from "lucide-react";
-import { getSecurityAlertStatsService, type AlertPerformanceStats, type AdminPerformanceStats } from "@/services/securityAlertStatsService";
-import { getAdminBadgeService } from "@/services/adminBadgeService";
-import { AdminBadges } from "@/components/admin/AdminBadges";
-import { AdminComparison } from "@/components/admin/AdminComparison";
-import type { AdminAchievements } from "@/types/badge";
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 export default function AdminAlertStats() {
-  const [period, setPeriod] = useState<number>(30);
-  const [loading, setLoading] = useState(true);
-  const [performanceStats, setPerformanceStats] = useState<AlertPerformanceStats | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { isAdmin, loading: authLoading } = useAuth();
+  const statsService = getSecurityAlertStatsService();
+  
+  const [alertStats, setAlertStats] = useState<AlertPerformanceStats | null>(null);
   const [adminStats, setAdminStats] = useState<AdminPerformanceStats[]>([]);
   const [metricsData, setMetricsData] = useState<any[]>([]);
-  const [adminAchievements, setAdminAchievements] = useState<Map<string, AdminAchievements>>(new Map());
-  const [selectedAdminsForComparison, setSelectedAdminsForComparison] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<number>(30);
 
   useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/auth');
+      return;
+    }
+
     loadStats();
-  }, [period]);
+  }, [authLoading, isAdmin, navigate, selectedPeriod]);
 
   const loadStats = async () => {
-    setLoading(true);
-    const service = getSecurityAlertStatsService();
-    const badgeService = getAdminBadgeService();
-
-    const [performance, admins, metrics] = await Promise.all([
-      service.getAlertPerformanceStats(period),
-      service.getAdminPerformanceStats(period),
-      service.getAlertMetricsByPeriod(Math.min(period, 30))
-    ]);
-
-    setPerformanceStats(performance);
-    setAdminStats(admins);
-    setMetricsData(metrics);
-
-    // Calcular achievements para cada admin
-    const achievementsMap = new Map<string, AdminAchievements>();
-    admins.forEach((admin, index) => {
-      const achievements = badgeService.generateAchievements(admin, index + 1);
-      achievementsMap.set(admin.admin_id, achievements);
-    });
-    setAdminAchievements(achievementsMap);
-
-    setLoading(false);
+    setIsLoading(true);
+    try {
+      const [alertData, adminData, metricsData] = await Promise.all([
+        statsService.getAlertPerformanceStats(selectedPeriod),
+        statsService.getAdminPerformanceStats(selectedPeriod),
+        statsService.getAlertMetricsByPeriod(selectedPeriod),
+      ]);
+      
+      setAlertStats(alertData);
+      setAdminStats(adminData);
+      setMetricsData(metricsData);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar as estatísticas.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const formatTime = (minutes: number | null) => {
-    if (!minutes) return 'N/A';
-    if (minutes < 1) return `${Math.round(minutes * 60)}s`;
-    if (minutes < 60) return `${Math.round(minutes)}min`;
-    return `${Math.round(minutes / 60)}h ${Math.round(minutes % 60)}min`;
-  };
-
-  const toggleAdminComparison = (adminId: string) => {
-    setSelectedAdminsForComparison(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(adminId)) {
-        newSet.delete(adminId);
-      } else {
-        if (newSet.size < 3) {
-          newSet.add(adminId);
-        }
-      }
-      return newSet;
-    });
-  };
-
-  const getComparisonData = () => {
-    return adminStats
-      .filter(admin => selectedAdminsForComparison.has(admin.admin_id))
-      .map(admin => ({
-        stats: admin,
-        achievements: adminAchievements.get(admin.admin_id)!
-      }))
-      .filter(item => item.achievements);
-  };
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando estatísticas...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Estatísticas de Alertas</h1>
-          <p className="text-muted-foreground">Performance e métricas dos alertas de segurança</p>
-        </div>
-        <Select value={period.toString()} onValueChange={(v) => setPeriod(parseInt(v))}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Selecione o período" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Últimos 7 dias</SelectItem>
-            <SelectItem value="30">Últimos 30 dias</SelectItem>
-            <SelectItem value="90">Últimos 90 dias</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Cards de Resumo */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Alertas</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{performanceStats?.total_alerts || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {performanceStats?.confirmed_alerts || 0} confirmados ({performanceStats?.confirmation_rate || 0}%)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tempo Médio de Leitura</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatTime(performanceStats?.avg_read_time_minutes || null)}
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6 max-w-7xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate('/admin/dashboard')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Estatísticas de Alertas</h1>
+              <p className="text-muted-foreground">
+                Desempenho e métricas do sistema de alertas
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Desde envio até leitura
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tempo Médio de Confirmação</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatTime(performanceStats?.avg_confirmation_time_minutes || null)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Desde envio até confirmação
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Escalonamento</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{performanceStats?.escalation_rate || 0}%</div>
-            <p className="text-xs text-muted-foreground">
-              {performanceStats?.total_escalations || 0} alertas escalonados
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="admins">Performance por Admin</TabsTrigger>
-          <TabsTrigger value="comparison">
-            <Users className="h-4 w-4 mr-2" />
-            Comparação
-          </TabsTrigger>
-          <TabsTrigger value="gamification">
-            <Trophy className="h-4 w-4 mr-2" />
-            Gamificação
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolução de Alertas</CardTitle>
-              <CardDescription>Distribuição diária de alertas nos últimos {Math.min(period, 30)} dias</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" name="Total" />
-                  <Line type="monotone" dataKey="confirmed" stroke="hsl(var(--success))" name="Confirmados" />
-                  <Line type="monotone" dataKey="escalated" stroke="hsl(var(--destructive))" name="Escalonados" />
-                  <Line type="monotone" dataKey="with_action" stroke="hsl(var(--accent))" name="Com Ação" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparativo de Métricas</CardTitle>
-              <CardDescription>Comparação de confirmação vs escalonamento</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metricsData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="confirmed" fill="hsl(var(--success))" name="Confirmados" />
-                  <Bar dataKey="escalated" fill="hsl(var(--destructive))" name="Escalonados" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="admins" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ranking de Performance</CardTitle>
-              <CardDescription>Desempenho individual de cada administrador. Selecione até 3 admins para comparar.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedAdminsForComparison.size === adminStats.length && adminStats.length > 0}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedAdminsForComparison(new Set(adminStats.slice(0, 3).map(a => a.admin_id)));
-                          } else {
-                            setSelectedAdminsForComparison(new Set());
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead>Posição</TableHead>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Badges & Conquistas</TableHead>
-                    <TableHead className="text-right">Total Alertas</TableHead>
-                    <TableHead className="text-right">Taxa Confirmação</TableHead>
-                    <TableHead className="text-right">Tempo Resposta</TableHead>
-                    <TableHead className="text-right">Ações Tomadas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adminStats.map((admin, index) => {
-                    const achievements = adminAchievements.get(admin.admin_id);
-                    const isSelected = selectedAdminsForComparison.has(admin.admin_id);
-                    const canSelect = selectedAdminsForComparison.size < 3 || isSelected;
-                    
-                    return (
-                      <TableRow key={admin.admin_id} className={isSelected ? 'bg-primary/5' : ''}>
-                        <TableCell>
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={!canSelect}
-                            onCheckedChange={() => toggleAdminComparison(admin.admin_id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <Badge variant={index === 0 ? "default" : "outline"}>
-                            #{index + 1}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{admin.admin_name}</div>
-                            <div className="text-sm text-muted-foreground">{admin.admin_phone}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {achievements && <AdminBadges achievements={achievements} compact />}
-                        </TableCell>
-                        <TableCell className="text-right">{admin.total_alerts}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={admin.confirmation_rate >= 80 ? "default" : "secondary"}>
-                            {admin.confirmation_rate}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatTime(admin.avg_response_time_minutes)}
-                        </TableCell>
-                        <TableCell className="text-right">{admin.alerts_with_action}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {adminStats.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
-                        Nenhum dado disponível para o período selecionado
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Comparação */}
-        <TabsContent value="comparison" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparação entre Administradores</CardTitle>
-              <CardDescription>
-                {selectedAdminsForComparison.size === 0 
-                  ? 'Selecione até 3 admins na aba "Performance por Admin" para comparar' 
-                  : `Comparando ${selectedAdminsForComparison.size} administrador(es)`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AdminComparison admins={getComparisonData()} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Gamificação */}
-        <TabsContent value="gamification" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {adminStats.map((admin, index) => {
-              const achievements = adminAchievements.get(admin.admin_id);
-              if (!achievements) return null;
-
-              return (
-                <div key={admin.admin_id} className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        <span>{admin.admin_name}</span>
-                        <Badge variant={index === 0 ? "default" : "outline"}>
-                          #{index + 1}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription>{admin.admin_phone}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                  <AdminBadges achievements={achievements} />
-                </div>
-              );
-            })}
           </div>
+          
+          <div className="flex gap-2">
+            {[7, 30, 90].map((days) => (
+              <Button
+                key={days}
+                variant={selectedPeriod === days ? 'default' : 'outline'}
+                onClick={() => setSelectedPeriod(days)}
+              >
+                {days} dias
+              </Button>
+            ))}
+          </div>
+        </div>
 
-          {adminStats.length === 0 && (
+        {/* Cards de Resumo */}
+        {alertStats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground">
-                  Nenhum dado disponível para o período selecionado
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Total de Alertas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{alertStats.total_alerts}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {alertStats.confirmed_alerts} confirmados
                 </p>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Taxa de Confirmação
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{alertStats.confirmation_rate}%</div>
+                <Progress value={alertStats.confirmation_rate} className="mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Tempo Médio de Resposta
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {alertStats.avg_confirmation_time_minutes?.toFixed(1) || 0} min
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leitura: {alertStats.avg_read_time_minutes?.toFixed(1) || 0} min
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Taxa de Escalonamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{alertStats.escalation_rate}%</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {alertStats.total_escalations} escalados
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Gráfico de Tendências */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Tendência de Alertas
+            </CardTitle>
+            <CardDescription>
+              Distribuição de alertas ao longo do período selecionado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={metricsData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="date" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="total" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  name="Total"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="confirmed" 
+                  stroke="hsl(var(--chart-2))" 
+                  strokeWidth={2}
+                  name="Confirmados"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="escalated" 
+                  stroke="hsl(var(--destructive))" 
+                  strokeWidth={2}
+                  name="Escalados"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Performance dos Administradores */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Performance dos Administradores
+            </CardTitle>
+            <CardDescription>
+              Desempenho individual de cada administrador
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {adminStats.map((admin, index) => (
+                <div key={admin.admin_id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold">{admin.admin_name}</h3>
+                      <p className="text-sm text-muted-foreground">{admin.admin_phone}</p>
+                    </div>
+                    {index < 3 && (
+                      <Badge variant={index === 0 ? 'default' : 'secondary'}>
+                        Top {index + 1}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Alertas</p>
+                      <p className="font-semibold">{admin.total_alerts}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Taxa Confirmação</p>
+                      <p className="font-semibold">{admin.confirmation_rate}%</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Tempo Resposta</p>
+                      <p className="font-semibold">
+                        {admin.avg_response_time_minutes?.toFixed(1) || 0} min
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Com Ação</p>
+                      <p className="font-semibold">{admin.alerts_with_action}</p>
+                    </div>
+                  </div>
+                  
+                  <Progress 
+                    value={admin.confirmation_rate} 
+                    className="mt-3"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

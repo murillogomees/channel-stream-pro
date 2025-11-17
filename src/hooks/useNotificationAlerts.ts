@@ -21,7 +21,7 @@ export function useNotificationAlerts() {
     // Conectar ao serviço de realtime
     realtimeService.connect();
 
-    // Inscrever-se para eventos de erro
+    // Inscrever-se para eventos de erro e alertas de playlist
     const listenerId = 'desktop-notifications';
     realtimeService.subscribe(listenerId, (event) => {
       if (event.type === 'notification_failed') {
@@ -34,8 +34,17 @@ export function useNotificationAlerts() {
       }
     });
 
+    // Inscrever-se também para eventos de alertas de playlist inativa
+    const playlistListenerId = 'playlist-alerts';
+    realtimeService.subscribe(playlistListenerId, (event) => {
+      if (event.type === 'playlist_inactive_alert') {
+        desktopService.notifyPlaylistAlert(event);
+      }
+    });
+
     return () => {
       realtimeService.unsubscribe(listenerId);
+      realtimeService.unsubscribe(playlistListenerId);
     };
   }, []);
 

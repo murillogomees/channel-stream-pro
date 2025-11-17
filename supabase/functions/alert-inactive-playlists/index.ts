@@ -45,11 +45,13 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Buscar playlists com erro
+    // Buscar playlists com erro (excluindo as que estão em snooze)
+    const now = new Date().toISOString();
     const { data: failedPlaylists, error: playlistError } = await supabase
       .from("playlist_health_checks")
       .select("*")
       .eq("status", "error")
+      .or(`snoozed_until.is.null,snoozed_until.lt.${now}`)
       .order("last_checked_at", { ascending: false });
 
     if (playlistError) {
