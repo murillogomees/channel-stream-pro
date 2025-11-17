@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { ContrastProvider } from "@/contexts/ContrastContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -60,7 +60,7 @@ const AutoNotificationProvider = () => {
 };
 
 const App = () => (
-  <ContrastProvider>
+  <ThemeProvider>
     <TooltipProvider>
       <AutoNotificationProvider />
       <Toaster />
@@ -133,7 +133,7 @@ const App = () => (
       </Suspense>
     </BrowserRouter>
   </TooltipProvider>
-  </ContrastProvider>
+  </ThemeProvider>
 );
 
 export default App;

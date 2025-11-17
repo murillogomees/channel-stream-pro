@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
 import { RecentActivities } from "@/components/admin/RecentActivities";
-import { ContrastToggle } from "@/components/admin/ContrastToggle";
+import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
   Users, Bell, Smartphone, Shield, BarChart3, Settings, 
   LogOut, User, Palette, FileText, Variable, MessageSquare,
@@ -89,6 +89,15 @@ const AdminDashboard = () => {
   const { isAdmin, loading, signOut: logout, user } = useAuth();
   const { getStats } = useClientes();
   const stats = getStats();
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simula carregamento inicial dos stats
+    const timer = setTimeout(() => {
+      setStatsLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -139,7 +148,6 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center gap-3">
               <GlobalSearch />
-              <ContrastToggle />
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')}>
                 <User className="h-4 w-4 mr-2" />
                 Perfil
@@ -160,23 +168,33 @@ const AdminDashboard = () => {
             <section>
               <h2 className="text-lg font-semibold mb-4">Visão Geral</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <QuickStat
-                  icon={<Users className="h-5 w-5" />}
-                  label="Total de Clientes"
-                  value={stats.total}
-                />
-                <QuickStat
-                  icon={<Clock className="h-5 w-5" />}
-                  label="Vencendo em 5 dias"
-                  value={stats.vencendoProximos5Dias}
-                  variant="warning"
-                />
-                <QuickStat
-                  icon={<AlertTriangle className="h-5 w-5" />}
-                  label="Ativos Vencidos"
-                  value={stats.ativosVencidos}
-                  variant="danger"
-                />
+                {statsLoading ? (
+                  <>
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                  </>
+                ) : (
+                  <>
+                    <QuickStat
+                      icon={<Users className="h-5 w-5" />}
+                      label="Total de Clientes"
+                      value={stats.total}
+                    />
+                    <QuickStat
+                      icon={<Clock className="h-5 w-5" />}
+                      label="Vencendo em 5 dias"
+                      value={stats.vencendoProximos5Dias}
+                      variant="warning"
+                    />
+                    <QuickStat
+                      icon={<AlertTriangle className="h-5 w-5" />}
+                      label="Ativos Vencidos"
+                      value={stats.ativosVencidos}
+                      variant="danger"
+                    />
+                  </>
+                )}
               </div>
             </section>
             
