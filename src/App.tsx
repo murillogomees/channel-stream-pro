@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ContrastProvider } from "@/contexts/ContrastContext";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -59,11 +60,12 @@ const AutoNotificationProvider = () => {
 };
 
 const App = () => (
-  <TooltipProvider>
-    <AutoNotificationProvider />
-    <Toaster />
-    <Sonner />
-    <BrowserRouter>
+  <ContrastProvider>
+    <TooltipProvider>
+      <AutoNotificationProvider />
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -131,6 +133,7 @@ const App = () => (
       </Suspense>
     </BrowserRouter>
   </TooltipProvider>
+  </ContrastProvider>
 );
 
 export default App;
