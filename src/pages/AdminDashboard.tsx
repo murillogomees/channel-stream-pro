@@ -1,26 +1,87 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, LogOut, Palette, Edit3, Users, AlertCircle, Clock, Trash2, MessageSquare, CheckCircle, XCircle, User, Key, Smartphone, Package, FileText, Variable, RefreshCw, BarChart3, Bell, Radio, MonitorPlay, PieChart, Shield } from "lucide-react";
+import { 
+  Users, Bell, Smartphone, Shield, BarChart3, Settings, 
+  LogOut, User, Palette, FileText, Variable, MessageSquare,
+  Radio, PieChart, Activity, Lock, UserCog, Package, 
+  ListChecks, TrendingUp, Clock, Zap, Database, AlertTriangle,
+  CheckCircle, XCircle, Timer, Target
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClientes } from "@/hooks/useClientes";
-import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+
+interface QuickStatProps {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  variant?: "default" | "success" | "warning" | "danger";
+}
+
+const QuickStat = ({ icon, label, value, variant = "default" }: QuickStatProps) => {
+  const variantClasses = {
+    default: "bg-primary/10 text-primary",
+    success: "bg-green-500/10 text-green-600 dark:text-green-500",
+    warning: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500",
+    danger: "bg-red-500/10 text-red-600 dark:text-red-500",
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-lg ${variantClasses[variant]}`}>
+            {icon}
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-2xl font-bold">{value}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+interface NavCardProps {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  path: string;
+  badge?: string;
+}
+
+const NavCard = ({ title, description, icon, path, badge }: NavCardProps) => {
+  const navigate = useNavigate();
+
+  return (
+    <Card className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate(path)}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            {icon}
+          </div>
+          {badge && (
+            <Badge variant="secondary">{badge}</Badge>
+          )}
+        </div>
+        <CardTitle className="text-lg mt-4">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
+};
 
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAdmin, loading, signOut: logout } = useAuth();
+  const { isAdmin, loading, signOut: logout, user } = useAuth();
   const { getStats } = useClientes();
   const stats = getStats();
-  const { config, saveConfig, isConfigured } = useWhatsAppConfig();
-  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
-  const [appkey, setAppkey] = useState('');
-  const [authkey, setAuthkey] = useState('');
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -29,23 +90,9 @@ const AdminDashboard = () => {
         description: "Você não tem permissão de administrador.",
         variant: "destructive",
       });
-      navigate('/auth');
+      navigate('/login');
     }
   }, [isAdmin, loading, navigate, toast]);
-
-  useEffect(() => {
-    setAppkey(config.appkey);
-    setAuthkey(config.authkey);
-  }, [config]);
-
-  const handleSaveWhatsAppConfig = () => {
-    saveConfig({ appkey, authkey, enabled: true });
-    setWhatsappDialogOpen(false);
-    toast({
-      title: "Configuração salva",
-      description: "Credenciais BotBot.chat configuradas com sucesso!",
-    });
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -53,60 +100,16 @@ const AdminDashboard = () => {
       title: "Logout realizado",
       description: "Você foi desconectado com sucesso.",
     });
-    navigate('/auth');
-  };
-
-  const handleClearCache = () => {
-    try {
-      // Limpar apenas cache de aplicação, nunca dados de autenticação
-      const keysToKeep = ['supabase.auth.token'];
-      const tempStorage: Record<string, string> = {};
-      
-      keysToKeep.forEach(key => {
-        const value = localStorage.getItem(key);
-        if (value) tempStorage[key] = value;
-      });
-      
-      localStorage.clear();
-      
-      Object.entries(tempStorage).forEach(([key, value]) => {
-        localStorage.setItem(key, value);
-      });
-
-      // Limpar sessionStorage
-      sessionStorage.clear();
-
-      // Limpar cache do service worker se existir
-      if ('caches' in window) {
-        caches.keys().then((names) => {
-          names.forEach(name => {
-            caches.delete(name);
-          });
-        });
-      }
-
-      toast({
-        title: "Cache limpo com sucesso",
-        description: "Todos os dados em cache foram removidos. A página será recarregada.",
-      });
-
-      // Recarregar sem cache após 1 segundo
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      toast({
-        title: "Erro ao limpar cache",
-        description: "Ocorreu um erro ao tentar limpar o cache.",
-        variant: "destructive",
-      });
-    }
+    navigate('/login');
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
+        <div className="text-center space-y-4">
+          <Activity className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Carregando dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -117,526 +120,301 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gradient-primary">Painel Administrativo</h1>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => navigate('/admin/perfil')} size="sm" className="flex-1 sm:flex-none">
-              <User className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Meu Perfil</span>
-            </Button>
-            <Button variant="outline" onClick={handleClearCache} title="Limpar todo o cache do navegador" size="sm" className="flex-1 sm:flex-none">
-              <Trash2 className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Limpar Cache</span>
-            </Button>
-            <Button variant="outline" onClick={handleLogout} size="sm" className="flex-1 sm:flex-none">
-              <LogOut className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Bem-vindo de volta, {user?.email?.split('@')[0] || 'Admin'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')}>
+                <User className="h-4 w-4 mr-2" />
+                Perfil
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
+      </header>
 
-        <div className="mb-6 sm:mb-8 space-y-4">
-          {/* Site Customization */}
-          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
-                onClick={() => navigate('/admin/customize')}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
-              <div className="lg:col-span-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <Palette className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <h3 className="text-lg sm:text-xl font-bold">Personalizar Site</h3>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  Edite cores, fontes, logotipos, textos e todos os elementos visuais da página inicial
-                </p>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <Edit3 className="h-10 w-10 sm:h-12 sm:w-12 text-primary/60" />
-                  <div>
-                    <p className="font-semibold text-base sm:text-lg">Customização Completa</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Interface intuitiva e fácil
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center">
-                <div className="text-center space-y-2 w-full">
-                  <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
-                    <div className="bg-primary/10 p-2 rounded">Header</div>
-                    <div className="bg-accent/10 p-2 rounded">Hero</div>
-                    <div className="bg-secondary/30 p-2 rounded">Planos</div>
-                    <div className="bg-muted/30 p-2 rounded">Contatos</div>
-                  </div>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Configure todas as seções
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* App Activation System */}
-          <Card className="bg-gradient-card border-border hover:shadow-lg transition-smooth w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
-              <div className="lg:col-span-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <Key className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-                  <h3 className="text-lg sm:text-xl font-bold">Sistema de Ativação</h3>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  Gerencie planos, chaves de ativação e dispositivos dos usuários
-                </p>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center">
-                <div className="grid grid-cols-3 gap-3 w-full">
-                  <div className="text-center">
-                    <Package className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mx-auto mb-2" />
-                    <p className="text-xs font-semibold">Planos</p>
-                  </div>
-                  <div className="text-center">
-                    <Key className="h-8 w-8 sm:h-10 sm:w-10 text-green-500 mx-auto mb-2" />
-                    <p className="text-xs font-semibold">Chaves</p>
-                  </div>
-                  <div className="text-center">
-                    <Smartphone className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 mx-auto mb-2" />
-                    <p className="text-xs font-semibold">Usuários</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
-                <div className="flex flex-col w-full lg:w-auto gap-2">
-                  <Button 
-                    onClick={() => navigate('/admin/user-roles')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Gerenciar Roles
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/security-monitor')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Monitor de Segurança
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/security-analytics')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <PieChart className="h-4 w-4 mr-2" />
-                    Analytics de Segurança
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/ip-blocking')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Bloqueio de IPs
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/permission-test')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Testar Permissões
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/m3u-lists')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Listas M3U
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/plans')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    Planos de Assinatura
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => navigate('/admin/activation-keys')}
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Key className="h-4 w-4 mr-2" />
-                    Chaves de Ativação
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/app-users')}
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Smartphone className="h-4 w-4 mr-2" />
-                    Usuários do App
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* WhatsApp Configuration */}
-          <Card className="bg-gradient-card border-border hover:shadow-lg transition-smooth w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
-              <div className="lg:col-span-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
-                  <h3 className="text-lg sm:text-xl font-bold">WhatsApp BotBot.chat</h3>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  Configure credenciais e envie notificações automáticas de pagamento
-                </p>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  {isConfigured ? (
-                    <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />
-                  ) : (
-                    <XCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500" />
-                  )}
-                  <div>
-                    <p className="font-semibold text-base sm:text-lg">
-                      {isConfigured ? 'Configurado' : 'Não Configurado'}
-                    </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      {isConfigured ? 'Sistema pronto' : 'Configure as credenciais'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
-                <div className="flex flex-col w-full lg:w-auto gap-2">
-                  <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configurar
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Configurar BotBot.chat</DialogTitle>
-                        <DialogDescription>
-                          Insira suas credenciais da plataforma BotBot.chat
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="appkey">App Key</Label>
-                          <Input
-                            id="appkey"
-                            value={appkey}
-                            onChange={(e) => setAppkey(e.target.value)}
-                            placeholder="b4153549-be4e-494d-8561-ee1912c55ee9"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="authkey">Auth Key</Label>
-                          <Input
-                            id="authkey"
-                            value={authkey}
-                            onChange={(e) => setAuthkey(e.target.value)}
-                            placeholder="jFXdat4Uaq19lVnt107Yn77lRjScoV9gzcRVzw17h0RIOXK4Xl"
-                          />
-                        </div>
-                        <Button onClick={handleSaveWhatsAppConfig} className="w-full">
-                          Salvar Configuração
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  
-                  <Button 
-                    onClick={() => navigate('/admin/templates')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Templates
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => navigate('/admin/variables')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Variable className="h-4 w-4 mr-2" />
-                    Variáveis
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/notification-settings')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Config. Notificações
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/notification-retry')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Fila de Retry
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/notification-stats')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Estatísticas
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/notification-alerts')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Bell className="h-4 w-4 mr-2" />
-                    Alertas
-                  </Button>
-
-                  <Button 
-                    onClick={() => navigate('/admin/notification-live')} 
-                    variant="outline"
-                    className="w-full justify-start"
-                  >
-                    <Radio className="h-4 w-4 mr-2" />
-                    Dashboard Ao Vivo
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => navigate('/admin/notificacoes')}
-                    className="w-full justify-start"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Notificações
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* SmartOne IPTV Integration */}
-          <Card className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth w-full"
-                onClick={() => navigate('/admin/smartone-config')}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
-              <div className="lg:col-span-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-                  <h3 className="text-lg sm:text-xl font-bold">SmartOne IPTV</h3>
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  Configure a integração automática com a API do SmartOne para criação de playlists
-                </p>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <Settings className="h-10 w-10 sm:h-12 sm:w-12 text-blue-500/60" />
-                  <div>
-                    <p className="font-semibold text-base sm:text-lg">Integração Automática</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Criação automática de playlists
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="lg:col-span-1 flex items-center justify-center lg:justify-end">
-                <Button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('/admin/smartone-config');
-                  }}
-                  className="w-full lg:w-auto"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configurar SmartOne
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-          {/* Client Stats */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
-          <Card 
-            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-            onClick={() => navigate('/admin/analytics')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Analytics de Cadastros
-              </CardTitle>
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">
-                Ver gráficos de origem
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-            onClick={() => navigate('/admin/system-health')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Saúde do Sistema
-              </CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-500">Operacional</div>
-              <p className="text-xs text-muted-foreground">
-                Ver métricas e gráficos
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-            onClick={() => navigate('/admin/clientes')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Clientes
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clientes cadastrados no sistema
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-            onClick={() => navigate('/admin/clientes')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Vencem em 5 Dias
-              </CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.vencendoProximos5Dias}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clientes com vencimento próximo
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-gradient-card border-border cursor-pointer hover:shadow-lg transition-smooth"
-            onClick={() => navigate('/admin/clientes')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Ativos Vencidos
-              </CardTitle>
-              <AlertCircle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.ativosVencidos}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clientes ativos com pagamento atrasado
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
+      <main className="container mx-auto px-6 py-8">
         {/* Quick Stats */}
-        <div className="mt-6 sm:mt-8">
-          <Card className="bg-gradient-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Resumo do Sistema</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
-                  <p className="text-xl sm:text-2xl font-bold text-primary">100%</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Sistema Online</p>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
-                  <p className="text-xl sm:text-2xl font-bold text-primary">24h</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Uptime</p>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-card rounded-lg border">
-                  <p className="text-xl sm:text-2xl font-bold text-primary">Ativo</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Status</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Visão Geral</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <QuickStat
+              icon={<Users className="h-5 w-5" />}
+              label="Total de Clientes"
+              value={stats.total}
+            />
+            <QuickStat
+              icon={<Clock className="h-5 w-5" />}
+              label="Vencendo em 5 dias"
+              value={stats.vencendoProximos5Dias}
+              variant="warning"
+            />
+            <QuickStat
+              icon={<AlertTriangle className="h-5 w-5" />}
+              label="Ativos Vencidos"
+              value={stats.ativosVencidos}
+              variant="danger"
+            />
+          </div>
+        </section>
 
-        {/* Cache Management Info */}
-        <div className="mt-6 sm:mt-8">
-          <Card className="bg-gradient-card border-border border-yellow-500/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                Gerenciamento de Cache
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Otimize o desempenho do site gerenciando o cache do navegador
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  O botão "Limpar Cache" remove todos os dados armazenados em cache, incluindo:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>Configurações do site (localStorage)</li>
-                  <li>Dados de sessão temporários (sessionStorage)</li>
-                  <li>Cache do Service Worker</li>
-                  <li>Imagens e recursos armazenados</li>
-                </ul>
-                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-3 rounded-lg">
-                  <p className="text-sm font-medium">
-                    ⚠️ Nota: Seus dados de autenticação serão preservados após limpar o cache.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        {/* Gestão de Clientes */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Gestão de Clientes</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              title="Lista de Clientes"
+              description="Visualize e gerencie todos os clientes cadastrados"
+              icon={<Users className="h-5 w-5" />}
+              path="/admin/clientes"
+            />
+            <NavCard
+              title="Novo Cliente"
+              description="Cadastre um novo cliente no sistema"
+              icon={<User className="h-5 w-5" />}
+              path="/admin/clientes/novo"
+            />
+            <NavCard
+              title="Listas M3U"
+              description="Configure playlists M3U por plano"
+              icon={<Package className="h-5 w-5" />}
+              path="/admin/m3u-lists"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Sistema de Notificações */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Sistema de Notificações</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <NavCard
+              title="Configurações"
+              description="Configure credenciais e horários de envio"
+              icon={<Settings className="h-5 w-5" />}
+              path="/admin/notification-settings"
+            />
+            <NavCard
+              title="Templates"
+              description="Gerencie templates de mensagens"
+              icon={<FileText className="h-5 w-5" />}
+              path="/admin/templates"
+            />
+            <NavCard
+              title="Notificações Automáticas"
+              description="Configure regras de envio automático"
+              icon={<Zap className="h-5 w-5" />}
+              path="/admin/auto-notifications"
+              badge="Novo"
+            />
+            <NavCard
+              title="Histórico"
+              description="Visualize o histórico de envios"
+              icon={<MessageSquare className="h-5 w-5" />}
+              path="/admin/notificacoes"
+            />
+            <NavCard
+              title="Estatísticas"
+              description="Análise de performance de envios"
+              icon={<BarChart3 className="h-5 w-5" />}
+              path="/admin/notification-stats"
+            />
+            <NavCard
+              title="Fila de Retry"
+              description="Mensagens aguardando reenvio"
+              icon={<Clock className="h-5 w-5" />}
+              path="/admin/notification-retry"
+            />
+            <NavCard
+              title="Monitor ao Vivo"
+              description="Acompanhe envios em tempo real"
+              icon={<Radio className="h-5 w-5" />}
+              path="/admin/notification-live"
+            />
+            <NavCard
+              title="Alertas"
+              description="Configure alertas de falhas"
+              icon={<AlertTriangle className="h-5 w-5" />}
+              path="/admin/notification-alerts"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* SmartOne */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Smartphone className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Integração SmartOne</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              title="Configuração"
+              description="Configure e teste a API SmartOne"
+              icon={<Settings className="h-5 w-5" />}
+              path="/admin/smartone-config"
+            />
+            <NavCard
+              title="Sincronização"
+              description="Sincronize clientes com SmartOne"
+              icon={<Target className="h-5 w-5" />}
+              path="/admin/smartone-sync"
+            />
+            <NavCard
+              title="Saúde das Playlists"
+              description="Monitore status das URLs M3U"
+              icon={<Activity className="h-5 w-5" />}
+              path="/admin/playlist-health"
+              badge="Novo"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Segurança */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Segurança e Monitoramento</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <NavCard
+              title="Monitor de Segurança"
+              description="Eventos de segurança em tempo real"
+              icon={<Shield className="h-5 w-5" />}
+              path="/admin/security-monitor"
+            />
+            <NavCard
+              title="Analytics de Segurança"
+              description="Análise de ameaças e padrões"
+              icon={<PieChart className="h-5 w-5" />}
+              path="/admin/security-analytics"
+            />
+            <NavCard
+              title="Alertas de Segurança"
+              description="Configure alertas automáticos"
+              icon={<Bell className="h-5 w-5" />}
+              path="/admin/security-alerts"
+            />
+            <NavCard
+              title="Escalonamento"
+              description="Regras de escalonamento de alertas"
+              icon={<TrendingUp className="h-5 w-5" />}
+              path="/admin/security-escalation"
+            />
+            <NavCard
+              title="Bloqueio de IPs"
+              description="Gerencie IPs bloqueados"
+              icon={<Lock className="h-5 w-5" />}
+              path="/admin/ip-blocking"
+            />
+            <NavCard
+              title="Estatísticas de Alertas"
+              description="Performance do sistema de alertas"
+              icon={<BarChart3 className="h-5 w-5" />}
+              path="/admin/alert-stats"
+            />
+            <NavCard
+              title="Timeline de Alertas"
+              description="Histórico cronológico de alertas"
+              icon={<Clock className="h-5 w-5" />}
+              path="/admin/alert-timeline"
+            />
+            <NavCard
+              title="Leaderboard"
+              description="Ranking de performance dos admins"
+              icon={<Target className="h-5 w-5" />}
+              path="/admin/leaderboard"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Sistema e Configurações */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Sistema e Configurações</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <NavCard
+              title="Analytics"
+              description="Métricas e análises do sistema"
+              icon={<BarChart3 className="h-5 w-5" />}
+              path="/admin/analytics"
+            />
+            <NavCard
+              title="Saúde do Sistema"
+              description="Status de serviços e integrações"
+              icon={<Activity className="h-5 w-5" />}
+              path="/admin/system-health"
+            />
+            <NavCard
+              title="Gestão de Usuários"
+              description="Controle de permissões e roles"
+              icon={<UserCog className="h-5 w-5" />}
+              path="/admin/user-roles"
+            />
+            <NavCard
+              title="Agendamentos"
+              description="Configure horários de alertas"
+              icon={<Clock className="h-5 w-5" />}
+              path="/admin/schedule-config"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Personalização */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Palette className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Personalização</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              title="Customização"
+              description="Personalize cores e aparência"
+              icon={<Palette className="h-5 w-5" />}
+              path="/admin/customize"
+            />
+            <NavCard
+              title="Variáveis"
+              description="Gerencie variáveis do sistema"
+              icon={<Variable className="h-5 w-5" />}
+              path="/admin/variables"
+            />
+            <NavCard
+              title="Banco de Dados"
+              description="Visualize estrutura do banco"
+              icon={<Database className="h-5 w-5" />}
+              path="/admin/permission-test"
+            />
+          </div>
+        </section>
+      </main>
     </div>
   );
 };
