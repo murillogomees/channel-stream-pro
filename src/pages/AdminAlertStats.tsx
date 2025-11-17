@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -13,10 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { AlertCircle, TrendingUp, Clock, CheckCircle2, AlertTriangle, Activity, Trophy } from "lucide-react";
+import { AlertCircle, TrendingUp, Clock, CheckCircle2, AlertTriangle, Activity, Trophy, Users } from "lucide-react";
 import { getSecurityAlertStatsService, type AlertPerformanceStats, type AdminPerformanceStats } from "@/services/securityAlertStatsService";
 import { getAdminBadgeService } from "@/services/adminBadgeService";
 import { AdminBadges } from "@/components/admin/AdminBadges";
+import { AdminComparison } from "@/components/admin/AdminComparison";
 import type { AdminAchievements } from "@/types/badge";
 
 export default function AdminAlertStats() {
@@ -26,6 +28,7 @@ export default function AdminAlertStats() {
   const [adminStats, setAdminStats] = useState<AdminPerformanceStats[]>([]);
   const [metricsData, setMetricsData] = useState<any[]>([]);
   const [adminAchievements, setAdminAchievements] = useState<Map<string, AdminAchievements>>(new Map());
+  const [selectedAdminsForComparison, setSelectedAdminsForComparison] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadStats();
@@ -62,6 +65,30 @@ export default function AdminAlertStats() {
     if (minutes < 1) return `${Math.round(minutes * 60)}s`;
     if (minutes < 60) return `${Math.round(minutes)}min`;
     return `${Math.round(minutes / 60)}h ${Math.round(minutes % 60)}min`;
+  };
+
+  const toggleAdminComparison = (adminId: string) => {
+    setSelectedAdminsForComparison(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(adminId)) {
+        newSet.delete(adminId);
+      } else {
+        if (newSet.size < 3) {
+          newSet.add(adminId);
+        }
+      }
+      return newSet;
+    });
+  };
+
+  const getComparisonData = () => {
+    return adminStats
+      .filter(admin => selectedAdminsForComparison.has(admin.admin_id))
+      .map(admin => ({
+        stats: admin,
+        achievements: adminAchievements.get(admin.admin_id)!
+      }))
+      .filter(item => item.achievements);
   };
 
   return (
@@ -146,6 +173,10 @@ export default function AdminAlertStats() {
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="admins">Performance por Admin</TabsTrigger>
+          <TabsTrigger value="comparison">
+            <Users className="h-4 w-4 mr-2" />
+            Comparação
+          </TabsTrigger>
           <TabsTrigger value="gamification">
             <Trophy className="h-4 w-4 mr-2" />
             Gamificação
@@ -200,12 +231,24 @@ export default function AdminAlertStats() {
           <Card>
             <CardHeader>
               <CardTitle>Ranking de Performance</CardTitle>
-              <CardDescription>Desempenho individual de cada administrador</CardDescription>
+              <CardDescription>Desempenho individual de cada administrador. Selecione até 3 admins para comparar.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedAdminsForComparison.size === adminStats.length && adminStats.length > 0}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedAdminsForComparison(new Set(adminStats.slice(0, 3).map(a => a.admin_id)));
+                          } else {
+                            setSelectedAdminsForComparison(new Set());
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Posição</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Badges & Conquistas</TableHead>
@@ -218,8 +261,18 @@ export default function AdminAlertStats() {
                 <TableBody>
                   {adminStats.map((admin, index) => {
                     const achievements = adminAchievements.get(admin.admin_id);
+                    const isSelected = selectedAdminsForComparison.has(admin.admin_id);
+                    const canSelect = selectedAdminsForComparison.size < 3 || isSelected;
+                    
                     return (
-                      <TableRow key={admin.admin_id}>
+                      <TableRow key={admin.admin_id} className={isSelected ? 'bg-primary/5' : ''}>
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            disabled={!canSelect}
+                            onCheckedChange={() => toggleAdminComparison(admin.admin_id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <Badge variant={index === 0 ? "default" : "outline"}>
                             #{index + 1}
@@ -249,13 +302,30 @@ export default function AdminAlertStats() {
                   })}
                   {adminStats.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         Nenhum dado disponível para o período selecionado
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab Comparação */}
+        <TabsContent value="comparison" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comparação entre Administradores</CardTitle>
+              <CardDescription>
+                {selectedAdminsForComparison.size === 0 
+                  ? 'Selecione até 3 admins na aba "Performance por Admin" para comparar' 
+                  : `Comparando ${selectedAdminsForComparison.size} administrador(es)`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminComparison admins={getComparisonData()} />
             </CardContent>
           </Card>
         </TabsContent>
