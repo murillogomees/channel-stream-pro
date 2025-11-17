@@ -45,3 +45,10 @@ verify_jwt = true
 # Cron job for alerting about inactive playlists - public for cron access
 [functions.alert-inactive-playlists]
 verify_jwt = false
+
+# 2FA functions - require authentication
+[functions.generate-totp-secret]
+verify_jwt = true
+
+[functions.verify-totp-token]
+verify_jwt = true

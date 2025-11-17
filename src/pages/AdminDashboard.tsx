@@ -366,6 +366,18 @@ const AdminDashboard = () => {
               icon={<Activity className="h-5 w-5" />}
               path="/admin/auth-status"
             />
+            <NavCard
+              title="Auditoria de Permissões"
+              description="Histórico de alterações de roles"
+              icon={<Shield className="h-5 w-5" />}
+              path="/admin/role-audit"
+            />
+            <NavCard
+              title="Tentativas Suspeitas"
+              description="Monitoramento de logins suspeitos"
+              icon={<AlertTriangle className="h-5 w-5" />}
+              path="/admin/suspicious-logins"
+            />
           </div>
         </section>
 
