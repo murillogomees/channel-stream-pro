@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { SituacaoCliente, PlanoCliente } from "@/types/cliente";
 
 interface SyncClientData {
   user_id: string;
@@ -9,6 +10,8 @@ interface SyncClientData {
   mac_smart_one?: string;
   usuario_m3u?: string;
   senha_m3u?: string;
+  situacao?: SituacaoCliente;
+  plano?: PlanoCliente;
 }
 
 interface SyncResponse {
@@ -58,7 +61,13 @@ export const smartoneAutoSyncService = {
     userId: string,
     clienteId: string,
     profileData: { nome: string; telefone: string; email: string },
-    clienteData?: { mac_smart_one?: string; usuario_m3u?: string; senha_m3u?: string }
+    clienteData?: { 
+      mac_smart_one?: string; 
+      usuario_m3u?: string; 
+      senha_m3u?: string;
+      situacao?: SituacaoCliente;
+      plano?: PlanoCliente;
+    }
   ): Promise<SyncResponse> {
     // Se não tiver MAC, não faz sincronização
     if (!clienteData?.mac_smart_one) {
@@ -77,6 +86,8 @@ export const smartoneAutoSyncService = {
       mac_smart_one: clienteData.mac_smart_one,
       usuario_m3u: clienteData.usuario_m3u,
       senha_m3u: clienteData.senha_m3u,
+      situacao: clienteData.situacao,
+      plano: clienteData.plano,
     });
   },
 };

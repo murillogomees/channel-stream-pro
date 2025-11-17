@@ -370,6 +370,8 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
+          plan_type: string | null
+          priority: number | null
           status: string | null
           updated_at: string | null
         }
@@ -379,6 +381,8 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
+          plan_type?: string | null
+          priority?: number | null
           status?: string | null
           updated_at?: string | null
         }
@@ -388,6 +392,8 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
+          plan_type?: string | null
+          priority?: number | null
           status?: string | null
           updated_at?: string | null
         }
@@ -977,6 +983,10 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_m3u_for_client_plan: {
+        Args: { cliente_plano: string; cliente_situacao: string }
+        Returns: string
+      }
       get_security_analytics: {
         Args: { _days?: number }
         Returns: {
