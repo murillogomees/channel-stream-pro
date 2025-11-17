@@ -579,6 +579,8 @@ export type Database = {
       m3u_lists: {
         Row: {
           created_at: string | null
+          created_by: string | null
+          description: string | null
           file_url: string
           id: string
           is_default: boolean | null
@@ -587,9 +589,12 @@ export type Database = {
           priority: number | null
           status: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           file_url: string
           id?: string
           is_default?: boolean | null
@@ -598,9 +603,12 @@ export type Database = {
           priority?: number | null
           status?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           file_url?: string
           id?: string
           is_default?: boolean | null
@@ -609,8 +617,47 @@ export type Database = {
           priority?: number | null
           status?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: []
+      }
+      m3u_lists_audit: {
+        Row: {
+          change_type: string
+          changed_by: string
+          created_at: string
+          id: string
+          m3u_list_id: string
+          new_values: Json | null
+          old_values: Json | null
+        }
+        Insert: {
+          change_type: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          m3u_list_id: string
+          new_values?: Json | null
+          old_values?: Json | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          m3u_list_id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_lists_audit_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       metrics_snapshots: {
         Row: {
