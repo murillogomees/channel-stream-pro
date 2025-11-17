@@ -16,6 +16,28 @@ export interface SmartOneSyncResult {
   error?: string;
 }
 
+export interface SmartOneTestPlaylist {
+  nome: string;
+  mac: string;
+  usuario: string;
+  senha: string;
+  descricao?: string;
+}
+
+export interface SmartOneTestResult {
+  id: string;
+  action: 'create' | 'update' | 'delete';
+  success: boolean;
+  playlistId?: string;
+  nome: string;
+  mac: string;
+  m3uUrl?: string;
+  descricao?: string;
+  error?: string;
+  timestamp: string;
+  rawResponse?: any;
+}
+
 class SmartoneService {
   private config: SmartOneConfig | null = null;
 
@@ -144,6 +166,191 @@ class SmartoneService {
         error: error.message,
       };
     }
+  }
+
+  async testCreatePlaylist(playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
+    const config = await this.getConfig();
+    
+    if (!config.enabled || !config.baseUrl || !config.clientApi || !config.keyApi) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'create',
+        success: false,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        error: 'Configuração SmartOne incompleta',
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-test', {
+        body: {
+          action: 'create',
+          playlist: {
+            nome: playlist.nome,
+            mac: playlist.mac,
+            usuario: playlist.usuario,
+            senha: playlist.senha,
+            descricao: playlist.descricao || '',
+          },
+        },
+      });
+
+      if (error) {
+        return {
+          id: crypto.randomUUID(),
+          action: 'create',
+          success: false,
+          nome: playlist.nome,
+          mac: playlist.mac,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          rawResponse: error,
+        };
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        action: 'create',
+        success: true,
+        playlistId: data.playlistId || data.id,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        m3uUrl: data.m3uUrl,
+        descricao: playlist.descricao,
+        timestamp: new Date().toISOString(),
+        rawResponse: data,
+      };
+    } catch (error: any) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'create',
+        success: false,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async testUpdatePlaylist(playlistId: string, playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-test', {
+        body: {
+          action: 'update',
+          playlistId,
+          playlist: {
+            nome: playlist.nome,
+            mac: playlist.mac,
+            usuario: playlist.usuario,
+            senha: playlist.senha,
+            descricao: playlist.descricao || '',
+          },
+        },
+      });
+
+      if (error) {
+        return {
+          id: crypto.randomUUID(),
+          action: 'update',
+          success: false,
+          playlistId,
+          nome: playlist.nome,
+          mac: playlist.mac,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        action: 'update',
+        success: true,
+        playlistId,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        m3uUrl: data.m3uUrl,
+        descricao: playlist.descricao,
+        timestamp: new Date().toISOString(),
+        rawResponse: data,
+      };
+    } catch (error: any) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'update',
+        success: false,
+        playlistId,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async testDeletePlaylist(playlistId: string, nome: string, mac: string): Promise<SmartOneTestResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-test', {
+        body: {
+          action: 'delete',
+          playlistId,
+        },
+      });
+
+      if (error) {
+        return {
+          id: crypto.randomUUID(),
+          action: 'delete',
+          success: false,
+          playlistId,
+          nome,
+          mac,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        action: 'delete',
+        success: true,
+        playlistId,
+        nome,
+        mac,
+        timestamp: new Date().toISOString(),
+        rawResponse: data,
+      };
+    } catch (error: any) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'delete',
+        success: false,
+        playlistId,
+        nome,
+        mac,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  getTestHistory(): SmartOneTestResult[] {
+    const stored = localStorage.getItem('smartone_test_history');
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  saveTestResult(result: SmartOneTestResult): void {
+    const history = this.getTestHistory();
+    history.unshift(result);
+    // Manter apenas os últimos 50 testes
+    const trimmed = history.slice(0, 50);
+    localStorage.setItem('smartone_test_history', JSON.stringify(trimmed));
+  }
+
+  clearTestHistory(): void {
+    localStorage.removeItem('smartone_test_history');
   }
 }
 
