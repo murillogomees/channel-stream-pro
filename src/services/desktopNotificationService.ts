@@ -147,6 +147,44 @@ class DesktopNotificationService {
     }
   }
 
+  async notifyPlaylistAlert(event: RealtimeNotificationEvent) {
+    if (!this.isEnabled()) {
+      return;
+    }
+
+    try {
+      const { data } = event;
+      const title = '🚨 Alerta: Playlists Inativas';
+      
+      let body = 'Foram detectadas playlists com problemas';
+      if (data.batchSize) {
+        body = `${data.batchSize} playlists inativas detectadas`;
+      }
+
+      const notification = new Notification(title, {
+        body,
+        icon: '/logo.png',
+        badge: '/logo.png',
+        tag: 'playlist-alert',
+        requireInteraction: true,
+        silent: false,
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+        // Navegar para a página de health das playlists
+        if (window.location.pathname !== '/admin/playlist-health') {
+          window.location.href = '/admin/playlist-health';
+        }
+      };
+
+      console.log('[Desktop Notifications] Notificação de playlist enviada');
+    } catch (error) {
+      console.error('[Desktop Notifications] Erro ao criar notificação de playlist:', error);
+    }
+  }
+
   async testNotification() {
     if (!this.isEnabled()) {
       const granted = await this.requestPermission();

@@ -11,6 +11,7 @@ export interface PlaylistHealthCheck {
   error_message?: string;
   last_checked_at: string;
   created_at: string;
+  snoozed_until?: string | null;
 }
 
 export interface PlaylistHealthStats {
@@ -157,6 +158,93 @@ class PlaylistHealthService {
       return data as PlaylistHealthCheck;
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Busca todas as verificações de playlists
+   */
+  async getAllHealthChecks(): Promise<PlaylistHealthCheck[]> {
+    try {
+      const { data, error } = await supabase
+        .from('playlist_health_checks')
+        .select('*')
+        .order('last_checked_at', { ascending: false });
+
+      if (error) {
+        console.error('Erro ao buscar verificações:', error);
+        return [];
+      }
+
+      return (data || []) as PlaylistHealthCheck[];
+    } catch (error) {
+      console.error('Erro ao buscar verificações:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Define um snooze para uma playlist específica
+   */
+  async snoozePlaylist(playlistId: string, hours: number): Promise<{ success: boolean; message: string }> {
+    try {
+      const snoozedUntil = new Date();
+      snoozedUntil.setHours(snoozedUntil.getHours() + hours);
+
+      const { error } = await supabase
+        .from('playlist_health_checks')
+        .update({ snoozed_until: snoozedUntil.toISOString() })
+        .eq('playlist_id', playlistId);
+
+      if (error) {
+        console.error('Erro ao configurar snooze:', error);
+        return {
+          success: false,
+          message: 'Erro ao configurar snooze',
+        };
+      }
+
+      return {
+        success: true,
+        message: `Alertas pausados por ${hours} horas`,
+      };
+    } catch (error: any) {
+      console.error('Erro ao configurar snooze:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro desconhecido',
+      };
+    }
+  }
+
+  /**
+   * Remove o snooze de uma playlist
+   */
+  async unsnoozePlaylist(playlistId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const { error } = await supabase
+        .from('playlist_health_checks')
+        .update({ snoozed_until: null })
+        .eq('playlist_id', playlistId);
+
+      if (error) {
+        console.error('Erro ao remover snooze:', error);
+        return {
+          success: false,
+          message: 'Erro ao reativar alertas',
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Alertas reativados',
+      };
+    } catch (error: any) {
+      console.error('Erro ao remover snooze:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro desconhecido',
+      };
     }
   }
 
