@@ -24,6 +24,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
+      console.log('[AuthContext] Buscando dados do usuário:', userId);
+      
       // 1. Buscar perfil
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -32,9 +34,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
 
       if (profileError) {
-        console.error('Erro ao buscar perfil:', profileError);
+        console.error('[AuthContext] Erro ao buscar perfil:', profileError);
         return null;
       }
+      
+      console.log('[AuthContext] Perfil encontrado:', profile);
 
       // 2. Buscar roles
       const { data: rolesData, error: rolesError } = await supabase
@@ -43,11 +47,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId);
 
       if (rolesError) {
-        console.error('Erro ao buscar roles:', rolesError);
+        console.error('[AuthContext] Erro ao buscar roles:', rolesError);
         return null;
       }
 
       const roles = (rolesData || []).map(r => r.role as AppRole);
+      console.log('[AuthContext] Roles encontrados:', roles);
 
       // 3. Buscar dados de cliente (se existir)
       const { data: clienteData } = await supabase
@@ -76,6 +81,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } : undefined
       };
 
+      console.log('[AuthContext] Usuário unificado criado:', {
+        email: unifiedUser.email,
+        roles: unifiedUser.roles,
+        isAdmin: unifiedUser.isAdmin,
+        isSuperAdmin: unifiedUser.isSuperAdmin,
+        isClient: unifiedUser.isClient
+      });
+
       return unifiedUser;
     } catch (error) {
       console.error('Erro ao buscar dados do usuário:', error);
@@ -87,12 +100,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Atualiza estado de autenticação
    */
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
+    console.log('[AuthContext] Atualizando estado de autenticação:', {
+      hasSession: !!currentSession,
+      userId: currentSession?.user?.id
+    });
+    
     setSession(currentSession);
     
     if (currentSession?.user) {
       const userData = await fetchUserData(currentSession.user.id);
+      console.log('[AuthContext] Dados do usuário carregados:', !!userData);
       setUser(userData);
     } else {
+      console.log('[AuthContext] Sem sessão, limpando usuário');
       setUser(null);
     }
     
