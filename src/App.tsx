@@ -46,6 +46,7 @@ const AdminAlertTimeline = lazy(() => import("./pages/AdminAlertTimeline"));
 const AdminLeaderboard = lazy(() => import("./pages/AdminLeaderboard"));
 const AdminPlaylistHealth = lazy(() => import("./pages/AdminPlaylistHealth"));
 const AdminAutoNotifications = lazy(() => import("./pages/AdminAutoNotifications"));
+const AdminAuthStatus = lazy(() => import("./pages/AdminAuthStatus"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -102,6 +103,7 @@ const App = () => (
           <Route path="/admin/smartone-sync" element={<ProtectedRoute requireAdmin><AdminSmartOneSync /></ProtectedRoute>} />
           <Route path="/admin/playlist-health" element={<ProtectedRoute requireAdmin><AdminPlaylistHealth /></ProtectedRoute>} />
           <Route path="/admin/auto-notifications" element={<ProtectedRoute requireAdmin><AdminAutoNotifications /></ProtectedRoute>} />
+          <Route path="/admin/auth-status" element={<ProtectedRoute requireAdmin><AdminAuthStatus /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />

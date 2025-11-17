@@ -360,6 +360,12 @@ const AdminDashboard = () => {
               icon={<Target className="h-5 w-5" />}
               path="/admin/leaderboard"
             />
+            <NavCard
+              title="Status de Autenticação"
+              description="Sessões ativas e histórico de logins"
+              icon={<Activity className="h-5 w-5" />}
+              path="/admin/auth-status"
+            />
           </div>
         </section>
 

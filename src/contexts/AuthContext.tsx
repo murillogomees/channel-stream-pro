@@ -11,6 +11,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
+import { authLoggingService } from '@/services/authLoggingService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -111,6 +112,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userData = await fetchUserData(currentSession.user.id);
       console.log('[AuthContext] Dados do usuário carregados:', !!userData);
       setUser(userData);
+      
+      // Registrar login
+      if (userData) {
+        setTimeout(() => {
+          authLoggingService.logLogin(
+            currentSession.user.id,
+            userData.email || currentSession.user.email || ''
+          );
+        }, 0);
+      }
     } else {
       console.log('[AuthContext] Sem sessão, limpando usuário');
       setUser(null);
@@ -133,10 +144,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Logout
    */
   const signOut = useCallback(async () => {
+    // Registrar logout antes de fazer signOut
+    if (user) {
+      await authLoggingService.logLogout(user.id, user.email || '');
+    }
+    
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // Configurar listener de mudanças de autenticação

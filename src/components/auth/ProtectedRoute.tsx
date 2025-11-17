@@ -10,6 +10,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { authLoggingService } from '@/services/authLoggingService';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -58,6 +59,19 @@ export const ProtectedRoute = ({
   // Super admin requer permissão específica
   if (requireSuperAdmin && !isSuperAdmin) {
     console.log('[ProtectedRoute] Super admin requerido mas usuário não tem permissão');
+    
+    // Registrar tentativa de acesso negado
+    if (user) {
+      setTimeout(() => {
+        authLoggingService.logAccessDenied(
+          user.id,
+          user.email || '',
+          'super_admin required',
+          location.pathname
+        );
+      }, 0);
+    }
+    
     return <Navigate to="/403" state={{ required: 'super_admin' }} replace />;
   }
 
@@ -67,12 +81,38 @@ export const ProtectedRoute = ({
       isAdmin,
       userRoles: user?.roles
     });
+    
+    // Registrar tentativa de acesso negado
+    if (user) {
+      setTimeout(() => {
+        authLoggingService.logAccessDenied(
+          user.id,
+          user.email || '',
+          'admin required',
+          location.pathname
+        );
+      }, 0);
+    }
+    
     return <Navigate to="/403" state={{ required: 'admin' }} replace />;
   }
 
   // Cliente precisa ter role client
   if (requireClient && !isClient) {
     console.log('[ProtectedRoute] Client requerido mas usuário não tem permissão');
+    
+    // Registrar tentativa de acesso negado
+    if (user) {
+      setTimeout(() => {
+        authLoggingService.logAccessDenied(
+          user.id,
+          user.email || '',
+          'client required',
+          location.pathname
+        );
+      }, 0);
+    }
+    
     return <Navigate to="/403" state={{ required: 'client' }} replace />;
   }
 
