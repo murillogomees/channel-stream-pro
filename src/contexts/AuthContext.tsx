@@ -41,19 +41,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log('[AuthContext] Perfil encontrado:', profile);
 
-      // 2. Buscar roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
+      // 2. Buscar roles com fallback robusto (RLS-safe)
+      let roles: AppRole[] = [];
+      try {
+        const { data: rolesData, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId);
 
-      if (rolesError) {
-        console.error('[AuthContext] Erro ao buscar roles:', rolesError);
-        return null;
+        if (rolesError) {
+          console.warn('[AuthContext] Erro ao buscar roles via tabela, tentando fallback RPC:', rolesError);
+        } else {
+          roles = (rolesData || []).map((r) => r.role as AppRole);
+        }
+      } catch (e) {
+        console.warn('[AuthContext] Exceção ao buscar roles via tabela, tentando fallback RPC:', e);
       }
 
-      const roles = (rolesData || []).map(r => r.role as AppRole);
-      console.log('[AuthContext] Roles encontrados:', roles);
+      // Fallback: usar RPC has_role (SECURITY DEFINER) para ignorar RLS
+      try {
+        const [{ data: isAdminRpc }, { data: isClientRpc }] = await Promise.all([
+          supabase.rpc('has_role', { _user_id: userId, _role: 'admin' as any }),
+          supabase.rpc('has_role', { _user_id: userId, _role: 'client' as any }),
+        ]);
+
+        if (isAdminRpc) roles = Array.from(new Set([...roles, 'admin' as AppRole]));
+        if (isClientRpc) roles = Array.from(new Set([...roles, 'client' as AppRole]));
+      } catch (e) {
+        console.warn('[AuthContext] Fallback RPC has_role falhou:', e);
+      }
+
+      console.log('[AuthContext] Roles finais:', roles);
 
       // 3. Buscar dados de cliente (se existir)
       const { data: clienteData } = await supabase
