@@ -65,6 +65,7 @@ export default function AdminNotificacoes() {
     error?: string;
     formatted?: string;
   }>({ isValid: false });
+  const [testingCredentials, setTestingCredentials] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
   const errorHandler = getErrorHandler();
@@ -135,6 +136,44 @@ export default function AdminNotificacoes() {
     });
   };
 
+  const handleTestCredentials = async () => {
+    setTestingCredentials(true);
+    try {
+      const whatsappService = getWhatsAppService();
+      if (!whatsappService) {
+        toast({
+          title: 'Erro',
+          description: 'Configure as credenciais do WhatsApp primeiro',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const result = await whatsappService.verifyCredentials();
+      
+      if (result.valid) {
+        toast({
+          title: 'Credenciais Válidas! ✅',
+          description: 'Suas credenciais BotBot estão funcionando corretamente.',
+        });
+      } else {
+        toast({
+          title: 'Credenciais Inválidas ❌',
+          description: result.error || 'Verifique suas credenciais BotBot',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao testar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingCredentials(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -163,6 +202,23 @@ export default function AdminNotificacoes() {
 
     setSending(true);
     try {
+      // Verificar credenciais antes de enviar
+      const whatsappService = getWhatsAppService();
+      if (!whatsappService) {
+        throw new Error('Configure as credenciais do WhatsApp primeiro');
+      }
+
+      const credentialsCheck = await whatsappService.verifyCredentials();
+      if (!credentialsCheck.valid) {
+        toast({
+          title: 'Credenciais Inválidas',
+          description: credentialsCheck.error || 'Verifique suas credenciais BotBot',
+          variant: 'destructive',
+        });
+        setSending(false);
+        return;
+      }
+
       const template = LOCAL_TEMPLATES.find(t => t.id === selectedTemplate);
       if (!template) throw new Error('Template não encontrado');
 
@@ -225,9 +281,21 @@ export default function AdminNotificacoes() {
 
     setSending(true);
     try {
+      // Verificar credenciais antes de enviar
       const whatsappService = getWhatsAppService();
       if (!whatsappService) {
-        throw new Error('WhatsApp não configurado');
+        throw new Error('Configure as credenciais do WhatsApp primeiro');
+      }
+
+      const credentialsCheck = await whatsappService.verifyCredentials();
+      if (!credentialsCheck.valid) {
+        toast({
+          title: 'Credenciais Inválidas',
+          description: credentialsCheck.error || 'Verifique suas credenciais BotBot',
+          variant: 'destructive',
+        });
+        setSending(false);
+        return;
       }
 
       const response = await whatsappService.sendFile(
@@ -520,6 +588,23 @@ export default function AdminNotificacoes() {
               <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-3 rounded-lg">
                 <p className="text-sm font-medium">
                   ⚠️ Configure as credenciais BotBot.chat no Dashboard primeiro
+                </p>
+              </div>
+            )}
+
+            {isConfigured && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleTestCredentials}
+                  disabled={testingCredentials}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  {testingCredentials ? 'Testando...' : 'Testar Credenciais BotBot'}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Verifica se suas credenciais estão válidas e ativas
                 </p>
               </div>
             )}

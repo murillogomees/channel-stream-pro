@@ -170,6 +170,53 @@ export class WhatsAppService {
   static validateCredentials(appkey: string, authkey: string): boolean {
     return appkey.trim().length > 0 && authkey.trim().length > 0;
   }
+
+  /**
+   * Verifica se as credenciais estão válidas fazendo uma chamada de teste à API
+   * Retorna { valid: boolean, error?: string }
+   */
+  async verifyCredentials(): Promise<{ valid: boolean; error?: string }> {
+    const formData = new FormData();
+    formData.append('appkey', this.appkey);
+    formData.append('authkey', this.authkey);
+    formData.append('to', '5500000000000'); // Número inválido apenas para teste de credenciais
+    formData.append('message', 'teste');
+
+    try {
+      const response = await fetch(BOTBOT_API_URL, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      // Se retornar erro de credenciais expiradas
+      if (data.error && data.error.toLowerCase().includes('expired')) {
+        return { 
+          valid: false, 
+          error: 'Suas credenciais BotBot expiraram. Atualize o appkey e authkey nas configurações.' 
+        };
+      }
+
+      // Se retornar erro de autenticação
+      if (response.status === 401 || response.status === 403) {
+        return { 
+          valid: false, 
+          error: 'Credenciais BotBot inválidas. Verifique seu appkey e authkey.' 
+        };
+      }
+
+      // Qualquer outro erro que não seja relacionado a número inválido
+      // significa que as credenciais estão válidas
+      return { valid: true };
+    } catch (error) {
+      console.error('Erro ao verificar credenciais:', error);
+      return { 
+        valid: false, 
+        error: 'Não foi possível verificar as credenciais. Verifique sua conexão.' 
+      };
+    }
+  }
 }
 
 export function getWhatsAppService(): WhatsAppService | null {
