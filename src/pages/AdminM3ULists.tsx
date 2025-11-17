@@ -164,6 +164,30 @@ export default function AdminM3ULists() {
     }
   };
 
+  const loadAuditHistory = async (listId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('m3u_lists_audit')
+        .select(`
+          *,
+          changed_by_profile:profiles!changed_by(nome)
+        `)
+        .eq('m3u_list_id', listId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedLogs = (data || []).map((log: any) => ({
+        ...log,
+        admin_name: log.changed_by_profile?.nome || 'Sistema'
+      }));
+
+      setAuditLogs(formattedLogs);
+    } catch (error: any) {
+      console.error('Error loading audit history:', error);
+    }
+  };
+
   const handleOpenDialog = async (list?: M3UList) => {
     if (list) {
       setEditingList(list);
