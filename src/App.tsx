@@ -53,6 +53,7 @@ const AdminRoleAudit = lazy(() => import("./pages/AdminRoleAudit"));
 const Admin2FASettings = lazy(() => import("./pages/Admin2FASettings"));
 const AdminSuspiciousLogins = lazy(() => import("./pages/AdminSuspiciousLogins"));
 const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
+const AdminDiagnostic = lazy(() => import("./pages/AdminDiagnostic"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -116,9 +117,7 @@ const App = () => (
           <Route path="/admin/2fa-settings" element={<ProtectedRoute requireAdmin><Admin2FASettings /></ProtectedRoute>} />
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
           <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
-          <Route path="/admin/role-audit" element={<ProtectedRoute requireAdmin><AdminRoleAudit /></ProtectedRoute>} />
-          <Route path="/admin/2fa-settings" element={<ProtectedRoute requireAdmin><Admin2FASettings /></ProtectedRoute>} />
-          <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
+          <Route path="/admin/diagnostic" element={<ProtectedRoute requireAdmin><AdminDiagnostic /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
