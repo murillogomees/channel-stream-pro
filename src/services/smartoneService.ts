@@ -75,6 +75,41 @@ export const normalizeMacAddress = (mac: string): string => {
   return normalized;
 };
 
+// Gera um MAC Address aleatório válido
+export const generateRandomMacAddress = (): string => {
+  const hexChars = '0123456789ABCDEF';
+  const octets: string[] = [];
+  
+  for (let i = 0; i < 6; i++) {
+    const octet = hexChars[Math.floor(Math.random() * 16)] + hexChars[Math.floor(Math.random() * 16)];
+    octets.push(octet);
+  }
+  
+  return octets.join(':');
+};
+
+// Gerenciamento de histórico de MACs
+const MAC_HISTORY_KEY = 'smartone_mac_history';
+const MAX_MAC_HISTORY = 10;
+
+export const saveMacToHistory = (mac: string): void => {
+  const history = getMacHistory();
+  const normalized = normalizeMacAddress(mac);
+  
+  // Remove duplicatas e adiciona no início
+  const updated = [normalized, ...history.filter(m => m !== normalized)].slice(0, MAX_MAC_HISTORY);
+  localStorage.setItem(MAC_HISTORY_KEY, JSON.stringify(updated));
+};
+
+export const getMacHistory = (): string[] => {
+  const stored = localStorage.getItem(MAC_HISTORY_KEY);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const clearMacHistory = (): void => {
+  localStorage.removeItem(MAC_HISTORY_KEY);
+};
+
 class SmartoneService {
   private config: SmartOneConfig | null = null;
 
