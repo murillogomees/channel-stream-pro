@@ -16,6 +16,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminCustomize = lazy(() => import("./pages/AdminCustomize"));
 const AdminClientes = lazy(() => import("./pages/AdminClientes"));
 const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
+const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
 const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
@@ -82,6 +83,7 @@ const App = () => (
           <Route path="/admin/clientes" element={<ProtectedRoute requireAdmin><AdminClientes /></ProtectedRoute>} />
           <Route path="/admin/clientes/novo" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
           <Route path="/admin/clientes/editar/:id" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
+          <Route path="/admin/clientes/:id/m3u" element={<ProtectedRoute requireAdmin><AdminClientM3U /></ProtectedRoute>} />
           <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoes /></ProtectedRoute>} />
           <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
           <Route path="/admin/templates" element={<ProtectedRoute requireAdmin><AdminTemplates /></ProtectedRoute>} />

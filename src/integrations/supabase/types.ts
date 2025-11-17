@@ -290,6 +290,48 @@ export type Database = {
         }
         Relationships: []
       }
+      client_m3u_lists: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          client_id: string
+          id: string
+          is_active: boolean | null
+          m3u_list_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          client_id: string
+          id?: string
+          is_active?: boolean | null
+          m3u_list_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          client_id?: string
+          id?: string
+          is_active?: boolean | null
+          m3u_list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_m3u_lists_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_m3u_lists_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           cliente_ativo: boolean | null
