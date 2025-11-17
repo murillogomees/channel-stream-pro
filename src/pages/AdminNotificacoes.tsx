@@ -187,6 +187,32 @@ export default function AdminNotificacoes() {
     }
   };
 
+  // Combinar clientes reais com contatos de teste para envio
+  const allContactsForSending = [
+    ...clientes,
+    ...(config.testContacts || []).map(contact => ({
+      id: contact.id,
+      nome: `${contact.name} (Teste)`,
+      telefone: contact.phone,
+      telegram: '',
+      email: '',
+      situacao: 'Testando' as const,
+      dataContratacao: contact.addedAt,
+      dataVencimento: contact.addedAt,
+      plano: 'Mensal' as const,
+      valorPago: 0,
+      dataUltimoPagamento: contact.addedAt,
+      formaUltimoPagamento: '',
+      macSmartOne: '',
+      usuario: '',
+      senha: '',
+      dataCadastro: contact.addedAt,
+      dataUltimaEdicao: contact.addedAt,
+      clienteAtivo: true,
+      origemCadastro: 'Outro' as const,
+    }))
+  ];
+
   const handleSendFile = async () => {
     if (!selectedCliente || !file) {
       toast({
@@ -652,12 +678,12 @@ export default function AdminNotificacoes() {
                         className="w-full p-2 border rounded-md bg-background"
                         value={selectedCliente?.id || ''}
                         onChange={(e) => {
-                          const cliente = clientes.find(c => c.id === e.target.value);
+                          const cliente = allContactsForSending.find(c => c.id === e.target.value);
                           setSelectedCliente(cliente || null);
                         }}
                       >
                         <option value="">Selecione um cliente</option>
-                        {clientes.map(c => (
+                        {allContactsForSending.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.nome} - {formatPhoneForDisplay(c.telefone)}
                           </option>
@@ -712,12 +738,12 @@ export default function AdminNotificacoes() {
                         className="w-full p-2 border rounded-md bg-background"
                         value={selectedCliente?.id || ''}
                         onChange={(e) => {
-                          const cliente = clientes.find(c => c.id === e.target.value);
+                          const cliente = allContactsForSending.find(c => c.id === e.target.value);
                           setSelectedCliente(cliente || null);
                         }}
                       >
                         <option value="">Selecione um cliente</option>
-                        {clientes.map(c => (
+                        {allContactsForSending.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.nome} - {formatPhoneForDisplay(c.telefone)}
                           </option>
