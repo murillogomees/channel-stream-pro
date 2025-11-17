@@ -234,20 +234,74 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { data: defaultList, error: dbError } = await supabaseService
-      .from('m3u_lists')
-      .select('file_url')
-      .eq('is_default', true)
-      .eq('status', 'active')
+    // Buscar dados do cliente para determinar o plano
+    const { data: clienteData, error: clienteError } = await supabaseService
+      .from('clientes')
+      .select('situacao, plano, mac_smart_one')
+      .eq('mac_smart_one', mac)
       .maybeSingle();
 
-    if (dbError || !defaultList) {
-      console.error('[smartone-sync] M3U list error');
+    if (clienteError) {
+      console.warn('[smartone-sync] Cliente data fetch warning:', clienteError);
+    }
+
+    console.log('[smartone-sync] Client plan:', clienteData?.plano, '| Status:', clienteData?.situacao);
+
+    // Buscar a lista M3U apropriada baseada no plano do cliente usando a função SQL
+    let m3uListId = null;
+    
+    if (clienteData?.plano && clienteData?.situacao) {
+      const { data: listId, error: rpcError } = await supabaseService
+        .rpc('get_m3u_for_client_plan', {
+          cliente_plano: clienteData.plano,
+          cliente_situacao: clienteData.situacao,
+        });
+
+      if (!rpcError && listId) {
+        m3uListId = listId;
+        console.log('[smartone-sync] Lista M3U selecionada via plano:', listId);
+      }
+    }
+
+    // Fallback: buscar lista padrão se não encontrar pela função
+    if (!m3uListId) {
+      console.log('[smartone-sync] Usando lista padrão como fallback...');
+      const { data: defaultList, error: defaultError } = await supabaseService
+        .from('m3u_lists')
+        .select('id')
+        .eq('is_default', true)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (!defaultError && defaultList) {
+        m3uListId = defaultList.id;
+      }
+    }
+
+    // Buscar URL da lista selecionada
+    if (!m3uListId) {
+      console.error('[smartone-sync] Nenhuma lista M3U disponível');
       return new Response(
-        JSON.stringify({ error: 'Lista M3U padrão não encontrada' }),
+        JSON.stringify({ error: 'Nenhuma lista M3U disponível' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { data: m3uList, error: dbError } = await supabaseService
+      .from('m3u_lists')
+      .select('file_url, plan_type, name')
+      .eq('id', m3uListId)
+      .single();
+
+    if (dbError || !m3uList) {
+      console.error('[smartone-sync] M3U list error:', dbError);
+      return new Response(
+        JSON.stringify({ error: 'Lista M3U não encontrada' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[smartone-sync] Lista M3U: ${m3uList.name} (${m3uList.plan_type})`);
 
     console.log('[smartone-sync] Calling SmartOne API');
     
@@ -258,7 +312,7 @@ serve(async (req) => {
         client_api: SMARTONE_CLIENT_API,
         key_api: SMARTONE_KEY_API,
         mac: mac,
-        m3u_url: defaultList.file_url,
+        m3u_url: m3uList.file_url,
         name: clienteNome,
       }),
     });

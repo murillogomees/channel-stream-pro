@@ -42,6 +42,8 @@ interface M3UList {
   created_at: string;
   updated_at: string;
   is_default?: boolean;
+  plan_type?: 'teste' | 'basico' | 'premium';
+  priority?: number;
 }
 
 export default function AdminM3ULists() {
@@ -53,6 +55,8 @@ export default function AdminM3ULists() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [listName, setListName] = useState('');
+  const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
+  const [priority, setPriority] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -77,7 +81,7 @@ export default function AdminM3ULists() {
 
       if (error) throw error;
 
-      setLists(data || []);
+      setLists((data || []) as M3UList[]);
     } catch (error: any) {
       console.error('Error loading M3U lists:', error);
       toast.error('Erro ao carregar listas M3U', {
@@ -147,6 +151,8 @@ export default function AdminM3ULists() {
       setIsDialogOpen(false);
       setSelectedFile(null);
       setListName('');
+      setPlanType('teste');
+      setPriority(0);
       loadLists();
     } catch (error: any) {
       console.error('Error uploading M3U:', error);
@@ -242,6 +248,19 @@ export default function AdminM3ULists() {
     return `${mb.toFixed(2)} MB`;
   };
 
+  const getPlanTypeBadge = (planType?: string) => {
+    switch (planType) {
+      case 'teste':
+        return <Badge variant="secondary">Teste</Badge>;
+      case 'basico':
+        return <Badge variant="outline">Básico</Badge>;
+      case 'premium':
+        return <Badge className="bg-gradient-to-r from-amber-500 to-amber-600 text-white">Premium</Badge>;
+      default:
+        return <Badge variant="secondary">Teste</Badge>;
+    }
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -319,8 +338,8 @@ export default function AdminM3ULists() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Arquivo</TableHead>
-                <TableHead>Tamanho</TableHead>
+                <TableHead>Plano</TableHead>
+                <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -347,13 +366,10 @@ export default function AdminM3ULists() {
                         )}
                       </div>
                     </TableCell>
+                    <TableCell>{getPlanTypeBadge(list.plan_type)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">{list.name}</span>
-                      </div>
+                      <Badge variant="outline">{list.priority || 0}</Badge>
                     </TableCell>
-                    <TableCell>URL: {list.file_url.substring(0, 40)}...</TableCell>
                     <TableCell>
                       <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
                         {list.status === 'active' ? 'Ativa' : 'Inativa'}
@@ -426,6 +442,39 @@ export default function AdminM3ULists() {
                 onChange={(e) => setListName(e.target.value)}
                 placeholder="Ex: Canais Premium HD"
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="planType">Tipo de Plano</Label>
+              <select
+                id="planType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={planType}
+                onChange={(e) => setPlanType(e.target.value as any)}
+              >
+                <option value="teste">Teste (Trial/Gratuito)</option>
+                <option value="basico">Básico (Mensal/Trimestral)</option>
+                <option value="premium">Premium (Semestral/Anual)</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Clientes receberão esta lista automaticamente baseado no plano contratado
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="priority">Prioridade (0-100)</Label>
+              <Input
+                id="priority"
+                type="number"
+                min="0"
+                max="100"
+                value={priority}
+                onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Maior prioridade = preferida quando múltiplas listas estão disponíveis para o mesmo plano
+              </p>
             </div>
 
             <div className="grid gap-2">
