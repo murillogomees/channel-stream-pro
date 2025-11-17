@@ -32,21 +32,36 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          notification_channels: Json | null
           phone: string
+          phone_sms: string | null
+          schedule_config: Json | null
+          schedule_enabled: boolean | null
+          telegram_id: string | null
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
           id?: string
           name: string
+          notification_channels?: Json | null
           phone: string
+          phone_sms?: string | null
+          schedule_config?: Json | null
+          schedule_enabled?: boolean | null
+          telegram_id?: string | null
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
           id?: string
           name?: string
+          notification_channels?: Json | null
           phone?: string
+          phone_sms?: string | null
+          schedule_config?: Json | null
+          schedule_enabled?: boolean | null
+          telegram_id?: string | null
         }
         Relationships: []
       }
