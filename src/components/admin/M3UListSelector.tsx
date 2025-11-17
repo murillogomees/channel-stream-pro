@@ -18,9 +18,10 @@ interface M3UList {
 interface M3UListSelectorProps {
   selectedLists: string[];
   onChange: (selectedIds: string[]) => void;
+  onListsLoaded?: (lists: M3UList[]) => void;
 }
 
-export const M3UListSelector = ({ selectedLists, onChange }: M3UListSelectorProps) => {
+export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UListSelectorProps) => {
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,7 +41,13 @@ export const M3UListSelector = ({ selectedLists, onChange }: M3UListSelectorProp
 
       if (error) throw error;
 
-      setLists((data || []) as M3UList[]);
+      const loadedLists = (data || []) as M3UList[];
+      setLists(loadedLists);
+      
+      // Notify parent component about loaded lists
+      if (onListsLoaded) {
+        onListsLoaded(loadedLists);
+      }
     } catch (error: any) {
       console.error('Error loading M3U lists:', error);
       toast.error('Erro ao carregar listas M3U');

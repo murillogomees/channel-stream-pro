@@ -9,6 +9,7 @@ import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler } from '@/services/notifications';
 import { smartoneService } from '@/services/smartoneService';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { M3UListSelector } from '@/components/admin/M3UListSelector';
+import { M3UListPreview } from '@/components/admin/M3UListPreview';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -97,6 +99,7 @@ export default function AdminClienteForm() {
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
   const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
+  const [allM3ULists, setAllM3ULists] = useState<any[]>([]);
 
   const {
     register,
@@ -174,8 +177,11 @@ export default function AdminClienteForm() {
       smartone_status: 'nao_enviado',
     };
 
+    let clientId: string;
+    
     if (id) {
       updateCliente(id, clienteData);
+      clientId = id;
       toast({
         title: 'Cliente atualizado',
         description: 'As informações foram salvas com sucesso.',
@@ -250,10 +256,45 @@ export default function AdminClienteForm() {
       }
     } else {
       const novoCliente = addCliente(clienteData);
+      clientId = novoCliente.id;
+      
       toast({
         title: 'Cliente cadastrado',
         description: 'O novo cliente foi adicionado com sucesso.',
       });
+
+      // Save M3U list assignments for new clients
+      if (selectedM3ULists.length > 0) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const assignments = selectedM3ULists.map(listId => ({
+            client_id: clientId,
+            m3u_list_id: listId,
+            assigned_by: user?.id,
+            is_active: true,
+          }));
+
+          const { error: assignError } = await supabase
+            .from('client_m3u_lists')
+            .insert(assignments);
+
+          if (assignError) {
+            console.error('Error assigning M3U lists:', assignError);
+            toast({
+              title: "Erro ao atribuir listas",
+              description: "Cliente criado, mas houve erro ao atribuir listas M3U",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Listas atribuídas",
+              description: `${selectedM3ULists.length} lista(s) M3U atribuída(s) com sucesso`,
+            });
+          }
+        } catch (error) {
+          console.error('Error assigning M3U lists:', error);
+        }
+      }
 
       // Se tem MAC, usuário e senha, sincronizar com SmartOne
       if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
@@ -453,8 +494,19 @@ export default function AdminClienteForm() {
                 <M3UListSelector 
                   selectedLists={selectedM3ULists}
                   onChange={setSelectedM3ULists}
+                  onListsLoaded={setAllM3ULists}
                 />
               </div>
+
+              {!id && selectedM3ULists.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Preview das Listas Selecionadas</Label>
+                  <M3UListPreview 
+                    selectedLists={selectedM3ULists}
+                    allLists={allM3ULists}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border border-border">
                 <Switch
