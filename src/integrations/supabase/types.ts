@@ -785,6 +785,7 @@ export type Database = {
           id: string
           nome: string
           telefone: string | null
+          theme: string | null
           totp_enabled: boolean | null
           totp_secret: string | null
           totp_verified_at: string | null
@@ -796,6 +797,7 @@ export type Database = {
           id: string
           nome: string
           telefone?: string | null
+          theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null
           totp_verified_at?: string | null
@@ -807,6 +809,7 @@ export type Database = {
           id?: string
           nome?: string
           telefone?: string | null
+          theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null
           totp_verified_at?: string | null

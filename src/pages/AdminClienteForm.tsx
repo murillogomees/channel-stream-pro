@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { M3UListSelector } from '@/components/admin/M3UListSelector';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -95,6 +96,7 @@ export default function AdminClienteForm() {
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
   const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
+  const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
 
   const {
     register,
@@ -439,6 +441,19 @@ export default function AdminClienteForm() {
                   <Label htmlFor="senha">Senha</Label>
                   <Input id="senha" type="password" {...register('senha')} />
                 </div>
+              </div>
+
+              <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Listas M3U</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Selecione uma ou mais listas M3U que serão atribuídas a este cliente
+                  </p>
+                </div>
+                <M3UListSelector 
+                  selectedLists={selectedM3ULists}
+                  onChange={setSelectedM3ULists}
+                />
               </div>
 
               <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border border-border">
