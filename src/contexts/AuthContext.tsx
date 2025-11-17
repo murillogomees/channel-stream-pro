@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('clientes')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       // 4. Montar objeto unificado
       const unifiedUser: UnifiedUser = {
