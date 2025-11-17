@@ -146,6 +146,51 @@ export type Database = {
         }
         Relationships: []
       }
+      automatic_notification_rules: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          days_before: number | null
+          description: string | null
+          event_type: string
+          id: string
+          name: string
+          priority: number | null
+          target_audience: string
+          template_reference: string | null
+          trigger_condition: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          days_before?: number | null
+          description?: string | null
+          event_type: string
+          id?: string
+          name: string
+          priority?: number | null
+          target_audience?: string
+          template_reference?: string | null
+          trigger_condition: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          days_before?: number | null
+          description?: string | null
+          event_type?: string
+          id?: string
+          name?: string
+          priority?: number | null
+          target_audience?: string
+          template_reference?: string | null
+          trigger_condition?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           cliente_ativo: boolean | null
