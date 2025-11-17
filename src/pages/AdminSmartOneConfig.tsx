@@ -37,8 +37,7 @@ export default function AdminSmartOneConfig() {
   // Estados para teste de playlist
   const [testNome, setTestNome] = useState('');
   const [testMac, setTestMac] = useState('');
-  const [testUsuario, setTestUsuario] = useState('');
-  const [testSenha, setTestSenha] = useState('');
+  const [testM3uUrl, setTestM3uUrl] = useState('');
   const [testDescricao, setTestDescricao] = useState('');
   const [testPlaylistId, setTestPlaylistId] = useState('');
   const [isTestingPlaylist, setIsTestingPlaylist] = useState(false);
@@ -203,10 +202,10 @@ export default function AdminSmartOneConfig() {
   };
 
   const handleTestCreate = async () => {
-    if (!testNome || !testMac || !testUsuario || !testSenha) {
+    if (!testNome || !testMac || !testM3uUrl) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha Nome, MAC, Usuário e Senha para criar.',
+        description: 'Preencha Nome, MAC e URL do M3U para criar.',
         variant: 'destructive',
       });
       return;
@@ -214,13 +213,12 @@ export default function AdminSmartOneConfig() {
 
     setIsTestingPlaylist(true);
     try {
-      const result = await smartoneService.testCreatePlaylist({
-        nome: testNome,
-        mac: testMac,
-        usuario: testUsuario,
-        senha: testSenha,
-        descricao: testDescricao,
-      });
+    const result = await smartoneService.testCreatePlaylist({
+      nome: testNome,
+      mac: testMac,
+      m3uUrl: testM3uUrl,
+      descricao: testDescricao,
+    });
 
       smartoneService.saveTestResult(result);
       
@@ -257,10 +255,10 @@ export default function AdminSmartOneConfig() {
   };
 
   const handleTestUpdate = async () => {
-    if (!testPlaylistId || !testNome || !testMac || !testUsuario || !testSenha) {
+    if (!testPlaylistId || !testNome || !testMac || !testM3uUrl) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha Playlist ID, Nome, MAC, Usuário e Senha para atualizar.',
+        description: 'Preencha Playlist ID, Nome, MAC e URL do M3U para atualizar.',
         variant: 'destructive',
       });
       return;
@@ -268,13 +266,12 @@ export default function AdminSmartOneConfig() {
 
     setIsTestingPlaylist(true);
     try {
-      const result = await smartoneService.testUpdatePlaylist(testPlaylistId, {
-        nome: testNome,
-        mac: testMac,
-        usuario: testUsuario,
-        senha: testSenha,
-        descricao: testDescricao,
-      });
+    const result = await smartoneService.testUpdatePlaylist(testPlaylistId, {
+      nome: testNome,
+      mac: testMac,
+      m3uUrl: testM3uUrl,
+      descricao: testDescricao,
+    });
 
       smartoneService.saveTestResult(result);
       loadTestHistory();
@@ -804,23 +801,12 @@ export default function AdminSmartOneConfig() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="testUsuario">Usuário M3U</Label>
+                  <Label htmlFor="testM3uUrl">URL do M3U (Xtream)</Label>
                   <Input
-                    id="testUsuario"
-                    placeholder="Ex: usuario123"
-                    value={testUsuario}
-                    onChange={(e) => setTestUsuario(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="testSenha">Senha M3U</Label>
-                  <Input
-                    id="testSenha"
-                    type="password"
-                    placeholder="Ex: senha123"
-                    value={testSenha}
-                    onChange={(e) => setTestSenha(e.target.value)}
+                    id="testM3uUrl"
+                    placeholder="Ex: https://exemplo.com/playlist.m3u"
+                    value={testM3uUrl}
+                    onChange={(e) => setTestM3uUrl(e.target.value)}
                   />
                 </div>
               </div>
