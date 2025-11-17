@@ -378,6 +378,12 @@ const AdminDashboard = () => {
               icon={<AlertTriangle className="h-5 w-5" />}
               path="/admin/suspicious-logins"
             />
+            <NavCard
+              title="Whitelist de IPs"
+              description="IPs confiáveis que nunca são bloqueados"
+              icon={<Shield className="h-5 w-5" />}
+              path="/admin/ip-whitelist"
+            />
           </div>
         </section>
 
