@@ -37,3 +37,7 @@ verify_jwt = false
 
 [functions.confirm-security-alert]
 verify_jwt = false
+
+# Admin-only function for checking playlist health - requires authentication
+[functions.check-playlist-health]
+verify_jwt = true

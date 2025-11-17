@@ -557,6 +557,53 @@ export type Database = {
         }
         Relationships: []
       }
+      playlist_health_checks: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          error_message: string | null
+          http_status_code: number | null
+          id: string
+          last_checked_at: string | null
+          m3u_url: string
+          playlist_id: string
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          http_status_code?: number | null
+          id?: string
+          last_checked_at?: string | null
+          m3u_url: string
+          playlist_id: string
+          response_time_ms?: number | null
+          status?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          http_status_code?: number | null
+          id?: string
+          last_checked_at?: string | null
+          m3u_url?: string
+          playlist_id?: string
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_health_checks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
