@@ -407,6 +407,13 @@ const AdminDashboard = () => {
               icon={<Shield className="h-5 w-5" />}
               path="/admin/ip-whitelist"
             />
+            <NavCard
+              title="Diagnóstico de Permissões"
+              description="Ferramentas de debug para roles e autenticação"
+              icon={<Database className="h-5 w-5" />}
+              path="/admin/diagnostic"
+              badge="Debug"
+            />
           </div>
         </section>
 
