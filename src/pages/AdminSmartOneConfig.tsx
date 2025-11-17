@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube, Trash2, AlertCircle, Shuffle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { smartoneService, SmartOneTestResult, validateMacAddress, normalizeMacAddress } from '@/services/smartoneService';
+import { smartoneService, SmartOneTestResult, validateMacAddress, normalizeMacAddress, generateRandomMacAddress, saveMacToHistory, getMacHistory } from '@/services/smartoneService';
 import { webhookService } from '@/services/webhookService';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 export default function AdminSmartOneConfig() {
   const navigate = useNavigate();
@@ -42,6 +44,8 @@ export default function AdminSmartOneConfig() {
   const [isTestingPlaylist, setIsTestingPlaylist] = useState(false);
   const [testHistory, setTestHistory] = useState<SmartOneTestResult[]>([]);
   const [macError, setMacError] = useState<string>('');
+  const [macHistoryList, setMacHistoryList] = useState<string[]>([]);
+  const [macPopoverOpen, setMacPopoverOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -51,11 +55,17 @@ export default function AdminSmartOneConfig() {
 
     loadConfig();
     loadTestHistory();
+    loadMacHistory();
   }, [authLoading, isAdmin, navigate]);
 
   const loadTestHistory = () => {
     const history = smartoneService.getTestHistory();
     setTestHistory(history);
+  };
+
+  const loadMacHistory = () => {
+    const history = getMacHistory();
+    setMacHistoryList(history);
   };
 
   const loadConfig = async () => {
@@ -213,6 +223,13 @@ export default function AdminSmartOneConfig() {
       });
 
       smartoneService.saveTestResult(result);
+      
+      // Salvar MAC no histórico se for válido
+      if (result.success && testMac) {
+        saveMacToHistory(testMac);
+        loadMacHistory();
+      }
+      
       loadTestHistory();
 
       if (result.success) {
@@ -360,6 +377,22 @@ export default function AdminSmartOneConfig() {
         setTestMac(normalized);
       }
     }
+  };
+
+  const handleGenerateMac = () => {
+    const newMac = generateRandomMacAddress();
+    setTestMac(newMac);
+    setMacError('');
+    toast({
+      title: 'MAC gerado',
+      description: `MAC Address aleatório: ${newMac}`,
+    });
+  };
+
+  const handleSelectMacFromHistory = (mac: string) => {
+    setTestMac(mac);
+    setMacError('');
+    setMacPopoverOpen(false);
   };
 
   if (authLoading || !configLoaded) {
@@ -700,18 +733,64 @@ export default function AdminSmartOneConfig() {
 
                 <div className="space-y-2">
                   <Label htmlFor="testMac">MAC Address</Label>
-                  <div className="relative">
-                    <Input
-                      id="testMac"
-                      placeholder="Ex: 00:1A:2B:3C:4D:5E"
-                      value={testMac}
-                      onChange={(e) => handleMacChange(e.target.value)}
-                      onBlur={handleMacBlur}
-                      className={macError ? 'border-red-500 pr-10' : ''}
-                    />
-                    {macError && (
-                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
-                    )}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="testMac"
+                        placeholder="Ex: 00:1A:2B:3C:4D:5E"
+                        value={testMac}
+                        onChange={(e) => handleMacChange(e.target.value)}
+                        onBlur={handleMacBlur}
+                        className={macError ? 'border-red-500 pr-10' : ''}
+                      />
+                      {macError && (
+                        <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+                      )}
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleGenerateMac}
+                      title="Gerar MAC aleatório"
+                    >
+                      <Shuffle className="h-4 w-4" />
+                    </Button>
+
+                    <Popover open={macPopoverOpen} onOpenChange={setMacPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          title="Histórico de MACs"
+                          disabled={macHistoryList.length === 0}
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0 bg-popover" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar MAC..." />
+                          <CommandList>
+                            <CommandEmpty>Nenhum MAC encontrado.</CommandEmpty>
+                            <CommandGroup heading="MACs Recentes">
+                              {macHistoryList.map((mac) => (
+                                <CommandItem
+                                  key={mac}
+                                  value={mac}
+                                  onSelect={() => handleSelectMacFromHistory(mac)}
+                                  className="cursor-pointer"
+                                >
+                                  <span className="font-mono text-sm">{mac}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   {macError && (
                     <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
