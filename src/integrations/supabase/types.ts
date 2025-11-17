@@ -26,6 +26,87 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_badge_notifications: {
+        Row: {
+          admin_id: string
+          badge_id: string
+          badge_name: string
+          badge_rarity: string
+          created_at: string | null
+          earned_at: string | null
+          id: string
+          read_at: string | null
+        }
+        Insert: {
+          admin_id: string
+          badge_id: string
+          badge_name: string
+          badge_rarity: string
+          created_at?: string | null
+          earned_at?: string | null
+          id?: string
+          read_at?: string | null
+        }
+        Update: {
+          admin_id?: string
+          badge_id?: string
+          badge_name?: string
+          badge_rarity?: string
+          created_at?: string | null
+          earned_at?: string | null
+          id?: string
+          read_at?: string | null
+        }
+        Relationships: []
+      }
+      admin_leaderboard_history: {
+        Row: {
+          admin_id: string
+          admin_name: string
+          admin_phone: string
+          avg_response_time_minutes: number | null
+          badges_earned: Json
+          confirmation_rate: number
+          created_at: string | null
+          id: string
+          level: number
+          month_year: string
+          rank: number
+          score: number
+          total_alerts: number
+        }
+        Insert: {
+          admin_id: string
+          admin_name: string
+          admin_phone: string
+          avg_response_time_minutes?: number | null
+          badges_earned?: Json
+          confirmation_rate: number
+          created_at?: string | null
+          id?: string
+          level: number
+          month_year: string
+          rank: number
+          score: number
+          total_alerts: number
+        }
+        Update: {
+          admin_id?: string
+          admin_name?: string
+          admin_phone?: string
+          avg_response_time_minutes?: number | null
+          badges_earned?: Json
+          confirmation_rate?: number
+          created_at?: string | null
+          id?: string
+          level?: number
+          month_year?: string
+          rank?: number
+          score?: number
+          total_alerts?: number
+        }
+        Relationships: []
+      }
       admin_phones: {
         Row: {
           active: boolean | null
@@ -929,6 +1010,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
+      save_monthly_leaderboard: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "client" | "admin"
