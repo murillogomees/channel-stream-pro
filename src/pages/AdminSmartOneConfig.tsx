@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { smartoneService } from '@/services/smartoneService';
+import { smartoneService, SmartOneTestResult } from '@/services/smartoneService';
 import { webhookService } from '@/services/webhookService';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function AdminSmartOneConfig() {
   const navigate = useNavigate();
@@ -30,6 +32,16 @@ export default function AdminSmartOneConfig() {
   const [configLoaded, setConfigLoaded] = useState(false);
   const webhookUrl = webhookService.getWebhookUrl();
 
+  // Estados para teste de playlist
+  const [testNome, setTestNome] = useState('');
+  const [testMac, setTestMac] = useState('');
+  const [testUsuario, setTestUsuario] = useState('');
+  const [testSenha, setTestSenha] = useState('');
+  const [testDescricao, setTestDescricao] = useState('');
+  const [testPlaylistId, setTestPlaylistId] = useState('');
+  const [isTestingPlaylist, setIsTestingPlaylist] = useState(false);
+  const [testHistory, setTestHistory] = useState<SmartOneTestResult[]>([]);
+
   useEffect(() => {
     if (!authLoading && !isAdmin) {
       navigate('/auth');
@@ -37,7 +49,13 @@ export default function AdminSmartOneConfig() {
     }
 
     loadConfig();
+    loadTestHistory();
   }, [authLoading, isAdmin, navigate]);
+
+  const loadTestHistory = () => {
+    const history = smartoneService.getTestHistory();
+    setTestHistory(history);
+  };
 
   const loadConfig = async () => {
     try {
@@ -171,6 +189,153 @@ export default function AdminSmartOneConfig() {
     } finally {
       setIsTestingWebhook(false);
     }
+  };
+
+  const handleTestCreate = async () => {
+    if (!testNome || !testMac || !testUsuario || !testSenha) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha Nome, MAC, Usuário e Senha para criar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsTestingPlaylist(true);
+    try {
+      const result = await smartoneService.testCreatePlaylist({
+        nome: testNome,
+        mac: testMac,
+        usuario: testUsuario,
+        senha: testSenha,
+        descricao: testDescricao,
+      });
+
+      smartoneService.saveTestResult(result);
+      loadTestHistory();
+
+      if (result.success) {
+        setTestPlaylistId(result.playlistId || '');
+        toast({
+          title: 'Playlist criada',
+          description: `Playlist criada com sucesso! ID: ${result.playlistId}`,
+        });
+      } else {
+        toast({
+          title: 'Erro ao criar playlist',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestingPlaylist(false);
+    }
+  };
+
+  const handleTestUpdate = async () => {
+    if (!testPlaylistId || !testNome || !testMac || !testUsuario || !testSenha) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha Playlist ID, Nome, MAC, Usuário e Senha para atualizar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsTestingPlaylist(true);
+    try {
+      const result = await smartoneService.testUpdatePlaylist(testPlaylistId, {
+        nome: testNome,
+        mac: testMac,
+        usuario: testUsuario,
+        senha: testSenha,
+        descricao: testDescricao,
+      });
+
+      smartoneService.saveTestResult(result);
+      loadTestHistory();
+
+      if (result.success) {
+        toast({
+          title: 'Playlist atualizada',
+          description: 'Playlist atualizada com sucesso!',
+        });
+      } else {
+        toast({
+          title: 'Erro ao atualizar playlist',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestingPlaylist(false);
+    }
+  };
+
+  const handleTestDelete = async () => {
+    if (!testPlaylistId) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Preencha o Playlist ID para deletar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsTestingPlaylist(true);
+    try {
+      const result = await smartoneService.testDeletePlaylist(
+        testPlaylistId,
+        testNome || 'N/A',
+        testMac || 'N/A'
+      );
+
+      smartoneService.saveTestResult(result);
+      loadTestHistory();
+
+      if (result.success) {
+        setTestPlaylistId('');
+        toast({
+          title: 'Playlist deletada',
+          description: 'Playlist deletada com sucesso!',
+        });
+      } else {
+        toast({
+          title: 'Erro ao deletar playlist',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestingPlaylist(false);
+    }
+  };
+
+  const handleClearHistory = () => {
+    smartoneService.clearTestHistory();
+    loadTestHistory();
+    toast({
+      title: 'Histórico limpo',
+      description: 'Histórico de testes limpo com sucesso.',
+    });
   };
 
   if (authLoading || !configLoaded) {
@@ -480,6 +645,217 @@ export default function AdminSmartOneConfig() {
   }
 }`}
               </pre>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seção de Testes de Playlist */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <TestTube className="h-5 w-5" />
+              <CardTitle>Testes de Integração</CardTitle>
+            </div>
+            <CardDescription>
+              Teste a criação, atualização e exclusão de playlists no SmartOne
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Formulário de Teste */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="testNome">Nome da Playlist</Label>
+                  <Input
+                    id="testNome"
+                    placeholder="Ex: Teste Cliente 1"
+                    value={testNome}
+                    onChange={(e) => setTestNome(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="testMac">MAC Address</Label>
+                  <Input
+                    id="testMac"
+                    placeholder="Ex: 00:1A:2B:3C:4D:5E"
+                    value={testMac}
+                    onChange={(e) => setTestMac(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="testUsuario">Usuário M3U</Label>
+                  <Input
+                    id="testUsuario"
+                    placeholder="Ex: usuario123"
+                    value={testUsuario}
+                    onChange={(e) => setTestUsuario(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="testSenha">Senha M3U</Label>
+                  <Input
+                    id="testSenha"
+                    type="password"
+                    placeholder="Ex: senha123"
+                    value={testSenha}
+                    onChange={(e) => setTestSenha(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="testDescricao">Descrição (Opcional)</Label>
+                <Textarea
+                  id="testDescricao"
+                  placeholder="Descrição da playlist de teste"
+                  value={testDescricao}
+                  onChange={(e) => setTestDescricao(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="testPlaylistId">Playlist ID (para atualizar/deletar)</Label>
+                <Input
+                  id="testPlaylistId"
+                  placeholder="ID retornado após criação"
+                  value={testPlaylistId}
+                  onChange={(e) => setTestPlaylistId(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleTestCreate}
+                  disabled={isTestingPlaylist}
+                  className="flex-1 sm:flex-none"
+                >
+                  {isTestingPlaylist ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Playlist'
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleTestUpdate}
+                  disabled={isTestingPlaylist}
+                  variant="secondary"
+                  className="flex-1 sm:flex-none"
+                >
+                  {isTestingPlaylist ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    'Atualizar Playlist'
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleTestDelete}
+                  disabled={isTestingPlaylist}
+                  variant="destructive"
+                  className="flex-1 sm:flex-none"
+                >
+                  {isTestingPlaylist ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deletando...
+                    </>
+                  ) : (
+                    'Deletar Playlist'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Histórico de Testes */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Histórico de Execuções</h3>
+                <Button
+                  onClick={handleClearHistory}
+                  variant="outline"
+                  size="sm"
+                  disabled={testHistory.length === 0}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Limpar Histórico
+                </Button>
+              </div>
+
+              {testHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Nenhum teste executado ainda
+                </p>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ação</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>MAC</TableHead>
+                        <TableHead>Playlist ID</TableHead>
+                        <TableHead>M3U URL</TableHead>
+                        <TableHead>Data/Hora</TableHead>
+                        <TableHead>Erro</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {testHistory.map((test) => (
+                        <TableRow key={test.id}>
+                          <TableCell>
+                            <Badge variant={
+                              test.action === 'create' ? 'default' :
+                              test.action === 'update' ? 'secondary' : 'destructive'
+                            }>
+                              {test.action === 'create' ? 'Criar' :
+                               test.action === 'update' ? 'Atualizar' : 'Deletar'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {test.success ? (
+                              <Badge className="bg-green-500 hover:bg-green-600">
+                                <CheckCircle className="mr-1 h-3 w-3" />
+                                Sucesso
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive">
+                                <XCircle className="mr-1 h-3 w-3" />
+                                Erro
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{test.nome}</TableCell>
+                          <TableCell className="font-mono text-xs">{test.mac}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {test.playlistId || '-'}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate text-xs">
+                            {test.m3uUrl || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {new Date(test.timestamp).toLocaleString('pt-BR')}
+                          </TableCell>
+                          <TableCell className="text-xs text-red-600 max-w-xs truncate">
+                            {test.error || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

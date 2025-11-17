@@ -12,6 +12,10 @@ verify_jwt = false
 [functions.smartone-sync]
 verify_jwt = true
 
+# Admin-only function for testing SmartOne integration - requires authentication
+[functions.smartone-test]
+verify_jwt = true
+
 # Webhook endpoint - kept public with signature verification
 [functions.smartone-webhook]
 verify_jwt = false
