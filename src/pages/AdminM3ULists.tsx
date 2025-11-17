@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Upload, Trash2, Loader2, FileText, Download, Eye, EyeOff, Star, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -54,9 +54,9 @@ export default function AdminM3ULists() {
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [listName, setListName] = useState('');
+  const [listUrl, setListUrl] = useState('');
   const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
   const [priority, setPriority] = useState(0);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -95,172 +95,61 @@ export default function AdminM3ULists() {
     }
   };
 
-  // Schema de validação para arquivos M3U
-  const m3uFileSchema = z.object({
+  // Schema de validação para URL M3U
+  const m3uUrlSchema = z.object({
     name: z.string()
-      .refine(
-        (name) => /\.(m3u|m3u8)$/i.test(name),
-        'Arquivo deve ter extensão .m3u ou .m3u8'
-      ),
-    size: z.number()
-      .max(50 * 1024 * 1024, 'Arquivo não pode ser maior que 50MB')
-      .min(1, 'Arquivo não pode estar vazio'),
-    type: z.string()
-      .refine(
-        (type) => type === '' || type.includes('text') || type.includes('audio/x-mpegurl') || type.includes('application/vnd.apple.mpegurl'),
-        'Tipo de arquivo não suportado'
-      ),
+      .trim()
+      .min(3, 'Nome deve ter pelo menos 3 caracteres')
+      .max(100, 'Nome deve ter no máximo 100 caracteres'),
+    url: z.string()
+      .trim()
+      .url('URL inválida')
+      .regex(/\.(m3u|m3u8)($|\?)/i, 'URL deve apontar para arquivo .m3u ou .m3u8'),
   });
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleUrlChange = (url: string) => {
+    setListUrl(url);
     setValidationError(null);
     
-    if (!file) {
-      setSelectedFile(null);
-      return;
-    }
+    // Validar URL em tempo real
+    const validation = m3uUrlSchema.safeParse({
+      name: listName || 'temp',
+      url: url
+    });
 
-    // Validar arquivo usando schema Zod
-    const validation = m3uFileSchema.safeParse({
-      name: file.name,
-      size: file.size,
-      type: file.type,
+    if (!validation.success && url.trim()) {
+      const urlError = validation.error.errors.find(e => e.path.includes('url'));
+      if (urlError) {
+        setValidationError(urlError.message);
+      }
+    }
+  };
+
+  const handleSaveList = async () => {
+    // Validações
+    const validation = m3uUrlSchema.safeParse({
+      name: listName,
+      url: listUrl
     });
 
     if (!validation.success) {
-      const errorMessage = validation.error.errors[0].message;
-      setValidationError(errorMessage);
-      toast.error('Arquivo inválido', {
-        description: errorMessage
-      });
-      event.target.value = ''; // Limpar input
-      setSelectedFile(null);
-      return;
-    }
-
-    // Validação adicional: verificar se começa com #EXTM3U
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const firstLine = content.trim().split('\n')[0];
-      
-      if (!firstLine.startsWith('#EXTM3U')) {
-        setValidationError('Arquivo M3U inválido: deve começar com #EXTM3U');
-        toast.error('Formato M3U inválido', {
-          description: 'O arquivo deve começar com #EXTM3U na primeira linha'
-        });
-        event.target.value = '';
-        setSelectedFile(null);
-        return;
-      }
-
-      // Arquivo válido
-      setSelectedFile(file);
-      setValidationError(null);
-      
-      if (!listName) {
-        setListName(file.name.replace(/\.(m3u8?|txt)$/i, ''));
-      }
-
-      toast.success('Arquivo validado', {
-        description: `${file.name} (${formatFileSize(file.size)}) está pronto para upload`
-      });
-    };
-
-    reader.onerror = () => {
-      setValidationError('Erro ao ler arquivo');
-      toast.error('Erro ao ler arquivo');
-      event.target.value = '';
-      setSelectedFile(null);
-    };
-
-    reader.readAsText(file.slice(0, 1024)); // Ler apenas os primeiros 1KB para validar
-  };
-
-  const handleUpload = async () => {
-    // Validações antes do upload
-    if (!selectedFile) {
-      toast.error('Nenhum arquivo selecionado', {
-        description: 'Por favor, selecione um arquivo M3U válido'
-      });
-      return;
-    }
-
-    if (!listName.trim()) {
-      toast.error('Nome da lista obrigatório', {
-        description: 'Por favor, forneça um nome para a lista M3U'
-      });
-      return;
-    }
-
-    if (listName.trim().length < 3) {
-      toast.error('Nome muito curto', {
-        description: 'O nome da lista deve ter pelo menos 3 caracteres'
-      });
-      return;
-    }
-
-    if (listName.trim().length > 100) {
-      toast.error('Nome muito longo', {
-        description: 'O nome da lista deve ter no máximo 100 caracteres'
-      });
-      return;
-    }
-
-    if (validationError) {
-      toast.error('Arquivo inválido', {
-        description: validationError
+      const errors = validation.error.errors.map(e => e.message).join(', ');
+      toast.error('Dados inválidos', {
+        description: errors
       });
       return;
     }
 
     try {
-      setIsUploading(true);
+      setIsSaving(true);
 
-      // Upload do arquivo para o storage com validação adicional
-      const fileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      
-      console.log('Iniciando upload:', {
-        fileName,
-        size: selectedFile.size,
-        type: selectedFile.type
-      });
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('m3u-files')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Erro no upload do storage:', uploadError);
-        throw new Error(`Falha no upload: ${uploadError.message}`);
-      }
-
-      if (!uploadData) {
-        throw new Error('Upload não retornou dados');
-      }
-
-      // Obter URL pública
-      const { data: urlData } = supabase.storage
-        .from('m3u-files')
-        .getPublicUrl(fileName);
-
-      if (!urlData.publicUrl) {
-        throw new Error('Não foi possível obter URL pública do arquivo');
-      }
-
-      console.log('Upload concluído, criando registro no banco...');
-
-      // Criar registro no banco de dados
+      // Criar registro no banco de dados com URL direta
       const { data: insertData, error: insertError } = await supabase
         .from('m3u_lists')
         .insert([
           {
             name: listName.trim(),
-            file_url: urlData.publicUrl,
+            file_url: listUrl.trim(),
             status: 'active',
             plan_type: planType,
             priority: priority,
@@ -270,29 +159,25 @@ export default function AdminM3ULists() {
         .single();
 
       if (insertError) {
-        console.error('Erro ao criar registro no banco:', insertError);
-        // Tentar deletar arquivo do storage se falhar
-        await supabase.storage.from('m3u-files').remove([fileName]);
+        console.error('Erro ao criar registro:', insertError);
         throw new Error(`Falha ao registrar lista: ${insertError.message}`);
       }
 
-      console.log('Lista M3U criada com sucesso:', insertData);
-
-      toast.success('Lista M3U enviada com sucesso!', {
+      toast.success('Lista M3U criada com sucesso!', {
         description: `${listName} foi adicionada ao sistema`
       });
       
       setIsDialogOpen(false);
-      setSelectedFile(null);
       setListName('');
+      setListUrl('');
       setPlanType('teste');
       setPriority(0);
       setValidationError(null);
       loadLists();
     } catch (error: any) {
-      console.error('Error uploading M3U:', error);
+      console.error('Error creating M3U list:', error);
       
-      let errorMessage = 'Erro desconhecido ao enviar lista';
+      let errorMessage = 'Erro desconhecido ao criar lista';
       
       if (error.message) {
         errorMessage = error.message;
@@ -305,20 +190,18 @@ export default function AdminM3ULists() {
       // Mensagens de erro específicas
       if (errorMessage.includes('row-level security')) {
         errorMessage = 'Permissões insuficientes. Verifique se você tem acesso de administrador.';
-      } else if (errorMessage.includes('storage')) {
-        errorMessage = 'Erro no storage. Verifique as permissões do bucket m3u-files.';
       } else if (errorMessage.includes('duplicate')) {
         errorMessage = 'Já existe uma lista com este nome.';
       } else if (errorMessage.includes('network')) {
         errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
       }
 
-      toast.error('Erro ao enviar lista M3U', {
+      toast.error('Erro ao criar lista M3U', {
         description: errorMessage,
         duration: 5000,
       });
     } finally {
-      setIsUploading(false);
+      setIsSaving(false);
     }
   };
 
@@ -343,22 +226,11 @@ export default function AdminM3ULists() {
     }
   };
 
-  const handleDelete = async (id: string, fileName: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir esta lista M3U?')) return;
 
     try {
-      // Extrair o nome do arquivo da URL
-      const urlParts = fileName.split('/');
-      const storageFileName = urlParts[urlParts.length - 1];
-
-      // Excluir arquivo do storage
-      const { error: storageError } = await supabase.storage
-        .from('m3u-files')
-        .remove([storageFileName]);
-
-      if (storageError) console.error('Storage delete error:', storageError);
-
-      // Excluir registro do banco
+      // Excluir apenas o registro do banco (não há mais arquivo no storage)
       const { error: dbError } = await supabase
         .from('m3u_lists')
         .delete()
@@ -548,9 +420,9 @@ export default function AdminM3ULists() {
                           variant="ghost"
                           size="sm"
                           onClick={() => window.open(list.file_url, '_blank')}
-                          title="Download"
+                          title="Abrir URL"
                         >
-                          <Download className="w-4 h-4" />
+                          <ExternalLink className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -567,7 +439,7 @@ export default function AdminM3ULists() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(list.id, list.file_url)}
+                          onClick={() => handleDelete(list.id)}
                           title="Excluir"
                         >
                           <Trash2 className="w-4 h-4" />
