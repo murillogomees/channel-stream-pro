@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
 import { RecentActivities } from "@/components/admin/RecentActivities";
-import { 
+import { ContrastToggle } from "@/components/admin/ContrastToggle";
+import {
   Users, Bell, Smartphone, Shield, BarChart3, Settings, 
   LogOut, User, Palette, FileText, Variable, MessageSquare,
   Radio, PieChart, Activity, Lock, UserCog, Package, 
@@ -34,10 +35,10 @@ const QuickStat = ({ icon, label, value, variant = "default" }: QuickStatProps) 
   };
 
   return (
-    <Card>
+    <Card className="animate-fade-in">
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-lg ${variantClasses[variant]}`}>
+          <div className={`p-3 rounded-lg transition-transform duration-300 hover:scale-110 ${variantClasses[variant]}`}>
             {icon}
           </div>
           <div>
@@ -62,17 +63,20 @@ const NavCard = ({ title, description, icon, path, badge }: NavCardProps) => {
   const navigate = useNavigate();
 
   return (
-    <Card className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate(path)}>
+    <Card 
+      className="hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in" 
+      onClick={() => navigate(path)}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 group-hover:scale-110">
             {icon}
           </div>
           {badge && (
-            <Badge variant="secondary">{badge}</Badge>
+            <Badge variant="secondary" className="animate-fade-in">{badge}</Badge>
           )}
         </div>
-        <CardTitle className="text-lg mt-4">{title}</CardTitle>
+        <CardTitle className="text-lg mt-4 group-hover:text-primary transition-colors">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
     </Card>
@@ -135,6 +139,7 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center gap-3">
               <GlobalSearch />
+              <ContrastToggle />
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')}>
                 <User className="h-4 w-4 mr-2" />
                 Perfil
