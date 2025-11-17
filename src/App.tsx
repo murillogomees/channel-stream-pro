@@ -44,6 +44,7 @@ const AdminIPBlocking = lazy(() => import("./pages/AdminIPBlocking"));
 const AdminAlertStats = lazy(() => import("./pages/AdminAlertStats"));
 const AdminAlertTimeline = lazy(() => import("./pages/AdminAlertTimeline"));
 const AdminLeaderboard = lazy(() => import("./pages/AdminLeaderboard"));
+const AdminPlaylistHealth = lazy(() => import("./pages/AdminPlaylistHealth"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -98,6 +99,7 @@ const App = () => (
           <Route path="/admin/ip-blocking" element={<ProtectedRoute requireAdmin><AdminIPBlocking /></ProtectedRoute>} />
           <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           <Route path="/admin/smartone-sync" element={<ProtectedRoute requireAdmin><AdminSmartOneSync /></ProtectedRoute>} />
+          <Route path="/admin/playlist-health" element={<ProtectedRoute requireAdmin><AdminPlaylistHealth /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
