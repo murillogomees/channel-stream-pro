@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +15,8 @@ import type { AutomaticNotificationRule, CreateNotificationRuleInput } from '@/t
 import { toast } from 'sonner';
 
 export default function AdminAutoNotifications() {
-  const queryClient = useQueryClient();
+  const [rules, setRules] = useState<AutomaticNotificationRule[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomaticNotificationRule | null>(null);
   const [deleteRule, setDeleteRule] = useState<AutomaticNotificationRule | null>(null);
@@ -31,51 +31,69 @@ export default function AdminAutoNotifications() {
     priority: 0,
   });
 
-  const { data: rules = [], isLoading } = useQuery({
-    queryKey: ['automatic-notification-rules'],
-    queryFn: () => automaticNotificationRuleService.getAll(),
-  });
+  useEffect(() => {
+    loadRules();
+  }, []);
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateNotificationRuleInput) => automaticNotificationRuleService.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automatic-notification-rules'] });
+  const loadRules = async () => {
+    try {
+      setIsLoading(true);
+      const data = await automaticNotificationRuleService.getAll();
+      setRules(data);
+    } catch (error) {
+      console.error('Erro ao carregar regras:', error);
+      toast.error('Erro ao carregar regras');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    try {
+      await automaticNotificationRuleService.create(formData);
       toast.success('Regra criada com sucesso!');
+      loadRules();
       resetForm();
-    },
-    onError: () => toast.error('Erro ao criar regra'),
-  });
+    } catch (error) {
+      toast.error('Erro ao criar regra');
+    }
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string } & Partial<CreateNotificationRuleInput>) => 
-      automaticNotificationRuleService.update(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automatic-notification-rules'] });
+  const handleUpdate = async () => {
+    if (!editingRule) return;
+    
+    try {
+      await automaticNotificationRuleService.update({ id: editingRule.id, ...formData });
       toast.success('Regra atualizada com sucesso!');
+      loadRules();
       resetForm();
-    },
-    onError: () => toast.error('Erro ao atualizar regra'),
-  });
+    } catch (error) {
+      toast.error('Erro ao atualizar regra');
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => automaticNotificationRuleService.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automatic-notification-rules'] });
+  const handleDelete = async () => {
+    if (!deleteRule) return;
+    
+    try {
+      await automaticNotificationRuleService.delete(deleteRule.id);
       toast.success('Regra excluída com sucesso!');
+      loadRules();
       setDeleteRule(null);
-    },
-    onError: () => toast.error('Erro ao excluir regra'),
-  });
+    } catch (error) {
+      toast.error('Erro ao excluir regra');
+    }
+  };
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      automaticNotificationRuleService.toggleActive(id, active),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automatic-notification-rules'] });
+  const handleToggleActive = async (id: string, active: boolean) => {
+    try {
+      await automaticNotificationRuleService.toggleActive(id, active);
       toast.success('Status atualizado!');
-    },
-    onError: () => toast.error('Erro ao atualizar status'),
-  });
+      loadRules();
+    } catch (error) {
+      toast.error('Erro ao atualizar status');
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -111,9 +129,9 @@ export default function AdminAutoNotifications() {
     e.preventDefault();
     
     if (editingRule) {
-      updateMutation.mutate({ id: editingRule.id, ...formData });
+      handleUpdate();
     } else {
-      createMutation.mutate(formData);
+      handleCreate();
     }
   };
 
@@ -364,9 +382,7 @@ export default function AdminAutoNotifications() {
                 <div className="mt-3 flex items-center gap-2">
                   <Switch
                     checked={rule.active}
-                    onCheckedChange={(checked) =>
-                      toggleActiveMutation.mutate({ id: rule.id, active: checked })
-                    }
+                    onCheckedChange={(checked) => handleToggleActive(rule.id, checked)}
                   />
                   <span className="text-sm text-muted-foreground">
                     {rule.active ? 'Desativar' : 'Ativar'} notificação
@@ -388,9 +404,7 @@ export default function AdminAutoNotifications() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteRule && deleteMutation.mutate(deleteRule.id)}
-            >
+            <AlertDialogAction onClick={handleDelete}>
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
