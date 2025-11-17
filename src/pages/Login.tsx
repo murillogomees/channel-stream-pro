@@ -55,8 +55,21 @@ export default function Login() {
 
       if (error) {
         console.error('[Login] Erro no login:', error);
+        
+        // Registrar tentativa suspeita em caso de erro
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Email ou senha incorretos');
+          // Log como tentativa suspeita (não aguardar resposta)
+          setTimeout(() => {
+            fetch('https://api.ipify.org?format=json')
+              .then(res => res.json())
+              .then(data => {
+                import('@/services/suspiciousLoginService').then(module => {
+                  module.suspiciousLoginService.checkLogin(data.ip, validatedData.email);
+                });
+              })
+              .catch(() => {});
+          }, 0);
         } else if (error.message.includes('Email not confirmed')) {
           toast.error('Por favor, confirme seu email antes de fazer login');
         } else {

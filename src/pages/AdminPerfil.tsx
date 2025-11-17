@@ -230,6 +230,26 @@ const AdminPerfil = () => {
             </CardContent>
           </Card>
 
+          {/* Segurança */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Segurança</CardTitle>
+              <CardDescription>
+                Configurações avançadas de segurança
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => navigate('/admin/2fa-settings')}
+                variant="outline"
+                className="w-full"
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Configurar Autenticação de Dois Fatores (2FA)
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Ações da Conta */}
           <Card>
             <CardHeader>

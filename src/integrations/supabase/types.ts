@@ -758,6 +758,9 @@ export type Database = {
           id: string
           nome: string
           telefone: string | null
+          totp_enabled: boolean | null
+          totp_secret: string | null
+          totp_verified_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -766,6 +769,9 @@ export type Database = {
           id: string
           nome: string
           telefone?: string | null
+          totp_enabled?: boolean | null
+          totp_secret?: string | null
+          totp_verified_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -774,6 +780,9 @@ export type Database = {
           id?: string
           nome?: string
           telefone?: string | null
+          totp_enabled?: boolean | null
+          totp_secret?: string | null
+          totp_verified_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1092,6 +1101,45 @@ export type Database = {
         }
         Relationships: []
       }
+      suspicious_login_attempts: {
+        Row: {
+          alert_sent: boolean | null
+          attempt_count: number | null
+          attempted_email: string | null
+          blocked: boolean | null
+          created_at: string
+          first_attempt_at: string
+          id: string
+          ip_address: string
+          last_attempt_at: string
+          metadata: Json | null
+        }
+        Insert: {
+          alert_sent?: boolean | null
+          attempt_count?: number | null
+          attempted_email?: string | null
+          blocked?: boolean | null
+          created_at?: string
+          first_attempt_at?: string
+          id?: string
+          ip_address: string
+          last_attempt_at?: string
+          metadata?: Json | null
+        }
+        Update: {
+          alert_sent?: boolean | null
+          attempt_count?: number | null
+          attempted_email?: string | null
+          blocked?: boolean | null
+          created_at?: string
+          first_attempt_at?: string
+          id?: string
+          ip_address?: string
+          last_attempt_at?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1127,11 +1175,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_suspicious_login: {
+        Args: { _email?: string; _ip_address: string }
+        Returns: Json
+      }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
+      cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       get_active_sessions: {
         Args: never
