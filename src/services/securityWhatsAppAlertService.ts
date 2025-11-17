@@ -226,8 +226,9 @@ class SecurityWhatsAppAlertService {
    * Gera link de confirmação para o alerta
    */
   private generateConfirmationLink(eventId: string, adminId: string): string {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/api/confirm-alert?deliveryId=${eventId}&adminId=${adminId}`;
+    // Usar o edge function em vez de link local
+    const projectId = 'sdvyxdghxqmntyoweqbd';
+    return `https://${projectId}.supabase.co/functions/v1/confirm-security-alert?deliveryId=${eventId}&adminId=${adminId}`;
   }
 
   /**

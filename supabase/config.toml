@@ -24,5 +24,8 @@ verify_jwt = false
 [functions.escalate-security-alerts]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 [functions.confirm-security-alert]
 verify_jwt = false
