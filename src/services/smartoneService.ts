@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/cliente';
+import { z } from 'zod';
 
 export interface SmartOneConfig {
   enabled: boolean;
@@ -37,6 +38,42 @@ export interface SmartOneTestResult {
   timestamp: string;
   rawResponse?: any;
 }
+
+// Validação de MAC Address - aceita formatos: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX ou XXXXXXXXXXXX
+const macAddressSchema = z.string()
+  .trim()
+  .regex(
+    /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/,
+    'MAC Address inválido. Use o formato: 00:1A:2B:3C:4D:5E, 00-1A-2B-3C-4D-5E ou 001A2B3C4D5E'
+  );
+
+export const validateMacAddress = (mac: string): { valid: boolean; error?: string } => {
+  try {
+    macAddressSchema.parse(mac);
+    return { valid: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { valid: false, error: error.errors[0].message };
+    }
+    return { valid: false, error: 'Formato de MAC Address inválido' };
+  }
+};
+
+// Normaliza MAC Address para o formato padrão XX:XX:XX:XX:XX:XX
+export const normalizeMacAddress = (mac: string): string => {
+  // Remove espaços
+  let normalized = mac.trim().toUpperCase();
+  
+  // Se não tem separadores, adiciona :
+  if (normalized.length === 12 && !normalized.includes(':') && !normalized.includes('-')) {
+    normalized = normalized.match(/.{1,2}/g)?.join(':') || normalized;
+  }
+  
+  // Converte - para :
+  normalized = normalized.replace(/-/g, ':');
+  
+  return normalized;
+};
 
 class SmartoneService {
   private config: SmartOneConfig | null = null;
@@ -169,6 +206,20 @@ class SmartoneService {
   }
 
   async testCreatePlaylist(playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
+    // Validar MAC Address
+    const macValidation = validateMacAddress(playlist.mac);
+    if (!macValidation.valid) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'create',
+        success: false,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        error: macValidation.error,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
     const config = await this.getConfig();
     
     if (!config.enabled || !config.baseUrl || !config.clientApi || !config.keyApi) {
@@ -183,13 +234,16 @@ class SmartoneService {
       };
     }
 
+    // Normalizar MAC Address
+    const normalizedMac = normalizeMacAddress(playlist.mac);
+
     try {
       const { data, error } = await supabase.functions.invoke('smartone-test', {
         body: {
           action: 'create',
           playlist: {
             nome: playlist.nome,
-            mac: playlist.mac,
+            mac: normalizedMac,
             usuario: playlist.usuario,
             senha: playlist.senha,
             descricao: playlist.descricao || '',
@@ -198,44 +252,62 @@ class SmartoneService {
       });
 
       if (error) {
-        return {
-          id: crypto.randomUUID(),
-          action: 'create',
-          success: false,
-          nome: playlist.nome,
-          mac: playlist.mac,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-          rawResponse: error,
-        };
-      }
-
-      return {
-        id: crypto.randomUUID(),
-        action: 'create',
-        success: true,
-        playlistId: data.playlistId || data.id,
-        nome: playlist.nome,
-        mac: playlist.mac,
-        m3uUrl: data.m3uUrl,
-        descricao: playlist.descricao,
-        timestamp: new Date().toISOString(),
-        rawResponse: data,
-      };
-    } catch (error: any) {
       return {
         id: crypto.randomUUID(),
         action: 'create',
         success: false,
         nome: playlist.nome,
-        mac: playlist.mac,
+        mac: normalizedMac,
         error: error.message,
+        timestamp: new Date().toISOString(),
+        rawResponse: error,
+      };
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      action: 'create',
+      success: true,
+      playlistId: data.playlistId || data.id,
+      nome: playlist.nome,
+      mac: normalizedMac,
+      m3uUrl: data.m3uUrl,
+      descricao: playlist.descricao,
+      timestamp: new Date().toISOString(),
+      rawResponse: data,
+    };
+  } catch (error: any) {
+    return {
+      id: crypto.randomUUID(),
+      action: 'create',
+      success: false,
+      nome: playlist.nome,
+      mac: normalizedMac,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+  async testUpdatePlaylist(playlistId: string, playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
+    // Validar MAC Address
+    const macValidation = validateMacAddress(playlist.mac);
+    if (!macValidation.valid) {
+      return {
+        id: crypto.randomUUID(),
+        action: 'update',
+        success: false,
+        playlistId,
+        nome: playlist.nome,
+        mac: playlist.mac,
+        error: macValidation.error,
         timestamp: new Date().toISOString(),
       };
     }
-  }
 
-  async testUpdatePlaylist(playlistId: string, playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
+    // Normalizar MAC Address
+    const normalizedMac = normalizeMacAddress(playlist.mac);
+
     try {
       const { data, error } = await supabase.functions.invoke('smartone-test', {
         body: {
@@ -243,7 +315,7 @@ class SmartoneService {
           playlistId,
           playlist: {
             nome: playlist.nome,
-            mac: playlist.mac,
+            mac: normalizedMac,
             usuario: playlist.usuario,
             senha: playlist.senha,
             descricao: playlist.descricao || '',
@@ -258,7 +330,7 @@ class SmartoneService {
           success: false,
           playlistId,
           nome: playlist.nome,
-          mac: playlist.mac,
+          mac: normalizedMac,
           error: error.message,
           timestamp: new Date().toISOString(),
         };
@@ -270,7 +342,7 @@ class SmartoneService {
         success: true,
         playlistId,
         nome: playlist.nome,
-        mac: playlist.mac,
+        mac: normalizedMac,
         m3uUrl: data.m3uUrl,
         descricao: playlist.descricao,
         timestamp: new Date().toISOString(),
@@ -283,7 +355,7 @@ class SmartoneService {
         success: false,
         playlistId,
         nome: playlist.nome,
-        mac: playlist.mac,
+        mac: normalizedMac,
         error: error.message,
         timestamp: new Date().toISOString(),
       };

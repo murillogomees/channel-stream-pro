@@ -5,6 +5,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validação de MAC Address
+const macAddressRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/;
+
+function validateMacAddress(mac: string): { valid: boolean; error?: string } {
+  if (!mac || typeof mac !== 'string') {
+    return { valid: false, error: 'MAC Address é obrigatório' };
+  }
+
+  const trimmedMac = mac.trim();
+  if (!macAddressRegex.test(trimmedMac)) {
+    return { 
+      valid: false, 
+      error: 'MAC Address inválido. Use o formato: 00:1A:2B:3C:4D:5E, 00-1A-2B-3C-4D-5E ou 001A2B3C4D5E' 
+    };
+  }
+
+  return { valid: true };
+}
+
+function normalizeMacAddress(mac: string): string {
+  let normalized = mac.trim().toUpperCase();
+  
+  // Se não tem separadores, adiciona :
+  if (normalized.length === 12 && !normalized.includes(':') && !normalized.includes('-')) {
+    normalized = normalized.match(/.{1,2}/g)?.join(':') || normalized;
+  }
+  
+  // Converte - para :
+  normalized = normalized.replace(/-/g, ':');
+  
+  return normalized;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -47,6 +80,18 @@ Deno.serve(async (req) => {
     if (action === 'create') {
       const { nome, mac, usuario, senha, descricao } = playlist;
 
+      // Validar MAC Address
+      const macValidation = validateMacAddress(mac);
+      if (!macValidation.valid) {
+        return new Response(
+          JSON.stringify({ error: macValidation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Normalizar MAC Address
+      const normalizedMac = normalizeMacAddress(mac);
+
       // Chamar API do SmartOne para criar playlist
       const smartoneUrl = `${smartoneBaseUrl}/plugin/smart_one/client_main/add_playlist/`;
       
@@ -61,7 +106,7 @@ Deno.serve(async (req) => {
           client_api: smartoneClientApi,
           key_api: smartoneKeyApi,
           name: nome,
-          mac_address: mac,
+          mac_address: normalizedMac,
           username: usuario,
           password: senha,
           description: descricao || '',
@@ -97,6 +142,18 @@ Deno.serve(async (req) => {
     if (action === 'update') {
       const { nome, mac, usuario, senha, descricao } = playlist;
 
+      // Validar MAC Address
+      const macValidation = validateMacAddress(mac);
+      if (!macValidation.valid) {
+        return new Response(
+          JSON.stringify({ error: macValidation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Normalizar MAC Address
+      const normalizedMac = normalizeMacAddress(mac);
+
       const smartoneUrl = `${smartoneBaseUrl}/plugin/smart_one/client_main/update_playlist/${playlistId}/`;
       
       console.log('Updating playlist at:', smartoneUrl);
@@ -110,7 +167,7 @@ Deno.serve(async (req) => {
           client_api: smartoneClientApi,
           key_api: smartoneKeyApi,
           name: nome,
-          mac_address: mac,
+          mac_address: normalizedMac,
           username: usuario,
           password: senha,
           description: descricao || '',

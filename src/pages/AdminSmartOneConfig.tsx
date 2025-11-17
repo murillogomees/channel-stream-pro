@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Loader2, Settings, Copy, Webhook, TestTube, Trash2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { smartoneService, SmartOneTestResult } from '@/services/smartoneService';
+import { smartoneService, SmartOneTestResult, validateMacAddress, normalizeMacAddress } from '@/services/smartoneService';
 import { webhookService } from '@/services/webhookService';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,6 +41,7 @@ export default function AdminSmartOneConfig() {
   const [testPlaylistId, setTestPlaylistId] = useState('');
   const [isTestingPlaylist, setIsTestingPlaylist] = useState(false);
   const [testHistory, setTestHistory] = useState<SmartOneTestResult[]>([]);
+  const [macError, setMacError] = useState<string>('');
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -336,6 +337,29 @@ export default function AdminSmartOneConfig() {
       title: 'Histórico limpo',
       description: 'Histórico de testes limpo com sucesso.',
     });
+  };
+
+  const handleMacChange = (value: string) => {
+    setTestMac(value);
+    
+    // Validar em tempo real
+    if (value.trim()) {
+      const validation = validateMacAddress(value);
+      setMacError(validation.valid ? '' : validation.error || '');
+    } else {
+      setMacError('');
+    }
+  };
+
+  const handleMacBlur = () => {
+    // Normalizar ao perder foco
+    if (testMac.trim()) {
+      const validation = validateMacAddress(testMac);
+      if (validation.valid) {
+        const normalized = normalizeMacAddress(testMac);
+        setTestMac(normalized);
+      }
+    }
   };
 
   if (authLoading || !configLoaded) {
@@ -676,12 +700,28 @@ export default function AdminSmartOneConfig() {
 
                 <div className="space-y-2">
                   <Label htmlFor="testMac">MAC Address</Label>
-                  <Input
-                    id="testMac"
-                    placeholder="Ex: 00:1A:2B:3C:4D:5E"
-                    value={testMac}
-                    onChange={(e) => setTestMac(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="testMac"
+                      placeholder="Ex: 00:1A:2B:3C:4D:5E"
+                      value={testMac}
+                      onChange={(e) => handleMacChange(e.target.value)}
+                      onBlur={handleMacBlur}
+                      className={macError ? 'border-red-500 pr-10' : ''}
+                    />
+                    {macError && (
+                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                  {macError && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {macError}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Formatos aceitos: 00:1A:2B:3C:4D:5E, 00-1A-2B-3C-4D-5E ou 001A2B3C4D5E
+                  </p>
                 </div>
 
                 <div className="space-y-2">
