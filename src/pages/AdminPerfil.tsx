@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { ThemeSelector } from "@/components/admin/ThemeSelector";
 
 const AdminPerfil = () => {
   const { toast } = useToast();
@@ -249,6 +250,9 @@ const AdminPerfil = () => {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Tema da Interface */}
+          <ThemeSelector />
 
           {/* Ações da Conta */}
           <Card>
