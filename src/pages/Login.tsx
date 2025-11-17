@@ -26,13 +26,14 @@ const loginSchema = z.object({
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
+  const { isAuthenticated, isAdmin, loading: authLoading, refreshUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
+      console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin });
       const from = (location.state as any)?.from?.pathname || (isAdmin ? '/admin/dashboard' : '/conta');
       navigate(from, { replace: true });
     }
@@ -45,12 +46,15 @@ export default function Login() {
     try {
       const validatedData = loginSchema.parse({ email, password });
 
+      console.log('[Login] Tentando fazer login com:', validatedData.email);
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
         password: validatedData.password,
       });
 
       if (error) {
+        console.error('[Login] Erro no login:', error);
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Email ou senha incorretos');
         } else if (error.message.includes('Email not confirmed')) {
@@ -62,7 +66,17 @@ export default function Login() {
       }
 
       if (data.user) {
+        console.log('[Login] Login bem-sucedido:', data.user.id);
         toast.success('Login realizado com sucesso!');
+        
+        // Forçar refresh dos dados do usuário para garantir que as roles sejam carregadas
+        console.log('[Login] Forçando refresh do usuário...');
+        await refreshUser();
+        console.log('[Login] Refresh concluído');
+        
+        // Aguardar um pouco para garantir que o estado seja atualizado
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // O useEffect vai redirecionar automaticamente
       }
     } catch (error) {

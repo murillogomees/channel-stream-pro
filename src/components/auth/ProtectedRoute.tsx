@@ -24,10 +24,25 @@ export const ProtectedRoute = ({
   requireSuperAdmin = false,
   requireClient = false 
 }: ProtectedRouteProps) => {
-  const { isAuthenticated, isAdmin, isSuperAdmin, isClient, loading } = useAuth();
+  const { isAuthenticated, isAdmin, isSuperAdmin, isClient, loading, user } = useAuth();
   const location = useLocation();
 
+  console.log('[ProtectedRoute] Verificando acesso:', {
+    isAuthenticated,
+    isAdmin,
+    isSuperAdmin,
+    isClient,
+    loading,
+    userEmail: user?.email,
+    userRoles: user?.roles,
+    requireAdmin,
+    requireSuperAdmin,
+    requireClient,
+    path: location.pathname
+  });
+
   if (loading) {
+    console.log('[ProtectedRoute] Ainda carregando...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -36,23 +51,31 @@ export const ProtectedRoute = ({
   }
 
   if (!isAuthenticated) {
+    console.log('[ProtectedRoute] Usuário não autenticado, redirecionando para /login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Super admin requer permissão específica
   if (requireSuperAdmin && !isSuperAdmin) {
+    console.log('[ProtectedRoute] Super admin requerido mas usuário não tem permissão');
     return <Navigate to="/403" state={{ required: 'super_admin' }} replace />;
   }
 
   // Admin pode ser admin ou super_admin
   if (requireAdmin && !isAdmin) {
+    console.log('[ProtectedRoute] Admin requerido mas usuário não tem permissão', {
+      isAdmin,
+      userRoles: user?.roles
+    });
     return <Navigate to="/403" state={{ required: 'admin' }} replace />;
   }
 
   // Cliente precisa ter role client
   if (requireClient && !isClient) {
+    console.log('[ProtectedRoute] Client requerido mas usuário não tem permissão');
     return <Navigate to="/403" state={{ required: 'client' }} replace />;
   }
 
+  console.log('[ProtectedRoute] Acesso permitido');
   return <>{children}</>;
 };
