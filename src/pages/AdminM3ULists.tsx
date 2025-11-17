@@ -507,79 +507,29 @@ export default function AdminM3ULists() {
               </p>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="file">Arquivo M3U</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="file"
-                  type="file"
-                  accept=".m3u,.m3u8"
-                  onChange={handleFileSelect}
-                  className="cursor-pointer"
-                />
-                {selectedFile && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setValidationError(null);
-                      const input = document.getElementById('file') as HTMLInputElement;
-                      if (input) input.value = '';
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              
-              {validationError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{validationError}</AlertDescription>
-                </Alert>
-              )}
-              
-              {selectedFile && !validationError && (
-                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 rounded-lg">
-                  <p className="text-sm text-green-900 dark:text-green-100">
-                    ✓ <strong>{selectedFile.name}</strong>
-                    <br />
-                    Tamanho: {formatFileSize(selectedFile.size)} | Tipo: {selectedFile.type || 'M3U'}
-                  </p>
-                </div>
-              )}
-              
-              <p className="text-xs text-muted-foreground">
-                Formatos aceitos: .m3u, .m3u8 | Tamanho máximo: 50MB
-              </p>
-            </div>
-
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Requisitos do arquivo M3U:</strong>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Deve começar com #EXTM3U na primeira linha</li>
-                  <li>Extensão .m3u ou .m3u8</li>
-                  <li>Tamanho máximo de 50MB</li>
-                  <li>URLs válidas e acessíveis dos canais</li>
-                </ul>
-              </AlertDescription>
-            </Alert>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDialogOpen(false);
+                setListName('');
+                setListUrl('');
+                setPlanType('teste');
+                setPriority(0);
+                setValidationError(null);
+              }}
+              disabled={isSaving}
+            >
               Cancelar
             </Button>
-            <Button 
-              onClick={handleUpload} 
-              disabled={isUploading || !selectedFile || !listName || !!validationError}
+            <Button
+              onClick={handleSaveList}
+              disabled={isSaving || !listName.trim() || !listUrl.trim() || !!validationError}
             >
-              {isUploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              <Upload className="w-4 h-4 mr-2" />
-              {isUploading ? 'Enviando...' : 'Enviar Lista'}
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaving ? 'Salvando...' : 'Salvar Lista'}
             </Button>
           </DialogFooter>
         </DialogContent>
