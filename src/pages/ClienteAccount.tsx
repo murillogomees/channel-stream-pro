@@ -38,11 +38,16 @@ export default function ClienteAccount() {
         .from('clientes')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching cliente:', error);
         toast.error('Erro ao carregar dados do cliente');
+        return;
+      }
+
+      if (!data) {
+        setCliente(null);
         return;
       }
 

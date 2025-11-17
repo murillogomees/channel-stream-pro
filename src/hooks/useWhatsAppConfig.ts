@@ -19,7 +19,18 @@ export function useWhatsAppConfig() {
     const stored = localStorage.getItem('whatsapp_config');
     if (stored) {
       try {
-        setConfig(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        const safe: WhatsAppConfig = {
+          ...DEFAULT_CONFIG,
+          ...parsed,
+          sendHour: Number.isFinite(Number(parsed?.sendHour)) ? Number(parsed.sendHour) : DEFAULT_CONFIG.sendHour,
+          daysToNotify: Array.isArray(parsed?.daysToNotify)
+            ? parsed.daysToNotify.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
+            : DEFAULT_CONFIG.daysToNotify,
+          testContacts: Array.isArray(parsed?.testContacts) ? parsed.testContacts : [],
+        };
+        setConfig(safe);
+        localStorage.setItem('whatsapp_config', JSON.stringify(safe));
       } catch (error) {
         console.error('Erro ao carregar configuração WhatsApp:', error);
       }
@@ -27,7 +38,16 @@ export function useWhatsAppConfig() {
   }, []);
 
   const saveConfig = (newConfig: Partial<WhatsAppConfig>) => {
-    const updated = { ...config, ...newConfig };
+    const merged = { ...config, ...newConfig } as Partial<WhatsAppConfig>;
+    const updated: WhatsAppConfig = {
+      ...DEFAULT_CONFIG,
+      ...merged,
+      sendHour: Number.isFinite(Number(merged.sendHour)) ? Number(merged.sendHour) : DEFAULT_CONFIG.sendHour,
+      daysToNotify: Array.isArray(merged.daysToNotify)
+        ? merged.daysToNotify.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
+        : DEFAULT_CONFIG.daysToNotify,
+      testContacts: Array.isArray(merged.testContacts) ? merged.testContacts as TestContact[] : [],
+    };
     setConfig(updated);
     localStorage.setItem('whatsapp_config', JSON.stringify(updated));
   };
@@ -43,9 +63,10 @@ export function useWhatsAppConfig() {
       phone,
       addedAt: new Date().toISOString(),
     };
-    const updated = {
+    const current = Array.isArray(config.testContacts) ? config.testContacts : [];
+    const updated: WhatsAppConfig = {
       ...config,
-      testContacts: [...config.testContacts, newContact],
+      testContacts: [...current, newContact],
     };
     setConfig(updated);
     localStorage.setItem('whatsapp_config', JSON.stringify(updated));
@@ -53,18 +74,20 @@ export function useWhatsAppConfig() {
   };
 
   const removeTestContact = (id: string) => {
-    const updated = {
+    const current = Array.isArray(config.testContacts) ? config.testContacts : [];
+    const updated: WhatsAppConfig = {
       ...config,
-      testContacts: config.testContacts.filter(c => c.id !== id),
+      testContacts: current.filter(c => c.id !== id),
     };
     setConfig(updated);
     localStorage.setItem('whatsapp_config', JSON.stringify(updated));
   };
 
   const updateTestContact = (id: string, data: Partial<TestContact>) => {
-    const updated = {
+    const current = Array.isArray(config.testContacts) ? config.testContacts : [];
+    const updated: WhatsAppConfig = {
       ...config,
-      testContacts: config.testContacts.map(c =>
+      testContacts: current.map(c =>
         c.id === id ? { ...c, ...data } : c
       ),
     };
