@@ -66,25 +66,25 @@ const AdminUserRoles = () => {
     try {
       setLoading(true);
 
-      const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
+      // Call Edge Function to list users (uses service_role internally)
+      const { data: usersResponse, error: usersError } = await supabase.functions.invoke('list-users');
       
-      if (authError) throw authError;
+      if (usersError) {
+        console.error('Error invoking list-users:', usersError);
+        throw new Error(usersError.message || 'Failed to load users');
+      }
 
-      const { data: rolesData, error: rolesError} = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      if (!usersResponse?.users) {
+        throw new Error('Invalid response from list-users function');
+      }
 
-      if (rolesError) throw rolesError;
-
-      const usersWithRoles: UserWithRole[] = (authUsers || []).map(user => {
-        const userRoles = rolesData?.filter(r => r.user_id === user.id).map(r => r.role) || [];
-        return {
-          id: user.id,
-          email: user.email || 'Sem email',
-          created_at: user.created_at,
-          roles: userRoles,
-        };
-      });
+      // Transform response to match UserWithRole interface
+      const usersWithRoles: UserWithRole[] = usersResponse.users.map((user: any) => ({
+        id: user.id,
+        email: user.email || 'Sem email',
+        created_at: user.created_at,
+        roles: user.roles || [],
+      }));
 
       setUsers(usersWithRoles);
     } catch (error: any) {

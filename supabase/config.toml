@@ -1,5 +1,9 @@
 project_id = "sdvyxdghxqmntyoweqbd"
 
+# Admin-only function for listing users - requires authentication
+[functions.list-users]
+verify_jwt = true
+
 # Public endpoint for prospect registration - kept public with validation
 [functions.notify-prospect]
 verify_jwt = false
