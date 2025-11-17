@@ -7,12 +7,16 @@ const corsHeaders = {
 };
 
 interface WhatsAppWebhookEvent {
-  event: string; // 'message_read', 'message_delivered', 'message_sent', 'message_failed'
+  event: string; // 'message_read', 'message_delivered', 'message_sent', 'message_failed', 'button_response'
   phone: string;
   message_id?: string;
   timestamp?: string;
   status?: string;
   error?: string;
+  button_id?: string; // 'investigate', 'resolve', 'escalate'
+  delivery_id?: string;
+  admin_phone_id?: string;
+  notes?: string;
   metadata?: {
     delivery_id?: string;
     admin_phone_id?: string;
@@ -57,6 +61,9 @@ serve(async (req) => {
         break;
       case 'message_failed':
         await handleMessageFailed(supabase, event);
+        break;
+      case 'button_response':
+        await handleButtonResponse(supabase, event);
         break;
       default:
         console.log('[WhatsAppWebhook] Unhandled event type:', event.event);

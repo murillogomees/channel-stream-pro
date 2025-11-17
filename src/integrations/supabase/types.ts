@@ -631,38 +631,59 @@ export type Database = {
       }
       security_alert_deliveries: {
         Row: {
+          action_notes: string | null
+          action_taken: string | null
+          action_taken_at: string | null
           admin_phone_id: string
+          confirmation_latency_ms: number | null
           confirmed_at: string | null
           created_at: string | null
+          delivery_latency_ms: number | null
           delivery_status: string | null
           error_message: string | null
           escalated: boolean | null
           escalated_at: string | null
           id: string
+          read_at: string | null
+          read_latency_ms: number | null
           security_event_id: string
           sent_at: string
         }
         Insert: {
+          action_notes?: string | null
+          action_taken?: string | null
+          action_taken_at?: string | null
           admin_phone_id: string
+          confirmation_latency_ms?: number | null
           confirmed_at?: string | null
           created_at?: string | null
+          delivery_latency_ms?: number | null
           delivery_status?: string | null
           error_message?: string | null
           escalated?: boolean | null
           escalated_at?: string | null
           id?: string
+          read_at?: string | null
+          read_latency_ms?: number | null
           security_event_id: string
           sent_at?: string
         }
         Update: {
+          action_notes?: string | null
+          action_taken?: string | null
+          action_taken_at?: string | null
           admin_phone_id?: string
+          confirmation_latency_ms?: number | null
           confirmed_at?: string | null
           created_at?: string | null
+          delivery_latency_ms?: number | null
           delivery_status?: string | null
           error_message?: string | null
           escalated?: boolean | null
           escalated_at?: string | null
           id?: string
+          read_at?: string | null
+          read_latency_ms?: number | null
           security_event_id?: string
           sent_at?: string
         }
@@ -829,6 +850,51 @@ export type Database = {
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      get_admin_performance_stats: {
+        Args: { _days?: number }
+        Returns: {
+          admin_id: string
+          admin_name: string
+          admin_phone: string
+          alerts_with_action: number
+          avg_response_time_minutes: number
+          confirmation_rate: number
+          confirmed_alerts: number
+          total_alerts: number
+        }[]
+      }
+      get_alert_performance_stats: {
+        Args: { _days?: number }
+        Returns: {
+          avg_confirmation_time_minutes: number
+          avg_read_time_minutes: number
+          confirmation_rate: number
+          confirmed_alerts: number
+          escalation_rate: number
+          total_alerts: number
+          total_escalations: number
+        }[]
+      }
+      get_alert_timeline: {
+        Args: { _hours?: number; _limit?: number }
+        Returns: {
+          action_taken: string
+          action_taken_at: string
+          admin_name: string
+          admin_phone: string
+          confirmed_at: string
+          delivery_id: string
+          delivery_status: string
+          escalated: boolean
+          escalated_at: string
+          event_details: Json
+          event_id: string
+          event_type: string
+          read_at: string
+          sent_at: string
+          severity: string
+        }[]
+      }
       get_auth_uid: { Args: never; Returns: string }
       get_security_analytics: {
         Args: { _days?: number }

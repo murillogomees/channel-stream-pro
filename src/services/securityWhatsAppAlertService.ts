@@ -169,16 +169,15 @@ class SecurityWhatsAppAlertService {
     const channels = admin.notification_channels || ['whatsapp'];
     const results: { channel: string; success: boolean; error?: string }[] = [];
 
-    // Adicionar link de confirmação à mensagem
-    const confirmationLink = this.generateConfirmationLink(event.id, admin.id);
-    const messageWithConfirmation = `${message}\n\n🔗 Confirmar recebimento: ${confirmationLink}`;
+    // Adicionar botões de ação à mensagem
+    const messageWithActions = this.formatMessageWithActions(message, event.id, admin.id);
 
     for (const channel of channels) {
       try {
         switch (channel) {
           case 'whatsapp':
             if (this.whatsAppAdapter.isConfigured()) {
-              await this.whatsAppAdapter.sendText(admin.phone, messageWithConfirmation);
+              await this.whatsAppAdapter.sendText(admin.phone, messageWithActions);
               results.push({ channel: 'whatsapp', success: true });
               console.log(`[SecurityAlert] WhatsApp enviado para ${admin.name}`);
             }
@@ -186,7 +185,7 @@ class SecurityWhatsAppAlertService {
           
           case 'telegram':
             if (admin.telegram_id) {
-              await this.sendTelegram(admin.telegram_id, messageWithConfirmation);
+              await this.sendTelegram(admin.telegram_id, messageWithActions);
               results.push({ channel: 'telegram', success: true });
               console.log(`[SecurityAlert] Telegram enviado para ${admin.name}`);
             }
@@ -194,7 +193,7 @@ class SecurityWhatsAppAlertService {
           
           case 'sms':
             if (admin.phone_sms) {
-              await this.sendSMS(admin.phone_sms, message); // SMS sem link por limitação de caracteres
+              await this.sendSMS(admin.phone_sms, message); // SMS sem botões por limitação
               results.push({ channel: 'sms', success: true });
               console.log(`[SecurityAlert] SMS enviado para ${admin.name}`);
             }
@@ -220,6 +219,34 @@ class SecurityWhatsAppAlertService {
     if (anySuccess) {
       console.log(`[SecurityAlert] Alerta enviado para ${admin.name} via ${results.filter(r => r.success).map(r => r.channel).join(', ')}`);
     }
+  }
+
+  /**
+   * Formata mensagem com botões de ação interativos
+   */
+  private formatMessageWithActions(message: string, eventId: string, adminId: string): string {
+    const projectId = 'sdvyxdghxqmntyoweqbd';
+    const webhookUrl = `https://${projectId}.supabase.co/functions/v1/whatsapp-webhook`;
+    
+    // Adicionar instruções de ação
+    const actionsText = `
+━━━━━━━━━━━━━━━━
+*AÇÕES DISPONÍVEIS:*
+
+🔍 *Investigar*
+Responda: INVESTIGAR
+
+✅ *Resolver*
+Responda: RESOLVER
+
+⚠️ *Escalar*
+Responda: ESCALAR
+
+_Ou clique no link para confirmar:_
+${this.generateConfirmationLink(eventId, adminId)}
+━━━━━━━━━━━━━━━━`;
+
+    return `${message}${actionsText}`;
   }
 
   /**
