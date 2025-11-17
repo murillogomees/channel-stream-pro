@@ -20,8 +20,7 @@ export interface SmartOneSyncResult {
 export interface SmartOneTestPlaylist {
   nome: string;
   mac: string;
-  usuario: string;
-  senha: string;
+  m3uUrl: string;
   descricao?: string;
 }
 
@@ -279,8 +278,7 @@ class SmartoneService {
           playlist: {
             nome: playlist.nome,
             mac: normalizedMac,
-            usuario: playlist.usuario,
-            senha: playlist.senha,
+            m3u_url: playlist.m3uUrl,
             descricao: playlist.descricao || '',
           },
         },
@@ -351,8 +349,7 @@ class SmartoneService {
           playlist: {
             nome: playlist.nome,
             mac: normalizedMac,
-            usuario: playlist.usuario,
-            senha: playlist.senha,
+            m3u_url: playlist.m3uUrl,
             descricao: playlist.descricao || '',
           },
         },

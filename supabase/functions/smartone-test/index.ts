@@ -71,58 +71,70 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = await req.json();
-    const { action, playlist, playlistId } = body;
+    // Parse request body
+    const { action, playlist, playlistId } = await req.json();
 
-    console.log('SmartOne Test - Action:', action);
+    if (!action) {
+      return new Response(
+        JSON.stringify({ error: 'Action is required (create, update, delete)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Criar playlist
-    if (action === 'create') {
-      const { nome, mac, usuario, senha, descricao } = playlist;
-
-      // Validar MAC Address
-      const macValidation = validateMacAddress(mac);
+    // Para create e update, validar e normalizar MAC Address
+    if ((action === 'create' || action === 'update') && playlist) {
+      const macValidation = validateMacAddress(playlist.mac);
       if (!macValidation.valid) {
         return new Response(
           JSON.stringify({ error: macValidation.error }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      // Normalizar MAC Address
-      const normalizedMac = normalizeMacAddress(mac);
-
-      // Chamar API do SmartOne para criar playlist
-      const smartoneUrl = `${smartoneBaseUrl}/plugin/smart_one/client_main/add_playlist/`;
       
-      console.log('Creating playlist at:', smartoneUrl);
+      // Normalizar MAC antes de enviar
+      playlist.mac = normalizeMacAddress(playlist.mac);
       
-      const response = await fetch(smartoneUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_api: smartoneClientApi,
-          key_api: smartoneKeyApi,
-          name: nome,
-          mac_address: normalizedMac,
-          username: usuario,
-          password: senha,
-          description: descricao || '',
-        }),
-      });
+      // Validar URL do M3U
+      if (!playlist.m3u_url) {
+        return new Response(
+          JSON.stringify({ error: 'URL do M3U é obrigatória' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
-      const responseData = await response.json();
+    // Create playlist (xtream_playlist type)
+    if (action === 'create') {
+      console.log('Creating xtream playlist:', playlist);
+
+      const smartoneResponse = await fetch(
+        `${smartoneBaseUrl}/plugin/smart_one/client_main/add_playlist/#xtream_playlist`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'client_api': smartoneClientApi,
+            'key_api': smartoneKeyApi,
+          },
+          body: JSON.stringify({
+            nome: playlist.nome,
+            mac: playlist.mac,
+            m3u_url: playlist.m3u_url,
+            descricao: playlist.descricao || '',
+          }),
+        }
+      );
+
+      const responseData = await smartoneResponse.json();
       
-      if (!response.ok) {
+      if (!smartoneResponse.ok) {
         console.error('SmartOne API error:', responseData);
         return new Response(
           JSON.stringify({ 
             error: responseData.message || 'Erro ao criar playlist no SmartOne',
             details: responseData,
           }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -138,52 +150,38 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Atualizar playlist
+    // Update playlist (xtream_playlist type)
     if (action === 'update') {
-      const { nome, mac, usuario, senha, descricao } = playlist;
+      console.log('Updating xtream playlist:', playlistId, playlist);
 
-      // Validar MAC Address
-      const macValidation = validateMacAddress(mac);
-      if (!macValidation.valid) {
-        return new Response(
-          JSON.stringify({ error: macValidation.error }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      const smartoneResponse = await fetch(
+        `${smartoneBaseUrl}/plugin/smart_one/client_main/update_playlist/${playlistId}/#xtream_playlist`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'client_api': smartoneClientApi,
+            'key_api': smartoneKeyApi,
+          },
+          body: JSON.stringify({
+            nome: playlist.nome,
+            mac: playlist.mac,
+            m3u_url: playlist.m3u_url,
+            descricao: playlist.descricao || '',
+          }),
+        }
+      );
 
-      // Normalizar MAC Address
-      const normalizedMac = normalizeMacAddress(mac);
+      const responseData = await smartoneResponse.json();
 
-      const smartoneUrl = `${smartoneBaseUrl}/plugin/smart_one/client_main/update_playlist/${playlistId}/`;
-      
-      console.log('Updating playlist at:', smartoneUrl);
-
-      const response = await fetch(smartoneUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_api: smartoneClientApi,
-          key_api: smartoneKeyApi,
-          name: nome,
-          mac_address: normalizedMac,
-          username: usuario,
-          password: senha,
-          description: descricao || '',
-        }),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
+      if (!smartoneResponse.ok) {
         console.error('SmartOne API error:', responseData);
         return new Response(
           JSON.stringify({ 
             error: responseData.message || 'Erro ao atualizar playlist no SmartOne',
             details: responseData,
           }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
