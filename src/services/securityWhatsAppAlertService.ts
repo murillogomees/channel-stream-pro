@@ -8,6 +8,17 @@ interface AdminPhone {
   name: string;
   phone: string;
   active: boolean;
+  telegram_id?: string;
+  phone_sms?: string;
+  notification_channels?: string[];
+  schedule_enabled?: boolean;
+  schedule_config?: {
+    [day: string]: {
+      enabled: boolean;
+      start: string;
+      end: string;
+    };
+  };
 }
 
 interface AlertConfig {
@@ -97,10 +108,18 @@ class SecurityWhatsAppAlertService {
         return;
       }
 
+      // Filtrar admins disponíveis baseado em horário de plantão
+      const availableAdmins = admins.filter(admin => this.isAdminAvailable(admin));
+
+      if (availableAdmins.length === 0) {
+        console.log('[SecurityAlert] Nenhum admin disponível no horário atual');
+        return;
+      }
+
       const message = await this.formatAlertMessage(event);
 
-      // Envia para todos os admins ativos em paralelo
-      const sendPromises = admins.map(admin => 
+      // Envia para todos os admins disponíveis em paralelo
+      const sendPromises = availableAdmins.map(admin => 
         this.sendToAdmin(admin, message, event)
       );
 
@@ -109,31 +128,124 @@ class SecurityWhatsAppAlertService {
       // Atualiza última vez que o alerta foi disparado
       await this.updateLastTriggered(event.event_type);
 
-      console.log(`[SecurityAlert] Alerta enviado para ${admins.length} admin(s)`);
+      console.log(`[SecurityAlert] Alerta enviado para ${availableAdmins.length} admin(s)`);
     } catch (error) {
       console.error('[SecurityAlert] Erro ao enviar alerta:', error);
     }
   }
 
   /**
-   * Envia mensagem para um admin específico
+   * Verifica se admin está disponível baseado no horário de plantão
+   */
+  private isAdminAvailable(admin: AdminPhone): boolean {
+    // Se não tem schedule habilitado, sempre disponível
+    if (!admin.schedule_enabled || !admin.schedule_config) {
+      return true;
+    }
+
+    const now = new Date();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[now.getDay()];
+    
+    const daySchedule = admin.schedule_config[dayName];
+    
+    if (!daySchedule || !daySchedule.enabled) {
+      return false;
+    }
+
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    return currentTime >= daySchedule.start && currentTime <= daySchedule.end;
+  }
+
+  /**
+   * Envia mensagem para um admin específico usando canais configurados
    */
   private async sendToAdmin(
     admin: AdminPhone,
     message: string,
     event: SecurityEvent
   ): Promise<void> {
-    try {
-      await this.whatsAppAdapter.sendText(admin.phone, message);
-      
-      // Registra entrega para tracking de confirmação
-      await this.recordDelivery(event.id, admin.id, 'sent');
-      
-      console.log(`[SecurityAlert] Alerta enviado para ${admin.name} (${admin.phone})`);
-    } catch (error) {
-      await this.recordDelivery(event.id, admin.id, 'failed', error as Error);
-      console.error(`[SecurityAlert] Falha ao enviar para ${admin.name}:`, error);
+    const channels = admin.notification_channels || ['whatsapp'];
+    const results: { channel: string; success: boolean; error?: string }[] = [];
+
+    // Adicionar link de confirmação à mensagem
+    const confirmationLink = this.generateConfirmationLink(event.id, admin.id);
+    const messageWithConfirmation = `${message}\n\n🔗 Confirmar recebimento: ${confirmationLink}`;
+
+    for (const channel of channels) {
+      try {
+        switch (channel) {
+          case 'whatsapp':
+            if (this.whatsAppAdapter.isConfigured()) {
+              await this.whatsAppAdapter.sendText(admin.phone, messageWithConfirmation);
+              results.push({ channel: 'whatsapp', success: true });
+              console.log(`[SecurityAlert] WhatsApp enviado para ${admin.name}`);
+            }
+            break;
+          
+          case 'telegram':
+            if (admin.telegram_id) {
+              await this.sendTelegram(admin.telegram_id, messageWithConfirmation);
+              results.push({ channel: 'telegram', success: true });
+              console.log(`[SecurityAlert] Telegram enviado para ${admin.name}`);
+            }
+            break;
+          
+          case 'sms':
+            if (admin.phone_sms) {
+              await this.sendSMS(admin.phone_sms, message); // SMS sem link por limitação de caracteres
+              results.push({ channel: 'sms', success: true });
+              console.log(`[SecurityAlert] SMS enviado para ${admin.name}`);
+            }
+            break;
+        }
+      } catch (error) {
+        results.push({ 
+          channel, 
+          success: false, 
+          error: (error as Error).message 
+        });
+        console.error(`[SecurityAlert] Falha no canal ${channel} para ${admin.name}:`, error);
+      }
     }
+
+    // Registrar entrega (sucesso se pelo menos um canal funcionou)
+    const anySuccess = results.some(r => r.success);
+    const status = anySuccess ? 'sent' : 'failed';
+    const errorMsg = anySuccess ? undefined : results.map(r => `${r.channel}: ${r.error}`).join('; ');
+    
+    await this.recordDelivery(event.id, admin.id, status, errorMsg ? new Error(errorMsg) : undefined);
+    
+    if (anySuccess) {
+      console.log(`[SecurityAlert] Alerta enviado para ${admin.name} via ${results.filter(r => r.success).map(r => r.channel).join(', ')}`);
+    }
+  }
+
+  /**
+   * Gera link de confirmação para o alerta
+   */
+  private generateConfirmationLink(eventId: string, adminId: string): string {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/api/confirm-alert?deliveryId=${eventId}&adminId=${adminId}`;
+  }
+
+  /**
+   * Envia mensagem via Telegram (placeholder - necessita implementação)
+   */
+  private async sendTelegram(telegramId: string, message: string): Promise<void> {
+    // TODO: Implementar integração com Telegram Bot API
+    console.log('[SecurityAlert] Telegram não implementado ainda');
+    throw new Error('Telegram não configurado');
+  }
+
+  /**
+   * Envia mensagem via SMS (placeholder - necessita implementação com Twilio/etc)
+   */
+  private async sendSMS(phone: string, message: string): Promise<void> {
+    // TODO: Implementar integração com provedor SMS (Twilio, AWS SNS, etc)
+    console.log('[SecurityAlert] SMS não implementado ainda');
+    throw new Error('SMS não configurado');
   }
 
   /**
@@ -297,7 +409,11 @@ class SecurityWhatsAppAlertService {
         return [];
       }
 
-      return (data || []) as AdminPhone[];
+      return (data || []).map(admin => ({
+        ...admin,
+        notification_channels: (admin.notification_channels as string[]) || ['whatsapp'],
+        schedule_config: admin.schedule_config as AdminPhone['schedule_config']
+      })) as AdminPhone[];
     } catch (error) {
       console.error('[SecurityAlert] Erro ao buscar admins:', error);
       return [];

@@ -23,3 +23,6 @@ verify_jwt = false
 # Cron job for escalating security alerts - public for cron access
 [functions.escalate-security-alerts]
 verify_jwt = false
+
+[functions.confirm-security-alert]
+verify_jwt = false
