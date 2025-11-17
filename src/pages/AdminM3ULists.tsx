@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Upload, Trash2, Loader2, FileText, Download, Eye, EyeOff, Star } from 'lucide-react';
+import { Plus, Upload, Trash2, Loader2, FileText, Download, Eye, EyeOff, Star, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { z } from 'zod';
 import {
   Table,
   TableBody,
@@ -57,6 +59,7 @@ export default function AdminM3ULists() {
   const [listName, setListName] = useState('');
   const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
   const [priority, setPriority] = useState(0);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -92,26 +95,122 @@ export default function AdminM3ULists() {
     }
   };
 
+  // Schema de validação para arquivos M3U
+  const m3uFileSchema = z.object({
+    name: z.string()
+      .refine(
+        (name) => /\.(m3u|m3u8)$/i.test(name),
+        'Arquivo deve ter extensão .m3u ou .m3u8'
+      ),
+    size: z.number()
+      .max(50 * 1024 * 1024, 'Arquivo não pode ser maior que 50MB')
+      .min(1, 'Arquivo não pode estar vazio'),
+    type: z.string()
+      .refine(
+        (type) => type === '' || type.includes('text') || type.includes('audio/x-mpegurl') || type.includes('application/vnd.apple.mpegurl'),
+        'Tipo de arquivo não suportado'
+      ),
+  });
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith('.m3u') && !file.name.endsWith('.m3u8')) {
-        toast.error('Formato inválido', {
-          description: 'Por favor, selecione um arquivo .m3u ou .m3u8'
+    setValidationError(null);
+    
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    // Validar arquivo usando schema Zod
+    const validation = m3uFileSchema.safeParse({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.errors[0].message;
+      setValidationError(errorMessage);
+      toast.error('Arquivo inválido', {
+        description: errorMessage
+      });
+      event.target.value = ''; // Limpar input
+      setSelectedFile(null);
+      return;
+    }
+
+    // Validação adicional: verificar se começa com #EXTM3U
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const firstLine = content.trim().split('\n')[0];
+      
+      if (!firstLine.startsWith('#EXTM3U')) {
+        setValidationError('Arquivo M3U inválido: deve começar com #EXTM3U');
+        toast.error('Formato M3U inválido', {
+          description: 'O arquivo deve começar com #EXTM3U na primeira linha'
         });
+        event.target.value = '';
+        setSelectedFile(null);
         return;
       }
+
+      // Arquivo válido
       setSelectedFile(file);
+      setValidationError(null);
+      
       if (!listName) {
         setListName(file.name.replace(/\.(m3u8?|txt)$/i, ''));
       }
-    }
+
+      toast.success('Arquivo validado', {
+        description: `${file.name} (${formatFileSize(file.size)}) está pronto para upload`
+      });
+    };
+
+    reader.onerror = () => {
+      setValidationError('Erro ao ler arquivo');
+      toast.error('Erro ao ler arquivo');
+      event.target.value = '';
+      setSelectedFile(null);
+    };
+
+    reader.readAsText(file.slice(0, 1024)); // Ler apenas os primeiros 1KB para validar
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !listName) {
-      toast.error('Dados incompletos', {
-        description: 'Selecione um arquivo e forneça um nome para a lista'
+    // Validações antes do upload
+    if (!selectedFile) {
+      toast.error('Nenhum arquivo selecionado', {
+        description: 'Por favor, selecione um arquivo M3U válido'
+      });
+      return;
+    }
+
+    if (!listName.trim()) {
+      toast.error('Nome da lista obrigatório', {
+        description: 'Por favor, forneça um nome para a lista M3U'
+      });
+      return;
+    }
+
+    if (listName.trim().length < 3) {
+      toast.error('Nome muito curto', {
+        description: 'O nome da lista deve ter pelo menos 3 caracteres'
+      });
+      return;
+    }
+
+    if (listName.trim().length > 100) {
+      toast.error('Nome muito longo', {
+        description: 'O nome da lista deve ter no máximo 100 caracteres'
+      });
+      return;
+    }
+
+    if (validationError) {
+      toast.error('Arquivo inválido', {
+        description: validationError
       });
       return;
     }
@@ -119,45 +218,104 @@ export default function AdminM3ULists() {
     try {
       setIsUploading(true);
 
-      // Upload do arquivo para o storage
-      const fileName = `${Date.now()}_${selectedFile.name}`;
+      // Upload do arquivo para o storage com validação adicional
+      const fileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      
+      console.log('Iniciando upload:', {
+        fileName,
+        size: selectedFile.size,
+        type: selectedFile.type
+      });
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('m3u-files')
-        .upload(fileName, selectedFile);
+        .upload(fileName, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Erro no upload do storage:', uploadError);
+        throw new Error(`Falha no upload: ${uploadError.message}`);
+      }
+
+      if (!uploadData) {
+        throw new Error('Upload não retornou dados');
+      }
 
       // Obter URL pública
       const { data: urlData } = supabase.storage
         .from('m3u-files')
         .getPublicUrl(fileName);
 
+      if (!urlData.publicUrl) {
+        throw new Error('Não foi possível obter URL pública do arquivo');
+      }
+
+      console.log('Upload concluído, criando registro no banco...');
+
       // Criar registro no banco de dados
-      const { error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await supabase
         .from('m3u_lists')
         .insert([
           {
-            name: listName,
-            filename: selectedFile.name,
+            name: listName.trim(),
             file_url: urlData.publicUrl,
-            file_size: selectedFile.size,
-            status: 'active'
+            status: 'active',
+            plan_type: planType,
+            priority: priority,
           }
-        ]);
+        ])
+        .select()
+        .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Erro ao criar registro no banco:', insertError);
+        // Tentar deletar arquivo do storage se falhar
+        await supabase.storage.from('m3u-files').remove([fileName]);
+        throw new Error(`Falha ao registrar lista: ${insertError.message}`);
+      }
 
-      toast.success('Lista M3U enviada com sucesso!');
+      console.log('Lista M3U criada com sucesso:', insertData);
+
+      toast.success('Lista M3U enviada com sucesso!', {
+        description: `${listName} foi adicionada ao sistema`
+      });
+      
       setIsDialogOpen(false);
       setSelectedFile(null);
       setListName('');
       setPlanType('teste');
       setPriority(0);
+      setValidationError(null);
       loadLists();
     } catch (error: any) {
       console.error('Error uploading M3U:', error);
+      
+      let errorMessage = 'Erro desconhecido ao enviar lista';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error) {
+        errorMessage = error.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      // Mensagens de erro específicas
+      if (errorMessage.includes('row-level security')) {
+        errorMessage = 'Permissões insuficientes. Verifique se você tem acesso de administrador.';
+      } else if (errorMessage.includes('storage')) {
+        errorMessage = 'Erro no storage. Verifique as permissões do bucket m3u-files.';
+      } else if (errorMessage.includes('duplicate')) {
+        errorMessage = 'Já existe uma lista com este nome.';
+      } else if (errorMessage.includes('network')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      }
+
       toast.error('Erro ao enviar lista M3U', {
-        description: error.message
+        description: errorMessage,
+        duration: 5000,
       });
     } finally {
       setIsUploading(false);
@@ -491,24 +649,52 @@ export default function AdminM3ULists() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedFile(null)}
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setValidationError(null);
+                      const input = document.getElementById('file') as HTMLInputElement;
+                      if (input) input.value = '';
+                    }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 )}
               </div>
-              {selectedFile && (
-                <p className="text-xs text-muted-foreground">
-                  Arquivo selecionado: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                </p>
+              
+              {validationError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{validationError}</AlertDescription>
+                </Alert>
               )}
-            </div>
-
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3 rounded-lg">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                💡 <strong>Dica:</strong> Certifique-se de que o arquivo M3U está no formato correto e contém URLs válidas para os canais.
+              
+              {selectedFile && !validationError && (
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 rounded-lg">
+                  <p className="text-sm text-green-900 dark:text-green-100">
+                    ✓ <strong>{selectedFile.name}</strong>
+                    <br />
+                    Tamanho: {formatFileSize(selectedFile.size)} | Tipo: {selectedFile.type || 'M3U'}
+                  </p>
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground">
+                Formatos aceitos: .m3u, .m3u8 | Tamanho máximo: 50MB
               </p>
             </div>
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Requisitos do arquivo M3U:</strong>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>Deve começar com #EXTM3U na primeira linha</li>
+                  <li>Extensão .m3u ou .m3u8</li>
+                  <li>Tamanho máximo de 50MB</li>
+                  <li>URLs válidas e acessíveis dos canais</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
           </div>
 
           <DialogFooter>
@@ -517,11 +703,11 @@ export default function AdminM3ULists() {
             </Button>
             <Button 
               onClick={handleUpload} 
-              disabled={isUploading || !selectedFile || !listName}
+              disabled={isUploading || !selectedFile || !listName || !!validationError}
             >
               {isUploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               <Upload className="w-4 h-4 mr-2" />
-              Enviar
+              {isUploading ? 'Enviando...' : 'Enviar Lista'}
             </Button>
           </DialogFooter>
         </DialogContent>
