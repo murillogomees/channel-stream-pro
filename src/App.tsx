@@ -21,6 +21,7 @@ const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
 const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
+const AdminM3UListStats = lazy(() => import("./pages/AdminM3UListStats"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSettings"));
 const AdminNotificationRetry = lazy(() => import("./pages/AdminNotificationRetry"));
@@ -90,6 +91,7 @@ const App = () => (
           <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
           <Route path="/admin/templates" element={<ProtectedRoute requireAdmin><AdminTemplates /></ProtectedRoute>} />
           <Route path="/admin/m3u-lists" element={<ProtectedRoute requireAdmin><AdminM3ULists /></ProtectedRoute>} />
+          <Route path="/admin/m3u-stats" element={<ProtectedRoute requireAdmin><AdminM3UListStats /></ProtectedRoute>} />
           <Route path="/admin/variables" element={<ProtectedRoute requireAdmin><AdminVariables /></ProtectedRoute>} />
           <Route path="/admin/notification-settings" element={<ProtectedRoute requireAdmin><AdminNotificationSettings /></ProtectedRoute>} />
           <Route path="/admin/notification-retry" element={<ProtectedRoute requireAdmin><AdminNotificationRetry /></ProtectedRoute>} />

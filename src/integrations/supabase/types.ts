@@ -576,6 +576,35 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_list_favorites: {
+        Row: {
+          admin_id: string
+          created_at: string | null
+          id: string
+          m3u_list_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          m3u_list_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          m3u_list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_list_favorites_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_list_tags: {
         Row: {
           created_at: string | null
