@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bell, TrendingUp, AlertTriangle, CheckCircle2, ArrowRight, Wifi } from 'lucide-react';
+import { Bell, TrendingUp, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { subDays } from 'date-fns';
@@ -82,11 +82,19 @@ export function NotificationStatsWidget() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2"><Bell className="h-5 w-5" />Notificações (Tempo Real)</div>
           <div className="flex items-center gap-2">
-            <Wifi className="h-4 w-4 text-green-500" />
-            <Badge variant="outline" className="text-xs">Ao vivo</Badge>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notification-stats')}>Ver Detalhes<ArrowRight className="h-4 w-4 ml-1" /></Button>
+            <Bell className="h-5 w-5" />
+            Notificações (Tempo Real)
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-1" />
+              Ao vivo
+            </Badge>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/notification-stats')}>
+              Ver Detalhes
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
           </div>
         </CardTitle>
         <CardDescription>Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}</CardDescription>

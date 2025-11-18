@@ -35,6 +35,7 @@ const getActivityColor = (actionType: string) => {
 export function RecentActivities() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadActivities();
@@ -42,6 +43,7 @@ export function RecentActivities() {
     // Subscribe to real-time updates
     const unsubscribe = activityLogService.subscribeToActivities((newActivity) => {
       setActivities((prev) => [newActivity, ...prev].slice(0, 10));
+      setLastUpdate(new Date());
     });
 
     return unsubscribe;
@@ -51,6 +53,7 @@ export function RecentActivities() {
     try {
       const data = await activityLogService.getRecentActivities(10);
       setActivities(data);
+      setLastUpdate(new Date());
     } catch (error) {
       console.error('Erro ao carregar atividades:', error);
     } finally {
@@ -61,12 +64,20 @@ export function RecentActivities() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle>Atividades Recentes</CardTitle>
-            <CardDescription>Últimas ações no sistema</CardDescription>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle>Atividades Recentes</CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Ao vivo • {lastUpdate.toLocaleTimeString('pt-BR')}</span>
+              </CardDescription>
+            </div>
           </div>
+          <Badge variant="outline" className="text-xs">
+            Tempo Real
+          </Badge>
         </div>
       </CardHeader>
       <CardContent>
