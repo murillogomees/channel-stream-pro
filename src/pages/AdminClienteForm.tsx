@@ -255,88 +255,100 @@ export default function AdminClienteForm() {
         }
       }
     } else {
-      const novoCliente = addCliente(clienteData);
-      clientId = novoCliente.id;
-      
-      toast({
-        title: 'Cliente cadastrado',
-        description: 'O novo cliente foi adicionado com sucesso.',
-      });
+      // Insert new client directly into Supabase
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-      // Save M3U list assignments for new clients
-      if (selectedM3ULists.length > 0) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          // Buscar atribuições existentes
-          const { data: existingAssignments } = await supabase
-            .from('client_m3u_lists')
-            .select('m3u_list_id, id')
-            .eq('client_id', clientId);
-          
-          const existingListIds = new Set(existingAssignments?.map(a => a.m3u_list_id) || []);
-          
-          // Separar listas novas das já existentes
-          const newListIds = selectedM3ULists.filter(id => !existingListIds.has(id));
-          const reactivateIds = selectedM3ULists.filter(id => existingListIds.has(id));
-          
-          // Inserir novas atribuições
-          if (newListIds.length > 0) {
-            const newAssignments = newListIds.map(listId => ({
+        const { data: newClientData, error: insertError } = await supabase
+          .from('clientes')
+          .insert({
+            nome: clienteData.nome,
+            telefone: clienteData.telefone,
+            telegram: clienteData.telegram || null,
+            email: clienteData.email || null,
+            situacao: clienteData.situacao,
+            data_contratacao: clienteData.dataContratacao || null,
+            data_vencimento: clienteData.dataVencimento || null,
+            plano: clienteData.plano,
+            valor_pago: clienteData.valorPago || null,
+            data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
+            forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
+            mac_smart_one: clienteData.macSmartOne || null,
+            usuario_m3u: clienteData.usuario || null,
+            senha_m3u: clienteData.senha || null,
+            cliente_ativo: clienteData.clienteAtivo,
+            smartone_status: 'nao_enviado',
+            data_cadastro: new Date().toISOString(),
+            data_ultima_edicao: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        if (!newClientData) throw new Error('Failed to create client');
+
+        clientId = newClientData.id;
+
+        // Also update local context
+        const novoCliente = addCliente(clienteData);
+        
+        toast({
+          title: 'Cliente cadastrado',
+          description: 'O novo cliente foi adicionado com sucesso.',
+        });
+
+        // Save M3U list assignments for new clients
+        if (selectedM3ULists.length > 0) {
+          try {
+            const newAssignments = selectedM3ULists.map(listId => ({
               client_id: clientId,
               m3u_list_id: listId,
               assigned_by: user?.id,
               is_active: true,
             }));
 
-            const { error: insertError } = await supabase
+            const { error: m3uError } = await supabase
               .from('client_m3u_lists')
               .insert(newAssignments);
 
-            if (insertError) throw insertError;
-          }
-          
-          // Reativar atribuições existentes
-          if (reactivateIds.length > 0) {
-            const { error: updateError } = await supabase
-              .from('client_m3u_lists')
-              .update({ is_active: true })
-              .eq('client_id', clientId)
-              .in('m3u_list_id', reactivateIds);
-            
-            if (updateError) throw updateError;
-          }
+            if (m3uError) throw m3uError;
 
-          if (newListIds.length > 0 || reactivateIds.length > 0) {
             toast({
               title: "Listas atribuídas",
               description: `${selectedM3ULists.length} lista(s) M3U atribuída(s) com sucesso`,
             });
+          } catch (error) {
+            console.error('Error assigning M3U lists:', error);
+            toast({
+              title: "Erro ao atribuir listas",
+              description: "Cliente criado, mas houve erro ao atribuir listas M3U",
+              variant: "destructive",
+            });
           }
-        } catch (error) {
-          console.error('Error assigning M3U lists:', error);
-          toast({
-            title: "Erro ao atribuir listas",
-            description: "Cliente criado, mas houve erro ao atribuir listas M3U",
-            variant: "destructive",
-          });
         }
-      }
 
-      // Se tem MAC, usuário e senha, sincronizar com SmartOne
-      if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
-        setIsSyncingSmartone(true);
-        toast({
-          title: "Sincronizando com SmartOne",
-          description: "Criando playlist no SmartOne IPTV...",
-        });
+        // Se tem MAC, usuário e senha, sincronizar com SmartOne
+        if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
+          setIsSyncingSmartone(true);
+          toast({
+            title: "Sincronizando com SmartOne",
+            description: "Criando playlist no SmartOne IPTV...",
+          });
 
-        const result = await smartoneService.syncPlaylistForClient(
-          novoCliente,
-          updateCliente
-        );
+          const clienteCompleto: Cliente = {
+            ...clienteData,
+            id: clientId,
+            dataCadastro: new Date().toISOString(),
+            dataUltimaEdicao: new Date().toISOString(),
+          };
 
-        setIsSyncingSmartone(false);
+          const result = await smartoneService.syncPlaylistForClient(
+            clienteCompleto,
+            updateCliente
+          );
+
+          setIsSyncingSmartone(false);
 
         if (result.success) {
           toast({
@@ -355,6 +367,15 @@ export default function AdminClienteForm() {
       // Boas-vindas serão enviadas automaticamente pelo EventNotificationHandler
       if (enviarWhatsApp) {
         console.log('Boas-vindas serão enviadas automaticamente pelo sistema');
+      }
+      } catch (error) {
+        console.error('Error creating client:', error);
+        toast({
+          title: "Erro ao criar cliente",
+          description: error instanceof Error ? error.message : "Erro desconhecido",
+          variant: "destructive",
+        });
+        return;
       }
     }
     navigate('/admin/clientes');

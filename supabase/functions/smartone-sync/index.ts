@@ -102,12 +102,8 @@ serve(async (req) => {
       );
     }
 
-    // Check if IP is blocked (admin should rarely be blocked, but check anyway)
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
+    // Check if IP is blocked and verify admin (using service role client from below)
+    
     // Verificar se é admin
     const { data: isAdmin, error: roleError } = await supabaseClient
       .rpc('is_admin', { _user_id: user.id });
@@ -130,6 +126,12 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Use service role for IP check and database operations
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
 
     const isBlocked = await checkIPBlocked(supabaseService, clientIp);
     if (isBlocked) {
@@ -222,12 +224,6 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Usar service role para operações de banco
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
 
     // Buscar dados do cliente para determinar o plano
     const { data: clienteData, error: clienteError } = await supabaseService
