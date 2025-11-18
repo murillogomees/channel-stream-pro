@@ -615,6 +615,50 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_health_checks: {
+        Row: {
+          channel_count: number | null
+          created_at: string | null
+          error_message: string | null
+          http_status_code: number | null
+          id: string
+          last_checked_at: string | null
+          m3u_list_id: string
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          channel_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          http_status_code?: number | null
+          id?: string
+          last_checked_at?: string | null
+          m3u_list_id: string
+          response_time_ms?: number | null
+          status?: string
+        }
+        Update: {
+          channel_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          http_status_code?: number | null
+          id?: string
+          last_checked_at?: string | null
+          m3u_list_id?: string
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_health_checks_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_list_favorites: {
         Row: {
           admin_id: string
@@ -686,6 +730,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           file_url: string
+          health_snoozed_until: string | null
           id: string
           is_default: boolean | null
           name: string
@@ -699,6 +744,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           file_url: string
+          health_snoozed_until?: string | null
           id?: string
           is_default?: boolean | null
           name: string
@@ -712,6 +758,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           file_url?: string
+          health_snoozed_until?: string | null
           id?: string
           is_default?: boolean | null
           name?: string
