@@ -196,13 +196,13 @@ const AdminDashboard = () => {
             
             <QuickShortcuts />
             
-            {/* SmartOne Retry Queue Widget */}
-            <SmartOneRetryQueueWidget />
+            {/* Widgets Grid - 2 lado a lado em desktop, 1 em mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SmartOneRetryQueueWidget />
+              <NotificationRetryWidget />
+            </div>
             
-            {/* Notification Retry Widget */}
-            <NotificationRetryWidget />
-            
-            {/* Notification Stats Widget */}
+            {/* Notification Stats ocupa largura total */}
             <NotificationStatsWidget />
           </div>
 
