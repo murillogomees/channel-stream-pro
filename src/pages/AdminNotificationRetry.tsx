@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Trash2, Play, Clock, AlertCircle, CheckCircle2, XCircle, Wifi } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2, Play, Clock, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -181,67 +181,51 @@ export default function AdminNotificationRetry() {
   const exhaustedItems = items.filter(i => i.status === 'exhausted');
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-7xl mx-auto space-y-4">
+        {/* Header Compacto */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/admin/dashboard')}
-            >
-              <ArrowLeft className="h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/admin/dashboard')}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold">Fila de Retry de Notificações</h1>
-                <Wifi className="h-5 w-5 text-green-500" />
-                <Badge variant="outline">Tempo Real</Badge>
+                <h1 className="text-xl font-bold">Retry Notificações</h1>
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               </div>
-              <p className="text-muted-foreground">
-                Gerenciamento de notificações com falha no envio
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+              <p className="text-xs text-muted-foreground">
+                Atualizado {lastUpdate.toLocaleTimeString('pt-BR')}
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleProcessQueue}
-            disabled={processing || activeItems.length === 0}
-          >
+          <Button size="sm" onClick={handleProcessQueue} disabled={processing || activeItems.length === 0}>
             {processing ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Processando...
-              </>
+              <><RefreshCw className="h-3 w-3 mr-1 animate-spin" />Processando</>
             ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Processar Fila
-              </>
+              <><Play className="h-3 w-3 mr-1" />Processar</>
             )}
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+        {/* Stats Compactas */}
+        <div className="flex gap-3 flex-wrap">
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-orange-500" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Aguardando</p>
-                  <p className="text-2xl font-bold">{activeItems.length}</p>
+                  <p className="text-xs text-muted-foreground">Aguardando</p>
+                  <p className="text-lg font-bold">{activeItems.length}</p>
                 </div>
-                <Clock className="h-8 w-8 text-orange-500" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Sucesso</p>
                   <p className="text-2xl font-bold text-green-600">{succeededItems.length}</p>
