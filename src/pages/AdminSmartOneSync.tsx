@@ -181,11 +181,13 @@ const AdminSmartOneSync = () => {
     }
   };
 
-  const filteredClientes = clientes.filter(c =>
-    c.profiles.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.profiles.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.mac_smart_one.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClientes = clientes
+    .filter(c => c.profiles !== null)
+    .filter(c =>
+      c.profiles.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.profiles.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.mac_smart_one.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
