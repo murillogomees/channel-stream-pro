@@ -10,7 +10,7 @@ import {
   LogOut, User, Palette, FileText, Variable, MessageSquare,
   Radio, PieChart, Activity, Lock, UserCog, Package, 
   ListChecks, TrendingUp, Clock, Zap, Database, AlertTriangle,
-  CheckCircle, XCircle, Timer, Target
+  CheckCircle, XCircle, Timer, Target, Bug
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";

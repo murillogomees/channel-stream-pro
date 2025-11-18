@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, AlertCircle, Download, AlertTriangle, History } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, AlertCircle, Download, AlertTriangle, History, CheckCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface DiagnosticResult {
   label: string;
@@ -40,6 +43,8 @@ interface DiscrepancyAlert {
   discrepancy_description: string;
   severity: string;
   resolved: boolean;
+  resolved_at?: string;
+  resolution_notes?: string;
   created_at: string;
 }
 
@@ -50,6 +55,8 @@ const AdminDiagnostic = () => {
   const [loading, setLoading] = useState(false);
   const [historicalDiagnostics, setHistoricalDiagnostics] = useState<HistoricalDiagnostic[]>([]);
   const [discrepancyAlerts, setDiscrepancyAlerts] = useState<DiscrepancyAlert[]>([]);
+  const [resolvingAlert, setResolvingAlert] = useState<string | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState("");
 
   const runDiagnostics = async () => {
     if (!session?.user?.id) {
@@ -316,6 +323,30 @@ const AdminDiagnostic = () => {
     toast.success("Diagnóstico exportado com sucesso!");
   };
 
+  const resolveAlert = async (alertId: string) => {
+    try {
+      const { error } = await supabase
+        .from('permission_discrepancy_alerts')
+        .update({
+          resolved: true,
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.id,
+          resolution_notes: resolutionNotes
+        })
+        .eq('id', alertId);
+
+      if (error) throw error;
+
+      toast.success("Alerta resolvido com sucesso!");
+      setResolvingAlert(null);
+      setResolutionNotes("");
+      loadDiscrepancyAlerts();
+    } catch (error) {
+      console.error('Erro ao resolver alerta:', error);
+      toast.error("Falha ao resolver alerta");
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && session) {
       runDiagnostics();
@@ -506,21 +537,60 @@ const AdminDiagnostic = () => {
                 ) : (
                   <div className="space-y-4">
                     {discrepancyAlerts.map((alert) => (
-                      <Alert key={alert.id} variant={alert.severity === 'critical' ? 'destructive' : 'default'}>
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>
-                          <div className="flex items-center justify-between mb-2">
-                            <strong className="text-foreground">{alert.discrepancy_type.replace('_', ' ').toUpperCase()}</strong>
-                            <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
-                              {alert.severity.toUpperCase()}
-                            </Badge>
+                      <Card key={alert.id} className={alert.resolved ? "border-muted" : "border-destructive"}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className={`flex items-center gap-2 ${alert.resolved ? 'text-muted-foreground' : 'text-destructive'}`}>
+                                {alert.resolved ? <CheckCircle className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                                {alert.discrepancy_type.replace('_', ' ').toUpperCase()}
+                              </CardTitle>
+                              <CardDescription>{alert.discrepancy_description}</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={alert.severity === 'critical' ? 'destructive' : 'default'}>
+                                {alert.severity}
+                              </Badge>
+                              {alert.resolved && (
+                                <Badge variant="outline" className="bg-green-500/10 text-green-500">
+                                  Resolvido
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm mb-1">{alert.discrepancy_description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Detectado em: {format(new Date(alert.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                          </p>
-                        </AlertDescription>
-                      </Alert>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                              Detectado em: {format(new Date(alert.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                            </p>
+                            {alert.resolved && (
+                              <>
+                                <p className="text-sm text-muted-foreground">
+                                  Resolvido em: {alert.resolved_at ? format(new Date(alert.resolved_at), "dd/MM/yyyy 'às' HH:mm") : 'N/A'}
+                                </p>
+                                {alert.resolution_notes && (
+                                  <div className="mt-2 p-2 bg-muted rounded">
+                                    <p className="text-sm font-medium mb-1">Notas de resolução:</p>
+                                    <p className="text-sm text-muted-foreground">{alert.resolution_notes}</p>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {!alert.resolved && (
+                              <Button
+                                onClick={() => setResolvingAlert(alert.id)}
+                                variant="outline"
+                                size="sm"
+                                className="mt-2"
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Marcar como resolvido
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
                 )}

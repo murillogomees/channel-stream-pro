@@ -118,6 +118,7 @@ const App = () => (
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
           <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
           <Route path="/admin/diagnostic" element={<ProtectedRoute requireAdmin><AdminDiagnostic /></ProtectedRoute>} />
+          <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
