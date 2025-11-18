@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search, Download, History, Filter } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search, Download, History, Filter, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,8 +43,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useM3UTags, M3UTag } from '@/hooks/useM3UTags';
 import { useM3UViewHistory } from '@/hooks/useM3UViewHistory';
+import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
 import { M3UTagSelector } from '@/components/admin/M3UTagSelector';
 import { M3UViewHistoryDialog } from '@/components/admin/M3UViewHistoryDialog';
+import { M3UListFilters } from '@/components/admin/M3UListFilters';
 import { exportToCSV, M3UListExport } from '@/utils/m3uExport';
 
 interface M3UList {
@@ -76,8 +78,9 @@ interface M3UAuditLog {
 export default function AdminM3ULists() {
   const navigate = useNavigate();
   const { isAdmin, loading: authLoading } = useAuth();
-  const { getListTags, updateListTags } = useM3UTags();
+  const { tags, getListTags, updateListTags } = useM3UTags();
   const { logView, getListHistory } = useM3UViewHistory();
+  const { isFavorite, toggleFavorite } = useM3UListFavorites();
   
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,6 +100,9 @@ export default function AdminM3ULists() {
   const [currentListHistory, setCurrentListHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [currentHistoryListName, setCurrentHistoryListName] = useState('');
+  const [tagFilterLogic, setTagFilterLogic] = useState<'AND' | 'OR'>('OR');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -149,7 +155,27 @@ export default function AdminM3ULists() {
       tag.name.toLowerCase().includes(query)
     );
 
-    return matchesSearch || matchesTags;
+    // Tag filtering with AND/OR logic
+    let matchesTagFilter = true;
+    if (selectedTags.length > 0) {
+      if (tagFilterLogic === 'AND') {
+        matchesTagFilter = selectedTags.every(selectedTag => 
+          list.tags?.some(tag => tag.id === selectedTag)
+        );
+      } else {
+        matchesTagFilter = list.tags?.some(tag => selectedTags.includes(tag.id)) || false;
+      }
+    }
+
+    // Status filtering
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && list.status === 'active') ||
+      (statusFilter === 'inactive' && list.status === 'inactive');
+
+    // Favorites filtering
+    const matchesFavorites = !showFavoritesOnly || isFavorite(list.id);
+
+    return (matchesSearch || matchesTags) && matchesTagFilter && matchesStatus && matchesFavorites;
   });
 
   // Schema de validação completo
@@ -504,6 +530,10 @@ export default function AdminM3ULists() {
           <p className="text-muted-foreground">Gerencie as listas de canais IPTV</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/admin/m3u-stats')}>
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Estatísticas
+          </Button>
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="w-4 h-4 mr-2" />
             Exportar CSV
@@ -518,7 +548,7 @@ export default function AdminM3ULists() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="space-y-4 mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -528,6 +558,18 @@ export default function AdminM3ULists() {
             className="pl-10"
           />
         </div>
+
+        <M3UListFilters
+          tags={tags}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+          tagFilterLogic={tagFilterLogic}
+          onTagFilterLogicChange={setTagFilterLogic}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          showFavoritesOnly={showFavoritesOnly}
+          onShowFavoritesOnlyChange={setShowFavoritesOnly}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 mb-6">
@@ -572,8 +614,10 @@ export default function AdminM3ULists() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Favorito</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead className="max-w-xs">Descrição</TableHead>
+                <TableHead>Tags</TableHead>
                 <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -583,7 +627,7 @@ export default function AdminM3ULists() {
             <TableBody>
               {filteredLists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     {searchQuery 
                       ? 'Nenhuma lista encontrada com esses critérios' 
                       : 'Nenhuma lista M3U cadastrada. Clique em "Nova Lista" para adicionar.'}
@@ -592,6 +636,18 @@ export default function AdminM3ULists() {
               ) : (
                 filteredLists.map((list) => (
                   <TableRow key={list.id}>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleFavorite(list.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Star 
+                          className={`h-4 w-4 ${isFavorite(list.id) ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground'}`}
+                        />
+                      </Button>
+                    </TableCell>
                      <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {list.name}
@@ -602,26 +658,44 @@ export default function AdminM3ULists() {
                           </Badge>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="max-w-xs">
-                      {list.description ? (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="truncate block cursor-help">
-                                {list.description}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-md">
-                              <p>{list.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        <span className="text-muted-foreground italic text-sm">Sem descrição</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
+                     </TableCell>
+                     <TableCell className="max-w-xs">
+                       {list.description ? (
+                         <TooltipProvider>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               <span className="truncate block cursor-help">
+                                 {list.description}
+                               </span>
+                             </TooltipTrigger>
+                             <TooltipContent className="max-w-md">
+                               <p>{list.description}</p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                       ) : (
+                         <span className="text-muted-foreground italic text-sm">Sem descrição</span>
+                       )}
+                     </TableCell>
+                     <TableCell>
+                       <div className="flex flex-wrap gap-1">
+                         {list.tags && list.tags.length > 0 ? (
+                           list.tags.map(tag => (
+                             <Badge 
+                               key={tag.id} 
+                               variant="secondary" 
+                               className="text-xs"
+                               style={tag.color ? { backgroundColor: tag.color } : undefined}
+                             >
+                               {tag.name}
+                             </Badge>
+                           ))
+                         ) : (
+                           <span className="text-muted-foreground italic text-sm">Sem tags</span>
+                         )}
+                       </div>
+                     </TableCell>
+                     <TableCell>
                       <Badge variant="outline">{list.priority || 0}</Badge>
                     </TableCell>
                     <TableCell>
