@@ -60,6 +60,9 @@ class RealtimeNotificationService {
   private healthService = getSystemHealthService();
   private alertService = getAdminAlertService();
   private persistenceService = getMetricsPersistenceService();
+  private networkStatusListener: (() => void) | null = null;
+  private offlineStatusListener: (() => void) | null = null;
+  private isOnline: boolean = navigator.onLine;
 
   connect() {
     if (this.isConnecting) {
@@ -73,6 +76,9 @@ class RealtimeNotificationService {
     }
 
     this.isConnecting = true;
+    
+    // Setup network detection for smart reconnection
+    this.setupNetworkDetection();
     
     // Start auto-save when connecting
     this.persistenceService.startAutoSave(
@@ -215,9 +221,72 @@ class RealtimeNotificationService {
     this.scheduleReconnect();
   }
 
+  private setupNetworkDetection() {
+    // Remove existing listeners first
+    this.removeNetworkDetection();
+    
+    // Listen for network coming back online
+    this.networkStatusListener = () => {
+      console.log('[Realtime] Rede voltou online, reconectando imediatamente...');
+      this.isOnline = true;
+      
+      // Clear any pending reconnect timers
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      
+      // Reset retry count for immediate reconnection
+      this.retryCount = 0;
+      this.connectionErrorCount = 0;
+      
+      // Reconnect immediately
+      if (!this.channel || this.getConnectionStatus() !== 'connected') {
+        this.connect();
+      }
+    };
+    
+    // Listen for network going offline
+    this.offlineStatusListener = () => {
+      console.log('[Realtime] Rede offline detectada');
+      this.isOnline = false;
+      
+      // Update health status
+      const health: ServiceHealth = {
+        name: 'WebSocket Realtime',
+        status: 'down',
+        latency: null,
+        lastCheck: Date.now(),
+        error: 'Sem conexão de rede',
+      };
+      this.healthService.updateWebSocketHealth(health);
+    };
+    
+    window.addEventListener('online', this.networkStatusListener);
+    window.addEventListener('offline', this.offlineStatusListener);
+  }
+  
+  private removeNetworkDetection() {
+    if (this.networkStatusListener) {
+      window.removeEventListener('online', this.networkStatusListener);
+      this.networkStatusListener = null;
+    }
+    
+    if (this.offlineStatusListener) {
+      window.removeEventListener('offline', this.offlineStatusListener);
+      this.offlineStatusListener = null;
+    }
+  }
+
   private scheduleReconnect() {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
+    }
+
+    // Se offline, não agendar reconexão (vai esperar evento 'online')
+    if (!this.isOnline) {
+      console.log('[Realtime] Rede offline, aguardando reconexão...');
+      return;
     }
 
     const delay = Math.min(
@@ -308,6 +377,12 @@ class RealtimeNotificationService {
 
   disconnect() {
     console.log('[Realtime] Desconectando...');
+    
+    // Stop auto-save
+    this.persistenceService.stopAutoSave();
+    
+    // Remove network detection listeners
+    this.removeNetworkDetection();
     
     // Clear all timers
     if (this.reconnectTimer) {
