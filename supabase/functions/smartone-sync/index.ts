@@ -48,8 +48,6 @@ const corsHeaders = {
 
 const syncRequestSchema = z.object({
   mac: z.string().trim().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, "MAC address inválido"),
-  usuario: z.string().trim().min(3).max(100),
-  senha: z.string().trim().min(4).max(100),
   clienteNome: z.string().trim().min(2).max(200),
 });
 
@@ -197,7 +195,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const validated = syncRequestSchema.parse(body);
-    const { mac, usuario, senha, clienteNome } = validated;
+    const { mac, clienteNome } = validated;
 
     // Hash sensitive data for logging
     const hashData = async (data: string): Promise<string> => {
