@@ -193,11 +193,34 @@ class SystemHealthService {
     const startTime = Date.now();
     
     try {
-      // Test SmartOne API connectivity
-      const baseUrl = import.meta.env.VITE_SMARTONE_API_BASE_URL || 'https://api.smartone.tv';
-      const apiKey = import.meta.env.VITE_SMARTONE_KEY_API;
+      // Get SmartOne config from localStorage (same as smartoneService)
+      const configStr = localStorage.getItem('smartone_config');
       
-      if (!apiKey) {
+      if (!configStr) {
+        this.healthStatus.services.smartone = {
+          name: 'SmartOne IPTV',
+          status: 'unknown',
+          latency: null,
+          lastCheck: Date.now(),
+          error: 'Integração não configurada',
+        };
+        return;
+      }
+
+      const config = JSON.parse(configStr);
+      
+      if (!config.enabled) {
+        this.healthStatus.services.smartone = {
+          name: 'SmartOne IPTV',
+          status: 'unknown',
+          latency: null,
+          lastCheck: Date.now(),
+          error: 'Integração desabilitada',
+        };
+        return;
+      }
+
+      if (!config.keyApi) {
         this.healthStatus.services.smartone = {
           name: 'SmartOne IPTV',
           status: 'unknown',
@@ -208,10 +231,11 @@ class SystemHealthService {
         return;
       }
 
+      const baseUrl = config.baseUrl || 'https://api.smartone.tv';
       const response = await fetch(`${baseUrl}/health`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${config.keyApi}`,
         },
       });
 
