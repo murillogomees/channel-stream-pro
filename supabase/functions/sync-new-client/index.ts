@@ -3,8 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'https://sdvyxdghxqmntyoweqbd.supabase.co',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
 };
 
 const clientSchema = z.object({
@@ -56,7 +58,6 @@ serve(async (req) => {
       .rpc('is_admin', { _user_id: user.id });
 
     if (roleError || !isAdmin) {
-      console.error('[sync-new-client] Permission denied for user:', user.id);
       return new Response(
         JSON.stringify({ error: 'Permissão negada. Apenas administradores.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -81,7 +82,6 @@ serve(async (req) => {
     const rateLimit = 30;
 
     if (currentCount >= rateLimit) {
-      console.warn(`[sync-new-client] Rate limit exceeded for user: ${user.id}`);
       return new Response(
         JSON.stringify({ 
           error: 'Taxa de requisições excedida. Tente novamente em alguns minutos.',
