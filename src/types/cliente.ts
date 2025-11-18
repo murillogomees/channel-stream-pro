@@ -15,8 +15,6 @@ export interface Cliente {
   dataUltimoPagamento: string;
   formaUltimoPagamento: string;
   macSmartOne: string;
-  usuario: string;
-  senha: string;
   dataCadastro: string;
   dataUltimaEdicao: string;
   clienteAtivo?: boolean; // Indica se o cliente está usando os serviços atualmente

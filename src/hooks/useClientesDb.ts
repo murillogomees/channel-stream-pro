@@ -18,8 +18,6 @@ function mapDbToCliente(row: any): Cliente {
     dataUltimoPagamento: row.data_ultimo_pagamento ?? '',
     formaUltimoPagamento: row.forma_ultimo_pagamento ?? '',
     macSmartOne: row.mac_smart_one ?? '',
-    usuario: row.usuario_m3u ?? '',
-    senha: row.senha_m3u ?? '',
     dataCadastro: row.data_cadastro ?? row.created_at ?? '',
     dataUltimaEdicao: row.data_ultima_edicao ?? row.updated_at ?? '',
     clienteAtivo: row.cliente_ativo ?? undefined,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClientes } from '@/hooks/useClientes';
+import { useClientesDb } from '@/hooks/useClientesDb';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -56,7 +56,7 @@ export default function AdminClientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, loading } = useAuth();
-  const { clientes, deleteCliente } = useClientes();
+  const { clientes, deleteCliente, loading: loadingClientes } = useClientesDb();
   const { isConfigured } = useWhatsAppConfig();
   const { addLog } = useNotificationLogs();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export default function AdminClientes() {
   const [showFileDialog, setShowFileDialog] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
-  if (loading) {
+  if (loading || loadingClientes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
