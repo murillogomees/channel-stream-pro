@@ -43,6 +43,57 @@ export default function AdminSecurityAlerts() {
 
   useEffect(() => {
     fetchData();
+    
+    // Real-time updates para templates e configurações
+    const templatesChannel = supabase
+      .channel('security-alerts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'security_alert_templates'
+        },
+        () => {
+          console.log('[SecurityAlerts] Templates alterados');
+          fetchTemplates();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'security_alert_config'
+        },
+        () => {
+          console.log('[SecurityAlerts] Configurações alteradas');
+          fetchConfigs();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_phones'
+        },
+        () => {
+          console.log('[SecurityAlerts] Admin phones alterados');
+          fetchAdmins();
+        }
+      )
+      .subscribe();
+    
+    // Atualização periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000);
+    
+    return () => {
+      supabase.removeChannel(templatesChannel);
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchData = async () => {

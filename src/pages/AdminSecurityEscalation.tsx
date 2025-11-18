@@ -54,6 +54,33 @@ export default function AdminSecurityEscalation() {
 
   useEffect(() => {
     fetchData();
+    
+    // Real-time updates via Supabase
+    const rulesChannel = supabase
+      .channel('escalation-rules-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'security_alert_escalation_rules'
+        },
+        () => {
+          console.log('[Escalation] Mudança em regras detectada');
+          fetchRules();
+        }
+      )
+      .subscribe();
+    
+    // Atualização periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000);
+    
+    return () => {
+      supabase.removeChannel(rulesChannel);
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchData = async () => {

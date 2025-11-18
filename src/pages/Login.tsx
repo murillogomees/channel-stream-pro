@@ -60,16 +60,31 @@ export default function Login() {
         // Registrar tentativa suspeita em caso de erro
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Email ou senha incorretos');
-          // Log como tentativa suspeita (não aguardar resposta)
-          setTimeout(() => {
-            fetch('https://api.ipify.org?format=json')
-              .then(res => res.json())
-              .then(data => {
-                import('@/services/suspiciousLoginService').then(module => {
-                  module.suspiciousLoginService.checkLogin(data.ip, validatedData.email);
-                });
-              })
-              .catch(() => {});
+          
+          // Log no sistema de segurança
+          setTimeout(async () => {
+            try {
+              // Registrar no sistema de monitoramento de segurança
+              const { securityMonitoringService } = await import('@/services/securityMonitoringService');
+              await securityMonitoringService.logFailedLogin(
+                validatedData.email,
+                undefined,
+                navigator.userAgent,
+                true // senha foi tentada
+              );
+              
+              // Verificar IP suspeito
+              fetch('https://api.ipify.org?format=json')
+                .then(res => res.json())
+                .then(data => {
+                  import('@/services/suspiciousLoginService').then(module => {
+                    module.suspiciousLoginService.checkLogin(data.ip, validatedData.email);
+                  });
+                })
+                .catch(() => {});
+            } catch (err) {
+              console.error('Erro ao registrar tentativa de login:', err);
+            }
           }, 0);
         } else if (error.message.includes('Email not confirmed')) {
           toast.error('Por favor, confirme seu email antes de fazer login');
