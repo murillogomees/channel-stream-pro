@@ -19,6 +19,7 @@ import { useClientesDb } from "@/hooks/useClientesDb";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
+import { SmartOneRetryQueueWidget } from "@/components/admin/SmartOneRetryQueueWidget";
 
 interface QuickStatProps {
   icon: React.ReactNode;
@@ -192,6 +193,9 @@ const AdminDashboard = () => {
             </section>
             
             <QuickShortcuts />
+            
+            {/* SmartOne Retry Queue Widget */}
+            <SmartOneRetryQueueWidget />
           </div>
 
           <div className="lg:col-span-1">

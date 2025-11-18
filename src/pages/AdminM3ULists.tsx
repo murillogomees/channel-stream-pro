@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search, Download, History, Filter, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search, Download, History, Filter, TrendingUp, Save, RefreshCw, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
 import {
@@ -92,6 +94,7 @@ export default function AdminM3ULists() {
   const [listUrl, setListUrl] = useState('');
   const [listDescription, setListDescription] = useState('');
   const [priority, setPriority] = useState(0);
+  const [isActive, setIsActive] = useState(true);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
   const [showAuditHistory, setShowAuditHistory] = useState(false);
@@ -770,7 +773,7 @@ export default function AdminM3ULists() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingList ? 'Editar' : 'Nova'} Lista M3U</DialogTitle>
             <DialogDescription>
@@ -786,126 +789,107 @@ export default function AdminM3ULists() {
                 value={listName}
                 onChange={(e) => setListName(e.target.value)}
                 placeholder="Ex: Lista Premium HD"
-                maxLength={100}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="url">URL da Lista M3U *</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="url"
-                    type="url"
-                    value={listUrl}
-                    onChange={(e) => setListUrl(e.target.value)}
-                    placeholder="https://exemplo.com/lista.m3u"
-                    className="pl-9"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={testUrlConnectivity}
-                  disabled={isTestingUrl || !listUrl.trim()}
-                  title="Testar conectividade"
-                >
-                  {isTestingUrl ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              
-              <p className="text-xs text-muted-foreground">
-                O administrador é responsável por validar se a URL está correta
-              </p>
-              
-              <p className="text-xs text-muted-foreground">
-                A URL deve apontar para um arquivo .m3u ou .m3u8. Esta URL será usada para cadastrar a playlist no SmartOne IPTV.
-              </p>
+              <Label htmlFor="url">URL do Arquivo M3U *</Label>
+              <Input
+                id="url"
+                value={listUrl}
+                onChange={(e) => setListUrl(e.target.value)}
+                placeholder="https://exemplo.com/playlist.m3u"
+              />
             </div>
 
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                Esta lista M3U estará disponível para todos os clientes, independente do plano. A seleção específica de qual lista atribuir será feita no cadastro de cada cliente.
-              </AlertDescription>
-            </Alert>
+            <div className="grid gap-2">
+              <Label htmlFor="description">
+                Descrição
+                <span className="text-xs text-muted-foreground ml-2">
+                  ({listDescription.length}/500)
+                </span>
+              </Label>
+              <Textarea
+                id="description"
+                value={listDescription}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) {
+                    setListDescription(e.target.value);
+                  }
+                }}
+                placeholder="Descreva as características desta playlist (qualidade, canais, região, idiomas, etc.)"
+                className="min-h-[80px] resize-none"
+              />
+            </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="priority">Prioridade</Label>
+              <Label htmlFor="priority">
+                Prioridade
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 inline ml-1 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-sm">
+                        Playlists com maior prioridade são selecionadas primeiro
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
               <Input
                 id="priority"
                 type="number"
-                min="0"
                 value={priority}
                 onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
-                placeholder="0"
+                min={0}
               />
-              <p className="text-xs text-muted-foreground">
-                Listas com maior prioridade são selecionadas primeiro
-              </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Descrição Detalhada</Label>
-              <textarea
-                id="description"
-                value={listDescription}
-                onChange={(e) => setListDescription(e.target.value)}
-                placeholder="Descreva características específicas desta lista (qualidade, canais incluídos, região, tipo de conteúdo, etc.)"
-                className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                maxLength={500}
-              />
-              <div className="flex justify-between items-center text-xs">
-                <p className="text-muted-foreground">
-                  Use este campo para documentar informações importantes sobre a lista M3U
-                </p>
-                <span className={`font-medium ${listDescription.length >= 450 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {listDescription.length}/500
+              <Label>
+                Tags
+                <span className="text-xs text-muted-foreground ml-2">
+                  Selecione tags para categorizar esta lista
                 </span>
-              </div>
+              </Label>
+              <M3UTagSelector
+                selectedTags={selectedTags}
+                onChange={setSelectedTags}
+              />
             </div>
 
-            <M3UTagSelector
-              selectedTags={selectedTags}
-              onChange={setSelectedTags}
-            />
-
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Importante:</strong> Certifique-se de que a URL está acessível publicamente e aponta para um arquivo M3U válido. Esta URL será utilizada para cadastrar playlists no SmartOne IPTV.
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="status"
+                checked={isActive}
+                onCheckedChange={setIsActive}
+              />
+              <Label htmlFor="status">Lista ativa</Label>
+            </div>
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={handleCloseDialog}
-              disabled={isSaving}
-            >
+            <Button onClick={handleCloseDialog} variant="outline">
               Cancelar
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      onClick={handleSaveList}
-                      disabled={isSaving || !listName.trim() || !listUrl.trim()}
-                    >
-                      {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-              </Tooltip>
-            </TooltipProvider>
+            <Button
+              onClick={handleSaveList}
+              disabled={!listName.trim() || !listUrl.trim() || isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
