@@ -585,7 +585,7 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
-          plan_type: string | null
+          plan_type: string[] | null
           priority: number | null
           status: string | null
           updated_at: string | null
@@ -599,7 +599,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
-          plan_type?: string | null
+          plan_type?: string[] | null
           priority?: number | null
           status?: string | null
           updated_at?: string | null
@@ -613,7 +613,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
-          plan_type?: string | null
+          plan_type?: string[] | null
           priority?: number | null
           status?: string | null
           updated_at?: string | null
