@@ -3,6 +3,7 @@ import { Shield, AlertTriangle, Activity, Lock, Eye, CheckCircle2, XCircle } fro
 import { useSecurityEvents } from "@/hooks/useSecurityEvents";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -278,9 +279,7 @@ function EventCard({
         </div>
         <div className="flex-1 space-y-1">
           <div className="flex items-center gap-2">
-            <Badge variant={getSeverityColor(event.severity)}>
-              {event.severity}
-            </Badge>
+            <StatusBadge status={event.severity} />
             <Badge variant="outline">
               {getEventTypeLabel(event.event_type)}
             </Badge>

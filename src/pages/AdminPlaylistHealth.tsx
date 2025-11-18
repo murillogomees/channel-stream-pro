@@ -7,6 +7,7 @@ import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Cloc
 import { useToast } from '@/hooks/use-toast';
 import { playlistHealthService, PlaylistHealthStats, PlaylistHealthCheck } from '@/services/playlistHealthService';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Progress } from '@/components/ui/progress';
 import {
   Select,

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { useNotificationLogs } from "@/hooks/useNotificationLogs";
 import { NotificationStatsService } from "@/services/notificationStatsService";
 import {
@@ -255,9 +256,7 @@ const AdminNotificationStats = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge variant={log.status === 'success' ? 'default' : 'destructive'}>
-                          {log.status === 'success' ? 'Sucesso' : 'Erro'}
-                        </Badge>
+                        <StatusBadge status={log.status} />
                         <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(log.dataEnvio), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                         </p>
