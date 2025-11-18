@@ -245,13 +245,22 @@ class SmartoneService {
         rawResponse: result,
       };
     } catch (error: any) {
-      console.error('Erro ao sincronizar com SmartOne:', error);
+      console.error('[SmartOne] Todas as tentativas de sincronização falharam:', error);
 
       updateClienteFn(cliente.id, {
         smartone_status: 'erro',
         smartone_raw_response: JSON.stringify({ error: error.message }),
         smartone_last_sync_at: new Date().toISOString(),
       });
+
+      // Notificar administradores sobre a falha
+      try {
+        const { getSmartOneSyncAlertService } = await import('./smartoneSyncAlertService');
+        const alertService = getSmartOneSyncAlertService();
+        await alertService.notifyAdminsOfSyncFailure(cliente, error.message, 3);
+      } catch (alertError) {
+        console.error('[SmartOne] Erro ao enviar alertas para admins:', alertError);
+      }
 
       return {
         success: false,
