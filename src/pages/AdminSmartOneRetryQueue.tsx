@@ -227,29 +227,30 @@ export default function AdminSmartOneRetryQueue() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-7xl mx-auto space-y-4">
+        {/* Header Compacto */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/admin/dashboard')}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Fila de Retry SmartOne</h1>
-              <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
-                Gerenciamento de sincronizações falhadas • Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold">Retry SmartOne</h1>
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Atualizado {lastUpdate.toLocaleTimeString('pt-BR')}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={loadQueue} variant="outline">
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Atualizar
+            <Button size="sm" onClick={loadQueue} variant="outline">
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button 
+              size="sm"
               onClick={handleProcessQueue}
               disabled={processing || queue.filter(q => q.status === 'pending' || q.status === 'retrying').length === 0}
             >
