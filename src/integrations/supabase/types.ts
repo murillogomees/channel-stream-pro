@@ -1502,6 +1502,53 @@ export type Database = {
         }
         Relationships: []
       }
+      smartone_sync_retry_queue: {
+        Row: {
+          attempt_count: number | null
+          cliente_id: string
+          created_at: string | null
+          error_details: Json | null
+          id: string
+          last_error: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          cliente_id: string
+          created_at?: string | null
+          error_details?: Json | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempt_count?: number | null
+          cliente_id?: string
+          created_at?: string | null
+          error_details?: Json | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smartone_sync_retry_queue_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       status_change_history: {
         Row: {
           changed_at: string | null

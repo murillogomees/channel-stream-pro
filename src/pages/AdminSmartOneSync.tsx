@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity, Wifi } from "lucide-react";
 
 interface ClienteComPerfil {
   id: string;
@@ -35,6 +35,7 @@ const AdminSmartOneSync = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [validationDialog, setValidationDialog] = useState<{
     open: boolean;
     cliente: ClienteComPerfil | null;
@@ -75,6 +76,7 @@ const AdminSmartOneSync = () => {
 
       if (error) throw error;
       setClientes(data || []);
+      setLastUpdate(new Date());
     } catch (error: any) {
       toast({
         title: "Erro ao carregar clientes",
@@ -89,6 +91,34 @@ const AdminSmartOneSync = () => {
   useEffect(() => {
     if (isAdmin) {
       loadClientes();
+      
+      // Real-time subscription for cliente changes
+      const channel = supabase
+        .channel('clientes-sync-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'clientes',
+            filter: 'mac_smart_one=not.is.null'
+          },
+          (payload) => {
+            console.log('🔄 Real-time update received:', payload);
+            loadClientes(); // Reload the list on any change
+          }
+        )
+        .subscribe();
+
+      // Periodic refresh every 30 seconds
+      const interval = setInterval(() => {
+        loadClientes();
+      }, 30000);
+
+      return () => {
+        supabase.removeChannel(channel);
+        clearInterval(interval);
+      };
     }
   }, [isAdmin]);
 

@@ -38,7 +38,28 @@ export const smartoneAutoSyncService = {
 
       if (error) {
         console.error('Edge function error:', error);
+        
+        // Add to retry queue on failure
+        const { smartoneRetryQueueService } = await import('./smartoneRetryQueueService');
+        await smartoneRetryQueueService.addToQueue(
+          data.cliente_id,
+          error.message,
+          { error: error.message, data, timestamp: new Date().toISOString() }
+        );
+        
         throw error;
+      }
+
+      if (!result.success) {
+        console.error('Sync failed:', result);
+        
+        // Add to retry queue on failure
+        const { smartoneRetryQueueService } = await import('./smartoneRetryQueueService');
+        await smartoneRetryQueueService.addToQueue(
+          data.cliente_id,
+          result.error || result.message || 'Erro ao sincronizar com SmartOne',
+          { error: result.error, message: result.message, data, timestamp: new Date().toISOString() }
+        );
       }
 
       console.log('Sync result:', result);

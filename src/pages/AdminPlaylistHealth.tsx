@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff } from 'lucide-react';
+import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff, Wifi } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { playlistHealthService, PlaylistHealthStats, PlaylistHealthCheck } from '@/services/playlistHealthService';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ export default function AdminPlaylistHealth() {
   const [allChecks, setAllChecks] = useState<PlaylistHealthCheck[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -34,6 +36,33 @@ export default function AdminPlaylistHealth() {
     }
 
     loadStats();
+    
+    // Real-time subscription for playlist health checks
+    const channel = supabase
+      .channel('playlist-health-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'playlist_health_checks'
+        },
+        (payload) => {
+          console.log('🔄 Real-time playlist health update:', payload);
+          loadStats();
+        }
+      )
+      .subscribe();
+
+    // Periodic refresh every 60 seconds
+    const interval = setInterval(() => {
+      loadStats();
+    }, 60000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, [authLoading, isAdmin, navigate]);
 
   const loadStats = async () => {
@@ -45,6 +74,7 @@ export default function AdminPlaylistHealth() {
       ]);
       setStats(statsData);
       setAllChecks(checksData);
+      setLastUpdate(new Date());
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
       toast({
