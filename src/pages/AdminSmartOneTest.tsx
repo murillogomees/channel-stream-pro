@@ -93,41 +93,56 @@ const AdminSmartOneTest = () => {
       // Teste 3: Testar conectividade com a API SmartOne
       const startConnTest = Date.now();
       try {
-        const { data, error } = await supabase.functions.invoke('smartone-sync', {
-          body: {
-            mac: testMAC,
-            usuario: testUsername,
-            senha: testPassword,
-            clienteNome: 'Teste de Conectividade',
-          },
-        });
-
-        const latency = Date.now() - startConnTest;
-
-        if (error) {
+        // Obter o token de autenticação da sessão atual
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
           results.push({
             test: 'Conectividade API',
             status: 'error',
-            message: `Erro ao conectar: ${error.message}`,
-            latency,
-            details: error,
-          });
-        } else if (data?.success) {
-          results.push({
-            test: 'Conectividade API',
-            status: 'success',
-            message: 'API SmartOne respondeu com sucesso',
-            latency,
-            details: data,
+            message: 'Sessão de autenticação não encontrada',
+            latency: Date.now() - startConnTest,
           });
         } else {
-          results.push({
-            test: 'Conectividade API',
-            status: 'warning',
-            message: data?.error || 'API retornou erro',
-            latency,
-            details: data,
+          const { data, error } = await supabase.functions.invoke('smartone-sync', {
+            body: {
+              mac: testMAC,
+              usuario: testUsername,
+              senha: testPassword,
+              clienteNome: 'Teste de Conectividade',
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
           });
+
+          const latency = Date.now() - startConnTest;
+
+          if (error) {
+            results.push({
+              test: 'Conectividade API',
+              status: 'error',
+              message: `Erro ao conectar: ${error.message}`,
+              latency,
+              details: error,
+            });
+          } else if (data?.success) {
+            results.push({
+              test: 'Conectividade API',
+              status: 'success',
+              message: 'API SmartOne respondeu com sucesso',
+              latency,
+            details: data,
+            });
+          } else {
+            results.push({
+              test: 'Conectividade API',
+              status: 'warning',
+              message: data?.error || 'API retornou erro',
+              latency,
+              details: data,
+            });
+          }
         }
       } catch (error: any) {
         results.push({
