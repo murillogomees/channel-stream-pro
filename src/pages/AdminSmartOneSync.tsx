@@ -18,8 +18,6 @@ interface ClienteComPerfil {
   id: string;
   user_id: string;
   mac_smart_one: string;
-  usuario_m3u: string;
-  senha_m3u: string;
   smartone_status: string;
   smartone_last_sync_at: string;
   profiles: {
@@ -64,8 +62,6 @@ const AdminSmartOneSync = () => {
           id,
           user_id,
           mac_smart_one,
-          usuario_m3u,
-          senha_m3u,
           smartone_status,
           smartone_last_sync_at,
           profiles:user_id (
@@ -105,8 +101,6 @@ const AdminSmartOneSync = () => {
         telefone: cliente.profiles.telefone,
         email: cliente.profiles.email,
         macSmartOne: cliente.mac_smart_one,
-        usuario: cliente.usuario_m3u,
-        senha: cliente.senha_m3u,
         smartone_status: cliente.smartone_status as any,
         smartone_last_sync_at: cliente.smartone_last_sync_at,
       } as Cliente;
@@ -147,8 +141,6 @@ const AdminSmartOneSync = () => {
         telefone: cliente.profiles.telefone,
         email: cliente.profiles.email,
         mac_smart_one: cliente.mac_smart_one,
-        usuario_m3u: cliente.usuario_m3u,
-        senha_m3u: cliente.senha_m3u,
       });
 
       if (result.success) {

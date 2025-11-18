@@ -223,8 +223,6 @@ export default function TutorialSmartOne() {
         dataUltimoPagamento: '',
         formaUltimoPagamento: '',
         macSmartOne: formData.macSmartOne.toUpperCase(),
-        usuario: usuarioM3U,
-        senha: senhaM3U,
         clienteAtivo: true,
         origemCadastro: formData.origemCadastro,
       });

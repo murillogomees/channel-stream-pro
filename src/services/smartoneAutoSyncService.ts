@@ -8,8 +8,6 @@ interface SyncClientData {
   telefone: string;
   email: string;
   mac_smart_one?: string;
-  usuario_m3u?: string;
-  senha_m3u?: string;
   situacao?: SituacaoCliente;
   plano?: PlanoCliente;
 }
@@ -63,8 +61,6 @@ export const smartoneAutoSyncService = {
     profileData: { nome: string; telefone: string; email: string },
     clienteData?: { 
       mac_smart_one?: string; 
-      usuario_m3u?: string; 
-      senha_m3u?: string;
       situacao?: SituacaoCliente;
       plano?: PlanoCliente;
     }
@@ -84,8 +80,6 @@ export const smartoneAutoSyncService = {
       telefone: profileData.telefone,
       email: profileData.email,
       mac_smart_one: clienteData.mac_smart_one,
-      usuario_m3u: clienteData.usuario_m3u,
-      senha_m3u: clienteData.senha_m3u,
       situacao: clienteData.situacao,
       plano: clienteData.plano,
     });

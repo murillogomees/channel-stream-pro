@@ -75,15 +75,6 @@ const clienteSchema = z.object({
     .regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^$/, 'MAC inválido. Use formato XX:XX:XX:XX:XX:XX')
     .optional()
     .or(z.literal('')),
-  usuario: z.string()
-    .trim()
-    .max(100, 'Usuário muito longo')
-    .optional()
-    .or(z.literal('')),
-  senha: z.string()
-    .max(100, 'Senha muito longa')
-    .optional()
-    .or(z.literal('')),
   clienteAtivo: z.boolean().optional(),
 });
 
@@ -138,12 +129,10 @@ export default function AdminClienteForm() {
   useEffect(() => {
     const validateSmartOneFields = async () => {
       const macSmartOne = watch('macSmartOne');
-      const usuario = watch('usuario');
-      const senha = watch('senha');
       const nome = watch('nome');
 
-      // Se nenhum campo SmartOne está preenchido, não validar
-      if (!macSmartOne && !usuario && !senha) {
+      // Se MAC não está preenchido, não validar
+      if (!macSmartOne) {
         setSmartoneValidation({ errors: [], warnings: [] });
         return;
       }
@@ -151,8 +140,6 @@ export default function AdminClienteForm() {
       // Criar objeto cliente temporário para validação
       const tempCliente: Partial<Cliente> = {
         macSmartOne: macSmartOne || '',
-        usuario: usuario || '',
-        senha: senha || '',
         nome: nome || '',
       } as any;
 
@@ -164,7 +151,7 @@ export default function AdminClienteForm() {
     };
 
     validateSmartOneFields();
-  }, [watch('macSmartOne'), watch('usuario'), watch('senha'), watch('nome')]);
+  }, [watch('macSmartOne'), watch('nome')]);
 
   if (loading) {
     return (
@@ -185,16 +172,6 @@ export default function AdminClienteForm() {
     const sanitizePhone = (str: string) => str.replace(/[^0-9+\-() ]/g, '');
     const sanitizeMac = (str: string) => str.replace(/[^A-Fa-f0-9:-]/g, '');
     
-    // Gerar credenciais M3U automaticamente se não existirem
-    let usuario = sanitizeString(data.usuario || '');
-    let senha = data.senha || '';
-    
-    if (!usuario || !senha) {
-      const timestamp = Date.now();
-      usuario = `user_${timestamp}`;
-      senha = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    }
-    
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
       nome: sanitizeString(data.nome || ''),
       telefone: sanitizePhone(data.telefone || ''),
@@ -208,8 +185,6 @@ export default function AdminClienteForm() {
       dataUltimoPagamento: data.dataUltimoPagamento || '',
       formaUltimoPagamento: sanitizeString(data.formaUltimoPagamento || ''),
       macSmartOne: sanitizeMac(data.macSmartOne || ''),
-      usuario: usuario,
-      senha: senha,
       clienteAtivo: data.clienteAtivo ?? false,
       smartone_status: 'nao_enviado',
     };
@@ -229,7 +204,7 @@ export default function AdminClienteForm() {
         clienteOriginal.macSmartOne !== clienteData.macSmartOne &&
         clienteData.macSmartOne;
 
-      if (macChanged && clienteData.usuario && clienteData.senha) {
+      if (macChanged) {
         setIsSyncingSmartone(true);
         toast({
           title: "Sincronizando com SmartOne",
@@ -312,8 +287,6 @@ export default function AdminClienteForm() {
             data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
             forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
             mac_smart_one: clienteData.macSmartOne || null,
-            usuario_m3u: clienteData.usuario || null,
-            senha_m3u: clienteData.senha || null,
             cliente_ativo: clienteData.clienteAtivo,
             smartone_status: 'nao_enviado',
             data_cadastro: new Date().toISOString(),
@@ -365,8 +338,8 @@ export default function AdminClienteForm() {
           }
         }
 
-        // Se tem MAC, usuário e senha, validar e sincronizar com SmartOne
-        if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
+        // Se tem MAC, sincronizar com SmartOne
+        if (clienteData.macSmartOne) {
           // Validação preventiva
           const clienteCompleto: Cliente = {
             ...clienteData,
@@ -583,18 +556,8 @@ export default function AdminClienteForm() {
                   <Input id="macSmartOne" {...register('macSmartOne')} />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="usuario">Usuário</Label>
-                  <Input id="usuario" {...register('usuario')} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="senha">Senha</Label>
-                  <Input id="senha" type="password" {...register('senha')} />
-                </div>
-
                 {/* Validação SmartOne em tempo real */}
-                {(watch('macSmartOne') || watch('usuario') || watch('senha')) && (
+                {watch('macSmartOne') && (
                   <div className="col-span-2">
                     <SmartOneValidationAlert 
                       errors={smartoneValidation.errors}

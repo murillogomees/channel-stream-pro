@@ -202,19 +202,6 @@ class SmartoneService {
       }
     }
 
-    // Validar credenciais M3U
-    if (!cliente.usuario) {
-      errors.push('Cliente não possui usuário M3U cadastrado');
-    } else if (cliente.usuario.length < 3) {
-      warnings.push('Usuário M3U muito curto (mínimo 3 caracteres)');
-    }
-
-    if (!cliente.senha) {
-      errors.push('Cliente não possui senha M3U cadastrada');
-    } else if (cliente.senha.length < 4) {
-      warnings.push('Senha M3U muito curta (mínimo 4 caracteres)');
-    }
-
     // Validar dados básicos do cliente
     if (!cliente.nome || cliente.nome.trim().length < 2) {
       errors.push('Nome do cliente inválido ou muito curto');
@@ -280,8 +267,6 @@ class SmartoneService {
         const { data, error } = await supabase.functions.invoke('smartone-sync', {
           body: {
             mac: cliente.macSmartOne,
-            usuario: cliente.usuario,
-            senha: cliente.senha,
             clienteNome: cliente.nome,
           },
         });
