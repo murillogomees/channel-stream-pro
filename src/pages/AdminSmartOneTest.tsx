@@ -4,8 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -36,9 +34,6 @@ const AdminSmartOneTest = () => {
   
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [testMAC, setTestMAC] = useState('00:1A:2B:3C:4D:5E');
-  const [testUsername, setTestUsername] = useState('test_user');
-  const [testPassword, setTestPassword] = useState('test_pass');
   const [overallStatus, setOverallStatus] = useState<'idle' | 'success' | 'error' | 'warning'>('idle');
 
   if (!authLoading && !isAdmin) {
@@ -53,44 +48,26 @@ const AdminSmartOneTest = () => {
     const results: TestResult[] = [];
 
     try {
-      // Teste 1: Validar formato de MAC
-      const startMacTest = Date.now();
-      const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-      if (macRegex.test(testMAC)) {
+      // Teste 1: Validar sessão ativa
+      const startSessionTest = Date.now();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         results.push({
-          test: 'Validação MAC',
+          test: 'Sessão Ativa',
           status: 'success',
-          message: 'Formato de MAC address válido',
-          latency: Date.now() - startMacTest,
+          message: 'Sessão de autenticação válida',
+          latency: Date.now() - startSessionTest,
         });
       } else {
         results.push({
-          test: 'Validação MAC',
+          test: 'Sessão Ativa',
           status: 'error',
-          message: 'Formato de MAC address inválido',
-          latency: Date.now() - startMacTest,
+          message: 'Nenhuma sessão ativa encontrada',
+          latency: Date.now() - startSessionTest,
         });
       }
 
-      // Teste 2: Validar credenciais M3U
-      const startCredsTest = Date.now();
-      if (testUsername.length >= 3 && testPassword.length >= 4) {
-        results.push({
-          test: 'Credenciais M3U',
-          status: 'success',
-          message: 'Credenciais M3U válidas',
-          latency: Date.now() - startCredsTest,
-        });
-      } else {
-        results.push({
-          test: 'Credenciais M3U',
-          status: 'warning',
-          message: 'Credenciais muito curtas (mín: usuário 3 chars, senha 4 chars)',
-          latency: Date.now() - startCredsTest,
-        });
-      }
-
-      // Teste 3: Testar conectividade com a API SmartOne
+      // Teste 2: Healthcheck SmartOne API
       const startConnTest = Date.now();
       try {
         // Obter o token de autenticação da sessão atual
@@ -104,13 +81,7 @@ const AdminSmartOneTest = () => {
             latency: Date.now() - startConnTest,
           });
         } else {
-          const { data, error } = await supabase.functions.invoke('smartone-sync', {
-            body: {
-              mac: testMAC,
-              usuario: testUsername,
-              senha: testPassword,
-              clienteNome: 'Teste de Conectividade',
-            },
+          const { data, error } = await supabase.functions.invoke('smartone-test', {
             headers: {
               Authorization: `Bearer ${session.access_token}`
             }
@@ -130,9 +101,9 @@ const AdminSmartOneTest = () => {
             results.push({
               test: 'Conectividade API',
               status: 'success',
-              message: 'API SmartOne respondeu com sucesso',
+              message: `Healthcheck OK - SmartOne ${data.smartone_status}`,
               latency,
-            details: data,
+              details: data,
             });
           } else {
             results.push({
@@ -153,7 +124,7 @@ const AdminSmartOneTest = () => {
         });
       }
 
-      // Teste 4: Verificar lista M3U padrão
+      // Teste 3: Verificar lista M3U padrão
       const startM3UTest = Date.now();
       try {
         const { data: m3uList, error: m3uError } = await supabase
@@ -303,43 +274,12 @@ const AdminSmartOneTest = () => {
         {/* Configurações de teste */}
         <Card>
           <CardHeader>
-            <CardTitle>Configurações de Teste</CardTitle>
+            <CardTitle>Teste de Conectividade</CardTitle>
             <CardDescription>
-              Configure os dados para testar a API SmartOne
+              Valida autenticação, permissões e conectividade com SmartOne API
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="testMAC">MAC Address de Teste</Label>
-                <Input
-                  id="testMAC"
-                  value={testMAC}
-                  onChange={(e) => setTestMAC(e.target.value)}
-                  placeholder="00:1A:2B:3C:4D:5E"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="testUsername">Usuário de Teste</Label>
-                <Input
-                  id="testUsername"
-                  value={testUsername}
-                  onChange={(e) => setTestUsername(e.target.value)}
-                  placeholder="test_user"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="testPassword">Senha de Teste</Label>
-                <Input
-                  id="testPassword"
-                  type="password"
-                  value={testPassword}
-                  onChange={(e) => setTestPassword(e.target.value)}
-                  placeholder="test_pass"
-                />
-              </div>
-            </div>
-
             <Button
               onClick={runConnectivityTest}
               disabled={testing}
@@ -353,7 +293,7 @@ const AdminSmartOneTest = () => {
               ) : (
                 <>
                   <Activity className="h-4 w-4 mr-2" />
-                  Executar Testes
+                  Executar Healthcheck
                 </>
               )}
             </Button>
