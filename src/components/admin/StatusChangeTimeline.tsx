@@ -1,10 +1,13 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { Clock, TrendingUp, TrendingDown, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { useStatusHistory } from '@/hooks/useStatusHistory';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { exportToCSV, exportToPDF } from '@/utils/exportStatusHistory';
+import { useToast } from '@/hooks/use-toast';
 
 interface StatusChangeTimelineProps {
   serviceName?: string;
@@ -18,6 +21,39 @@ export function StatusChangeTimeline({
   showServiceName = true 
 }: StatusChangeTimelineProps) {
   const { history, loading } = useStatusHistory(serviceName, limit);
+  const { toast } = useToast();
+
+  const handleExportCSV = () => {
+    try {
+      exportToCSV(history, serviceName ? `historico-${serviceName}` : 'historico-status');
+      toast({
+        title: 'Exportado com sucesso',
+        description: 'Histórico exportado em formato CSV',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível exportar o histórico',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      exportToPDF(history, serviceName ? `historico-${serviceName}` : 'historico-status');
+      toast({
+        title: 'Exportado com sucesso',
+        description: 'Histórico exportado em formato PDF',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível exportar o histórico',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -54,16 +90,40 @@ export function StatusChangeTimeline({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Histórico de Mudanças de Status
-        </CardTitle>
-        <CardDescription>
-          {serviceName 
-            ? `Timeline de mudanças para ${serviceName}`
-            : 'Timeline de todas as mudanças de status'
-          }
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Histórico de Mudanças de Status
+            </CardTitle>
+            <CardDescription>
+              {serviceName 
+                ? `Timeline de mudanças para ${serviceName}`
+                : 'Timeline de todas as mudanças de status'
+              }
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={history.length === 0}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={history.length === 0}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[600px] pr-4">

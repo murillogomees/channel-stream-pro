@@ -438,6 +438,20 @@ const AdminDashboard = () => {
               path="/admin/system-health"
             />
             <NavCard
+              title="Histórico de Status"
+              description="Timeline de mudanças de status"
+              icon={<Clock className="h-5 w-5" />}
+              path="/admin/status-history"
+              badge="Novo"
+            />
+            <NavCard
+              title="Badges Personalizados"
+              description="Crie status customizados"
+              icon={<CheckCircle className="h-5 w-5" />}
+              path="/admin/custom-status-badges"
+              badge="Novo"
+            />
+            <NavCard
               title="Gestão de Usuários"
               description="Controle de permissões e roles"
               icon={<UserCog className="h-5 w-5" />}
