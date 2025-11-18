@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { smartoneAutoSyncService } from "@/services/smartoneAutoSyncService";
+import { smartoneService } from "@/services/smartoneService";
+import { Cliente } from "@/types/cliente";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert } from "lucide-react";
 
 interface ClienteComPerfil {
   id: string;
@@ -34,6 +37,17 @@ const AdminSmartOneSync = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    cliente: ClienteComPerfil | null;
+    errors: string[];
+    warnings: string[];
+  }>({
+    open: false,
+    cliente: null,
+    errors: [],
+    warnings: [],
+  });
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -83,6 +97,46 @@ const AdminSmartOneSync = () => {
   }, [isAdmin]);
 
   const handleSync = async (cliente: ClienteComPerfil) => {
+    try {
+      // Converter para formato Cliente para validação
+      const clienteParaValidar: Cliente = {
+        id: cliente.id,
+        nome: cliente.profiles.nome,
+        telefone: cliente.profiles.telefone,
+        email: cliente.profiles.email,
+        macSmartOne: cliente.mac_smart_one,
+        usuario: cliente.usuario_m3u,
+        senha: cliente.senha_m3u,
+        smartone_status: cliente.smartone_status as any,
+        smartone_last_sync_at: cliente.smartone_last_sync_at,
+      } as Cliente;
+
+      // Validação preventiva
+      const validation = await smartoneService.validateClientForSync(clienteParaValidar);
+
+      // Se houver erros ou avisos, mostrar diálogo
+      if (!validation.valid || validation.warnings.length > 0) {
+        setValidationDialog({
+          open: true,
+          cliente,
+          errors: validation.errors,
+          warnings: validation.warnings,
+        });
+        return;
+      }
+
+      // Se passou na validação, prosseguir com sync
+      await performSync(cliente);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const performSync = async (cliente: ClienteComPerfil) => {
     try {
       setSyncing(cliente.id);
       
@@ -234,6 +288,62 @@ const AdminSmartOneSync = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Dialog de Validação */}
+        <AlertDialog open={validationDialog.open} onOpenChange={(open) => setValidationDialog({ ...validationDialog, open })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-yellow-500" />
+                Validação de Sincronização
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-4">
+                {validationDialog.errors.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-destructive">⚠️ Erros encontrados:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {validationDialog.errors.map((error, index) => (
+                        <li key={index} className="text-destructive">{error}</li>
+                      ))}
+                    </ul>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Corrija os erros acima antes de sincronizar.
+                    </p>
+                  </div>
+                )}
+
+                {validationDialog.warnings.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-yellow-600">⚡ Avisos:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {validationDialog.warnings.map((warning, index) => (
+                        <li key={index} className="text-yellow-600">{warning}</li>
+                      ))}
+                    </ul>
+                    {validationDialog.errors.length === 0 && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Você pode prosseguir, mas recomendamos revisar os avisos acima.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setValidationDialog({ open: false, cliente: null, errors: [], warnings: [] })}>
+                Cancelar
+              </AlertDialogCancel>
+              {validationDialog.errors.length === 0 && validationDialog.cliente && (
+                <AlertDialogAction onClick={async () => {
+                  setValidationDialog({ open: false, cliente: null, errors: [], warnings: [] });
+                  await performSync(validationDialog.cliente!);
+                }}>
+                  Prosseguir mesmo assim
+                </AlertDialogAction>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

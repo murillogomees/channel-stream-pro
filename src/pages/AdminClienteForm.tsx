@@ -25,6 +25,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { M3UListSelector } from '@/components/admin/M3UListSelector';
 import { M3UListPreview } from '@/components/admin/M3UListPreview';
+import { SmartOneValidationAlert } from '@/components/admin/SmartOneValidationAlert';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +101,10 @@ export default function AdminClienteForm() {
   const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
   const [allM3ULists, setAllM3ULists] = useState<any[]>([]);
+  const [smartoneValidation, setSmartoneValidation] = useState<{
+    errors: string[];
+    warnings: string[];
+  }>({ errors: [], warnings: [] });
 
   const {
     register,
@@ -128,6 +133,38 @@ export default function AdminClienteForm() {
       }
     }
   }, [id, getClienteById, setValue]);
+
+  // Validação SmartOne em tempo real
+  useEffect(() => {
+    const validateSmartOneFields = async () => {
+      const macSmartOne = watch('macSmartOne');
+      const usuario = watch('usuario');
+      const senha = watch('senha');
+      const nome = watch('nome');
+
+      // Se nenhum campo SmartOne está preenchido, não validar
+      if (!macSmartOne && !usuario && !senha) {
+        setSmartoneValidation({ errors: [], warnings: [] });
+        return;
+      }
+
+      // Criar objeto cliente temporário para validação
+      const tempCliente: Partial<Cliente> = {
+        macSmartOne: macSmartOne || '',
+        usuario: usuario || '',
+        senha: senha || '',
+        nome: nome || '',
+      } as any;
+
+      const validation = await smartoneService.validateClientForSync(tempCliente as Cliente);
+      setSmartoneValidation({
+        errors: validation.errors,
+        warnings: validation.warnings,
+      });
+    };
+
+    validateSmartOneFields();
+  }, [watch('macSmartOne'), watch('usuario'), watch('senha'), watch('nome')]);
 
   if (loading) {
     return (
@@ -328,20 +365,45 @@ export default function AdminClienteForm() {
           }
         }
 
-        // Se tem MAC, usuário e senha, sincronizar com SmartOne
+        // Se tem MAC, usuário e senha, validar e sincronizar com SmartOne
         if (clienteData.macSmartOne && clienteData.usuario && clienteData.senha) {
-          setIsSyncingSmartone(true);
-          toast({
-            title: "Sincronizando com SmartOne",
-            description: "Criando playlist no SmartOne IPTV...",
-          });
-
+          // Validação preventiva
           const clienteCompleto: Cliente = {
             ...clienteData,
             id: clientId,
             dataCadastro: new Date().toISOString(),
             dataUltimaEdicao: new Date().toISOString(),
           };
+
+          const validation = await smartoneService.validateClientForSync(clienteCompleto);
+
+          // Mostrar avisos se houver
+          if (validation.warnings.length > 0) {
+            toast({
+              title: "Avisos de Validação",
+              description: validation.warnings.join('\n'),
+              variant: "default",
+            });
+          }
+
+          // Se houver erros, não sincronizar
+          if (!validation.valid) {
+            toast({
+              title: "Erro de Validação",
+              description: validation.errors.join('\n'),
+              variant: "destructive",
+            });
+            
+            navigate("/admin/clientes");
+            return;
+          }
+
+          // Prosseguir com sincronização
+          setIsSyncingSmartone(true);
+          toast({
+            title: "Sincronizando com SmartOne",
+            description: "Criando playlist no SmartOne IPTV...",
+          });
 
           const result = await smartoneService.syncPlaylistForClient(
             clienteCompleto,
@@ -530,6 +592,16 @@ export default function AdminClienteForm() {
                   <Label htmlFor="senha">Senha</Label>
                   <Input id="senha" type="password" {...register('senha')} />
                 </div>
+
+                {/* Validação SmartOne em tempo real */}
+                {(watch('macSmartOne') || watch('usuario') || watch('senha')) && (
+                  <div className="col-span-2">
+                    <SmartOneValidationAlert 
+                      errors={smartoneValidation.errors}
+                      warnings={smartoneValidation.warnings}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">
