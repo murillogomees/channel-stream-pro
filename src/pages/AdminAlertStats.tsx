@@ -42,6 +42,15 @@ export default function AdminAlertStats() {
     }
 
     loadStats();
+    
+    // Atualização periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      loadStats();
+    }, 60000);
+    
+    return () => {
+      clearInterval(interval);
+    };
   }, [authLoading, isAdmin, navigate, selectedPeriod]);
 
   const loadStats = async () => {

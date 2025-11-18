@@ -39,6 +39,15 @@ export default function AdminSecurityAnalytics() {
 
   useEffect(() => {
     loadAnalytics();
+    
+    // Atualização periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      loadAnalytics();
+    }, 60000);
+    
+    return () => {
+      clearInterval(interval);
+    };
   }, [timeRange]);
 
   const loadAnalytics = async () => {

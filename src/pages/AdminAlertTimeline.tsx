@@ -17,6 +17,15 @@ export default function AdminAlertTimeline() {
 
   useEffect(() => {
     loadTimeline();
+    
+    // Atualização periódica a cada 30 segundos
+    const interval = setInterval(() => {
+      loadTimeline();
+    }, 30000);
+    
+    return () => {
+      clearInterval(interval);
+    };
   }, [hours]);
 
   useEffect(() => {

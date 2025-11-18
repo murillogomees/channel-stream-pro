@@ -298,7 +298,18 @@ function EventCard({
             )}
           </div>
           <p className="text-sm">
-            {event.event_details?.description || event.event_details?.email || 'Evento de segurança'}
+            {event.event_type === 'failed_login' && event.event_details?.email ? (
+              <>
+                Email tentado: <span className="font-mono text-primary">{event.event_details.email}</span>
+                {event.event_details.passwordAttempted && (
+                  <Badge variant="destructive" className="ml-2 text-[10px]">
+                    Com senha
+                  </Badge>
+                )}
+              </>
+            ) : (
+              event.event_details?.description || event.event_details?.email || 'Evento de segurança'
+            )}
           </p>
           {event.ip_address && (
             <p className="text-xs text-muted-foreground">

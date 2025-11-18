@@ -36,13 +36,22 @@ export const securityMonitoringService = {
   /**
    * Log a failed login attempt
    */
-  async logFailedLogin(email: string, ipAddress?: string, userAgent?: string): Promise<void> {
+  async logFailedLogin(
+    email: string, 
+    ipAddress?: string, 
+    userAgent?: string,
+    passwordAttempted?: boolean
+  ): Promise<void> {
     await this.logEvent({
       event_type: 'failed_login',
       severity: 'warning',
       ip_address: ipAddress,
       user_agent: userAgent,
-      event_details: { email, timestamp: new Date().toISOString() }
+      event_details: { 
+        email, 
+        passwordAttempted: passwordAttempted || false,
+        timestamp: new Date().toISOString() 
+      }
     });
   },
 

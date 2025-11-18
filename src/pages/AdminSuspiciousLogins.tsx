@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Loader2, AlertTriangle, Shield, Clock } from 'lucide-react';
 import { suspiciousLoginService } from '@/services/suspiciousLoginService';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -24,6 +25,33 @@ export default function AdminSuspiciousLogins() {
       return;
     }
     loadData();
+    
+    // Real-time updates via Supabase
+    const channel = supabase
+      .channel('suspicious-logins-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'suspicious_login_attempts'
+        },
+        () => {
+          console.log('[SuspiciousLogins] Mudança detectada, recarregando');
+          loadData();
+        }
+      )
+      .subscribe();
+    
+    // Atualização periódica a cada 30 segundos
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000);
+    
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, [isAdmin, navigate]);
 
   const loadData = async () => {

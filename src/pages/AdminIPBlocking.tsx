@@ -13,6 +13,7 @@ import { ipBlockingService, IPBlock } from "@/services/ipBlockingService";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AdminIPBlocking() {
   const navigate = useNavigate();
@@ -37,6 +38,33 @@ export default function AdminIPBlocking() {
 
   useEffect(() => {
     loadData();
+    
+    // Real-time updates via Supabase
+    const channel = supabase
+      .channel('ip-blocking-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ip_blacklist'
+        },
+        () => {
+          console.log('[IPBlocking] Mudança detectada, recarregando dados');
+          loadData();
+        }
+      )
+      .subscribe();
+    
+    // Atualização periódica a cada 30 segundos
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000);
+    
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
   const loadData = async () => {
