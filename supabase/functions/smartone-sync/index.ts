@@ -292,22 +292,24 @@ serve(async (req) => {
 
     console.log(`[smartone-sync] Lista M3U: ${m3uList.name}`);
 
-    console.log('[smartone-sync] Calling SmartOne API /playlist/create');
+    console.log('[smartone-sync] Calling SmartOne API /plugin/smart_one/client_main/add_playlist/');
     
-    const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/create`, {
+    // SmartOne espera um POST simulando o submit do formulário original
+    const formBody = new URLSearchParams({
+      client_api: SMARTONE_CLIENT_API,
+      key_api: SMARTONE_KEY_API,
+      mac: mac,
+      nome: clienteNome,
+      m3u_url: m3uList.file_url,
+      descricao: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')} pelo cliente ${clienteNome}`,
+    });
+    
+    const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SMARTONE_KEY_API}`
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({
-        client_api: SMARTONE_CLIENT_API,
-        key_api: SMARTONE_KEY_API,
-        mac: mac,
-        nome: clienteNome, // Nome da Lista (Nome do Usuario)
-        m3u_url: m3uList.file_url, // URL da M3U exatamente como está cadastrada
-        descricao: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')} pelo cliente ${clienteNome}`
-      }),
+      body: formBody.toString(),
     });
 
     const responseText = await smartoneResponse.text();
@@ -316,10 +318,10 @@ serve(async (req) => {
     try {
       smartoneData = JSON.parse(responseText);
     } catch {
-      smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
+      smartoneData = { success: smartoneResponse.ok, error: 'Resposta inválida', raw_response: responseText };
     }
 
-    if (smartoneResponse.ok && smartoneData.success) {
+    if (smartoneResponse.ok && smartoneData.success !== false) {
       console.log('[smartone-sync] Success');
       return new Response(
         JSON.stringify({ success: true, message: 'Playlist criada com sucesso', data: smartoneData }),
