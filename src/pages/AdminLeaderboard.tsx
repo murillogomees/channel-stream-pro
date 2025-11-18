@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +24,38 @@ export default function AdminLeaderboard() {
   const [monthlyWinners, setMonthlyWinners] = useState<MonthlyWinner[]>([]);
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadData();
+
+    // Configurar atualização em tempo real
+    const channel = supabase
+      .channel('leaderboard-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_leaderboard_history'
+        },
+        () => {
+          console.log('Leaderboard atualizado em tempo real');
+          loadData();
+        }
+      )
+      .subscribe();
+
+    // Atualização periódica a cada 60 segundos
+    const interval = setInterval(() => {
+      console.log('Atualizando leaderboard automaticamente');
+      loadData();
+    }, 60000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
   const loadData = async () => {
@@ -45,6 +75,7 @@ export default function AdminLeaderboard() {
       setCurrentLeaderboard(current);
       setMonthlyWinners(winners);
       setAvailableMonths(months);
+      setLastUpdate(new Date());
       if (months.length > 0) {
         setSelectedMonth(months[0]);
       }
@@ -80,15 +111,22 @@ export default function AdminLeaderboard() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/dashboard')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-primary" />
-            Leaderboard
-          </h1>
-          <p className="text-muted-foreground">Rankings e conquistas mensais dos admins</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Trophy className="h-8 w-8 text-primary" />
+              Leaderboard
+            </h1>
+            <Badge variant="outline" className="animate-pulse">
+              🔴 Ao vivo
+            </Badge>
+          </div>
+          <p className="text-muted-foreground mt-2">
+            Rankings e conquistas mensais dos admins • Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+          </p>
         </div>
       </div>
       <div className="flex justify-end items-center">
@@ -111,8 +149,27 @@ export default function AdminLeaderboard() {
         </TabsList>
 
         <TabsContent value="current" className="space-y-4">
-          {/* Pódio - Top 3 */}
-          {currentLeaderboard.length >= 3 && (
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : currentLeaderboard.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Trophy className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Nenhum dado disponível ainda</h3>
+                <p className="text-muted-foreground mb-4">
+                  O leaderboard será populado automaticamente quando os admins começarem a responder alertas de segurança.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  📊 Sistema pronto e aguardando dados • 🔴 Atualizações em tempo real ativas
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Pódio - Top 3 */}
+              {currentLeaderboard.length >= 3 && (
             <div className="grid gap-4 md:grid-cols-3">
               {/* 2º Lugar */}
               <Card className="md:order-1">
@@ -220,6 +277,8 @@ export default function AdminLeaderboard() {
               </Table>
             </CardContent>
           </Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
