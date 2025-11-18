@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -228,7 +231,38 @@ const statusConfig: Record<string, {
 
 export function StatusBadge({ status, className, showIcon = true, showTooltip = true }: StatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
-  const config = statusConfig[normalizedStatus] || statusConfig.unknown;
+  const [customBadges, setCustomBadges] = useState<any[]>([]);
+  
+  // Carregar badges personalizados
+  useEffect(() => {
+    const loadCustomBadges = async () => {
+      const { data } = await supabase
+        .from('custom_status_badges')
+        .select('*');
+      if (data) setCustomBadges(data);
+    };
+    loadCustomBadges();
+  }, []);
+  
+  // Verificar se é um badge personalizado
+  const customBadge = customBadges.find(b => b.name === normalizedStatus);
+  
+  let config;
+  if (customBadge) {
+    // Usar configuração do badge personalizado
+    config = {
+      label: customBadge.label,
+      variant: 'default',
+      className: `bg-[${customBadge.color}]/10 text-[${customBadge.color}] border-[${customBadge.color}]/20 hover:bg-[${customBadge.color}]/20`,
+      description: customBadge.description || customBadge.label,
+      icon: HelpCircle, // Usar ícone padrão para badges personalizados
+      critical: customBadge.is_critical,
+    };
+  } else {
+    // Usar configuração padrão
+    config = statusConfig[normalizedStatus] || statusConfig.unknown;
+  }
+  
   const Icon = config.icon;
 
   const badge = (
@@ -241,6 +275,11 @@ export function StatusBadge({ status, className, showIcon = true, showTooltip = 
         config.critical && 'animate-pulse',
         className
       )}
+      style={customBadge ? {
+        backgroundColor: `${customBadge.color}20`,
+        color: customBadge.color,
+        borderColor: `${customBadge.color}40`,
+      } : undefined}
     >
       <span className="flex items-center gap-1.5">
         {showIcon && Icon && (

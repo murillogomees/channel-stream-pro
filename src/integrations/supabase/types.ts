@@ -447,6 +447,45 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_status_badges: {
+        Row: {
+          color: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          icon_name: string | null
+          id: string
+          is_critical: boolean | null
+          label: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_critical?: boolean | null
+          label: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_critical?: boolean | null
+          label?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       health_snapshots: {
         Row: {
           id: string
@@ -1463,6 +1502,36 @@ export type Database = {
         }
         Relationships: []
       }
+      status_change_history: {
+        Row: {
+          changed_at: string | null
+          created_by: string | null
+          id: string
+          metadata: Json | null
+          new_status: string
+          previous_status: string | null
+          service_name: string
+        }
+        Insert: {
+          changed_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status: string
+          previous_status?: string | null
+          service_name: string
+        }
+        Update: {
+          changed_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status?: string
+          previous_status?: string | null
+          service_name?: string
+        }
+        Relationships: []
+      }
       suspicious_login_attempts: {
         Row: {
           alert_sent: boolean | null
@@ -1672,6 +1741,15 @@ export type Database = {
           _entity_type?: string
           _metadata?: Json
           _user_id: string
+        }
+        Returns: string
+      }
+      log_status_change: {
+        Args: {
+          p_metadata?: Json
+          p_new_status: string
+          p_previous_status: string
+          p_service_name: string
         }
         Returns: string
       }
