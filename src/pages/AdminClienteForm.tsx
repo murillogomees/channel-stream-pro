@@ -112,18 +112,65 @@ export default function AdminClienteForm() {
   });
 
   useEffect(() => {
-    if (id) {
-      const cliente = getClienteById(id);
-      if (cliente) {
-        setClienteOriginal(cliente);
-        Object.entries(cliente).forEach(([key, value]) => {
-          if (key !== 'id' && key !== 'dataCadastro' && key !== 'dataUltimaEdicao') {
-            setValue(key as keyof ClienteFormData, value, { shouldValidate: false });
+    const loadCliente = async () => {
+      if (id) {
+        try {
+          const { data, error } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          if (error) throw error;
+
+          if (data) {
+            // Mapear campos do banco (snake_case) para o formato do formulário (camelCase)
+            const cliente: Cliente = {
+              id: data.id,
+              nome: data.nome,
+              telefone: data.telefone,
+              telegram: data.telegram || '',
+              email: data.email || '',
+              situacao: data.situacao as SituacaoCliente,
+              dataContratacao: data.data_contratacao || '',
+              dataVencimento: data.data_vencimento || '',
+              plano: data.plano as PlanoCliente,
+              valorPago: data.valor_pago || 0,
+              dataUltimoPagamento: data.data_ultimo_pagamento || '',
+              formaUltimoPagamento: data.forma_ultimo_pagamento || '',
+              macSmartOne: data.mac_smart_one || '',
+              dataCadastro: data.data_cadastro || '',
+              dataUltimaEdicao: data.data_ultima_edicao || '',
+              clienteAtivo: data.cliente_ativo ?? false,
+              smartone_status: data.smartone_status,
+              smartone_playlist_id: data.smartone_playlist_id,
+              smartone_raw_response: data.smartone_raw_response,
+              smartone_last_sync_at: data.smartone_last_sync_at,
+              origemCadastro: data.origem_cadastro,
+            };
+
+            setClienteOriginal(cliente);
+            
+            // Preencher os campos do formulário
+            Object.entries(cliente).forEach(([key, value]) => {
+              if (key !== 'id' && key !== 'dataCadastro' && key !== 'dataUltimaEdicao') {
+                setValue(key as keyof ClienteFormData, value, { shouldValidate: false });
+              }
+            });
           }
-        });
+        } catch (error) {
+          console.error('Erro ao carregar cliente:', error);
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível carregar os dados do cliente.',
+            variant: 'destructive',
+          });
+        }
       }
-    }
-  }, [id, getClienteById, setValue]);
+    };
+
+    loadCliente();
+  }, [id, setValue, toast]);
 
   // Validação SmartOne em tempo real
   useEffect(() => {
