@@ -178,10 +178,7 @@ export default function AdminM3ULists() {
     try {
       const { data, error } = await supabase
         .from('m3u_lists_audit')
-        .select(`
-          *,
-          changed_by_profile:profiles!changed_by(nome)
-        `)
+        .select('*')
         .eq('m3u_list_id', listId)
         .order('created_at', { ascending: false });
 
@@ -189,7 +186,7 @@ export default function AdminM3ULists() {
 
       const formattedLogs = (data || []).map((log: any) => ({
         ...log,
-        admin_name: log.changed_by_profile?.nome || 'Sistema'
+        admin_name: 'Sistema'
       }));
 
       setAuditLogs(formattedLogs);

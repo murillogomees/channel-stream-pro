@@ -102,6 +102,12 @@ serve(async (req) => {
       );
     }
 
+    // Check if IP is blocked (admin should rarely be blocked, but check anyway)
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     // Verificar se é admin
     const { data: isAdmin, error: roleError } = await supabaseClient
       .rpc('is_admin', { _user_id: user.id });
@@ -110,11 +116,6 @@ serve(async (req) => {
       console.error('[smartone-sync] Permission denied for user:', user.id);
       
       // Log unauthorized admin access attempt
-      const supabaseService = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      
       await logSecurityEvent(
         supabaseService,
         'unauthorized_access',
@@ -129,12 +130,6 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Check if IP is blocked (admin should rarely be blocked, but check anyway)
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
 
     const isBlocked = await checkIPBlocked(supabaseService, clientIp);
     if (isBlocked) {
