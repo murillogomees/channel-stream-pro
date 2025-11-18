@@ -42,8 +42,10 @@ async function checkIPBlocked(supabase: any, ipAddress: string): Promise<boolean
 }
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'https://sdvyxdghxqmntyoweqbd.supabase.co',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
 };
 
 const syncRequestSchema = z.object({
@@ -105,23 +107,19 @@ serve(async (req) => {
       );
     }
 
-    console.log('[smartone-sync] User authenticated:', user.id);
-    
     // Verificar se é admin usando RPC call com uid
     const { data: isAdmin, error: roleError } = await supabaseService
       .rpc('is_admin', { uid: user.id });
 
     if (roleError || !isAdmin) {
-      console.error('[smartone-sync] Permission denied for user:', user.id, 'roleError:', roleError);
-      
-      // Log unauthorized admin access attempt
+      // Log unauthorized admin access attempt (no PII)
       await logSecurityEvent(
         supabaseService,
         'unauthorized_access',
         'warning',
         clientIp,
         user.id,
-        { endpoint: 'smartone-sync', reason: 'not_admin', userId: user.id, roleError: roleError?.message }
+        { endpoint: 'smartone-sync', reason: 'not_admin' }
       );
 
       return new Response(
@@ -165,7 +163,6 @@ serve(async (req) => {
     const rateLimit = 30;
 
     if (currentCount >= rateLimit) {
-      console.warn(`[smartone-sync] Rate limit exceeded for user: ${user.id}`);
       return new Response(
         JSON.stringify({ 
           error: 'Taxa de requisições excedida. Tente novamente em alguns minutos.',
@@ -197,20 +194,6 @@ serve(async (req) => {
     const validated = syncRequestSchema.parse(body);
     const { mac, clienteNome } = validated;
 
-    // Hash sensitive data for logging
-    const hashData = async (data: string): Promise<string> => {
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8);
-    };
-
-    console.log('[smartone-sync] Request:', { 
-      macHash: await hashData(mac),
-      userId: user.id,
-      timestamp: Date.now()
-    });
-
     const SMARTONE_API_BASE_URL = Deno.env.get('SMARTONE_API_BASE_URL');
     const SMARTONE_CLIENT_API = Deno.env.get('SMARTONE_CLIENT_API');
     const SMARTONE_KEY_API = Deno.env.get('SMARTONE_KEY_API');
@@ -231,10 +214,8 @@ serve(async (req) => {
       .maybeSingle();
 
     if (clienteError) {
-      console.warn('[smartone-sync] Cliente data fetch warning:', clienteError);
+      console.warn('[smartone-sync] Cliente data fetch warning');
     }
-
-    console.log('[smartone-sync] Client plan:', clienteData?.plano, '| Status:', clienteData?.situacao);
 
     // Buscar a lista M3U apropriada baseada no plano do cliente usando a função SQL
     let m3uListId = null;
@@ -248,13 +229,11 @@ serve(async (req) => {
 
       if (!rpcError && listId) {
         m3uListId = listId;
-        console.log('[smartone-sync] Lista M3U selecionada via plano:', listId);
       }
     }
 
     // Fallback: buscar lista padrão se não encontrar pela função
     if (!m3uListId) {
-      console.log('[smartone-sync] Usando lista padrão como fallback...');
       const { data: defaultList, error: defaultError } = await supabaseService
         .from('m3u_lists')
         .select('id')
@@ -290,23 +269,21 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[smartone-sync] Lista M3U: ${m3uList.name}`);
-
-    console.log('[smartone-sync] Calling SmartOne API /plugin/smart_one/client_main/add_playlist/');
-    
-    // SmartOne espera um POST com os campos exatos do formulário HTML
+    // SmartOne API call com autenticação via headers
     const formBody = new URLSearchParams({
       form_action: 'generate_m3u_playlist',
       mac: mac,
       m3u_name: clienteNome,
       m3u_playlist: m3uList.file_url,
-      note: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')}`,
+      note: `Auto-sync ${new Date().toISOString()}`,
     });
     
     const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Client-API': SMARTONE_CLIENT_API,
+        'X-Key-API': SMARTONE_KEY_API,
       },
       body: formBody.toString(),
     });
@@ -321,7 +298,6 @@ serve(async (req) => {
     }
 
     if (smartoneResponse.ok && smartoneData.success !== false) {
-      console.log('[smartone-sync] Success');
       return new Response(
         JSON.stringify({ success: true, message: 'Playlist criada com sucesso', data: smartoneData }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
