@@ -366,9 +366,19 @@ export default function AdminTemplates() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-                Templates de Mensagens
-              </h1>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+                  Templates de Mensagens
+                </h1>
+                {isLive && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="font-medium">Ao vivo</span>
+                    </div>
+                  </div>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 Gerencie os modelos de notificação WhatsApp
               </p>
