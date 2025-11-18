@@ -292,95 +292,81 @@ export default function AdminNotificationRetry() {
           </Button>
         </div>
 
-        {/* Tabela */}
+        {/* Tabela Compacta */}
         <Card>
-          <CardHeader>
-            <CardTitle>Itens na Fila</CardTitle>
-            <CardDescription>
-              Lista de notificações aguardando reenvio
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : items.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhum item na fila
-              </div>
-            ) : (
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Destinatário</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Tentativas</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Próximo Retry</TableHead>
-                    <TableHead>Erro</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="w-[200px]">Cliente</TableHead>
+                    <TableHead className="w-[120px]">Telefone</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[80px]">Tentativas</TableHead>
+                    <TableHead className="w-[150px]">Próximo Retry</TableHead>
+                    <TableHead className="text-right w-[120px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{item.recipient_name || 'Sem nome'}</p>
-                          <p className="text-sm text-muted-foreground">{item.recipient_phone}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.type}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.attempts >= item.max_attempts ? 'destructive' : 'secondary'}>
-                          {item.attempts}/{item.max_attempts}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell>
-                        <p className="text-sm">
-                          {format(new Date(item.next_retry_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        {item.error_message && (
-                          <div className="flex items-center gap-1">
-                            <AlertCircle className="h-4 w-4 text-destructive" />
-                            <span className="text-sm text-destructive truncate max-w-[200px]" title={item.error_message}>
-                              {item.error_message}
-                            </span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {(item.status === 'pending' || item.status === 'retrying') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRetryNow(item.id)}
-                            >
-                              <Play className="h-3 w-3 mr-1" />
-                              Retry Agora
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2" />
+                        <p className="text-muted-foreground">Carregando...</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Nenhum item na fila
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium text-sm">
+                          <div className="truncate">{item.recipient_name || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {item.template_name || item.type}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {item.recipient_phone}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell className="text-sm">
+                          {item.attempts}/{item.max_attempts}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {item.next_retry_at
+                            ? format(new Date(item.next_retry_at), 'dd/MM HH:mm', { locale: ptBR })
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRetryNow(item.id)}
+                              disabled={item.status === 'succeeded' || item.status === 'exhausted'}
+                            >
+                              <Play className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>
