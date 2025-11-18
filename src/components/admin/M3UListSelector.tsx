@@ -11,7 +11,7 @@ interface M3UList {
   name: string;
   file_url: string;
   status: string;
-  plan_type?: 'teste' | 'basico' | 'premium';
+  plan_type?: ('teste' | 'basico' | 'premium')[];
   is_default?: boolean;
 }
 
@@ -64,14 +64,22 @@ export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UL
     onChange(newSelection);
   };
 
-  const getPlanTypeBadge = (planType?: string) => {
+  const getPlanTypeBadge = (type: string) => {
     const colors = {
       teste: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
       basico: 'bg-green-500/10 text-green-500 border-green-500/20',
       premium: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
     };
+    const labels = {
+      teste: 'Teste',
+      basico: 'Básico',
+      premium: 'Premium',
+    };
     
-    return colors[planType as keyof typeof colors] || colors.teste;
+    return {
+      className: colors[type as keyof typeof colors] || colors.teste,
+      label: labels[type as keyof typeof labels] || type,
+    };
   };
 
   if (isLoading) {
@@ -110,9 +118,14 @@ export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UL
                   Padrão
                 </Badge>
               )}
-              <Badge className={getPlanTypeBadge(list.plan_type)}>
-                {list.plan_type || 'teste'}
-              </Badge>
+              {(list.plan_type || ['teste']).map((type) => {
+                const badge = getPlanTypeBadge(type);
+                return (
+                  <Badge key={type} className={badge.className}>
+                    {badge.label}
+                  </Badge>
+                );
+              })}
             </Label>
             <p className="text-xs text-muted-foreground line-clamp-1">
               {list.file_url}

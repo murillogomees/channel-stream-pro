@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,7 @@ interface M3UList {
   created_at: string;
   updated_at: string;
   is_default?: boolean;
-  plan_type?: 'teste' | 'basico' | 'premium';
+  plan_type?: ('teste' | 'basico' | 'premium')[];
   priority?: number;
   description?: string;
   created_by?: string;
@@ -73,7 +73,7 @@ export default function AdminM3ULists() {
   const [listName, setListName] = useState('');
   const [listUrl, setListUrl] = useState('');
   const [listDescription, setListDescription] = useState('');
-  const [planType, setPlanType] = useState<'teste' | 'basico' | 'premium'>('teste');
+  const [planTypes, setPlanTypes] = useState<('teste' | 'basico' | 'premium')[]>(['teste']);
   const [priority, setPriority] = useState(0);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
@@ -194,7 +194,7 @@ export default function AdminM3ULists() {
       setListName(list.name);
       setListUrl(list.file_url);
       setListDescription(list.description || '');
-      setPlanType(list.plan_type || 'teste');
+      setPlanTypes(list.plan_type || ['teste']);
       setPriority(list.priority || 0);
       await loadAuditHistory(list.id);
       setShowAuditHistory(true);
@@ -203,7 +203,7 @@ export default function AdminM3ULists() {
       setListName('');
       setListUrl('');
       setListDescription('');
-      setPlanType('teste');
+      setPlanTypes(['teste']);
       setPriority(0);
       setAuditLogs([]);
       setShowAuditHistory(false);
@@ -217,7 +217,7 @@ export default function AdminM3ULists() {
     setListName('');
     setListUrl('');
     setListDescription('');
-    setPlanType('teste');
+    setPlanTypes(['teste']);
     setPriority(0);
     setAuditLogs([]);
     setShowAuditHistory(false);
@@ -248,7 +248,7 @@ export default function AdminM3ULists() {
           .update({
             name: listName.trim(),
             file_url: listUrl.trim(),
-            plan_type: planType,
+            plan_type: planTypes,
             priority: priority,
           })
           .eq('id', editingList.id);
@@ -270,7 +270,7 @@ export default function AdminM3ULists() {
               name: listName.trim(),
               file_url: listUrl.trim(),
               status: 'active',
-              plan_type: planType,
+              plan_type: planTypes,
               priority: priority,
             }
           ]);
@@ -391,17 +391,31 @@ export default function AdminM3ULists() {
     return `${mb.toFixed(2)} MB`;
   };
 
-  const getPlanTypeBadge = (planType?: string) => {
-    switch (planType) {
-      case 'teste':
-        return <Badge variant="secondary">Teste</Badge>;
-      case 'basico':
-        return <Badge variant="outline">Básico</Badge>;
-      case 'premium':
-        return <Badge className="bg-gradient-to-r from-amber-500 to-amber-600 text-white">Premium</Badge>;
-      default:
-        return <Badge variant="secondary">Teste</Badge>;
+  const getPlanTypeBadge = (planType?: ('teste' | 'basico' | 'premium')[]) => {
+    const colors = {
+      teste: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+      basico: 'bg-green-500/10 text-green-500 border-green-500/20',
+      premium: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    };
+    const labels = {
+      teste: 'Teste',
+      basico: 'Básico',
+      premium: 'Premium',
+    };
+    
+    if (!planType || planType.length === 0) {
+      return <Badge className={colors.teste}>{labels.teste}</Badge>;
     }
+    
+    return (
+      <div className="flex gap-1 flex-wrap">
+        {planType.map((type) => (
+          <Badge key={type} className={colors[type]}>
+            {labels[type]}
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   if (authLoading || isLoading) {
@@ -635,19 +649,35 @@ export default function AdminM3ULists() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="planType">Tipo de Plano *</Label>
-              <Select value={planType} onValueChange={(value: any) => setPlanType(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o plano" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="teste">Teste (Trial)</SelectItem>
-                  <SelectItem value="basico">Básico</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="planTypes">Tipos de Plano *</Label>
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {['teste', 'basico', 'premium'].map((type) => {
+                    const isSelected = planTypes.includes(type as any);
+                    const labels = { teste: 'Teste', basico: 'Básico', premium: 'Premium' };
+                    return (
+                      <Button
+                        key={type}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          if (isSelected) {
+                            setPlanTypes(planTypes.filter(t => t !== type));
+                          } else {
+                            setPlanTypes([...planTypes, type as any]);
+                          }
+                        }}
+                      >
+                        {isSelected && <Check className="h-4 w-4 mr-1" />}
+                        {labels[type as keyof typeof labels]}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Define qual tipo de cliente terá acesso a esta lista
+                Selecione um ou mais tipos de planos que terão acesso a esta lista
               </p>
             </div>
 

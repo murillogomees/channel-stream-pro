@@ -8,7 +8,7 @@ export interface M3UListWithPlan {
   name: string;
   file_url: string;
   status: string;
-  plan_type: M3UPlanType;
+  plan_type: M3UPlanType[];
   priority: number;
   is_default: boolean;
   created_at: string;
@@ -105,7 +105,7 @@ export const m3uPlanService = {
     const { data, error } = await supabase
       .from('m3u_lists')
       .select('*')
-      .eq('plan_type', planType)
+      .contains('plan_type', [planType])
       .eq('status', 'active')
       .order('priority', { ascending: false });
 
@@ -118,14 +118,14 @@ export const m3uPlanService = {
   },
 
   /**
-   * Atualiza o tipo de plano de uma lista M3U
+   * Atualiza os tipos de plano de uma lista M3U
    */
   async updateListPlanType(
     listId: string,
-    planType: M3UPlanType,
+    planTypes: M3UPlanType[],
     priority?: number
   ): Promise<boolean> {
-    const updateData: any = { plan_type: planType };
+    const updateData: any = { plan_type: planTypes };
     if (priority !== undefined) {
       updateData.priority = priority;
     }
@@ -136,7 +136,7 @@ export const m3uPlanService = {
       .eq('id', listId);
 
     if (error) {
-      console.error('Erro ao atualizar tipo de plano da lista:', error);
+      console.error('Erro ao atualizar tipos de plano da lista:', error);
       return false;
     }
 
@@ -177,9 +177,9 @@ export const m3uPlanService = {
     }
 
     const listsByPlan = {
-      teste: lists.filter(l => l.plan_type === 'teste' && l.status === 'active').length,
-      basico: lists.filter(l => l.plan_type === 'basico' && l.status === 'active').length,
-      premium: lists.filter(l => l.plan_type === 'premium' && l.status === 'active').length,
+      teste: lists.filter(l => l.plan_type?.includes('teste') && l.status === 'active').length,
+      basico: lists.filter(l => l.plan_type?.includes('basico') && l.status === 'active').length,
+      premium: lists.filter(l => l.plan_type?.includes('premium') && l.status === 'active').length,
     };
 
     const clientsByPlan = {
