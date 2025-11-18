@@ -2,7 +2,7 @@ import { getDesktopNotificationService } from './desktopNotificationService';
 
 export interface AdminAlert {
   id: string;
-  type: 'websocket_fallback' | 'service_down' | 'high_error_rate' | 'critical_failure';
+  type: 'websocket_fallback' | 'service_down' | 'high_error_rate' | 'critical_failure' | 'smartone_sync_failure';
   severity: 'info' | 'warning' | 'critical';
   title: string;
   message: string;
@@ -52,6 +52,13 @@ class AdminAlertService {
       type: 'critical_failure',
       enabled: true,
       cooldownMs: 2 * 60 * 1000, // 2 minutes
+      lastTriggered: null,
+    },
+    {
+      id: 'smartone_sync_failure',
+      type: 'smartone_sync_failure',
+      enabled: true,
+      cooldownMs: 10 * 60 * 1000, // 10 minutes
       lastTriggered: null,
     },
   ];
