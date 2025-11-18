@@ -139,23 +139,24 @@ serve(async (req) => {
       throw new Error('Lista M3U não encontrada');
     }
 
+    // Formato correto para SmartOne API
     const smartonePayload = {
       client_api: smartoneClientApi,
       key_api: smartoneKeyApi,
       mac: mac_smart_one,
-      name: nome,
-      email: email,
-      phone: telefone,
-      playlist_url: defaultM3U.file_url,
-      username: usuario_m3u || `user_${Date.now()}`,
-      password: senha_m3u || Math.random().toString(36).slice(-8),
+      nome: nome, // Nome da Lista (Nome do Usuario)
+      m3u_url: defaultM3U.file_url, // URL da M3U exatamente como está cadastrada
+      descricao: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')} pelo usuário ${nome}`
     };
 
-    console.log('[sync-new-client] Calling SmartOne');
+    console.log('[sync-new-client] Calling SmartOne API /playlist/create');
 
-    const smartoneResponse = await fetch(`${smartoneApiBase}/create-user`, {
+    const smartoneResponse = await fetch(`${smartoneApiBase}/playlist/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${smartoneKeyApi}`
+      },
       body: JSON.stringify(smartonePayload),
     });
 
@@ -169,10 +170,7 @@ serve(async (req) => {
 
     if (smartoneResponse.ok && smartoneData.success) {
       updateData.smartone_status = 'criado';
-      updateData.smartone_playlist_id = smartoneData.playlist_id || null;
-      
-      if (smartonePayload.username && !usuario_m3u) updateData.usuario_m3u = smartonePayload.username;
-      if (smartonePayload.password && !senha_m3u) updateData.senha_m3u = smartonePayload.password;
+      updateData.smartone_playlist_id = smartoneData.playlist_id || smartoneData.id || null;
     } else {
       updateData.smartone_status = 'erro';
     }
@@ -199,10 +197,9 @@ serve(async (req) => {
 
 Olá ${nome}! Seu acesso ao SmartOne IPTV foi ativado!
 
-📺 *Suas Credenciais:*
-• Usuário: ${smartonePayload.username}
-• Senha: ${smartonePayload.password}
+📺 *Seus Dados:*
 • MAC: ${mac_smart_one}
+• Playlist: ${defaultM3U.file_url}
 
 ✅ Seu SmartOne está pronto para uso!`;
 
