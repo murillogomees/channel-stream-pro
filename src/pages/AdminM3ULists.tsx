@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,7 @@ export default function AdminM3ULists() {
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
   const [showAuditHistory, setShowAuditHistory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -116,6 +117,14 @@ export default function AdminM3ULists() {
       setIsLoading(false);
     }
   };
+
+  const filteredLists = lists.filter((list) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      list.name.toLowerCase().includes(query) ||
+      (list.description?.toLowerCase() || '').includes(query)
+    );
+  });
 
   // Schema de validação completo
   const m3uListSchema = z.object({
@@ -424,6 +433,18 @@ export default function AdminM3ULists() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou descrição (ex: HD, 4K, Esportes)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="pb-3">
@@ -467,6 +488,7 @@ export default function AdminM3ULists() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead className="max-w-xs">Descrição</TableHead>
                 <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -474,14 +496,16 @@ export default function AdminM3ULists() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {lists.length === 0 ? (
+              {filteredLists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    Nenhuma lista M3U cadastrada. Clique em "Nova Lista" para adicionar.
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    {searchQuery 
+                      ? 'Nenhuma lista encontrada com esses critérios' 
+                      : 'Nenhuma lista M3U cadastrada. Clique em "Nova Lista" para adicionar.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                lists.map((list) => (
+                filteredLists.map((list) => (
                   <TableRow key={list.id}>
                      <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -493,6 +517,24 @@ export default function AdminM3ULists() {
                           </Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      {list.description ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate block cursor-help">
+                                {list.description}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-md">
+                              <p>{list.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <span className="text-muted-foreground italic text-sm">Sem descrição</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{list.priority || 0}</Badge>
@@ -650,9 +692,14 @@ export default function AdminM3ULists() {
                 className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 maxLength={500}
               />
-              <p className="text-xs text-muted-foreground">
-                Use este campo para documentar informações importantes sobre a lista M3U (máximo 500 caracteres)
-              </p>
+              <div className="flex justify-between items-center text-xs">
+                <p className="text-muted-foreground">
+                  Use este campo para documentar informações importantes sobre a lista M3U
+                </p>
+                <span className={`font-medium ${listDescription.length >= 450 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {listDescription.length}/500
+                </span>
+              </div>
             </div>
 
             <Alert>
