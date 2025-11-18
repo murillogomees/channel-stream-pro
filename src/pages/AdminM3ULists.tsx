@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, Star, AlertCircle, LinkIcon, ExternalLink, Edit, Check, Search, Download, History, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useM3UTags, M3UTag } from '@/hooks/useM3UTags';
+import { useM3UViewHistory } from '@/hooks/useM3UViewHistory';
+import { M3UTagSelector } from '@/components/admin/M3UTagSelector';
+import { M3UViewHistoryDialog } from '@/components/admin/M3UViewHistoryDialog';
+import { exportToCSV, M3UListExport } from '@/utils/m3uExport';
 
 interface M3UList {
   id: string;
@@ -54,6 +59,7 @@ interface M3UList {
   description?: string;
   created_by?: string;
   updated_by?: string;
+  tags?: M3UTag[];
 }
 
 interface M3UAuditLog {
@@ -70,6 +76,9 @@ interface M3UAuditLog {
 export default function AdminM3ULists() {
   const navigate = useNavigate();
   const { isAdmin, loading: authLoading } = useAuth();
+  const { getListTags, updateListTags } = useM3UTags();
+  const { logView, getListHistory } = useM3UViewHistory();
+  
   const [lists, setLists] = useState<M3UList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -83,6 +92,11 @@ export default function AdminM3ULists() {
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
   const [showAuditHistory, setShowAuditHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [currentListHistory, setCurrentListHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [currentHistoryListName, setCurrentHistoryListName] = useState('');
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -107,7 +121,15 @@ export default function AdminM3ULists() {
 
       if (error) throw error;
 
-      setLists((data || []) as M3UList[]);
+      // Carregar tags para cada lista
+      const listsWithTags = await Promise.all(
+        (data || []).map(async (list) => {
+          const tags = await getListTags(list.id);
+          return { ...list, tags };
+        })
+      );
+
+      setLists(listsWithTags as M3UList[]);
     } catch (error: any) {
       console.error('Error loading M3U lists:', error);
       toast.error('Erro ao carregar listas M3U', {
@@ -120,10 +142,14 @@ export default function AdminM3ULists() {
 
   const filteredLists = lists.filter((list) => {
     const query = searchQuery.toLowerCase();
-    return (
-      list.name.toLowerCase().includes(query) ||
-      (list.description?.toLowerCase() || '').includes(query)
+    const matchesSearch = list.name.toLowerCase().includes(query) ||
+      (list.description?.toLowerCase() || '').includes(query);
+    
+    const matchesTags = list.tags?.some(tag => 
+      tag.name.toLowerCase().includes(query)
     );
+
+    return matchesSearch || matchesTags;
   });
 
   // Schema de validação completo
@@ -206,14 +232,23 @@ export default function AdminM3ULists() {
       setListUrl(list.file_url);
       setListDescription(list.description || '');
       setPriority(list.priority || 0);
+      
+      // Carregar tags da lista
+      const tags = await getListTags(list.id);
+      setSelectedTags(tags.map(t => t.id));
+      
       await loadAuditHistory(list.id);
       setShowAuditHistory(true);
+      
+      // Registrar visualização
+      await logView(list.id, 'edit');
     } else {
       setEditingList(null);
       setListName('');
       setListUrl('');
       setListDescription('');
       setPriority(0);
+      setSelectedTags([]);
       setAuditLogs([]);
       setShowAuditHistory(false);
     }
@@ -227,6 +262,7 @@ export default function AdminM3ULists() {
     setListUrl('');
     setListDescription('');
     setPriority(0);
+    setSelectedTags([]);
     setAuditLogs([]);
     setShowAuditHistory(false);
   };
@@ -266,12 +302,15 @@ export default function AdminM3ULists() {
           throw new Error(`Falha ao atualizar lista: ${updateError.message}`);
         }
 
+        // Atualizar tags
+        await updateListTags(editingList.id, selectedTags);
+
         toast.success('Lista M3U atualizada com sucesso!', {
           description: `${listName} foi atualizada`
         });
       } else {
         // Modo criação
-        const { error: insertError } = await supabase
+        const { data: newList, error: insertError } = await supabase
           .from('m3u_lists')
           .insert([
             {
@@ -281,11 +320,18 @@ export default function AdminM3ULists() {
               status: 'active',
               priority: priority,
             }
-          ]);
+          ])
+          .select()
+          .single();
 
         if (insertError) {
           console.error('Erro ao criar registro:', insertError);
           throw new Error(`Falha ao registrar lista: ${insertError.message}`);
+        }
+
+        // Adicionar tags
+        if (newList && selectedTags.length > 0) {
+          await updateListTags(newList.id, selectedTags);
         }
 
         toast.success('Lista M3U criada com sucesso!', {
@@ -399,6 +445,41 @@ export default function AdminM3ULists() {
     return `${mb.toFixed(2)} MB`;
   };
 
+  const handleExportCSV = async () => {
+    try {
+      await logView('export', 'export');
+      
+      const exportData: M3UListExport[] = filteredLists.map(list => ({
+        id: list.id,
+        name: list.name,
+        file_url: list.file_url,
+        description: list.description,
+        priority: list.priority,
+        status: list.status,
+        is_default: list.is_default,
+        created_at: list.created_at,
+        updated_at: list.updated_at,
+        tags: list.tags?.map(t => t.name).join(', ')
+      }));
+
+      exportToCSV(exportData);
+      toast.success('Listas exportadas com sucesso!');
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast.error('Erro ao exportar listas');
+    }
+  };
+
+  const handleShowHistory = async (list: M3UList) => {
+    setCurrentHistoryListName(list.name);
+    setIsLoadingHistory(true);
+    setShowHistoryDialog(true);
+    
+    const history = await getListHistory(list.id);
+    setCurrentListHistory(history);
+    setIsLoadingHistory(false);
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -423,6 +504,10 @@ export default function AdminM3ULists() {
           <p className="text-muted-foreground">Gerencie as listas de canais IPTV</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="w-4 h-4 mr-2" />
+            Exportar CSV
+          </Button>
           <Button variant="outline" onClick={() => navigate('/admin/dashboard')}>
             Voltar
           </Button>
@@ -566,6 +651,14 @@ export default function AdminM3ULists() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleShowHistory(list)}
+                          title="Ver histórico"
+                        >
+                          <History className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleOpenDialog(list)}
                           title="Editar"
                         >
@@ -702,6 +795,11 @@ export default function AdminM3ULists() {
               </div>
             </div>
 
+            <M3UTagSelector
+              selectedTags={selectedTags}
+              onChange={setSelectedTags}
+            />
+
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-sm">
@@ -736,6 +834,14 @@ export default function AdminM3ULists() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <M3UViewHistoryDialog
+        open={showHistoryDialog}
+        onOpenChange={setShowHistoryDialog}
+        listName={currentHistoryListName}
+        history={currentListHistory}
+        isLoading={isLoadingHistory}
+      />
     </div>
   );
 }

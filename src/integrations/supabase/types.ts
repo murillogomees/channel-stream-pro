@@ -576,6 +576,42 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_list_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          m3u_list_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          m3u_list_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          m3u_list_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_list_tags_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "m3u_list_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_lists: {
         Row: {
           created_at: string | null
@@ -649,6 +685,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "m3u_lists_audit_m3u_list_id_fkey"
+            columns: ["m3u_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_tags: {
+        Row: {
+          category: string
+          color: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          category: string
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          category?: string
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      m3u_view_history: {
+        Row: {
+          admin_id: string
+          admin_name: string
+          id: string
+          m3u_list_id: string
+          metadata: Json | null
+          view_type: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          admin_id: string
+          admin_name: string
+          id?: string
+          m3u_list_id: string
+          metadata?: Json | null
+          view_type?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          admin_id?: string
+          admin_name?: string
+          id?: string
+          m3u_list_id?: string
+          metadata?: Json | null
+          view_type?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_view_history_m3u_list_id_fkey"
             columns: ["m3u_list_id"]
             isOneToOne: false
             referencedRelation: "m3u_lists"
