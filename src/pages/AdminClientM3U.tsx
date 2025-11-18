@@ -118,18 +118,44 @@ export default function AdminClientM3U() {
       setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      const newAssignments = selectedLists.map(listId => ({
-        client_id: id,
-        m3u_list_id: listId,
-        assigned_by: user?.id,
-        is_active: true,
-      }));
-
-      const { error } = await supabase
+      // Buscar atribuições existentes
+      const { data: existingAssignments } = await supabase
         .from('client_m3u_lists')
-        .insert(newAssignments);
+        .select('m3u_list_id, id')
+        .eq('client_id', id);
+      
+      const existingListIds = new Set(existingAssignments?.map(a => a.m3u_list_id) || []);
+      
+      // Separar listas novas das já existentes
+      const newListIds = selectedLists.filter(listId => !existingListIds.has(listId));
+      const reactivateIds = selectedLists.filter(listId => existingListIds.has(listId));
+      
+      // Inserir novas atribuições
+      if (newListIds.length > 0) {
+        const newAssignments = newListIds.map(listId => ({
+          client_id: id,
+          m3u_list_id: listId,
+          assigned_by: user?.id,
+          is_active: true,
+        }));
 
-      if (error) throw error;
+        const { error: insertError } = await supabase
+          .from('client_m3u_lists')
+          .insert(newAssignments);
+
+        if (insertError) throw insertError;
+      }
+      
+      // Reativar atribuições existentes
+      if (reactivateIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('client_m3u_lists')
+          .update({ is_active: true })
+          .eq('client_id', id)
+          .in('m3u_list_id', reactivateIds);
+        
+        if (updateError) throw updateError;
+      }
 
       toast.success(`${selectedLists.length} lista(s) adicionada(s) com sucesso`);
       setShowAddDialog(false);

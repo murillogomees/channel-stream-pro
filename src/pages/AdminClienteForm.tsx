@@ -267,25 +267,47 @@ export default function AdminClienteForm() {
       if (selectedM3ULists.length > 0) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
-          const assignments = selectedM3ULists.map(listId => ({
-            client_id: clientId,
-            m3u_list_id: listId,
-            assigned_by: user?.id,
-            is_active: true,
-          }));
-
-          const { error: assignError } = await supabase
+          
+          // Buscar atribuições existentes
+          const { data: existingAssignments } = await supabase
             .from('client_m3u_lists')
-            .insert(assignments);
+            .select('m3u_list_id, id')
+            .eq('client_id', clientId);
+          
+          const existingListIds = new Set(existingAssignments?.map(a => a.m3u_list_id) || []);
+          
+          // Separar listas novas das já existentes
+          const newListIds = selectedM3ULists.filter(id => !existingListIds.has(id));
+          const reactivateIds = selectedM3ULists.filter(id => existingListIds.has(id));
+          
+          // Inserir novas atribuições
+          if (newListIds.length > 0) {
+            const newAssignments = newListIds.map(listId => ({
+              client_id: clientId,
+              m3u_list_id: listId,
+              assigned_by: user?.id,
+              is_active: true,
+            }));
 
-          if (assignError) {
-            console.error('Error assigning M3U lists:', assignError);
-            toast({
-              title: "Erro ao atribuir listas",
-              description: "Cliente criado, mas houve erro ao atribuir listas M3U",
-              variant: "destructive",
-            });
-          } else {
+            const { error: insertError } = await supabase
+              .from('client_m3u_lists')
+              .insert(newAssignments);
+
+            if (insertError) throw insertError;
+          }
+          
+          // Reativar atribuições existentes
+          if (reactivateIds.length > 0) {
+            const { error: updateError } = await supabase
+              .from('client_m3u_lists')
+              .update({ is_active: true })
+              .eq('client_id', clientId)
+              .in('m3u_list_id', reactivateIds);
+            
+            if (updateError) throw updateError;
+          }
+
+          if (newListIds.length > 0 || reactivateIds.length > 0) {
             toast({
               title: "Listas atribuídas",
               description: `${selectedM3ULists.length} lista(s) M3U atribuída(s) com sucesso`,
@@ -293,6 +315,11 @@ export default function AdminClienteForm() {
           }
         } catch (error) {
           console.error('Error assigning M3U lists:', error);
+          toast({
+            title: "Erro ao atribuir listas",
+            description: "Cliente criado, mas houve erro ao atribuir listas M3U",
+            variant: "destructive",
+          });
         }
       }
 
