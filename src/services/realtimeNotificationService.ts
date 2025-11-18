@@ -37,11 +37,11 @@ interface ConnectionConfig {
 }
 
 const DEFAULT_CONFIG: ConnectionConfig = {
-  maxRetries: 5,
-  retryDelayMs: 1000,
-  maxRetryDelayMs: 30000,
-  connectionTimeoutMs: 10000,
-  heartbeatIntervalMs: 30000,
+  maxRetries: 8,
+  retryDelayMs: 2000,
+  maxRetryDelayMs: 60000,
+  connectionTimeoutMs: 30000,
+  heartbeatIntervalMs: 45000,
 };
 
 class RealtimeNotificationService {
@@ -186,10 +186,10 @@ class RealtimeNotificationService {
     // Record metrics
     this.metricsService.recordConnectionFailure();
     
-    // Update health
+    // Update health - more lenient status thresholds
     const health: ServiceHealth = {
       name: 'WebSocket Realtime',
-      status: this.connectionErrorCount >= 3 ? 'down' : 'degraded',
+      status: this.connectionErrorCount >= 5 ? 'down' : 'degraded',
       latency: null,
       lastCheck: Date.now(),
       error: error instanceof Error ? error.message : 'Connection failed',
@@ -203,8 +203,8 @@ class RealtimeNotificationService {
       return;
     }
     
-    // Alert if high error rate
-    if (this.connectionErrorCount === 3) {
+    // Alert if high error rate - but only after more failures
+    if (this.connectionErrorCount === 5) {
       this.alertService.alertHighErrorRate(
         this.connectionErrorCount / this.config.maxRetries,
         'WebSocket'
