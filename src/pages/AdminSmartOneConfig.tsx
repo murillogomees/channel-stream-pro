@@ -414,20 +414,29 @@ export default function AdminSmartOneConfig() {
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate('/admin/dashboard')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">
-              Configurações SmartOne IPTV
-            </h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate('/admin/dashboard')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <Settings className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold text-foreground">
+                Configurações SmartOne IPTV
+              </h1>
+            </div>
           </div>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/admin/smartone-test')}
+          >
+            <TestTube className="h-4 w-4 mr-2" />
+            Teste de Conectividade
+          </Button>
         </div>
 
         <Alert>
