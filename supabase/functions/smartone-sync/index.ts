@@ -278,7 +278,7 @@ serve(async (req) => {
 
     const { data: m3uList, error: dbError } = await supabaseService
       .from('m3u_lists')
-      .select('file_url, plan_type, name')
+      .select('file_url, name')
       .eq('id', m3uListId)
       .single();
 
@@ -290,7 +290,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[smartone-sync] Lista M3U: ${m3uList.name} (${m3uList.plan_type})`);
+    console.log(`[smartone-sync] Lista M3U: ${m3uList.name}`);
 
     console.log('[smartone-sync] Calling SmartOne API /playlist/create');
     
