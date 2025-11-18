@@ -262,6 +262,7 @@ export default function AdminM3ULists() {
       setListUrl(list.file_url);
       setListDescription(list.description || '');
       setPriority(list.priority || 0);
+      setIsActive(list.status === 'active');
       
       // Carregar tags da lista
       const tags = await getListTags(list.id);
@@ -278,6 +279,7 @@ export default function AdminM3ULists() {
       setListUrl('');
       setListDescription('');
       setPriority(0);
+      setIsActive(true);
       setSelectedTags([]);
       setAuditLogs([]);
       setShowAuditHistory(false);
@@ -292,6 +294,7 @@ export default function AdminM3ULists() {
     setListUrl('');
     setListDescription('');
     setPriority(0);
+    setIsActive(true);
     setSelectedTags([]);
     setAuditLogs([]);
     setShowAuditHistory(false);
@@ -324,6 +327,7 @@ export default function AdminM3ULists() {
             file_url: listUrl.trim(),
             description: listDescription.trim() || null,
             priority: priority,
+            status: isActive ? 'active' : 'inactive',
           })
           .eq('id', editingList.id);
 
@@ -347,7 +351,7 @@ export default function AdminM3ULists() {
               name: listName.trim(),
               file_url: listUrl.trim(),
               description: listDescription.trim() || null,
-              status: 'active',
+              status: isActive ? 'active' : 'inactive',
               priority: priority,
             }
           ])
