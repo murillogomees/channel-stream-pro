@@ -12,7 +12,6 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle,
-  Wifi,
   ExternalLink
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -118,9 +117,12 @@ export function SmartOneRetryQueueWidget() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <RefreshCw className="h-5 w-5" />
               Fila de Retry SmartOne
+              <Badge variant="outline" className="text-xs">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-1" />
+                Ao vivo
+              </Badge>
             </CardTitle>
             <CardDescription className="flex items-center gap-2 mt-1">
-              <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
               <span className="text-xs">
                 Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}
               </span>

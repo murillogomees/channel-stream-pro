@@ -110,6 +110,10 @@ export function NotificationRetryWidget() {
           <div className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5" />
             Fila de Retry
+            <Badge variant="outline" className="text-xs ml-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-1" />
+              Ao vivo
+            </Badge>
           </div>
           <Button
             variant="ghost"
