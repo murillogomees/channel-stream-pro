@@ -1,89 +1,53 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { PlanoCliente, SituacaoCliente } from "@/types/cliente";
 
-export type M3UPlanType = 'teste' | 'basico' | 'premium';
-
-export interface M3UListWithPlan {
+export interface M3UList {
   id: string;
   name: string;
   file_url: string;
   status: string;
-  plan_type: M3UPlanType[];
   priority: number;
   is_default: boolean;
   created_at: string;
+  description?: string;
 }
 
 /**
- * Serviço para gerenciar listas M3U baseadas em planos de clientes
+ * Serviço para gerenciar listas M3U
+ * Nota: Todas as listas estão disponíveis para todos os clientes
+ * A atribuição específica é feita no cadastro do cliente
  */
 export const m3uPlanService = {
   /**
-   * Determina o tipo de plano M3U apropriado para um cliente
+   * Obtém a lista M3U padrão ou a primeira lista ativa disponível
    */
-  getPlanTypeForClient(
-    situacao: SituacaoCliente,
-    plano?: PlanoCliente
-  ): M3UPlanType {
-    // Clientes em teste ou leads recebem lista de teste
-    if (situacao === 'Testando' || situacao === 'Lead') {
-      return 'teste';
-    }
-
-    // Clientes com planos longos recebem lista premium
-    if (plano === 'Semestral' || plano === 'Anual') {
-      return 'premium';
-    }
-
-    // Demais clientes recebem lista básica
-    return 'basico';
-  },
-
-  /**
-   * Obtém a lista M3U apropriada para um cliente usando a função SQL
-   */
-  async getM3UForClient(
-    situacao: SituacaoCliente,
-    plano?: PlanoCliente
-  ): Promise<string | null> {
+  async getM3UForClient(): Promise<string | null> {
     try {
-      const { data, error } = await supabase.rpc('get_m3u_for_client_plan', {
-        cliente_plano: plano || 'Mensal',
-        cliente_situacao: situacao,
-      });
+      // Buscar lista padrão ou primeira lista ativa
+      const { data, error } = await supabase
+        .from('m3u_lists')
+        .select('file_url')
+        .eq('status', 'active')
+        .order('is_default', { ascending: false })
+        .order('priority', { ascending: false })
+        .limit(1)
+        .single();
 
-      if (error) {
-        console.error('Erro ao buscar lista M3U para cliente:', error);
+      if (error || !data) {
+        console.error('Erro ao buscar lista M3U:', error);
         return null;
       }
 
-      // Buscar URL da lista
-      if (data) {
-        const { data: listData, error: listError } = await supabase
-          .from('m3u_lists')
-          .select('file_url')
-          .eq('id', data)
-          .single();
-
-        if (listError || !listData) {
-          console.error('Erro ao buscar URL da lista M3U:', listError);
-          return null;
-        }
-
-        return listData.file_url;
-      }
-
-      return null;
+      return data.file_url;
     } catch (error) {
-      console.error('Erro ao obter lista M3U para cliente:', error);
+      console.error('Erro ao obter lista M3U:', error);
       return null;
     }
   },
 
   /**
-   * Lista todas as listas M3U com suas categorias de plano
+   * Lista todas as listas M3U ativas
    */
-  async getAllLists(): Promise<M3UListWithPlan[]> {
+  async getAllLists(): Promise<M3UList[]> {
     const { data, error } = await supabase
       .from('m3u_lists')
       .select('*')
@@ -95,48 +59,41 @@ export const m3uPlanService = {
       return [];
     }
 
-    return (data || []) as M3UListWithPlan[];
+    return (data || []) as M3UList[];
   },
 
   /**
-   * Busca listas por tipo de plano
+   * Busca listas ativas
    */
-  async getListsByPlanType(planType: M3UPlanType): Promise<M3UListWithPlan[]> {
+  async getActiveLists(): Promise<M3UList[]> {
     const { data, error } = await supabase
       .from('m3u_lists')
       .select('*')
-      .contains('plan_type', [planType])
       .eq('status', 'active')
       .order('priority', { ascending: false });
 
     if (error) {
-      console.error('Erro ao buscar listas por plano:', error);
+      console.error('Erro ao buscar listas ativas:', error);
       return [];
     }
 
-    return (data || []) as M3UListWithPlan[];
+    return (data || []) as M3UList[];
   },
 
   /**
-   * Atualiza os tipos de plano de uma lista M3U
+   * Atualiza a prioridade de uma lista M3U
    */
-  async updateListPlanType(
+  async updateListPriority(
     listId: string,
-    planTypes: M3UPlanType[],
-    priority?: number
+    priority: number
   ): Promise<boolean> {
-    const updateData: any = { plan_type: planTypes };
-    if (priority !== undefined) {
-      updateData.priority = priority;
-    }
-
     const { error } = await supabase
       .from('m3u_lists')
-      .update(updateData)
+      .update({ priority })
       .eq('id', listId);
 
     if (error) {
-      console.error('Erro ao atualizar tipos de plano da lista:', error);
+      console.error('Erro ao atualizar prioridade da lista:', error);
       return false;
     }
 
@@ -144,63 +101,50 @@ export const m3uPlanService = {
   },
 
   /**
-   * Verifica se um cliente precisa ser re-sincronizado devido a mudança de plano
+   * Define lista como padrão
    */
-  async checkClientNeedsResync(clienteId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('smartone_status')
-      .eq('id', clienteId)
-      .single();
+  async setDefaultList(listId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('m3u_lists')
+      .update({ is_default: true })
+      .eq('id', listId);
 
-    if (error || !data) {
+    if (error) {
+      console.error('Erro ao definir lista padrão:', error);
       return false;
     }
 
-    return data.smartone_status === 'pendente';
+    return true;
   },
 
   /**
-   * Estatísticas de distribuição de listas por plano
+   * Busca lista por ID
    */
-  async getPlanDistributionStats() {
-    const { data: lists, error: listsError } = await supabase
+  async getListById(listId: string): Promise<M3UList | null> {
+    const { data, error } = await supabase
       .from('m3u_lists')
-      .select('plan_type, status');
+      .select('*')
+      .eq('id', listId)
+      .single();
 
-    const { data: clients, error: clientsError } = await supabase
-      .from('clientes')
-      .select('situacao, plano');
-
-    if (listsError || clientsError || !lists || !clients) {
+    if (error) {
+      console.error('Erro ao buscar lista M3U:', error);
       return null;
     }
 
-    const listsByPlan = {
-      teste: lists.filter(l => l.plan_type?.includes('teste') && l.status === 'active').length,
-      basico: lists.filter(l => l.plan_type?.includes('basico') && l.status === 'active').length,
-      premium: lists.filter(l => l.plan_type?.includes('premium') && l.status === 'active').length,
-    };
-
-    const clientsByPlan = {
-      teste: clients.filter(c => c.situacao === 'Testando' || c.situacao === 'Lead').length,
-      basico: clients.filter(c => 
-        (c.situacao === 'Ativo' || c.situacao === 'Devendo') &&
-        (c.plano === 'Mensal' || c.plano === 'Trimestral')
-      ).length,
-      premium: clients.filter(c => 
-        (c.situacao === 'Ativo' || c.situacao === 'Devendo') &&
-        (c.plano === 'Semestral' || c.plano === 'Anual')
-      ).length,
-    };
-
-    return {
-      listsByPlan,
-      clientsByPlan,
-      total: {
-        lists: lists.filter(l => l.status === 'active').length,
-        clients: clients.length,
-      },
-    };
+    return data as M3UList;
   },
+
+  /**
+   * Valida se uma URL M3U é acessível
+   */
+  async validateM3UUrl(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao validar URL M3U:', error);
+      return false;
+    }
+  }
 };
