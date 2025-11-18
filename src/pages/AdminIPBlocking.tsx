@@ -7,13 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, Ban, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
+import { Shield, Ban, CheckCircle2, AlertTriangle, Plus, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ipBlockingService, IPBlock } from "@/services/ipBlockingService";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function AdminIPBlocking() {
+  const navigate = useNavigate();
   const [blockedIPs, setBlockedIPs] = useState<IPBlock[]>([]);
   const [stats, setStats] = useState({
     totalBlocked: 0,
@@ -123,8 +125,11 @@ export default function AdminIPBlocking() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Shield className="h-8 w-8" />
             Bloqueio de IPs

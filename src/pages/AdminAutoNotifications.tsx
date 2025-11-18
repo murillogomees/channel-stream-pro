@@ -9,12 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Bell, BellOff, Users, UserCog, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Bell, BellOff, Users, UserCog, Calendar, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { automaticNotificationRuleService } from '@/services/automaticNotificationRuleService';
 import type { AutomaticNotificationRule, CreateNotificationRuleInput } from '@/types/automaticNotification';
 import { toast } from 'sonner';
 
 export default function AdminAutoNotifications() {
+  const navigate = useNavigate();
   const [rules, setRules] = useState<AutomaticNotificationRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -154,8 +156,11 @@ export default function AdminAutoNotifications() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold">Notificações Automáticas</h1>
           <p className="text-muted-foreground">
             Gerencie todas as notificações automáticas do sistema

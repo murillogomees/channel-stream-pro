@@ -3,12 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Clock, CheckCircle2, AlertTriangle, Shield, Eye, ArrowUpCircle } from "lucide-react";
+import { AlertCircle, Clock, CheckCircle2, AlertTriangle, Shield, Eye, ArrowUpCircle, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { getSecurityAlertStatsService, type AlertTimelineItem } from "@/services/securityAlertStatsService";
 import { cn } from "@/lib/utils";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
 export default function AdminAlertTimeline() {
+  const navigate = useNavigate();
   const [hours, setHours] = useState<number>(24);
   const [timeline, setTimeline] = useState<AlertTimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,10 @@ export default function AdminAlertTimeline() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
           <h1 className="text-3xl font-bold">Timeline de Alertas</h1>
           <p className="text-muted-foreground">Acompanhamento em tempo real do fluxo de alertas</p>
