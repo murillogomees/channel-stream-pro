@@ -40,11 +40,14 @@ export default function AdminSmartOneConfig() {
   const [testM3uUrl, setTestM3uUrl] = useState('');
   const [testDescricao, setTestDescricao] = useState('');
   const [testPlaylistId, setTestPlaylistId] = useState('');
+  const [testPlaylistName, setTestPlaylistName] = useState('');
   const [isTestingPlaylist, setIsTestingPlaylist] = useState(false);
   const [testHistory, setTestHistory] = useState<SmartOneTestResult[]>([]);
   const [macError, setMacError] = useState<string>('');
   const [macHistoryList, setMacHistoryList] = useState<string[]>([]);
   const [macPopoverOpen, setMacPopoverOpen] = useState(false);
+  const [smartonePlaylists, setSmartOnePlaylists] = useState<any[]>([]);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -55,6 +58,7 @@ export default function AdminSmartOneConfig() {
     loadConfig();
     loadTestHistory();
     loadMacHistory();
+    loadSmartOnePlaylists();
   }, [authLoading, isAdmin, navigate]);
 
   const loadTestHistory = () => {
@@ -65,6 +69,35 @@ export default function AdminSmartOneConfig() {
   const loadMacHistory = () => {
     const history = getMacHistory();
     setMacHistoryList(history);
+  };
+
+  const loadSmartOnePlaylists = async () => {
+    setIsLoadingPlaylists(true);
+    try {
+      const result = await smartoneService.listPlaylists();
+      if (result.success && result.playlists) {
+        setSmartOnePlaylists(result.playlists);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar playlists do SmartOne:', error);
+    } finally {
+      setIsLoadingPlaylists(false);
+    }
+  };
+
+  const handlePlaylistSelect = (playlistName: string) => {
+    const playlist = smartonePlaylists.find(p => p.nome === playlistName);
+    if (playlist) {
+      setTestNome(playlist.nome || '');
+      setTestMac(playlist.mac || '');
+      setTestM3uUrl(playlist.m3u_url || '');
+      setTestDescricao(playlist.descricao || '');
+      setTestPlaylistName(playlist.nome || '');
+      toast({
+        title: 'Playlist carregada',
+        description: `Dados da playlist "${playlist.nome}" carregados com sucesso`,
+      });
+    }
   };
 
   const loadConfig = async () => {
@@ -255,10 +288,10 @@ export default function AdminSmartOneConfig() {
   };
 
   const handleTestUpdate = async () => {
-    if (!testPlaylistId || !testNome || !testMac || !testM3uUrl) {
+    if (!testPlaylistName || !testNome || !testMac || !testM3uUrl) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha Playlist ID, Nome, MAC e URL do M3U para atualizar.',
+        description: 'Selecione uma playlist, preencha Nome, MAC e URL do M3U para atualizar.',
         variant: 'destructive',
       });
       return;
@@ -266,7 +299,7 @@ export default function AdminSmartOneConfig() {
 
     setIsTestingPlaylist(true);
     try {
-    const result = await smartoneService.testUpdatePlaylist(testPlaylistId, {
+    const result = await smartoneService.testUpdatePlaylist(testPlaylistName, {
       nome: testNome,
       mac: testMac,
       m3uUrl: testM3uUrl,
@@ -300,10 +333,10 @@ export default function AdminSmartOneConfig() {
   };
 
   const handleTestDelete = async () => {
-    if (!testPlaylistId) {
+    if (!testPlaylistName) {
       toast({
         title: 'Campo obrigatório',
-        description: 'Preencha o Playlist ID para deletar.',
+        description: 'Selecione uma playlist para deletar.',
         variant: 'destructive',
       });
       return;
@@ -312,7 +345,7 @@ export default function AdminSmartOneConfig() {
     setIsTestingPlaylist(true);
     try {
       const result = await smartoneService.testDeletePlaylist(
-        testPlaylistId,
+        testPlaylistName,
         testNome || 'N/A',
         testMac || 'N/A'
       );
@@ -321,11 +354,16 @@ export default function AdminSmartOneConfig() {
       loadTestHistory();
 
       if (result.success) {
-        setTestPlaylistId('');
+        setTestPlaylistName('');
+        setTestNome('');
+        setTestMac('');
+        setTestM3uUrl('');
+        setTestDescricao('');
         toast({
           title: 'Playlist deletada',
           description: 'Playlist deletada com sucesso!',
         });
+        await loadSmartOnePlaylists(); // Recarregar lista
       } else {
         toast({
           title: 'Erro ao deletar playlist',
