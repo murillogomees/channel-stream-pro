@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Shield, Plus, Trash2, Edit2, Check, X, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function AdminIPWhitelist() {
+  const navigate = useNavigate();
   const [whitelistedIPs, setWhitelistedIPs] = useState<IPWhitelist[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -100,6 +102,15 @@ export default function AdminIPWhitelist() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/admin/dashboard')}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Voltar ao Dashboard
+      </Button>
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
