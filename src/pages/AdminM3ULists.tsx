@@ -508,6 +508,128 @@ export default function AdminM3ULists() {
     }
   };
 
+  const handleSelectAll = () => {
+    if (selectedLists.length === filteredLists.length) {
+      setSelectedLists([]);
+    } else {
+      setSelectedLists(filteredLists.map(l => l.id));
+    }
+  };
+
+  const handleSelectList = (listId: string) => {
+    setSelectedLists(prev => 
+      prev.includes(listId) 
+        ? prev.filter(id => id !== listId)
+        : [...prev, listId]
+    );
+  };
+
+  const handleBulkActivate = async () => {
+    if (selectedLists.length === 0) {
+      toast.error('Selecione pelo menos uma lista');
+      return;
+    }
+
+    setIsBulkOperating(true);
+    try {
+      const { error } = await supabase
+        .from('m3u_lists')
+        .update({ status: 'active' })
+        .in('id', selectedLists);
+
+      if (error) throw error;
+
+      toast.success(`${selectedLists.length} lista(s) ativada(s)`);
+      await loadLists();
+      setSelectedLists([]);
+    } catch (error: any) {
+      toast.error('Erro ao ativar listas', { description: error.message });
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (selectedLists.length === 0) {
+      toast.error('Selecione pelo menos uma lista');
+      return;
+    }
+
+    setIsBulkOperating(true);
+    try {
+      const { error } = await supabase
+        .from('m3u_lists')
+        .update({ status: 'inactive' })
+        .in('id', selectedLists);
+
+      if (error) throw error;
+
+      toast.success(`${selectedLists.length} lista(s) desativada(s)`);
+      await loadLists();
+      setSelectedLists([]);
+    } catch (error: any) {
+      toast.error('Erro ao desativar listas', { description: error.message });
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLists.length === 0) {
+      toast.error('Selecione pelo menos uma lista');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja deletar ${selectedLists.length} lista(s)? Esta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
+
+    setIsBulkOperating(true);
+    try {
+      const { error } = await supabase
+        .from('m3u_lists')
+        .delete()
+        .in('id', selectedLists);
+
+      if (error) throw error;
+
+      toast.success(`${selectedLists.length} lista(s) deletada(s)`);
+      await loadLists();
+      setSelectedLists([]);
+    } catch (error: any) {
+      toast.error('Erro ao deletar listas', { description: error.message });
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkApplyTags = async () => {
+    if (bulkSelectedTags.length === 0) {
+      toast.error('Selecione pelo menos uma tag');
+      return;
+    }
+
+    setIsBulkOperating(true);
+    try {
+      for (const listId of selectedLists) {
+        await updateListTags(listId, bulkSelectedTags);
+      }
+
+      toast.success(`Tags aplicadas a ${selectedLists.length} lista(s)`);
+      await loadLists();
+      setBulkTagsDialogOpen(false);
+      setBulkSelectedTags([]);
+      setSelectedLists([]);
+    } catch (error: any) {
+      toast.error('Erro ao aplicar tags', { description: error.message });
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+
   const handleShowHistory = async (list: M3UList) => {
     setCurrentHistoryListName(list.name);
     setIsLoadingHistory(true);

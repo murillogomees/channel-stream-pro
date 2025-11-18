@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { validateBrazilianPhone } from "@/utils/phoneValidator";
 import { getDesktopNotificationService } from "@/services/desktopNotificationService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface NotificationPhone {
   id: string;
@@ -26,38 +28,67 @@ const AdminNotificationSettings = () => {
   const [newName, setNewName] = useState("");
   const [desktopNotificationsEnabled, setDesktopNotificationsEnabled] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isLive, setIsLive] = useState(true);
   
   const desktopService = getDesktopNotificationService();
 
-  // Carregar configurações do localStorage
+  // Carregar configurações e setup realtime
   useEffect(() => {
-    const stored = localStorage.getItem('admin_notification_settings');
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        setPhones(data.phones || []);
-      } catch (error) {
-        console.error("Erro ao carregar configurações:", error);
-      }
-    }
+    loadPhones();
     
-    // Adicionar número padrão se não houver nenhum
-    if (!stored || JSON.parse(stored).phones?.length === 0) {
-      const defaultPhone: NotificationPhone = {
-        id: Date.now().toString(),
-        phone: "5561996975924",
-        name: "Administrador Principal",
-        active: true,
-        createdAt: new Date().toISOString()
-      };
-      setPhones([defaultPhone]);
-      saveToStorage([defaultPhone]);
-    }
+    // Supabase Realtime subscription
+    const channel = supabase
+      .channel('admin_phones_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_phones'
+        },
+        () => {
+          loadPhones();
+          setLastUpdate(new Date());
+        }
+      )
+      .subscribe();
 
-    // Carregar status de notificações desktop
-    setDesktopNotificationsEnabled(desktopService.isEnabled());
-    setNotificationPermission(desktopService.getPermission());
+    // Refresh periódico a cada 30 segundos
+    const interval = setInterval(() => {
+      loadPhones();
+      setLastUpdate(new Date());
+    }, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
+
+  const loadPhones = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_phones')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setPhones(data.map(p => ({
+          id: p.id,
+          phone: p.phone,
+          name: p.name,
+          active: p.active || false,
+          createdAt: p.created_at || new Date().toISOString()
+        })));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar telefones:', error);
+      toast.error('Erro ao carregar telefones de notificação');
+    }
+  };
 
   const saveToStorage = (phonesData: NotificationPhone[]) => {
     localStorage.setItem('admin_notification_settings', JSON.stringify({
