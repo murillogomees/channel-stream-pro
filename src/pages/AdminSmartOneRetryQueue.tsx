@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,8 +16,7 @@ import {
   CheckCircle, 
   XCircle,
   AlertCircle,
-  Play,
-  Wifi
+  Play
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -260,138 +259,139 @@ export default function AdminSmartOneRetryQueue() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Pendentes</CardDescription>
-            </CardHeader>
-            <CardContent>
+        {/* Stats Compactas */}
+        <div className="flex gap-3 flex-wrap">
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <Clock className="h-8 w-8 text-yellow-500" />
-                <span className="text-3xl font-bold">
-                  {queue.filter(q => q.status === 'pending').length}
-                </span>
+                <Clock className="h-4 w-4 text-orange-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Pendentes</p>
+                  <p className="text-lg font-bold">
+                    {queue.filter(i => i.status === 'pending').length}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Processando</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <RefreshCw className="h-8 w-8 text-blue-500" />
-                <span className="text-3xl font-bold">
-                  {queue.filter(q => q.status === 'retrying').length}
-                </span>
+                <RefreshCw className="h-4 w-4 text-blue-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Processando</p>
+                  <p className="text-lg font-bold">
+                    {queue.filter(i => i.status === 'retrying').length}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Sucesso</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-8 w-8 text-green-500" />
-                <span className="text-3xl font-bold">
-                  {queue.filter(q => q.status === 'succeeded').length}
-                </span>
+                <XCircle className="h-4 w-4 text-red-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Esgotados</p>
+                  <p className="text-lg font-bold text-destructive">
+                    {queue.filter(i => i.status === 'exhausted').length}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Esgotados</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="flex-1 min-w-[140px]">
+            <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <XCircle className="h-8 w-8 text-red-500" />
-                <span className="text-3xl font-bold">
-                  {queue.filter(q => q.status === 'exhausted').length}
-                </span>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Sucesso</p>
+                  <p className="text-lg font-bold text-green-600">
+                    {queue.filter(i => i.status === 'succeeded').length}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Queue Table */}
+        {/* Tabela Compacta */}
         <Card>
-          <CardHeader>
-            <CardTitle>Itens na Fila</CardTitle>
-            <CardDescription>
-              Lista completa de todos os itens na fila de retry
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {queue.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">Nenhum item na fila</p>
-              </div>
-            ) : (
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Cliente ID</TableHead>
-                    <TableHead>Tentativas</TableHead>
-                    <TableHead>Próximo Retry</TableHead>
-                    <TableHead>Último Erro</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="w-[250px]">Cliente ID</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[80px]">Tentativas</TableHead>
+                    <TableHead className="w-[150px]">Próximo Retry</TableHead>
+                    <TableHead className="text-right w-[120px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {queue.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {item.cliente_id.substring(0, 8)}...
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2" />
+                        <p className="text-muted-foreground">Carregando...</p>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {item.attempt_count}/{item.max_attempts}
-                        </Badge>
+                    </TableRow>
+                  ) : queue.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhum item na fila
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {getNextRetryTime(item)}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                        {item.last_error || '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {format(new Date(item.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {(item.status === 'pending' || item.status === 'exhausted') && (
+                    </TableRow>
+                  ) : (
+                    queue.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-xs">
+                          <div className="truncate">{item.cliente_id}</div>
+                          {item.last_error && (
+                            <div className="text-xs text-muted-foreground truncate mt-1">
+                              {item.last_error}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(item.status)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {item.attempt_count}/{item.max_attempts || 5}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {getNextRetryTime(item)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="ghost"
                               onClick={() => handleRetryNow(item.id)}
+                              disabled={item.status === 'succeeded' || item.status === 'exhausted' || processing}
                             >
                               <Play className="h-3 w-3" />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setDeleteDialog({ open: true, itemId: item.id })}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteDialog({ open: true, itemId: item.id })}
+                              disabled={processing}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            )}
+            </div>
           </CardContent>
         </Card>
 
