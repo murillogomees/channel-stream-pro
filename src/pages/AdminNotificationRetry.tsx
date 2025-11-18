@@ -1,253 +1,405 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RefreshCw, Trash2, AlertCircle, Clock, CheckCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { getRetryQueue } from "@/services/notificationRetryQueue";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, RefreshCw, Trash2, Play, Clock, AlertCircle, CheckCircle2, XCircle, Wifi } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const AdminNotificationRetry = () => {
+interface RetryQueueItem {
+  id: string;
+  type: string;
+  recipient_phone: string;
+  recipient_name: string | null;
+  message_content: string;
+  template_name: string | null;
+  client_id: string | null;
+  attempts: number;
+  max_attempts: number;
+  last_attempt_at: string | null;
+  next_retry_at: string;
+  error_message: string | null;
+  status: string;
+  created_at: string;
+}
+
+export default function AdminNotificationRetry() {
   const navigate = useNavigate();
-  const [queue, setQueue] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({ total: 0, byType: {}, highAttempts: 0 });
-  const retryQueue = getRetryQueue();
+  const [items, setItems] = useState<RetryQueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [filter, setFilter] = useState<'all' | 'pending' | 'retrying' | 'exhausted'>('all');
 
-  const loadQueue = () => {
-    const currentQueue = retryQueue.getQueue();
-    const currentStats = retryQueue.getStats();
-    setQueue(currentQueue);
-    setStats(currentStats);
+  const loadItems = async () => {
+    try {
+      let query = supabase
+        .from('notification_retry_queue')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (filter !== 'all') {
+        query = query.eq('status', filter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Erro ao carregar itens:', error);
+        toast.error('Erro ao carregar fila de retry');
+        return;
+      }
+
+      setItems(data || []);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Erro:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadQueue();
-    
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(loadQueue, 30000);
-    
-    return () => clearInterval(interval);
-  }, []);
+    loadItems();
 
-  const handleRetryNow = async (id: string) => {
+    // Realtime subscription
+    const channel = supabase
+      .channel('retry-queue-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notification_retry_queue',
+        },
+        () => {
+          loadItems();
+        }
+      )
+      .subscribe();
+
+    // Refresh periódico a cada 30 segundos
+    const interval = setInterval(loadItems, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [filter]);
+
+  const handleProcessQueue = async () => {
+    setProcessing(true);
     try {
-      toast.loading("Tentando reenviar...");
-      await retryQueue.processQueue();
-      loadQueue();
-      toast.success("Fila processada!");
-    } catch (error) {
-      toast.error("Erro ao processar fila");
+      const { data, error } = await supabase.functions.invoke('process-notification-retry-queue', {
+        method: 'POST',
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success('Fila processada com sucesso', {
+        description: data.message,
+      });
+
+      loadItems();
+    } catch (error: any) {
+      console.error('Erro ao processar fila:', error);
+      toast.error('Erro ao processar fila', {
+        description: error.message,
+      });
+    } finally {
+      setProcessing(false);
     }
   };
 
-  const handleRemove = (id: string) => {
-    retryQueue.remove(id);
-    loadQueue();
-    toast.success("Notificação removida da fila");
-  };
+  const handleRetryNow = async (itemId: string) => {
+    try {
+      // Atualizar next_retry_at para agora
+      const { error } = await supabase
+        .from('notification_retry_queue')
+        .update({
+          next_retry_at: new Date().toISOString(),
+          status: 'pending',
+        })
+        .eq('id', itemId);
 
-  const handleClearAll = () => {
-    if (confirm("Tem certeza que deseja limpar toda a fila de retry?")) {
-      retryQueue.clearQueue();
-      loadQueue();
-      toast.success("Fila limpa com sucesso");
+      if (error) throw error;
+
+      toast.success('Item marcado para retry imediato');
+      
+      // Processar a fila
+      await handleProcessQueue();
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast.error('Erro ao agendar retry');
     }
   };
 
-  const formatNextAttempt = (nextAttempt: string) => {
-    const next = new Date(nextAttempt);
-    const now = new Date();
-    const diff = next.getTime() - now.getTime();
-    
-    if (diff <= 0) {
-      return "Pronto para enviar";
+  const handleDelete = async (itemId: string) => {
+    if (!confirm('Tem certeza que deseja remover este item da fila?')) {
+      return;
     }
-    
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) {
-      return `Em ${hours}h ${minutes % 60}min`;
+
+    try {
+      const { error } = await supabase
+        .from('notification_retry_queue')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      toast.success('Item removido da fila');
+      loadItems();
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast.error('Erro ao remover item');
     }
-    return `Em ${minutes} minutos`;
   };
 
-  const getAttemptColor = (attempts: number, maxAttempts: number) => {
-    const ratio = attempts / maxAttempts;
-    if (ratio < 0.5) return "text-green-600";
-    if (ratio < 0.8) return "text-yellow-600";
-    return "text-red-600";
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline">Pendente</Badge>;
+      case 'retrying':
+        return <Badge variant="secondary">Retrying</Badge>;
+      case 'succeeded':
+        return <Badge variant="default">Sucesso</Badge>;
+      case 'exhausted':
+        return <Badge variant="destructive">Esgotado</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
   };
+
+  const activeItems = items.filter(i => i.status === 'pending' || i.status === 'retrying');
+  const succeededItems = items.filter(i => i.status === 'succeeded');
+  const exhaustedItems = items.filter(i => i.status === 'exhausted');
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/dashboard")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">Fila de Retry de Notificações</h1>
-            <p className="text-muted-foreground">
-              Gerenciamento automático de notificações falhadas
-            </p>
-          </div>
-          <Button onClick={() => retryQueue.processQueue()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Processar Agora
-          </Button>
-        </div>
-
-        {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total na Fila</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <Clock className="h-8 w-8 text-primary" />
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/admin/dashboard')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold">Fila de Retry de Notificações</h1>
+                <Wifi className="h-5 w-5 text-green-500" />
+                <Badge variant="outline">Tempo Real</Badge>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Boas-vindas</p>
-                  <p className="text-2xl font-bold">{stats.byType.prospect_welcome || 0}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Notif. Admin</p>
-                  <p className="text-2xl font-bold">{stats.byType.admin_notification || 0}</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Informação sobre o sistema */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Como Funciona o Sistema de Retry</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• As notificações são automaticamente adicionadas à fila quando falham</p>
-            <p>• O sistema tenta reenviar a cada 2 minutos com backoff exponencial</p>
-            <p>• Máximo de 5 tentativas por notificação</p>
-            <p>• Após 5 tentativas sem sucesso, a notificação é removida automaticamente</p>
-          </CardContent>
-        </Card>
-
-        {/* Lista de Notificações */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Notificações Pendentes ({queue.length})</CardTitle>
-                <CardDescription>
-                  Notificações aguardando reenvio automático
-                </CardDescription>
-              </div>
-              {queue.length > 0 && (
-                <Button variant="destructive" onClick={handleClearAll} size="sm">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Limpar Tudo
-                </Button>
-              )}
+              <p className="text-muted-foreground">
+                Gerenciamento de notificações com falha no envio
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+              </p>
             </div>
+          </div>
+          <Button
+            onClick={handleProcessQueue}
+            disabled={processing || activeItems.length === 0}
+          >
+            {processing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Processando...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Processar Fila
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Aguardando</p>
+                  <p className="text-2xl font-bold">{activeItems.length}</p>
+                </div>
+                <Clock className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Sucesso</p>
+                  <p className="text-2xl font-bold text-green-600">{succeededItems.length}</p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Esgotados</p>
+                  <p className="text-2xl font-bold text-destructive">{exhaustedItems.length}</p>
+                </div>
+                <XCircle className="h-8 w-8 text-destructive" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold">{items.length}</p>
+                </div>
+                <RefreshCw className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filtros */}
+        <div className="flex gap-2">
+          <Button
+            variant={filter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('all')}
+          >
+            Todos ({items.length})
+          </Button>
+          <Button
+            variant={filter === 'pending' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('pending')}
+          >
+            Pendentes
+          </Button>
+          <Button
+            variant={filter === 'retrying' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('retrying')}
+          >
+            Retrying
+          </Button>
+          <Button
+            variant={filter === 'exhausted' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('exhausted')}
+          >
+            Esgotados
+          </Button>
+        </div>
+
+        {/* Tabela */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Itens na Fila</CardTitle>
+            <CardDescription>
+              Lista de notificações aguardando reenvio
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {queue.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                <p className="text-lg font-medium">Nenhuma notificação na fila</p>
-                <p className="text-sm text-muted-foreground">
-                  Todas as notificações foram enviadas com sucesso!
-                </p>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : items.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum item na fila
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Destinatário</TableHead>
-                      <TableHead>Tentativas</TableHead>
-                      <TableHead>Próxima Tentativa</TableHead>
-                      <TableHead>Último Erro</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {queue.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <Badge variant={item.type === 'prospect_welcome' ? 'default' : 'secondary'}>
-                            {item.type === 'prospect_welcome' ? 'Boas-vindas' : 'Admin'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{item.recipient.name || 'Sem nome'}</p>
-                            <p className="text-sm text-muted-foreground font-mono">
-                              {item.recipient.phone}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={getAttemptColor(item.attempts, item.maxAttempts)}>
-                            {item.attempts}/{item.maxAttempts}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">
-                              {formatNextAttempt(item.nextAttempt)}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Destinatário</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Tentativas</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Próximo Retry</TableHead>
+                    <TableHead>Erro</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{item.recipient_name || 'Sem nome'}</p>
+                          <p className="text-sm text-muted-foreground">{item.recipient_phone}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.type}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.attempts >= item.max_attempts ? 'destructive' : 'secondary'}>
+                          {item.attempts}/{item.max_attempts}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(item.status)}</TableCell>
+                      <TableCell>
+                        <p className="text-sm">
+                          {format(new Date(item.next_retry_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        {item.error_message && (
+                          <div className="flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4 text-destructive" />
+                            <span className="text-sm text-destructive truncate max-w-[200px]" title={item.error_message}>
+                              {item.error_message}
                             </span>
                           </div>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate text-sm">
-                          {item.error || 'Nenhum erro registrado'}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {(item.status === 'pending' || item.status === 'retrying') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRetryNow(item.id)}
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Retry Agora
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemove(item.id)}
-                            title="Remover da fila"
+                            size="sm"
+                            onClick={() => handleDelete(item.id)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
       </div>
     </div>
   );
-};
-
-export default AdminNotificationRetry;
+}

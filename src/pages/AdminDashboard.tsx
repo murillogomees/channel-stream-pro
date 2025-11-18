@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
 import { SmartOneRetryQueueWidget } from "@/components/admin/SmartOneRetryQueueWidget";
+import { NotificationRetryWidget } from '@/components/admin/NotificationRetryWidget';
+import { NotificationStatsWidget } from '@/components/admin/NotificationStatsWidget';
 
 interface QuickStatProps {
   icon: React.ReactNode;
@@ -196,6 +198,12 @@ const AdminDashboard = () => {
             
             {/* SmartOne Retry Queue Widget */}
             <SmartOneRetryQueueWidget />
+            
+            {/* Notification Retry Widget */}
+            <NotificationRetryWidget />
+            
+            {/* Notification Stats Widget */}
+            <NotificationStatsWidget />
           </div>
 
           <div className="lg:col-span-1">

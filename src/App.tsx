@@ -128,6 +128,7 @@ const App = () => (
           <Route path="/admin/custom-status-badges" element={<ProtectedRoute requireAdmin><AdminCustomStatusBadges /></ProtectedRoute>} />
           <Route path="/admin/status-history" element={<ProtectedRoute requireAdmin><AdminStatusHistory /></ProtectedRoute>} />
           <Route path="/admin/smartone-retry-queue" element={<ProtectedRoute requireAdmin><AdminSmartOneRetryQueue /></ProtectedRoute>} />
+          <Route path="/admin/notification-retry" element={<ProtectedRoute requireAdmin><AdminNotificationRetry /></ProtectedRoute>} />
           <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />

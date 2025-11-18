@@ -1000,6 +1000,74 @@ export type Database = {
           },
         ]
       }
+      notification_retry_queue: {
+        Row: {
+          attempts: number
+          client_id: string | null
+          created_at: string | null
+          error_details: Json | null
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number
+          message_content: string
+          metadata: Json | null
+          next_retry_at: string
+          recipient_name: string | null
+          recipient_phone: string
+          status: string
+          template_name: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          client_id?: string | null
+          created_at?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          message_content: string
+          metadata?: Json | null
+          next_retry_at: string
+          recipient_name?: string | null
+          recipient_phone: string
+          status?: string
+          template_name?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          client_id?: string | null
+          created_at?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          message_content?: string
+          metadata?: Json | null
+          next_retry_at?: string
+          recipient_name?: string | null
+          recipient_phone?: string
+          status?: string
+          template_name?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_retry_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_templates: {
         Row: {
           active: boolean | null
@@ -1794,6 +1862,7 @@ export type Database = {
         Args: { cliente_plano: string; cliente_situacao: string }
         Returns: string
       }
+      get_notification_retry_stats: { Args: never; Returns: Json }
       get_security_analytics: {
         Args: { _days?: number }
         Returns: {
