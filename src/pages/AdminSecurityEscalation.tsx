@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Clock, Users, Save, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Clock, Users, Save, Plus, Trash2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ const SEVERITY_LEVELS = [
 ];
 
 export default function AdminSecurityEscalation() {
+  const navigate = useNavigate();
   const [rules, setRules] = useState<EscalationRule[]>([]);
   const [admins, setAdmins] = useState<AdminPhone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,10 +217,15 @@ export default function AdminSecurityEscalation() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Regras de Escalonamento</h1>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <AlertTriangle className="h-8 w-8 text-primary" />
+            Regras de Escalonamento
+          </h1>
         </div>
         <Button onClick={() => setShowNewRule(true)}>
           <Plus className="h-4 w-4 mr-2" />

@@ -12,10 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trophy, Calendar, TrendingUp, Award, Crown, Medal } from "lucide-react";
+import { Trophy, Calendar, TrendingUp, Award, Crown, Medal, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { getLeaderboardService, type LeaderboardEntry, type MonthlyWinner } from "@/services/leaderboardService";
 
 export default function AdminLeaderboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [currentLeaderboard, setCurrentLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [monthlyWinners, setMonthlyWinners] = useState<MonthlyWinner[]>([]);
@@ -77,14 +79,19 @@ export default function AdminLeaderboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Trophy className="h-8 w-8 text-primary" />
             Leaderboard
           </h1>
           <p className="text-muted-foreground">Rankings e conquistas mensais dos admins</p>
         </div>
+      </div>
+      <div className="flex justify-end items-center">
         <Button onClick={loadData} variant="outline">
           <TrendingUp className="h-4 w-4 mr-2" />
           Atualizar

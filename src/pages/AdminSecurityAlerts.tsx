@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Bell, Phone, Save, Plus, Trash2, FileText } from "lucide-react";
+import { Bell, Phone, Save, Plus, Trash2, FileText, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ interface AlertConfig {
 }
 
 export default function AdminSecurityAlerts() {
+  const navigate = useNavigate();
   const [admins, setAdmins] = useState<AdminPhone[]>([]);
   const [configs, setConfigs] = useState<AlertConfig[]>([]);
   const [templates, setTemplates] = useState<SecurityAlertTemplate[]>([]);
@@ -273,9 +275,16 @@ export default function AdminSecurityAlerts() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <Bell className="h-8 w-8" />
-        <h1 className="text-3xl font-bold">Alertas de Segurança por WhatsApp</h1>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Bell className="h-8 w-8 text-primary" />
+            Alertas de Segurança por WhatsApp
+          </h1>
+        </div>
       </div>
 
       <Tabs defaultValue="admins" className="w-full">

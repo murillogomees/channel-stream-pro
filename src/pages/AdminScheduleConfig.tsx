@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Clock, User, Save, Plus, Trash2 } from "lucide-react";
+import { Clock, User, Save, Plus, Trash2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AdminPhone {
@@ -44,6 +45,7 @@ const CHANNELS = [
 ];
 
 export default function AdminScheduleConfig() {
+  const navigate = useNavigate();
   const [admins, setAdmins] = useState<AdminPhone[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<AdminPhone | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,10 +156,15 @@ export default function AdminScheduleConfig() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Clock className="h-8 w-8 text-primary" />
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
-          <h1 className="text-3xl font-bold">Sistema de Plantão</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Clock className="h-8 w-8 text-primary" />
+            Sistema de Plantão
+          </h1>
           <p className="text-muted-foreground">
             Configure horários e canais de notificação para cada administrador
           </p>

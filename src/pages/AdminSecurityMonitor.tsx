@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Shield, AlertTriangle, Activity, Lock, Eye, CheckCircle2, XCircle } from "lucide-react";
+import { Shield, AlertTriangle, Activity, Lock, Eye, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useSecurityEvents } from "@/hooks/useSecurityEvents";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function AdminSecurityMonitor() {
+  const navigate = useNavigate();
   const { events, loading, stats, refetch, resolveEvent } = useSecurityEvents(true);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
@@ -54,8 +56,11 @@ export default function AdminSecurityMonitor() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Shield className="h-8 w-8" />
             Monitor de Segurança
@@ -64,6 +69,8 @@ export default function AdminSecurityMonitor() {
             Acompanhe eventos de segurança em tempo real
           </p>
         </div>
+      </div>
+      <div className="flex justify-end">
         <Button onClick={refetch}>
           Atualizar
         </Button>
