@@ -107,6 +107,10 @@ export default function AdminM3ULists() {
   const [tagFilterLogic, setTagFilterLogic] = useState<'AND' | 'OR'>('OR');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [selectedLists, setSelectedLists] = useState<string[]>([]);
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
+  const [bulkTagsDialogOpen, setBulkTagsDialogOpen] = useState(false);
+  const [bulkSelectedTags, setBulkSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -622,6 +626,14 @@ export default function AdminM3ULists() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedLists.length === filteredLists.length && filteredLists.length > 0}
+                    onChange={handleSelectAll}
+                    className="cursor-pointer"
+                  />
+                </TableHead>
                 <TableHead>Favorito</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead className="max-w-xs">Descrição</TableHead>
@@ -635,7 +647,7 @@ export default function AdminM3ULists() {
             <TableBody>
               {filteredLists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     {searchQuery 
                       ? 'Nenhuma lista encontrada com esses critérios' 
                       : 'Nenhuma lista M3U cadastrada. Clique em "Nova Lista" para adicionar.'}
@@ -644,6 +656,14 @@ export default function AdminM3ULists() {
               ) : (
                 filteredLists.map((list) => (
                   <TableRow key={list.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedLists.includes(list.id)}
+                        onChange={() => handleSelectList(list.id)}
+                        className="cursor-pointer"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
