@@ -46,6 +46,7 @@ import { useM3UViewHistory } from '@/hooks/useM3UViewHistory';
 import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
 import { M3UTagSelector } from '@/components/admin/M3UTagSelector';
 import { M3UViewHistoryDialog } from '@/components/admin/M3UViewHistoryDialog';
+import { AdminComparison } from '@/components/admin/AdminComparison';
 import { M3UListFilters } from '@/components/admin/M3UListFilters';
 import { exportToCSV, M3UListExport } from '@/utils/m3uExport';
 

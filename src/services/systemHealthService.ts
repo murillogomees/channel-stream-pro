@@ -106,8 +106,11 @@ class SystemHealthService {
     const startTime = Date.now();
     
     try {
-      // Simple connectivity test using rpc or simple query
-      const { error } = await supabase.rpc('get_current_timestamp' as any).limit(1);
+      // Test database connectivity with a real query
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id')
+        .limit(1);
       
       const latency = Date.now() - startTime;
       
@@ -187,37 +190,56 @@ class SystemHealthService {
   }
 
   private async checkSmartOne(): Promise<void> {
-    // Check SmartOne configuration from settings
+    const startTime = Date.now();
+    
     try {
-      const settingsData = localStorage.getItem('app_settings');
+      // Test SmartOne API connectivity
+      const baseUrl = import.meta.env.VITE_SMARTONE_API_BASE_URL || 'https://api.smartone.tv';
+      const apiKey = import.meta.env.VITE_SMARTONE_KEY_API;
       
-      if (!settingsData) {
+      if (!apiKey) {
         this.healthStatus.services.smartone = {
           name: 'SmartOne IPTV',
           status: 'unknown',
           latency: null,
           lastCheck: Date.now(),
-          error: 'Configuração não encontrada',
+          error: 'API Key não configurada',
         };
         return;
       }
 
-      const settings = JSON.parse(settingsData);
-      const smartoneEnabled = settings?.smartone?.enabled || false;
-      
-      this.healthStatus.services.smartone = {
-        name: 'SmartOne IPTV',
-        status: smartoneEnabled ? 'operational' : 'unknown',
-        latency: null,
-        lastCheck: Date.now(),
-      };
+      const response = await fetch(`${baseUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+
+      const latency = Date.now() - startTime;
+
+      if (!response.ok) {
+        this.healthStatus.services.smartone = {
+          name: 'SmartOne IPTV',
+          status: 'down',
+          latency,
+          lastCheck: Date.now(),
+          error: `HTTP ${response.status}`,
+        };
+      } else {
+        this.healthStatus.services.smartone = {
+          name: 'SmartOne IPTV',
+          status: latency > 3000 ? 'degraded' : 'operational',
+          latency,
+          lastCheck: Date.now(),
+        };
+      }
     } catch (error) {
       this.healthStatus.services.smartone = {
         name: 'SmartOne IPTV',
-        status: 'unknown',
+        status: 'down',
         latency: null,
         lastCheck: Date.now(),
-        error: 'Erro ao verificar configuração',
+        error: error instanceof Error ? error.message : 'Erro de conexão',
       };
     }
   }

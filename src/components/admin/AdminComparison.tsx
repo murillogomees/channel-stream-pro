@@ -1,130 +1,162 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { AdminBadges } from "./AdminBadges";
-import type { AdminPerformanceStats } from "@/services/securityAlertStatsService";
-import type { AdminAchievements } from "@/types/badge";
-import { Trophy, Clock, CheckCircle2, Target, TrendingUp } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GitCompare } from 'lucide-react';
 
-interface AdminComparisonProps {
-  admins: {
-    stats: AdminPerformanceStats;
-    achievements: AdminAchievements;
-  }[];
+interface M3UList {
+  id: string;
+  name: string;
+  description: string | null;
+  file_url: string;
+  status: string;
+  priority: number;
+  tags?: Array<{ id: string; name: string; color: string | null }>;
 }
 
-export function AdminComparison({ admins }: AdminComparisonProps) {
-  const formatTime = (minutes: number | null) => {
-    if (!minutes) return 'N/A';
-    if (minutes < 1) return `${Math.round(minutes * 60)}s`;
-    if (minutes < 60) return `${Math.round(minutes)}min`;
-    return `${Math.round(minutes / 60)}h ${Math.round(minutes % 60)}min`;
+interface AdminComparisonProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  list1: M3UList | null;
+  list2: M3UList | null;
+}
+
+export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminComparisonProps) {
+  if (!list1 || !list2) return null;
+
+  const differences = {
+    name: list1.name !== list2.name,
+    description: list1.description !== list2.description,
+    fileUrl: list1.file_url !== list2.file_url,
+    status: list1.status !== list2.status,
+    priority: list1.priority !== list2.priority,
+    tags: JSON.stringify(list1.tags) !== JSON.stringify(list2.tags),
   };
 
-  const getComparisonColor = (value: number, max: number, inverse: boolean = false) => {
-    const percentage = (value / max) * 100;
-    if (inverse) {
-      if (percentage <= 33) return 'text-success';
-      if (percentage <= 66) return 'text-warning';
-      return 'text-destructive';
-    }
-    if (percentage >= 66) return 'text-success';
-    if (percentage >= 33) return 'text-warning';
-    return 'text-destructive';
-  };
-
-  if (admins.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          Selecione admins para comparar
-        </CardContent>
-      </Card>
-    );
-  }
+  const hasDifferences = Object.values(differences).some(d => d);
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {admins.map(({ stats, achievements }, index) => (
-        <Card key={stats.admin_id} className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16" />
-          
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">{stats.admin_name}</CardTitle>
-              <Badge variant="outline" className="text-lg">
-                #{index + 1}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{stats.admin_phone}</p>
-          </CardHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <GitCompare className="h-5 w-5" />
+            Comparação de Listas M3U
+          </DialogTitle>
+          <DialogDescription>
+            Comparando diferenças entre as duas listas selecionadas
+          </DialogDescription>
+        </DialogHeader>
 
-          <CardContent className="space-y-6">
-            {/* Score e Level */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-primary" />
-                  Score Total
-                </span>
-                <span className="text-2xl font-bold">{achievements.score}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Level {achievements.level}</span>
-                <span className="text-muted-foreground">{achievements.rank}</span>
-              </div>
-              <Progress value={achievements.nextLevelProgress} className="h-2" />
-            </div>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Resumo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {hasDifferences ? (
+                <p className="text-sm text-muted-foreground">
+                  Foram encontradas <span className="font-bold text-foreground">{Object.values(differences).filter(Boolean).length}</span> diferenças entre as listas.
+                </p>
+              ) : (
+                <p className="text-sm text-green-600 dark:text-green-500">
+                  As listas são idênticas em todos os aspectos comparados.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* Métricas */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm flex items-center gap-2">
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                  Total de Alertas
-                </span>
-                <span className="font-medium">{stats.total_alerts}</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                  Taxa de Confirmação
-                </span>
-                <Badge
-                  variant={stats.confirmation_rate >= 85 ? "default" : "secondary"}
-                  className={getComparisonColor(stats.confirmation_rate, 100)}
-                >
-                  {stats.confirmation_rate}%
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  Tempo Médio
-                </span>
-                <span className="font-medium">
-                  {formatTime(stats.avg_response_time_minutes)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  Ações Tomadas
-                </span>
-                <span className="font-medium">{stats.alerts_with_action}</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
+              <div className="font-semibold text-sm text-muted-foreground">Campo</div>
+              <div className="space-y-3">
+                <div className="py-2">Nome</div>
+                <div className="py-2">Descrição</div>
+                <div className="py-2">URL</div>
+                <div className="py-2">Status</div>
+                <div className="py-2">Prioridade</div>
+                <div className="py-2">Tags</div>
               </div>
             </div>
 
-            {/* Badges */}
-            <div className="pt-4 border-t">
-              <AdminBadges achievements={achievements} compact />
+            <div className="space-y-4">
+              <div className="font-semibold text-sm">{list1.name}</div>
+              <div className="space-y-3">
+                <div className={`py-2 ${differences.name ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list1.name}
+                </div>
+                <div className={`py-2 ${differences.description ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list1.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+                </div>
+                <div className={`py-2 text-xs break-all ${differences.fileUrl ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list1.file_url}
+                </div>
+                <div className={`py-2 ${differences.status ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  <Badge variant={list1.status === 'active' ? 'default' : 'secondary'}>
+                    {list1.status === 'active' ? 'Ativa' : 'Inativa'}
+                  </Badge>
+                </div>
+                <div className={`py-2 ${differences.priority ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list1.priority}
+                </div>
+                <div className={`py-2 ${differences.tags ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  <div className="flex flex-wrap gap-1">
+                    {list1.tags && list1.tags.length > 0 ? (
+                      list1.tags.map(tag => (
+                        <Badge key={tag.id} variant="outline" className="text-xs">
+                          {tag.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground italic text-sm">Sem tags</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+
+            <div className="space-y-4">
+              <div className="font-semibold text-sm">{list2.name}</div>
+              <div className="space-y-3">
+                <div className={`py-2 ${differences.name ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list2.name}
+                </div>
+                <div className={`py-2 ${differences.description ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list2.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+                </div>
+                <div className={`py-2 text-xs break-all ${differences.fileUrl ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list2.file_url}
+                </div>
+                <div className={`py-2 ${differences.status ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  <Badge variant={list2.status === 'active' ? 'default' : 'secondary'}>
+                    {list2.status === 'active' ? 'Ativa' : 'Inativa'}
+                  </Badge>
+                </div>
+                <div className={`py-2 ${differences.priority ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list2.priority}
+                </div>
+                <div className={`py-2 ${differences.tags ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  <div className="flex flex-wrap gap-1">
+                    {list2.tags && list2.tags.length > 0 ? (
+                      list2.tags.map(tag => (
+                        <Badge key={tag.id} variant="outline" className="text-xs">
+                          {tag.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground italic text-sm">Sem tags</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-4 h-4 bg-yellow-500/10 rounded"></div>
+            <span>Campos com diferenças</span>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
