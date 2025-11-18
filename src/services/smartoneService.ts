@@ -109,6 +109,37 @@ export const clearMacHistory = (): void => {
   localStorage.removeItem(MAC_HISTORY_KEY);
 };
 
+// Retry com backoff exponencial
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Se for a última tentativa, lança o erro
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+      
+      // Calcula delay com backoff exponencial: 1s, 2s, 4s, etc.
+      const delay = baseDelay * Math.pow(2, attempt);
+      console.log(`[SmartOne Retry] Tentativa ${attempt + 1}/${maxRetries} falhou. Tentando novamente em ${delay}ms...`);
+      
+      // Aguarda antes da próxima tentativa
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
 class SmartoneService {
   private config: SmartOneConfig | null = null;
 
@@ -180,46 +211,38 @@ class SmartoneService {
     });
 
     try {
-      // Chamar edge function que fará a integração
-      const { data, error } = await supabase.functions.invoke('smartone-sync', {
-        body: {
-          mac: cliente.macSmartOne,
-          usuario: cliente.usuario,
-          senha: cliente.senha,
-          clienteNome: cliente.nome,
-        },
-      });
-
-      if (error) {
-        console.error('Erro ao sincronizar com SmartOne:', error);
-        
-        updateClienteFn(cliente.id, {
-          smartone_status: 'erro',
-          smartone_raw_response: JSON.stringify({ error: error.message }),
-          smartone_last_sync_at: new Date().toISOString(),
+      // Chamar edge function com retry automático
+      const result = await retryWithBackoff(async () => {
+        const { data, error } = await supabase.functions.invoke('smartone-sync', {
+          body: {
+            mac: cliente.macSmartOne,
+            usuario: cliente.usuario,
+            senha: cliente.senha,
+            clienteNome: cliente.nome,
+          },
         });
 
-        return {
-          success: false,
-          status: 'erro',
-          rawResponse: error,
-          error: error.message,
-        };
-      }
+        if (error) {
+          console.error('[SmartOne] Erro na tentativa de sincronização:', error);
+          throw error;
+        }
+
+        return data;
+      }, 3, 1000); // 3 tentativas com delay inicial de 1s
 
       // Sucesso
       updateClienteFn(cliente.id, {
         smartone_status: 'criado',
-        smartone_playlist_id: data.playlistId || data.id || 'N/A',
-        smartone_raw_response: JSON.stringify(data),
+        smartone_playlist_id: result.playlistId || result.id || 'N/A',
+        smartone_raw_response: JSON.stringify(result),
         smartone_last_sync_at: new Date().toISOString(),
       });
 
       return {
         success: true,
         status: 'criado',
-        playlistId: data.playlistId || data.id,
-        rawResponse: data,
+        playlistId: result.playlistId || result.id,
+        rawResponse: result,
       };
     } catch (error: any) {
       console.error('Erro ao sincronizar com SmartOne:', error);
