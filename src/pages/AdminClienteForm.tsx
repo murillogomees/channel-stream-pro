@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClientes } from '@/hooks/useClientes';
+import { useClientesDb } from '@/hooks/useClientesDb';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler } from '@/services/notifications';

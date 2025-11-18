@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, DollarSign, AlertTriangle, Download, ArrowUpRight, ArrowDownRight, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useClientes } from "@/hooks/useClientes";
+import { useClientesDb } from '@/hooks/useClientesDb';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LineChart, AreaChart, Area } from "recharts";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ const INVESTMENT_STORAGE_KEY = 'marketing_investments';
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
-  const { clientes } = useClientes();
+  const { clientes } = useClientesDb();
   
   // Estado para filtro de período
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
