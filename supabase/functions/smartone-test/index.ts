@@ -1,308 +1,156 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Validação de MAC Address
-const macAddressRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/;
-
-function validateMacAddress(mac: string): { valid: boolean; error?: string } {
-  if (!mac || typeof mac !== 'string') {
-    return { valid: false, error: 'MAC Address é obrigatório' };
-  }
-
-  const trimmedMac = mac.trim();
-  if (!macAddressRegex.test(trimmedMac)) {
-    return { 
-      valid: false, 
-      error: 'MAC Address inválido. Use o formato: 00:1A:2B:3C:4D:5E, 00-1A-2B-3C-4D-5E ou 001A2B3C4D5E' 
-    };
-  }
-
-  return { valid: true };
-}
-
-function normalizeMacAddress(mac: string): string {
-  let normalized = mac.trim().toUpperCase();
-  
-  // Se não tem separadores, adiciona :
-  if (normalized.length === 12 && !normalized.includes(':') && !normalized.includes('-')) {
-    normalized = normalized.match(/.{1,2}/g)?.join(':') || normalized;
-  }
-  
-  // Converte - para :
-  normalized = normalized.replace(/-/g, ':');
-  
-  return normalized;
-}
-
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    // Criar cliente Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const startTime = Date.now();
 
-    // Verificar autenticação
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+  try {
+    // Extract and validate token
+    const rawAuth = req.headers.get('Authorization') || req.headers.get('authorization');
+    const token = rawAuth?.replace(/^Bearer\s+/i, '').trim();
+
+    if (!token) {
       return new Response(
-        JSON.stringify({ error: 'Autorização necessária' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Token de autenticação não fornecido',
+          auth_valid: false,
+          latency_ms: Date.now() - startTime
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Obter configurações do SmartOne do ambiente
-    const smartoneBaseUrl = Deno.env.get('SMARTONE_API_BASE_URL');
-    const smartoneClientApi = Deno.env.get('SMARTONE_CLIENT_API');
-    const smartoneKeyApi = Deno.env.get('SMARTONE_KEY_API');
+    // Create Supabase clients
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    if (!smartoneBaseUrl || !smartoneClientApi || !smartoneKeyApi) {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+
+    // Validate user authentication
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Configurações SmartOne não encontradas' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Token inválido ou expirado',
+          auth_valid: false,
+          details: userError?.message,
+          latency_ms: Date.now() - startTime
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check admin role
+    const { data: isAdmin, error: roleError } = await supabaseService
+      .rpc('is_admin', { uid: user.id });
+
+    if (roleError || !isAdmin) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Acesso negado: permissões de administrador necessárias',
+          auth_valid: true,
+          is_admin: false,
+          latency_ms: Date.now() - startTime
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check SmartOne API configuration
+    const smartoneApiUrl = Deno.env.get('SMARTONE_API_BASE_URL');
+    const smartoneKeyApi = Deno.env.get('SMARTONE_KEY_API');
+    
+    if (!smartoneApiUrl || !smartoneKeyApi) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Configuração do SmartOne incompleta',
+          auth_valid: true,
+          is_admin: true,
+          smartone_configured: false,
+          missing_config: {
+            api_url: !smartoneApiUrl,
+            api_key: !smartoneKeyApi
+          },
+          latency_ms: Date.now() - startTime
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse request body
-    const { action, playlist, playlistId } = await req.json();
+    // Test SmartOne API connectivity (simple HEAD request)
+    const smartoneTestStart = Date.now();
+    let smartoneStatus = 'unknown';
+    let smartoneLatency = 0;
+    let smartoneError = null;
 
-    if (!action) {
-      return new Response(
-        JSON.stringify({ error: 'Action is required (create, update, delete)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Para create e update, validar e normalizar MAC Address
-    if ((action === 'create' || action === 'update') && playlist) {
-      const macValidation = validateMacAddress(playlist.mac);
-      if (!macValidation.valid) {
-        return new Response(
-          JSON.stringify({ error: macValidation.error }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // Normalizar MAC antes de enviar
-      playlist.mac = normalizeMacAddress(playlist.mac);
-      
-      // Validar URL do M3U
-      if (!playlist.m3u_url) {
-        return new Response(
-          JSON.stringify({ error: 'URL do M3U é obrigatória' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Create playlist (xtream_playlist type)
-    if (action === 'create') {
-      console.log('Creating xtream playlist:', playlist);
-
-      const smartoneResponse = await fetch(
-        `${smartoneBaseUrl}/plugin/smart_one/client_main/add_playlist/#xtream_playlist`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'client_api': smartoneClientApi,
-            'key_api': smartoneKeyApi,
-          },
-          body: JSON.stringify({
-            nome: playlist.nome,
-            mac: playlist.mac,
-            m3u_url: playlist.m3u_url,
-            descricao: playlist.descricao || '',
-          }),
-        }
-      );
-
-      // Verificar Content-Type antes de fazer parse
-      const contentType = smartoneResponse.headers.get('content-type');
-      console.log('Response status:', smartoneResponse.status, 'Content-Type:', contentType);
-      
-      if (!smartoneResponse.ok) {
-        // Se não for JSON, pegar o texto da resposta
-        const responseText = contentType?.includes('application/json') 
-          ? JSON.stringify(await smartoneResponse.json())
-          : await smartoneResponse.text();
-        
-        console.error('SmartOne API error:', {
-          status: smartoneResponse.status,
-          statusText: smartoneResponse.statusText,
-          contentType,
-          response: responseText.substring(0, 500), // Primeiros 500 caracteres
-        });
-        
-        return new Response(
-          JSON.stringify({ 
-            error: `Erro ${smartoneResponse.status}: ${smartoneResponse.statusText}`,
-            details: `A API retornou: ${contentType}. Verifique se a URL base e credenciais estão corretas.`,
-            response: responseText.substring(0, 200),
-          }),
-          { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Se sucesso, fazer parse do JSON
-      let responseData;
-      try {
-        responseData = contentType?.includes('application/json') 
-          ? await smartoneResponse.json()
-          : { message: await smartoneResponse.text() };
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Erro ao processar resposta da API',
-            details: 'A API não retornou um JSON válido',
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          playlistId: responseData.id || responseData.playlist_id,
-          m3uUrl: responseData.m3u_url,
-          message: 'Playlist criada com sucesso',
-          data: responseData,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Update playlist (xtream_playlist type)
-    if (action === 'update') {
-      console.log('Updating xtream playlist:', playlistId, playlist);
-
-      const smartoneResponse = await fetch(
-        `${smartoneBaseUrl}/plugin/smart_one/client_main/update_playlist/${playlistId}/#xtream_playlist`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'client_api': smartoneClientApi,
-            'key_api': smartoneKeyApi,
-          },
-          body: JSON.stringify({
-            nome: playlist.nome,
-            mac: playlist.mac,
-            m3u_url: playlist.m3u_url,
-            descricao: playlist.descricao || '',
-          }),
-        }
-      );
-
-      // Verificar Content-Type antes de fazer parse
-      const contentType = smartoneResponse.headers.get('content-type');
-      console.log('Update response status:', smartoneResponse.status, 'Content-Type:', contentType);
-      
-      if (!smartoneResponse.ok) {
-        const responseText = contentType?.includes('application/json') 
-          ? JSON.stringify(await smartoneResponse.json())
-          : await smartoneResponse.text();
-        
-        console.error('SmartOne API error:', {
-          status: smartoneResponse.status,
-          statusText: smartoneResponse.statusText,
-          response: responseText.substring(0, 500),
-        });
-        
-        return new Response(
-          JSON.stringify({ 
-            error: `Erro ${smartoneResponse.status}: ${smartoneResponse.statusText}`,
-            details: `A API retornou: ${contentType}. Verifique se o playlist ID é válido.`,
-            response: responseText.substring(0, 200),
-          }),
-          { status: smartoneResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      let responseData;
-      try {
-        responseData = contentType?.includes('application/json') 
-          ? await smartoneResponse.json()
-          : { message: await smartoneResponse.text() };
-      } catch (parseError) {
-        console.error('Error parsing update response:', parseError);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Erro ao processar resposta da API',
-            details: 'A API não retornou um JSON válido',
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          playlistId,
-          m3uUrl: responseData.m3u_url,
-          message: 'Playlist atualizada com sucesso',
-          data: responseData,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Deletar playlist
-    if (action === 'delete') {
-      const smartoneUrl = `${smartoneBaseUrl}/plugin/smart_one/client_main/delete_playlist/${playlistId}/`;
-      
-      console.log('Deleting playlist at:', smartoneUrl);
-
-      const response = await fetch(smartoneUrl, {
-        method: 'DELETE',
+    try {
+      const testResponse = await fetch(smartoneApiUrl, {
+        method: 'HEAD',
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_api: smartoneClientApi,
-          key_api: smartoneKeyApi,
-        }),
+          'Authorization': `Bearer ${smartoneKeyApi}`
+        }
       });
-
-      if (!response.ok) {
-        const responseData = await response.json();
-        console.error('SmartOne API error:', responseData);
-        return new Response(
-          JSON.stringify({ 
-            error: responseData.message || 'Erro ao deletar playlist no SmartOne',
-            details: responseData,
-          }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      
+      smartoneLatency = Date.now() - smartoneTestStart;
+      smartoneStatus = testResponse.ok ? 'online' : 'error';
+      
+      if (!testResponse.ok) {
+        smartoneError = `HTTP ${testResponse.status}`;
       }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Playlist deletada com sucesso',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    } catch (error) {
+      smartoneLatency = Date.now() - smartoneTestStart;
+      smartoneStatus = 'offline';
+      smartoneError = error.message;
     }
 
+    // Return success with all diagnostic info
     return new Response(
-      JSON.stringify({ error: 'Ação inválida' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: true,
+        message: 'Healthcheck completo',
+        auth_valid: true,
+        is_admin: true,
+        smartone_configured: true,
+        smartone_status: smartoneStatus,
+        smartone_latency_ms: smartoneLatency,
+        smartone_error: smartoneError,
+        user_id: user.id,
+        user_email: user.email,
+        total_latency_ms: Date.now() - startTime
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in smartone-test function:', error);
+    console.error('[smartone-test] Unexpected error:', error);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: 'Erro interno do servidor',
+        details: error.message,
+        latency_ms: Date.now() - startTime
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
