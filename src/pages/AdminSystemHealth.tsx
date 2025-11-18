@@ -10,6 +10,7 @@ import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Cartesia
 import { getSystemHealthService, SystemHealthStatus } from '@/services/systemHealthService';
 import { getWebSocketMetricsService, WebSocketMetrics, MetricsSnapshot } from '@/services/websocketMetricsService';
 import { getAdminAlertService, AdminAlert } from '@/services/adminAlertService';
+import { StatusBadge } from '@/components/admin/StatusBadge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -55,14 +56,6 @@ const AdminSystemHealth = () => {
     a.click();
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'operational': case 'healthy': return 'text-green-500';
-      case 'degraded': return 'text-yellow-500';
-      case 'down': case 'critical': return 'text-red-500';
-      default: return 'text-gray-500';
-    }
-  };
 
   const formatUptime = (ms: number) => {
     const hours = Math.floor(ms / (1000 * 60 * 60));
@@ -128,9 +121,7 @@ const AdminSystemHealth = () => {
               <CardTitle>Status Geral</CardTitle>
             </CardHeader>
             <CardContent>
-              <Badge className={getStatusColor(health.overall)}>
-                {health.overall.toUpperCase()}
-              </Badge>
+              <StatusBadge status={health.overall} />
             </CardContent>
           </Card>
         )}
@@ -143,9 +134,7 @@ const AdminSystemHealth = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>{service.name}</span>
-                    <Badge className={getStatusColor(service.status)}>
-                      {service.status}
-                    </Badge>
+                    <StatusBadge status={service.status} />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
