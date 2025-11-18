@@ -117,7 +117,7 @@ serve(async (req) => {
     const validated = clientSchema.parse(body);
     const { user_id, cliente_id, nome, telefone, email, mac_smart_one, usuario_m3u, senha_m3u } = validated;
 
-    console.log('[sync-new-client] Starting:', { user_id, cliente_id, nome });
+    console.log('[sync-new-client] Starting client sync');
 
     if (!mac_smart_one) {
       console.log('[sync-new-client] No MAC, skipping');

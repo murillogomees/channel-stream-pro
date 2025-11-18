@@ -171,7 +171,7 @@ serve(async (req) => {
 
     const { email, password, nome, telefone } = await req.json();
 
-    console.log(`[Auth] Starting signup for email: ${email}`);
+    console.log('[Auth] Starting signup request');
 
     // Validate input
     if (!email || !password) {
