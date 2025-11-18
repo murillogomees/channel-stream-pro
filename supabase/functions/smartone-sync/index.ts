@@ -296,10 +296,10 @@ serve(async (req) => {
     
     // SmartOne espera um POST com os campos exatos do formulário HTML
     const formBody = new URLSearchParams({
-      form_action: 'generate_xtream_playlist',
+      form_action: 'generate_m3u_playlist',
       mac: mac,
-      xtream_name: clienteNome,
-      xtream_playlist: m3uList.file_url,
+      m3u_name: clienteNome,
+      m3u_playlist: m3uList.file_url,
       note: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')}`,
     });
     
