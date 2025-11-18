@@ -23,6 +23,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -113,8 +119,8 @@ export default function AdminM3ULists() {
     }
   };
 
-  // Schema de validação simplificado (admin é responsável pela URL)
-  const m3uUrlSchema = z.object({
+  // Schema de validação completo
+  const m3uListSchema = z.object({
     name: z.string()
       .trim()
       .min(3, 'Nome deve ter pelo menos 3 caracteres')
@@ -122,6 +128,9 @@ export default function AdminM3ULists() {
     url: z.string()
       .trim()
       .url('URL inválida'),
+    planTypes: z.array(z.enum(['teste', 'basico', 'premium']))
+      .min(1, 'Selecione pelo menos um tipo de plano')
+      .nonempty('Pelo menos um tipo de plano deve ser selecionado'),
   });
 
   const testUrlConnectivity = async () => {
@@ -130,8 +139,9 @@ export default function AdminM3ULists() {
       return;
     }
 
-    const validation = m3uUrlSchema.safeParse({
-      name: listName || 'temp',
+    const validation = z.object({
+      url: z.string().trim().url('URL inválida')
+    }).safeParse({
       url: listUrl
     });
 
@@ -225,9 +235,10 @@ export default function AdminM3ULists() {
 
   const handleSaveList = async () => {
     // Validações
-    const validation = m3uUrlSchema.safeParse({
+    const validation = m3uListSchema.safeParse({
       name: listName,
-      url: listUrl
+      url: listUrl,
+      planTypes: planTypes
     });
 
     if (!validation.success) {
@@ -649,9 +660,20 @@ export default function AdminM3ULists() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="planTypes">Tipos de Plano *</Label>
+              <Label htmlFor="planTypes" className="flex items-center gap-2">
+                Tipos de Plano *
+                {planTypes.length === 0 && (
+                  <span className="text-xs text-destructive font-normal">
+                    (Selecione pelo menos um)
+                  </span>
+                )}
+              </Label>
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
+                <div className={`flex flex-wrap gap-2 p-3 rounded-md border ${
+                  planTypes.length === 0 
+                    ? 'border-destructive bg-destructive/5' 
+                    : 'border-border'
+                }`}>
                   {['teste', 'basico', 'premium'].map((type) => {
                     const isSelected = planTypes.includes(type as any);
                     const labels = { teste: 'Teste', basico: 'Básico', premium: 'Premium' };
@@ -663,7 +685,12 @@ export default function AdminM3ULists() {
                         size="sm"
                         onClick={() => {
                           if (isSelected) {
-                            setPlanTypes(planTypes.filter(t => t !== type));
+                            // Prevenir desmarcar se for o único selecionado
+                            if (planTypes.length > 1) {
+                              setPlanTypes(planTypes.filter(t => t !== type));
+                            } else {
+                              toast.error('Pelo menos um tipo de plano deve permanecer selecionado');
+                            }
                           } else {
                             setPlanTypes([...planTypes, type as any]);
                           }
@@ -675,6 +702,12 @@ export default function AdminM3ULists() {
                     );
                   })}
                 </div>
+                {planTypes.length === 0 && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Você deve selecionar pelo menos um tipo de plano
+                  </p>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Selecione um ou mais tipos de planos que terão acesso a esta lista
@@ -712,13 +745,26 @@ export default function AdminM3ULists() {
             >
               Cancelar
             </Button>
-            <Button
-              onClick={handleSaveList}
-              disabled={isSaving || !listName.trim() || !listUrl.trim()}
-            >
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      onClick={handleSaveList}
+                      disabled={isSaving || !listName.trim() || !listUrl.trim() || planTypes.length === 0}
+                    >
+                      {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {planTypes.length === 0 && (
+                  <TooltipContent>
+                    <p>Selecione pelo menos um tipo de plano para continuar</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </DialogFooter>
         </DialogContent>
       </Dialog>
