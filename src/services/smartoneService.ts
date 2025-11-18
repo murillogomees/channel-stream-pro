@@ -170,39 +170,103 @@ class SmartoneService {
     localStorage.setItem('smartone_config', JSON.stringify(this.config));
   }
 
+  /**
+   * Valida todas as pré-condições antes de tentar sincronizar com SmartOne
+   * Retorna array de avisos/erros encontrados
+   */
+  async validateClientForSync(cliente: Cliente): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Verificar configuração SmartOne
+    const config = await this.getConfig();
+    if (!config.enabled) {
+      errors.push('Integração SmartOne está desabilitada');
+    }
+
+    if (!config.baseUrl || !config.clientApi || !config.keyApi) {
+      errors.push('Credenciais da API SmartOne não configuradas');
+    }
+
+    // Validar MAC Address
+    if (!cliente.macSmartOne) {
+      errors.push('Cliente não possui MAC address cadastrado');
+    } else {
+      const macValidation = validateMacAddress(cliente.macSmartOne);
+      if (!macValidation.valid) {
+        errors.push(`MAC address inválido: ${macValidation.error}`);
+      }
+    }
+
+    // Validar credenciais M3U
+    if (!cliente.usuario) {
+      errors.push('Cliente não possui usuário M3U cadastrado');
+    } else if (cliente.usuario.length < 3) {
+      warnings.push('Usuário M3U muito curto (mínimo 3 caracteres)');
+    }
+
+    if (!cliente.senha) {
+      errors.push('Cliente não possui senha M3U cadastrada');
+    } else if (cliente.senha.length < 4) {
+      warnings.push('Senha M3U muito curta (mínimo 4 caracteres)');
+    }
+
+    // Validar dados básicos do cliente
+    if (!cliente.nome || cliente.nome.trim().length < 2) {
+      errors.push('Nome do cliente inválido ou muito curto');
+    }
+
+    // Verificar se já existe sincronização pendente
+    if (cliente.smartone_status === 'pendente') {
+      warnings.push('Cliente possui sincronização em andamento');
+    }
+
+    // Verificar se já foi sincronizado com sucesso recentemente
+    if (cliente.smartone_status === 'criado' && cliente.smartone_last_sync_at) {
+      const lastSync = new Date(cliente.smartone_last_sync_at);
+      const hoursSinceSync = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
+      
+      if (hoursSinceSync < 1) {
+        warnings.push('Cliente foi sincronizado há menos de 1 hora');
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
+
   async syncPlaylistForClient(
     cliente: Cliente,
     updateClienteFn: (id: string, data: Partial<Cliente>) => void
   ): Promise<SmartOneSyncResult> {
+    // Validação preventiva completa
+    const validation = await this.validateClientForSync(cliente);
+    
+    if (!validation.valid) {
+      const errorMessage = validation.errors.join('; ');
+      console.error('[SmartOne] Validação preventiva falhou:', errorMessage);
+      
+      return {
+        success: false,
+        status: 'erro',
+        rawResponse: { validation },
+        error: errorMessage,
+      };
+    }
+
+    // Mostrar avisos no console se houver
+    if (validation.warnings.length > 0) {
+      console.warn('[SmartOne] Avisos de validação:', validation.warnings);
+    }
+
     const config = await this.getConfig();
-
-    // Validações
-    if (!config.enabled) {
-      return {
-        success: false,
-        status: 'erro',
-        rawResponse: null,
-        error: 'Integração SmartOne desabilitada',
-      };
-    }
-
-    if (!cliente.macSmartOne) {
-      return {
-        success: false,
-        status: 'erro',
-        rawResponse: null,
-        error: 'Cliente não possui MAC cadastrado',
-      };
-    }
-
-    if (!cliente.usuario || !cliente.senha) {
-      return {
-        success: false,
-        status: 'erro',
-        rawResponse: null,
-        error: 'Cliente não possui credenciais M3U cadastradas',
-      };
-    }
 
     // Atualizar status para pendente
     updateClienteFn(cliente.id, {
