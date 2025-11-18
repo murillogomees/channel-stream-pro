@@ -76,10 +76,11 @@ serve(async (req) => {
     }
 
     // Check SmartOne API configuration
-    const smartoneApiUrl = Deno.env.get('SMARTONE_API_BASE_URL');
-    const smartoneKeyApi = Deno.env.get('SMARTONE_KEY_API');
+    const SMARTONE_API_BASE_URL = Deno.env.get('SMARTONE_API_BASE_URL');
+    const SMARTONE_CLIENT_API = Deno.env.get('SMARTONE_CLIENT_API');
+    const SMARTONE_KEY_API = Deno.env.get('SMARTONE_KEY_API');
     
-    if (!smartoneApiUrl || !smartoneKeyApi) {
+    if (!SMARTONE_API_BASE_URL || !SMARTONE_CLIENT_API || !SMARTONE_KEY_API) {
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -88,8 +89,9 @@ serve(async (req) => {
           is_admin: true,
           smartone_configured: false,
           missing_config: {
-            api_url: !smartoneApiUrl,
-            api_key: !smartoneKeyApi
+            api_url: !SMARTONE_API_BASE_URL,
+            client_api: !SMARTONE_CLIENT_API,
+            api_key: !SMARTONE_KEY_API
           },
           latency_ms: Date.now() - startTime
         }),
@@ -97,17 +99,151 @@ serve(async (req) => {
       );
     }
 
-    // Test SmartOne API connectivity (simple HEAD request)
+    // Parse request body to check if this is a playlist test or healthcheck
+    const body = await req.json().catch(() => ({}));
+    const { action, playlist } = body;
+
+    // If action is provided, perform playlist operation test
+    if (action && playlist) {
+      console.log(`[smartone-test] Testing ${action} operation for playlist:`, playlist.nome);
+
+      const testStart = Date.now();
+      let result;
+
+      try {
+        if (action === 'create') {
+          // Test creating a playlist
+          const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_api: SMARTONE_CLIENT_API,
+              key_api: SMARTONE_KEY_API,
+              mac: playlist.mac,
+              m3u_url: playlist.m3u_url,
+              name: playlist.nome,
+            }),
+          });
+
+          const responseText = await smartoneResponse.text();
+          let smartoneData;
+          
+          try {
+            smartoneData = JSON.parse(responseText);
+          } catch {
+            smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
+          }
+
+          result = {
+            success: smartoneResponse.ok && smartoneData.success,
+            playlistId: smartoneData.id || smartoneData.playlist_id,
+            data: smartoneData,
+            latency_ms: Date.now() - testStart,
+          };
+
+        } else if (action === 'update') {
+          // Test updating a playlist
+          const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/update`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_api: SMARTONE_CLIENT_API,
+              key_api: SMARTONE_KEY_API,
+              playlist_id: body.playlistId,
+              mac: playlist.mac,
+              m3u_url: playlist.m3u_url,
+              name: playlist.nome,
+            }),
+          });
+
+          const responseText = await smartoneResponse.text();
+          let smartoneData;
+          
+          try {
+            smartoneData = JSON.parse(responseText);
+          } catch {
+            smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
+          }
+
+          result = {
+            success: smartoneResponse.ok && smartoneData.success,
+            data: smartoneData,
+            latency_ms: Date.now() - testStart,
+          };
+
+        } else if (action === 'delete') {
+          // Test deleting a playlist
+          const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_api: SMARTONE_CLIENT_API,
+              key_api: SMARTONE_KEY_API,
+              playlist_id: body.playlistId,
+              mac: playlist.mac,
+            }),
+          });
+
+          const responseText = await smartoneResponse.text();
+          let smartoneData;
+          
+          try {
+            smartoneData = JSON.parse(responseText);
+          } catch {
+            smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
+          }
+
+          result = {
+            success: smartoneResponse.ok && smartoneData.success,
+            data: smartoneData,
+            latency_ms: Date.now() - testStart,
+          };
+
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              success: false,
+              error: 'Ação inválida. Use: create, update ou delete',
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log(`[smartone-test] ${action} result:`, result.success ? 'SUCCESS' : 'FAILED');
+
+        return new Response(
+          JSON.stringify(result),
+          { 
+            status: result.success ? 200 : 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+
+      } catch (error) {
+        console.error(`[smartone-test] Error during ${action}:`, error);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: error.message,
+            latency_ms: Date.now() - testStart,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Default: perform healthcheck
     const smartoneTestStart = Date.now();
     let smartoneStatus = 'unknown';
     let smartoneLatency = 0;
     let smartoneError = null;
 
     try {
-      const testResponse = await fetch(smartoneApiUrl, {
+      const testResponse = await fetch(SMARTONE_API_BASE_URL, {
         method: 'HEAD',
         headers: {
-          'Authorization': `Bearer ${smartoneKeyApi}`
+          'Authorization': `Bearer ${SMARTONE_KEY_API}`
         }
       });
       
