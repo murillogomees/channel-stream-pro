@@ -26,18 +26,19 @@ const loginSchema = z.object({
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isAdmin, loading: authLoading, refreshUser } = useAuth();
+  const { isAuthenticated, isAdmin, loading: authLoading, refreshUser, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin });
-      const from = (location.state as any)?.from?.pathname || (isAdmin ? '/admin/dashboard' : '/conta');
+    if (!authLoading && isAuthenticated && user) {
+      const isAdminRole = isAdmin || user.roles?.includes('admin');
+      console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin: isAdminRole });
+      const from = (location.state as any)?.from?.pathname || (isAdminRole ? '/admin/dashboard' : '/conta');
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, isAdmin, authLoading, navigate, location]);
+  }, [isAuthenticated, isAdmin, authLoading, navigate, location, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
