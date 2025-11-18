@@ -1,5 +1,6 @@
 export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead';
 export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
+export type FormaPagamento = 'Pix' | 'TED' | 'Boleto' | 'Cartão de Crédito' | 'Cartão de Débito' | 'Dinheiro';
 
 export interface Cliente {
   id: string;
@@ -13,7 +14,7 @@ export interface Cliente {
   plano: PlanoCliente;
   valorPago: number;
   dataUltimoPagamento: string;
-  formaUltimoPagamento: string;
+  formaUltimoPagamento: FormaPagamento | string;
   macSmartOne: string;
   dataCadastro: string;
   dataUltimaEdicao: string;

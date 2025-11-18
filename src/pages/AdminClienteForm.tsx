@@ -31,7 +31,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 
 // Schema de validação com segurança contra XSS e injeção
 const clienteSchema = z.object({
@@ -64,11 +64,7 @@ const clienteSchema = z.object({
     .min(0, 'Valor não pode ser negativo')
     .max(999999.99, 'Valor muito alto'),
   dataUltimoPagamento: z.string().optional().or(z.literal('')),
-  formaUltimoPagamento: z.string()
-    .trim()
-    .max(100, 'Forma de pagamento muito longa')
-    .optional()
-    .or(z.literal('')),
+  formaUltimoPagamento: z.enum(['Pix', 'TED', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', '']).optional(),
   macSmartOne: z.string()
     .trim()
     .max(100, 'MAC muito longo')
@@ -199,6 +195,45 @@ export default function AdminClienteForm() {
 
     validateSmartOneFields();
   }, [watch('macSmartOne'), watch('nome')]);
+
+  // Cálculo automático de data de vencimento
+  useEffect(() => {
+    const dataContratacao = watch('dataContratacao');
+    const situacao = watch('situacao');
+    const plano = watch('plano');
+
+    if (dataContratacao && situacao) {
+      const dataContrato = parseISO(dataContratacao);
+      let dataVencimento: Date;
+
+      if (situacao === 'Testando') {
+        // 14 dias após data de contratação
+        dataVencimento = addDays(dataContrato, 14);
+      } else if (situacao === 'Ativo' && plano) {
+        // Calcular baseado no plano
+        switch (plano) {
+          case 'Mensal':
+            dataVencimento = addMonths(dataContrato, 1);
+            break;
+          case 'Trimestral':
+            dataVencimento = addMonths(dataContrato, 3);
+            break;
+          case 'Semestral':
+            dataVencimento = addMonths(dataContrato, 6);
+            break;
+          case 'Anual':
+            dataVencimento = addYears(dataContrato, 1);
+            break;
+          default:
+            dataVencimento = addMonths(dataContrato, 1);
+        }
+      } else {
+        return; // Não calcular para outras situações
+      }
+
+      setValue('dataVencimento', format(dataVencimento, 'yyyy-MM-dd'));
+    }
+  }, [watch('dataContratacao'), watch('situacao'), watch('plano'), setValue]);
 
   if (loading) {
     return (
@@ -574,16 +609,6 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="valorPago">Valor Pago</Label>
-                  <Input
-                    id="valorPago"
-                    type="number"
-                    step="0.01"
-                    {...register('valorPago', { valueAsNumber: true })}
-                  />
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="dataUltimoPagamento">Data do Último Pagamento</Label>
                   <DatePicker
                     date={watch('dataUltimoPagamento') ? parseISO(watch('dataUltimoPagamento')) : undefined}
@@ -594,8 +619,34 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="valorPago">Valor Pago (R$)</Label>
+                  <Input
+                    id="valorPago"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    {...register('valorPago', { valueAsNumber: true })}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="formaUltimoPagamento">Forma do Último Pagamento</Label>
-                  <Input id="formaUltimoPagamento" {...register('formaUltimoPagamento')} />
+                  <Select
+                    onValueChange={(value) => setValue('formaUltimoPagamento', value as any)}
+                    value={watch('formaUltimoPagamento') || ''}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a forma de pagamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pix">Pix</SelectItem>
+                      <SelectItem value="TED">TED</SelectItem>
+                      <SelectItem value="Boleto">Boleto</SelectItem>
+                      <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
+                      <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                      <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
