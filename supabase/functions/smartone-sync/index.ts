@@ -294,17 +294,21 @@ serve(async (req) => {
 
     console.log(`[smartone-sync] Lista M3U: ${m3uList.name} (${m3uList.plan_type})`);
 
-    console.log('[smartone-sync] Calling SmartOne API');
+    console.log('[smartone-sync] Calling SmartOne API /playlist/create');
     
     const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SMARTONE_KEY_API}`
+      },
       body: JSON.stringify({
         client_api: SMARTONE_CLIENT_API,
         key_api: SMARTONE_KEY_API,
         mac: mac,
-        m3u_url: m3uList.file_url,
-        name: clienteNome,
+        nome: clienteNome, // Nome da Lista (Nome do Usuario)
+        m3u_url: m3uList.file_url, // URL da M3U exatamente como está cadastrada
+        descricao: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')} pelo cliente ${clienteNome}`
       }),
     });
 
