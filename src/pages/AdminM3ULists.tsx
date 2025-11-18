@@ -50,7 +50,6 @@ interface M3UList {
   created_at: string;
   updated_at: string;
   is_default?: boolean;
-  plan_type?: ('teste' | 'basico' | 'premium')[];
   priority?: number;
   description?: string;
   created_by?: string;
@@ -248,6 +247,7 @@ export default function AdminM3ULists() {
           .update({
             name: listName.trim(),
             file_url: listUrl.trim(),
+            description: listDescription.trim() || null,
             priority: priority,
           })
           .eq('id', editingList.id);
@@ -268,6 +268,7 @@ export default function AdminM3ULists() {
             {
               name: listName.trim(),
               file_url: listUrl.trim(),
+              description: listDescription.trim() || null,
               status: 'active',
               priority: priority,
             }
@@ -636,6 +637,21 @@ export default function AdminM3ULists() {
               />
               <p className="text-xs text-muted-foreground">
                 Listas com maior prioridade são selecionadas primeiro
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="description">Descrição Detalhada</Label>
+              <textarea
+                id="description"
+                value={listDescription}
+                onChange={(e) => setListDescription(e.target.value)}
+                placeholder="Descreva características específicas desta lista (qualidade, canais incluídos, região, tipo de conteúdo, etc.)"
+                className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use este campo para documentar informações importantes sobre a lista M3U (máximo 500 caracteres)
               </p>
             </div>
 
