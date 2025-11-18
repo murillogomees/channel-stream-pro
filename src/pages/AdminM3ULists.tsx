@@ -79,7 +79,6 @@ export default function AdminM3ULists() {
   const [listName, setListName] = useState('');
   const [listUrl, setListUrl] = useState('');
   const [listDescription, setListDescription] = useState('');
-  const [planTypes, setPlanTypes] = useState<('teste' | 'basico' | 'premium')[]>(['teste']);
   const [priority, setPriority] = useState(0);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
@@ -127,10 +126,7 @@ export default function AdminM3ULists() {
       .max(100, 'Nome deve ter no máximo 100 caracteres'),
     url: z.string()
       .trim()
-      .url('URL inválida'),
-    planTypes: z.array(z.enum(['teste', 'basico', 'premium']))
-      .min(1, 'Selecione pelo menos um tipo de plano')
-      .nonempty('Pelo menos um tipo de plano deve ser selecionado'),
+      .url('URL inválida')
   });
 
   const testUrlConnectivity = async () => {
@@ -201,7 +197,6 @@ export default function AdminM3ULists() {
       setListName(list.name);
       setListUrl(list.file_url);
       setListDescription(list.description || '');
-      setPlanTypes(list.plan_type || ['teste']);
       setPriority(list.priority || 0);
       await loadAuditHistory(list.id);
       setShowAuditHistory(true);
@@ -210,7 +205,6 @@ export default function AdminM3ULists() {
       setListName('');
       setListUrl('');
       setListDescription('');
-      setPlanTypes(['teste']);
       setPriority(0);
       setAuditLogs([]);
       setShowAuditHistory(false);
@@ -224,7 +218,6 @@ export default function AdminM3ULists() {
     setListName('');
     setListUrl('');
     setListDescription('');
-    setPlanTypes(['teste']);
     setPriority(0);
     setAuditLogs([]);
     setShowAuditHistory(false);
@@ -234,8 +227,7 @@ export default function AdminM3ULists() {
     // Validações
     const validation = m3uListSchema.safeParse({
       name: listName,
-      url: listUrl,
-      planTypes: planTypes
+      url: listUrl
     });
 
     if (!validation.success) {
@@ -256,7 +248,6 @@ export default function AdminM3ULists() {
           .update({
             name: listName.trim(),
             file_url: listUrl.trim(),
-            plan_type: planTypes,
             priority: priority,
           })
           .eq('id', editingList.id);
@@ -278,7 +269,6 @@ export default function AdminM3ULists() {
               name: listName.trim(),
               file_url: listUrl.trim(),
               status: 'active',
-              plan_type: planTypes,
               priority: priority,
             }
           ]);
@@ -399,33 +389,6 @@ export default function AdminM3ULists() {
     return `${mb.toFixed(2)} MB`;
   };
 
-  const getPlanTypeBadge = (planType?: ('teste' | 'basico' | 'premium')[]) => {
-    const colors = {
-      teste: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      basico: 'bg-green-500/10 text-green-500 border-green-500/20',
-      premium: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-    };
-    const labels = {
-      teste: 'Teste',
-      basico: 'Básico',
-      premium: 'Premium',
-    };
-    
-    if (!planType || planType.length === 0) {
-      return <Badge className={colors.teste}>{labels.teste}</Badge>;
-    }
-    
-    return (
-      <div className="flex gap-1 flex-wrap">
-        {planType.map((type) => (
-          <Badge key={type} className={colors[type]}>
-            {labels[type]}
-          </Badge>
-        ))}
-      </div>
-    );
-  };
-
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -503,7 +466,6 @@ export default function AdminM3ULists() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Plano</TableHead>
                 <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -513,7 +475,7 @@ export default function AdminM3ULists() {
             <TableBody>
               {lists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Nenhuma lista M3U cadastrada. Clique em "Nova Lista" para adicionar.
                   </TableCell>
                 </TableRow>
@@ -531,7 +493,6 @@ export default function AdminM3ULists() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{getPlanTypeBadge(list.plan_type)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{list.priority || 0}</Badge>
                     </TableCell>
@@ -656,60 +617,12 @@ export default function AdminM3ULists() {
               </p>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="planTypes" className="flex items-center gap-2">
-                Tipos de Plano *
-                {planTypes.length === 0 && (
-                  <span className="text-xs text-destructive font-normal">
-                    (Selecione pelo menos um)
-                  </span>
-                )}
-              </Label>
-              <div className="space-y-2">
-                <div className={`flex flex-wrap gap-2 p-3 rounded-md border ${
-                  planTypes.length === 0 
-                    ? 'border-destructive bg-destructive/5' 
-                    : 'border-border'
-                }`}>
-                  {['teste', 'basico', 'premium'].map((type) => {
-                    const isSelected = planTypes.includes(type as any);
-                    const labels = { teste: 'Teste', basico: 'Básico', premium: 'Premium' };
-                    return (
-                      <Button
-                        key={type}
-                        type="button"
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          if (isSelected) {
-                            // Prevenir desmarcar se for o único selecionado
-                            if (planTypes.length > 1) {
-                              setPlanTypes(planTypes.filter(t => t !== type));
-                            } else {
-                              toast.error('Pelo menos um tipo de plano deve permanecer selecionado');
-                            }
-                          } else {
-                            setPlanTypes([...planTypes, type as any]);
-                          }
-                        }}
-                      >
-                        {isSelected && <Check className="h-4 w-4 mr-1" />}
-                        {labels[type as keyof typeof labels]}
-                      </Button>
-                    );
-                  })}
-                </div>
-                {planTypes.length === 0 && (
-                  <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    Você deve selecionar pelo menos um tipo de plano
-                  </p>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Selecione um ou mais tipos de planos que terão acesso a esta lista
-              </p>
-            </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Esta lista M3U estará disponível para todos os clientes, independente do plano. A seleção específica de qual lista atribuir será feita no cadastro de cada cliente.
+              </AlertDescription>
+            </Alert>
 
             <div className="grid gap-2">
               <Label htmlFor="priority">Prioridade</Label>
@@ -748,18 +661,13 @@ export default function AdminM3ULists() {
                   <span>
                     <Button
                       onClick={handleSaveList}
-                      disabled={isSaving || !listName.trim() || !listUrl.trim() || planTypes.length === 0}
+                      disabled={isSaving || !listName.trim() || !listUrl.trim()}
                     >
                       {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {isSaving ? 'Salvando...' : editingList ? 'Atualizar Lista' : 'Salvar Lista'}
                     </Button>
                   </span>
                 </TooltipTrigger>
-                {planTypes.length === 0 && (
-                  <TooltipContent>
-                    <p>Selecione pelo menos um tipo de plano para continuar</p>
-                  </TooltipContent>
-                )}
               </Tooltip>
             </TooltipProvider>
           </DialogFooter>
