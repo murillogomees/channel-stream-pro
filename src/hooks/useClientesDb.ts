@@ -38,6 +38,7 @@ export function useClientesDb() {
     setLoading(true);
     setError(null);
     try {
+      // Admins devem ver todos os clientes (não filtrar por user_id)
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
