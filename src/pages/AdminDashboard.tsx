@@ -10,7 +10,7 @@ import {
   LogOut, User, Palette, FileText, Variable, MessageSquare,
   Radio, PieChart, Activity, Lock, UserCog, Package, 
   ListChecks, TrendingUp, Clock, Zap, Database, AlertTriangle,
-  CheckCircle, XCircle, Timer, Target, Bug
+  CheckCircle, XCircle, Timer, Target, Bug, TestTube
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -317,11 +317,17 @@ const AdminDashboard = () => {
               path="/admin/smartone-sync"
             />
             <NavCard
+              title="Teste de Conectividade"
+              description="Valide credenciais e disponibilidade"
+              icon={<TestTube className="h-5 w-5" />}
+              path="/admin/smartone-test"
+              badge="Novo"
+            />
+            <NavCard
               title="Saúde das Playlists"
               description="Monitore status das URLs M3U"
               icon={<Activity className="h-5 w-5" />}
               path="/admin/playlist-health"
-              badge="Novo"
             />
           </div>
         </section>

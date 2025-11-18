@@ -54,6 +54,7 @@ const Admin2FASettings = lazy(() => import("./pages/Admin2FASettings"));
 const AdminSuspiciousLogins = lazy(() => import("./pages/AdminSuspiciousLogins"));
 const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
 const AdminDiagnostic = lazy(() => import("./pages/AdminDiagnostic"));
+const AdminSmartOneTest = lazy(() => import("./pages/AdminSmartOneTest"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -118,6 +119,7 @@ const App = () => (
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
           <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
           <Route path="/admin/diagnostic" element={<ProtectedRoute requireAdmin><AdminDiagnostic /></ProtectedRoute>} />
+          <Route path="/admin/smartone-test" element={<ProtectedRoute requireAdmin><AdminSmartOneTest /></ProtectedRoute>} />
           <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
