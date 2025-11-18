@@ -817,6 +817,122 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_diagnostics: {
+        Row: {
+          auth_context_is_admin: boolean | null
+          auth_context_is_client: boolean | null
+          auth_context_is_super_admin: boolean | null
+          created_at: string | null
+          discrepancy_details: Json | null
+          executed_at: string
+          full_diagnostic_data: Json
+          has_discrepancy: boolean
+          id: string
+          is_admin_rpc: boolean | null
+          jwt_role: string | null
+          roles_via_rpc: string[] | null
+          roles_via_table: string[] | null
+          session_active: boolean | null
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          auth_context_is_admin?: boolean | null
+          auth_context_is_client?: boolean | null
+          auth_context_is_super_admin?: boolean | null
+          created_at?: string | null
+          discrepancy_details?: Json | null
+          executed_at?: string
+          full_diagnostic_data: Json
+          has_discrepancy?: boolean
+          id?: string
+          is_admin_rpc?: boolean | null
+          jwt_role?: string | null
+          roles_via_rpc?: string[] | null
+          roles_via_table?: string[] | null
+          session_active?: boolean | null
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          auth_context_is_admin?: boolean | null
+          auth_context_is_client?: boolean | null
+          auth_context_is_super_admin?: boolean | null
+          created_at?: string | null
+          discrepancy_details?: Json | null
+          executed_at?: string
+          full_diagnostic_data?: Json
+          has_discrepancy?: boolean
+          id?: string
+          is_admin_rpc?: boolean | null
+          jwt_role?: string | null
+          roles_via_rpc?: string[] | null
+          roles_via_table?: string[] | null
+          session_active?: boolean | null
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      permission_discrepancy_alerts: {
+        Row: {
+          admins_notified: boolean | null
+          created_at: string | null
+          diagnostic_id: string | null
+          discrepancy_description: string
+          discrepancy_type: string
+          id: string
+          notified_at: string | null
+          resolution_notes: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          admins_notified?: boolean | null
+          created_at?: string | null
+          diagnostic_id?: string | null
+          discrepancy_description: string
+          discrepancy_type: string
+          id?: string
+          notified_at?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          admins_notified?: boolean | null
+          created_at?: string | null
+          diagnostic_id?: string | null
+          discrepancy_description?: string
+          discrepancy_type?: string
+          id?: string
+          notified_at?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_discrepancy_alerts_diagnostic_id_fkey"
+            columns: ["diagnostic_id"]
+            isOneToOne: false
+            referencedRelation: "permission_diagnostics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_health_checks: {
         Row: {
           client_id: string | null
@@ -1305,6 +1421,18 @@ export type Database = {
       cleanup_old_security_events: { Args: never; Returns: undefined }
       cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      detect_permission_discrepancies: {
+        Args: {
+          _auth_context_is_admin: boolean
+          _diagnostic_id: string
+          _is_admin_rpc: boolean
+          _roles_rpc: string[]
+          _roles_table: string[]
+          _user_email: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       get_active_sessions: {
         Args: never
         Returns: {

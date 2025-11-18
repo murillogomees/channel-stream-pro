@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, AlertCircle, Download, AlertTriangle, History } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface DiagnosticResult {
   label: string;
@@ -16,11 +19,37 @@ interface DiagnosticResult {
   details?: string;
 }
 
+interface HistoricalDiagnostic {
+  id: string;
+  executed_at: string;
+  has_discrepancy: boolean;
+  full_diagnostic_data: any;
+  discrepancy_details?: any;
+  roles_via_table?: string[];
+  roles_via_rpc?: string[];
+  is_admin_rpc?: boolean;
+  auth_context_is_admin?: boolean;
+  auth_context_is_super_admin?: boolean;
+  auth_context_is_client?: boolean;
+  jwt_role?: string;
+}
+
+interface DiscrepancyAlert {
+  id: string;
+  discrepancy_type: string;
+  discrepancy_description: string;
+  severity: string;
+  resolved: boolean;
+  created_at: string;
+}
+
 const AdminDiagnostic = () => {
   const navigate = useNavigate();
   const { user, session, isAdmin, isSuperAdmin, isClient, loading: authLoading } = useAuth();
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [historicalDiagnostics, setHistoricalDiagnostics] = useState<HistoricalDiagnostic[]>([]);
+  const [discrepancyAlerts, setDiscrepancyAlerts] = useState<DiscrepancyAlert[]>([]);
 
   const runDiagnostics = async () => {
     if (!session?.user?.id) {
@@ -151,6 +180,14 @@ const AdminDiagnostic = () => {
       }
 
       setDiagnostics(results);
+
+      // Salvar diagnóstico no banco
+      await saveDiagnosticToDatabase(results);
+      
+      // Carregar histórico e alertas
+      await loadHistoricalDiagnostics();
+      await loadDiscrepancyAlerts();
+      
       toast.success("Diagnóstico completo!");
     } catch (error: any) {
       console.error('Erro no diagnóstico:', error);
@@ -160,9 +197,130 @@ const AdminDiagnostic = () => {
     }
   };
 
+  const saveDiagnosticToDatabase = async (results: DiagnosticResult[]) => {
+    if (!session?.user?.id) return;
+
+    try {
+      // Extrair valores específicos dos resultados
+      const rolesViaTable = results.find(r => r.label === "Roles via SELECT (user_roles table)")?.value?.split(', ').filter(Boolean) || [];
+      const rolesViaRpc = [
+        results.find(r => r.label === "RPC has_role('admin')")?.value ? 'admin' : null,
+        results.find(r => r.label === "RPC has_role('client')")?.value ? 'client' : null,
+      ].filter(Boolean);
+      
+      const isAdminRpc = results.find(r => r.label === "RPC is_admin(uid)")?.value || false;
+      const authContextIsAdmin = results.find(r => r.label === "AuthContext.isAdmin")?.value || false;
+      const authContextIsSuperAdmin = results.find(r => r.label === "AuthContext.isSuperAdmin")?.value || false;
+      const authContextIsClient = results.find(r => r.label === "AuthContext.isClient")?.value || false;
+      const jwtRole = results.find(r => r.label === "JWT role claim")?.value || 'N/A';
+
+      // Inserir diagnóstico
+      const { data: diagnostic, error: diagnosticError } = await supabase
+        .from('permission_diagnostics')
+        .insert([{
+          user_id: session.user.id,
+          user_email: session.user.email || 'N/A',
+          session_active: !!session,
+          roles_via_table: rolesViaTable,
+          roles_via_rpc: rolesViaRpc,
+          is_admin_rpc: isAdminRpc,
+          auth_context_is_admin: authContextIsAdmin,
+          auth_context_is_super_admin: authContextIsSuperAdmin,
+          auth_context_is_client: authContextIsClient,
+          jwt_role: jwtRole,
+          full_diagnostic_data: results as any
+        }])
+        .select()
+        .single();
+
+      if (diagnosticError) {
+        console.error('Erro ao salvar diagnóstico:', diagnosticError);
+        return;
+      }
+
+      // Detectar discrepâncias usando função do banco
+      await supabase.rpc('detect_permission_discrepancies', {
+        _diagnostic_id: diagnostic.id,
+        _user_id: session.user.id,
+        _user_email: session.user.email || 'N/A',
+        _roles_table: rolesViaTable,
+        _roles_rpc: rolesViaRpc,
+        _is_admin_rpc: isAdminRpc,
+        _auth_context_is_admin: authContextIsAdmin
+      });
+
+    } catch (error) {
+      console.error('Erro ao processar diagnóstico:', error);
+    }
+  };
+
+  const loadHistoricalDiagnostics = async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('permission_diagnostics')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('executed_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setHistoricalDiagnostics(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+    }
+  };
+
+  const loadDiscrepancyAlerts = async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('permission_discrepancy_alerts')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('resolved', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDiscrepancyAlerts(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar alertas:', error);
+    }
+  };
+
+  const exportDiagnosticToJSON = () => {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      user: {
+        id: session?.user?.id,
+        email: session?.user?.email,
+        nome: user?.nome
+      },
+      diagnostics: diagnostics,
+      alerts: discrepancyAlerts,
+      history: historicalDiagnostics
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `diagnostic-${session?.user?.id}-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success("Diagnóstico exportado com sucesso!");
+  };
+
   useEffect(() => {
     if (!authLoading && session) {
       runDiagnostics();
+      loadHistoricalDiagnostics();
+      loadDiscrepancyAlerts();
     }
   }, [authLoading, session]);
 
@@ -213,6 +371,16 @@ const AdminDiagnostic = () => {
           </Button>
         </div>
 
+        {discrepancyAlerts.length > 0 && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Atenção:</strong> {discrepancyAlerts.length} discrepância(s) detectada(s) nas permissões. 
+              Verifique a aba "Alertas" para mais detalhes.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Informações da Sessão</CardTitle>
@@ -240,24 +408,45 @@ const AdminDiagnostic = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Resultados do Diagnóstico</CardTitle>
-                <CardDescription>Verificação de roles e permissões em diferentes camadas</CardDescription>
-              </div>
-              <Button 
-                onClick={runDiagnostics} 
-                disabled={loading}
-                variant="outline"
-                size="sm"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Recarregar
-              </Button>
-            </div>
-          </CardHeader>
+        <Tabs defaultValue="diagnostico" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="diagnostico">Diagnóstico Atual</TabsTrigger>
+            <TabsTrigger value="alertas">
+              Alertas {discrepancyAlerts.length > 0 && `(${discrepancyAlerts.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="historico">Histórico</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="diagnostico">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Resultados do Diagnóstico</CardTitle>
+                    <CardDescription>Verificação de roles e permissões em diferentes camadas</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={exportDiagnosticToJSON}
+                      disabled={diagnostics.length === 0}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Exportar JSON
+                    </Button>
+                    <Button 
+                      onClick={runDiagnostics} 
+                      disabled={loading}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                      Recarregar
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
           <CardContent>
             {diagnostics.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -296,8 +485,127 @@ const AdminDiagnostic = () => {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="alertas">
+            <Card>
+              <CardHeader>
+                <CardTitle>Alertas de Discrepâncias</CardTitle>
+                <CardDescription>
+                  Inconsistências detectadas automaticamente entre diferentes métodos de verificação de permissões
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {discrepancyAlerts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nenhuma discrepância detectada</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {discrepancyAlerts.map((alert) => (
+                      <Alert key={alert.id} variant={alert.severity === 'critical' ? 'destructive' : 'default'}>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="flex items-center justify-between mb-2">
+                            <strong className="text-foreground">{alert.discrepancy_type.replace('_', ' ').toUpperCase()}</strong>
+                            <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                              {alert.severity.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-1">{alert.discrepancy_description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Detectado em: {format(new Date(alert.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="historico">
+            <Card>
+              <CardHeader>
+                <CardTitle>Histórico de Diagnósticos</CardTitle>
+                <CardDescription>
+                  <History className="inline h-4 w-4 mr-1" />
+                  Últimos 10 diagnósticos executados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {historicalDiagnostics.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Nenhum histórico disponível</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {historicalDiagnostics.map((hist) => (
+                      <div key={hist.id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">
+                              {format(new Date(hist.executed_at), "dd/MM/yyyy 'às' HH:mm:ss")}
+                            </p>
+                            {hist.has_discrepancy && (
+                              <Badge variant="destructive">Com Discrepâncias</Badge>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const blob = new Blob([JSON.stringify(hist.full_diagnostic_data, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `diagnostic-${hist.id}.json`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Baixar
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Roles (tabela):</span>
+                            <span className="ml-2 font-mono">{hist.roles_via_table?.join(', ') || 'nenhum'}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Roles (RPC):</span>
+                            <span className="ml-2 font-mono">{hist.roles_via_rpc?.join(', ') || 'nenhum'}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">is_admin (RPC):</span>
+                            <span className="ml-2 font-mono">{hist.is_admin_rpc ? 'TRUE' : 'FALSE'}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">is_admin (Context):</span>
+                            <span className="ml-2 font-mono">{hist.auth_context_is_admin ? 'TRUE' : 'FALSE'}</span>
+                          </div>
+                        </div>
+                        {hist.discrepancy_details && (
+                          <div className="mt-3 p-2 bg-destructive/10 rounded border border-destructive/20">
+                            <p className="text-sm font-medium text-destructive mb-1">Discrepâncias detectadas:</p>
+                            <pre className="text-xs overflow-auto">{JSON.stringify(hist.discrepancy_details, null, 2)}</pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <Card className="mt-6">
           <CardHeader>
