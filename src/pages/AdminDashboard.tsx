@@ -15,9 +15,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientes } from "@/hooks/useClientes";
+import { useClientesDb } from "@/hooks/useClientesDb";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
 
 interface QuickStatProps {
   icon: React.ReactNode;
@@ -87,17 +88,9 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAdmin, loading, signOut: logout, user } = useAuth();
-  const { getStats } = useClientes();
+  const { getStats, loading: statsLoading } = useClientesDb();
   const stats = getStats();
-  const [statsLoading, setStatsLoading] = useState(true);
 
-  useEffect(() => {
-    // Simula carregamento inicial dos stats
-    const timer = setTimeout(() => {
-      setStatsLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
