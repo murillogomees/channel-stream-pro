@@ -281,12 +281,21 @@ export default function AdminClienteForm() {
         description: 'As informações foram salvas com sucesso.',
       });
 
-      // Verificar se MAC foi alterado ou adicionado
-      const macChanged = clienteOriginal && 
+      // Verificar se devemos sincronizar com SmartOne
+      // Critérios:
+      // - MAC foi alterado/adicionado, OU
+      // - cliente ainda não foi enviado para o SmartOne (status nao_enviado ou erro)
+      const macChanged =
+        !!clienteOriginal &&
         clienteOriginal.macSmartOne !== clienteData.macSmartOne &&
-        clienteData.macSmartOne;
+        !!clienteData.macSmartOne;
 
-      if (macChanged) {
+      const precisaSyncSmartone =
+        macChanged ||
+        (!!clienteData.macSmartOne &&
+          (!!clienteOriginal?.smartone_status || clienteOriginal?.smartone_status === 'nao_enviado' || clienteOriginal?.smartone_status === 'erro'));
+
+      if (precisaSyncSmartone) {
         setIsSyncingSmartone(true);
         toast({
           title: "Sincronizando com SmartOne",
