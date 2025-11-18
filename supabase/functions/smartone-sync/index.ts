@@ -294,14 +294,13 @@ serve(async (req) => {
 
     console.log('[smartone-sync] Calling SmartOne API /plugin/smart_one/client_main/add_playlist/');
     
-    // SmartOne espera um POST simulando o submit do formulário original
+    // SmartOne espera um POST com os campos exatos do formulário HTML
     const formBody = new URLSearchParams({
-      client_api: SMARTONE_CLIENT_API,
-      key_api: SMARTONE_KEY_API,
+      form_action: 'generate_xtream_playlist',
       mac: mac,
-      nome: clienteNome,
-      m3u_url: m3uList.file_url,
-      descricao: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')} pelo cliente ${clienteNome}`,
+      xtream_name: clienteNome,
+      xtream_playlist: m3uList.file_url,
+      note: `Inserido automaticamente em ${new Date().toLocaleString('pt-BR')}`,
     });
     
     const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`, {
