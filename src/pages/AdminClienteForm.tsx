@@ -300,6 +300,48 @@ export default function AdminClienteForm() {
         description: 'As informações foram salvas com sucesso.',
       });
 
+      // Atualizar atribuições de M3U lists para cliente existente
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Primeiro, desativar todas as atribuições existentes
+        const { error: deactivateError } = await supabase
+          .from('client_m3u_lists')
+          .update({ is_active: false })
+          .eq('client_id', id);
+
+        if (deactivateError) throw deactivateError;
+
+        // Depois, inserir ou reativar as atribuições selecionadas
+        if (selectedM3ULists.length > 0) {
+          const newAssignments = selectedM3ULists.map(listId => ({
+            client_id: id,
+            m3u_list_id: listId,
+            assigned_by: user.id,
+            is_active: true,
+          }));
+
+          const { error: m3uError } = await supabase
+            .from('client_m3u_lists')
+            .upsert(newAssignments, {
+              onConflict: 'client_id,m3u_list_id',
+              ignoreDuplicates: false,
+            });
+
+          if (m3uError) throw m3uError;
+
+          console.log('M3U lists atualizadas:', selectedM3ULists.length);
+        }
+      } catch (error) {
+        console.error('Error updating M3U lists:', error);
+        toast({
+          title: "Erro ao atualizar listas",
+          description: "Cliente atualizado, mas houve erro ao atualizar listas M3U",
+          variant: "destructive",
+        });
+      }
+
       // Verificar se devemos sincronizar com SmartOne
       // Critérios:
       // - MAC foi alterado/adicionado, OU
