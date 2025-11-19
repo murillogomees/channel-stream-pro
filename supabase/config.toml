@@ -35,6 +35,12 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+[functions.generate-m3u-file]
+verify_jwt = false
+
+[functions.daily-m3u-regeneration]
+verify_jwt = false
+
 [functions.confirm-security-alert]
 verify_jwt = false
 

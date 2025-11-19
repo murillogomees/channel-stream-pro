@@ -378,6 +378,52 @@ export type Database = {
         }
         Relationships: []
       }
+      client_m3u_custom_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          cliente_id: string
+          custom_list_id: string
+          id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          cliente_id: string
+          custom_list_id: string
+          id?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          cliente_id?: string
+          custom_list_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_m3u_custom_assignments_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_m3u_custom_assignments_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_m3u_custom_assignments_custom_list_id_fkey"
+            columns: ["custom_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_custom_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_m3u_lists: {
         Row: {
           assigned_at: string | null
@@ -876,6 +922,189 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      m3u_categories: {
+        Row: {
+          created_at: string | null
+          custom_list_id: string
+          display_name: string
+          icon: string | null
+          id: string
+          name: string
+          order_position: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          custom_list_id: string
+          display_name: string
+          icon?: string | null
+          id?: string
+          name: string
+          order_position?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          custom_list_id?: string
+          display_name?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          order_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_categories_custom_list_id_fkey"
+            columns: ["custom_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_custom_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_channels: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          group_title: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          order_position: number | null
+          stream_url: string
+          tvg_id: string | null
+          tvg_logo: string | null
+          tvg_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          group_title?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          order_position?: number | null
+          stream_url: string
+          tvg_id?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          group_title?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          order_position?: number | null
+          stream_url?: string
+          tvg_id?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_channels_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_custom_lists: {
+        Row: {
+          bucket_path: string | null
+          cdn_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          last_generated_at: string | null
+          name: string
+          slug: string
+          status: string | null
+          total_categories: number | null
+          total_channels: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          bucket_path?: string | null
+          cdn_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          last_generated_at?: string | null
+          name: string
+          slug: string
+          status?: string | null
+          total_categories?: number | null
+          total_channels?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          bucket_path?: string | null
+          cdn_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          last_generated_at?: string | null
+          name?: string
+          slug?: string
+          status?: string | null
+          total_categories?: number | null
+          total_channels?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      m3u_generation_logs: {
+        Row: {
+          cdn_upload_status: string | null
+          cdn_upload_time_ms: number | null
+          channels_count: number | null
+          created_at: string | null
+          custom_list_id: string
+          error_message: string | null
+          file_size: number | null
+          generation_time_ms: number | null
+          id: string
+        }
+        Insert: {
+          cdn_upload_status?: string | null
+          cdn_upload_time_ms?: number | null
+          channels_count?: number | null
+          created_at?: string | null
+          custom_list_id: string
+          error_message?: string | null
+          file_size?: number | null
+          generation_time_ms?: number | null
+          id?: string
+        }
+        Update: {
+          cdn_upload_status?: string | null
+          cdn_upload_time_ms?: number | null
+          channels_count?: number | null
+          created_at?: string | null
+          custom_list_id?: string
+          error_message?: string | null
+          file_size?: number | null
+          generation_time_ms?: number | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_generation_logs_custom_list_id_fkey"
+            columns: ["custom_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_custom_lists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       m3u_health_checks: {
         Row: {

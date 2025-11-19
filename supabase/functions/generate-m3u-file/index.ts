@@ -1,0 +1,170 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { customListId } = await req.json();
+
+    if (!customListId) {
+      return new Response(
+        JSON.stringify({ error: 'customListId é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const startTime = Date.now();
+
+    // Buscar lista personalizada
+    const { data: customList, error: listError } = await supabase
+      .from('m3u_custom_lists')
+      .select('*')
+      .eq('id', customListId)
+      .single();
+
+    if (listError || !customList) {
+      throw new Error(`Lista não encontrada: ${listError?.message}`);
+    }
+
+    // Buscar categorias
+    const { data: categories } = await supabase
+      .from('m3u_categories')
+      .select('*')
+      .eq('custom_list_id', customListId)
+      .order('order_position', { ascending: true });
+
+    if (!categories || categories.length === 0) {
+      throw new Error('Lista sem categorias configuradas');
+    }
+
+    // Gerar conteúdo M3U
+    let m3uContent = '#EXTM3U\n\n';
+    let totalChannels = 0;
+
+    for (const category of categories) {
+      const { data: channels } = await supabase
+        .from('m3u_channels')
+        .select('*')
+        .eq('category_id', category.id)
+        .order('order_position', { ascending: true });
+
+      if (channels && channels.length > 0) {
+        for (const channel of channels) {
+          const tvgId = channel.tvg_id ? ` tvg-id="${channel.tvg_id}"` : '';
+          const tvgName = channel.tvg_name ? ` tvg-name="${channel.tvg_name}"` : '';
+          const tvgLogo = channel.tvg_logo ? ` tvg-logo="${channel.tvg_logo}"` : '';
+          const groupTitle = ` group-title="${category.display_name}"`;
+
+          m3uContent += `#EXTINF:-1${tvgId}${tvgName}${tvgLogo}${groupTitle},${channel.name}\n`;
+          m3uContent += `${channel.stream_url}\n\n`;
+          totalChannels++;
+        }
+      }
+    }
+
+    const generationTime = Date.now() - startTime;
+    const fileSize = new TextEncoder().encode(m3uContent).length;
+
+    // Upload para CDN (Cloudflare R2 ou Amazon S3)
+    const cdnUrl = await uploadToCDN(customList.slug, m3uContent);
+
+    const uploadTime = Date.now() - startTime - generationTime;
+
+    // Atualizar lista com CDN URL
+    await supabase
+      .from('m3u_custom_lists')
+      .update({
+        cdn_url: cdnUrl,
+        bucket_path: `${customList.slug}.m3u`,
+        total_channels: totalChannels,
+        total_categories: categories.length,
+        last_generated_at: new Date().toISOString()
+      })
+      .eq('id', customListId);
+
+    // Registrar log
+    await supabase
+      .from('m3u_generation_logs')
+      .insert({
+        custom_list_id: customListId,
+        file_size: fileSize,
+        channels_count: totalChannels,
+        generation_time_ms: generationTime,
+        cdn_upload_status: 'success',
+        cdn_upload_time_ms: uploadTime
+      });
+
+    console.log(`✅ M3U gerada: ${customList.name} (${totalChannels} canais, ${fileSize} bytes)`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        cdnUrl,
+        fileSize,
+        channelsCount: totalChannels,
+        generationTime,
+        uploadTime
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar M3U:', error);
+
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
+
+/**
+ * Upload para CDN (implementação simplificada - requer configuração de R2 ou S3)
+ */
+async function uploadToCDN(slug: string, content: string): Promise<string> {
+  // TODO: Implementar upload real para Cloudflare R2 ou Amazon S3
+  // Por enquanto, retorna uma URL simulada
+  
+  // Exemplo de implementação com R2:
+  /*
+  const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
+  const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
+  const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
+  const R2_BUCKET = Deno.env.get('R2_BUCKET_NAME');
+  
+  const s3 = new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY,
+      secretAccessKey: R2_SECRET_KEY
+    }
+  });
+
+  await s3.send(new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: `${slug}.m3u`,
+    Body: content,
+    ContentType: 'audio/x-mpegurl'
+  }));
+
+  return `https://cdn.seudominio.com/${slug}.m3u`;
+  */
+
+  // URL simulada para desenvolvimento
+  const cdnDomain = Deno.env.get('CDN_DOMAIN') || 'cdn.iptv-link.com.br';
+  return `https://${cdnDomain}/playlists/${slug}.m3u`;
+}
