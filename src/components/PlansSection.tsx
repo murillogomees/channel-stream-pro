@@ -15,28 +15,28 @@ const PlansSection = () => {
     },
     {
       name: "Trimestral",
-      price: "109,00",
+      price: "79,90",
       currency: "R$",
       period: "/3 meses",
-      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte prioritário 24/7", "Sem contrato", "Economia de 15%"],
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte prioritário 24/7", "Sem contrato", "Economize R$ 10"],
       ctaText: "Assinar Agora",
       highlighted: true
     },
     {
       name: "Semestral",
-      price: "200,00",
+      price: "149,90",
       currency: "R$",
       period: "/6 meses",
-      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP 24/7", "Sem contrato", "Economia de 20%"],
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP 24/7", "Sem contrato", "Economize R$ 30"],
       ctaText: "Assinar Agora",
       highlighted: false
     },
     {
       name: "Anual",
-      price: "360,00",
+      price: "279,90",
       currency: "R$",
       period: "/ano",
-      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP dedicado 24/7", "Sem contrato", "Economia de 25%"],
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP dedicado 24/7", "Sem contrato", "Economize R$ 80"],
       ctaText: "Assinar Agora",
       highlighted: false
     }
