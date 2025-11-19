@@ -87,7 +87,6 @@ export default function AdminClientes() {
   // Filtros avançados
   const [filterPlano, setFilterPlano] = useState<string>('all');
   const [filterOrigem, setFilterOrigem] = useState<string>('all');
-  const [filterSmartOneStatus, setFilterSmartOneStatus] = useState<string>('all');
   const [filterVencimento, setFilterVencimento] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -100,11 +99,6 @@ export default function AdminClientes() {
 
       // Filtro de origem
       if (filterOrigem !== 'all' && cliente.origemCadastro !== filterOrigem) {
-        return false;
-      }
-
-      // Filtro de status SmartOne
-      if (filterSmartOneStatus !== 'all' && cliente.smartone_status !== filterSmartOneStatus) {
         return false;
       }
 
@@ -131,17 +125,16 @@ export default function AdminClientes() {
 
       return true;
     });
-  }, [clientes, filterPlano, filterOrigem, filterSmartOneStatus, filterVencimento]);
+  }, [clientes, filterPlano, filterOrigem, filterVencimento]);
 
   const resetFilters = () => {
     setFilterPlano('all');
     setFilterOrigem('all');
-    setFilterSmartOneStatus('all');
     setFilterVencimento('all');
   };
 
   const hasActiveFilters = filterPlano !== 'all' || filterOrigem !== 'all' || 
-                          filterSmartOneStatus !== 'all' || filterVencimento !== 'all';
+                          filterVencimento !== 'all';
 
   if (loading || loadingClientes) {
     return (
@@ -417,7 +410,7 @@ export default function AdminClientes() {
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Plano</Label>
                   <Select value={filterPlano} onValueChange={setFilterPlano}>
@@ -448,22 +441,6 @@ export default function AdminClientes() {
                       <SelectItem value="Indicação">Indicação</SelectItem>
                       <SelectItem value="Website">Website</SelectItem>
                       <SelectItem value="Outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Status SmartOne</Label>
-                  <Select value={filterSmartOneStatus} onValueChange={setFilterSmartOneStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      <SelectItem value="nao_enviado">Não Enviado</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="criado">Criado</SelectItem>
-                      <SelectItem value="erro">Erro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -509,14 +486,13 @@ export default function AdminClientes() {
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="whitespace-nowrap hidden sm:table-cell">Ativo</TableHead>
-                    <TableHead className="whitespace-nowrap hidden lg:table-cell">SmartOne</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredClientes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         {hasActiveFilters 
                           ? 'Nenhum cliente encontrado com os filtros aplicados' 
                           : 'Nenhum cliente cadastrado ainda'}
@@ -552,27 +528,6 @@ export default function AdminClientes() {
                             Inativo
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <Badge 
-                          variant={
-                            cliente.smartone_status === 'criado' ? "default" :
-                            cliente.smartone_status === 'pendente' ? "secondary" :
-                            cliente.smartone_status === 'erro' ? "destructive" :
-                            "outline"
-                          }
-                          className={
-                            cliente.smartone_status === 'criado' ? "bg-green-600" :
-                            cliente.smartone_status === 'pendente' ? "bg-yellow-500" :
-                            cliente.smartone_status === 'erro' ? "" :
-                            ""
-                          }
-                        >
-                          {cliente.smartone_status === 'criado' ? '✓ Criado' :
-                           cliente.smartone_status === 'pendente' ? '⏳ Pendente' :
-                           cliente.smartone_status === 'erro' ? '✗ Erro' :
-                           '○ Não enviado'}
-                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">
