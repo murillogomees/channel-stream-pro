@@ -46,6 +46,14 @@ verify_jwt = true
 [functions.alert-inactive-playlists]
 verify_jwt = false
 
+# Cron job for daily expiration summary - public for cron access
+[functions.daily-expiration-summary]
+verify_jwt = false
+
+# Cron job for weekly expiration summary - public for cron access
+[functions.weekly-expiration-summary]
+verify_jwt = false
+
 # 2FA functions - require authentication
 [functions.generate-totp-secret]
 verify_jwt = true
