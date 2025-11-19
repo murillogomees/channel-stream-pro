@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { validateBrazilianPhone } from "@/utils/phoneValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
+import { activityLogService } from "@/services/activityLogService";
 
 interface NotificationPhone {
   id: string;
@@ -161,7 +162,7 @@ const AdminNotificationSettings = () => {
     return phone;
   };
 
-  const handleAddAdminPhone = () => {
+  const handleAddAdminPhone = async () => {
     if (!newAdminPhone.trim()) {
       toast.error("Digite um número de telefone");
       return;
@@ -185,15 +186,34 @@ const AdminNotificationSettings = () => {
       adminPhones: [...adminPhones, formatted]
     });
 
+    // Registrar atividade
+    await activityLogService.logActivity(
+      'config_updated',
+      `Telefone de administrador adicionado: ${formatted}`,
+      'configuracao',
+      undefined,
+      { tipo: 'admin_phone_added', telefone: formatted }
+    );
+
     setNewAdminPhone("");
     toast.success("Telefone de administrador adicionado!");
   };
 
-  const handleRemoveAdminPhone = (phone: string) => {
+  const handleRemoveAdminPhone = async (phone: string) => {
     const adminPhones = config.adminPhones || [];
     saveConfig({
       adminPhones: adminPhones.filter(p => p !== phone)
     });
+    
+    // Registrar atividade
+    await activityLogService.logActivity(
+      'config_updated',
+      `Telefone de administrador removido: ${phone}`,
+      'configuracao',
+      undefined,
+      { tipo: 'admin_phone_removed', telefone: phone }
+    );
+    
     toast.success("Telefone removido!");
   };
 
