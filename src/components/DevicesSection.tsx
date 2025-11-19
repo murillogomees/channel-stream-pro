@@ -33,23 +33,23 @@ const DevicesSection = () => {
   };
 
   return (
-    <section className="py-20 px-4 bg-gradient-to-b from-background via-surface/50 to-background">
+    <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background via-surface/50 to-background">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+        <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent px-4">
             {devicesConfig.title}
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground mb-2">
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-2 px-4">
             {devicesConfig.subtitle}
           </p>
-          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-4">
             {devicesConfig.description}
           </p>
         </div>
 
         {/* Devices Image */}
-        <div className="mb-16 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="mb-10 sm:mb-12 lg:mb-16 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl">
           <img
             src={devicesImageWebP}
             alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
@@ -64,7 +64,7 @@ const DevicesSection = () => {
         </div>
 
         {/* Platform Icons Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
           {devicesConfig.platforms
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
@@ -73,7 +73,7 @@ const DevicesSection = () => {
               return (
                 <Card
                   key={platform.id}
-                  className="p-6 flex flex-col items-center justify-center gap-4 hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer group bg-surface/50 backdrop-blur border-muted/20"
+                  className="p-4 sm:p-5 md:p-6 flex flex-col items-center justify-center gap-3 sm:gap-4 hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer group bg-surface/50 backdrop-blur border-muted/20"
                   onClick={() => {
                     if (platform.downloadUrl) {
                       window.open(platform.downloadUrl, "_blank");

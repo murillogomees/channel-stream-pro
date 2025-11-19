@@ -6,25 +6,25 @@ const FloatingButtons = () => {
   const instagramUrl = "https://instagram.com/iptvlinkbr";
 
   return (
-    <div className="fixed right-6 bottom-[7.5rem] z-50 flex flex-col gap-3">
+    <div className="fixed right-4 sm:right-6 bottom-20 sm:bottom-24 lg:bottom-[7.5rem] z-50 flex flex-col gap-2 sm:gap-3">
       {/* WhatsApp Button */}
       <Button
         variant="default"
         size="icon"
-        className="h-14 w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all"
+        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all"
         onClick={() => window.open(whatsappUrl, "_blank")}
         aria-label="Falar no WhatsApp"
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
       </Button>
 
       {/* Instagram Button */}
       <button
-        className="h-14 w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white flex items-center justify-center"
+        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white flex items-center justify-center"
         onClick={() => window.open(instagramUrl, "_blank")}
         aria-label="Seguir no Instagram"
       >
-        <Instagram className="h-6 w-6" />
+        <Instagram className="h-5 w-5 sm:h-6 sm:w-6" />
       </button>
     </div>
   );

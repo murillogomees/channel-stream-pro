@@ -17,18 +17,18 @@ const ContactSection = () => {
   ];
 
   return (
-    <section id="contato" className="py-20 bg-background">
-      <div className="container mx-auto px-6">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl font-bold text-gradient-primary mb-4">
+    <section id="contato" className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-background">
+      <div className="container mx-auto max-w-7xl">
+      <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gradient-primary mb-4 sm:mb-6">
           Entre em Contato
         </h2>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
           Estamos prontos para atender você e tirar todas as suas dúvidas
         </p>
       </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-12">
           {/* Main WhatsApp Contact Card */}
           <div className="lg:col-span-1">
             <Card className="bg-gradient-card border-border text-center h-full flex flex-col shadow-glow ring-2 ring-primary/20">
