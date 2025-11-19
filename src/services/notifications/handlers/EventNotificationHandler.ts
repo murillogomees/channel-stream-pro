@@ -34,7 +34,7 @@ export class EventNotificationHandler {
     // 1. Detectar e enviar boas-vindas para novos clientes
     const newClientes = this.newClientDetector.detectNewClients(clientes);
     for (const cliente of newClientes) {
-      const sent = await this.sendWelcomeMessage(cliente, addLog);
+      const sent = await this.sendWelcomeMessage(cliente, addLog, true);
       if (sent) welcomeSent++;
     }
 
@@ -47,12 +47,22 @@ export class EventNotificationHandler {
     return { welcomeSent, renewalSent };
   }
 
-  private async sendWelcomeMessage(cliente: Cliente, addLog: (log: NotificationLog) => void): Promise<boolean> {
+  // Método público para enviar boas-vindas para um cliente específico (cadastro manual via formulário)
+  // Não verifica duplicação, sempre envia a mensagem
+  async sendWelcomeToNewClient(cliente: Cliente, addLog: (log: NotificationLog) => void): Promise<boolean> {
+    return await this.sendWelcomeMessage(cliente, addLog, false); // skipDuplicateCheck = false
+  }
+
+  private async sendWelcomeMessage(
+    cliente: Cliente, 
+    addLog: (log: NotificationLog) => void,
+    checkDuplicate: boolean = true
+  ): Promise<boolean> {
     const isTrial = cliente.situacao === 'Testando';
     const eventType = isTrial ? 'welcome_trial' : 'welcome_plan';
 
-    // Verificar se já enviou boas-vindas para este cliente
-    if (this.hasEventBeenSent(cliente.id, eventType)) {
+    // Verificar se já enviou boas-vindas para este cliente (apenas se checkDuplicate for true)
+    if (checkDuplicate && this.hasEventBeenSent(cliente.id, eventType)) {
       console.log(`Já enviou boas-vindas para ${cliente.nome}`);
       return false;
     }
