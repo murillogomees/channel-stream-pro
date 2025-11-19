@@ -41,8 +41,10 @@ export default function AdminM3UCustomBuilder() {
     tvg_logo: '',
   });
   const [importUrl, setImportUrl] = useState('');
+  const [importContent, setImportContent] = useState('');
   const [m3uPreview, setM3uPreview] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const selectedList = lists.find(l => l.id === selectedListId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
@@ -101,21 +103,36 @@ export default function AdminM3UCustomBuilder() {
   };
 
   const handleImportM3U = async () => {
-    if (!selectedListId || !importUrl) return;
+    if (!selectedListId) return;
+    if (!importUrl && !importContent) {
+      toast({
+        title: 'Informe a URL ou cole o conteúdo da M3U',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
-      const result = await m3uCustomService.importFromUrl(importUrl, selectedListId);
+      setIsImporting(true);
+      const result = importContent.trim()
+        ? await m3uCustomService.importFromContent(importContent, selectedListId)
+        : await m3uCustomService.importFromUrl(importUrl, selectedListId);
+      
       toast({
         title: 'M3U importado com sucesso!',
-        description: `${result.categoriesCount} categorias e ${result.channelsCount} canais importados`
+        description: `${result.categoriesCount} categorias e ${result.channelsCount} canais importados`,
       });
       setIsImportDialogOpen(false);
       setImportUrl('');
+      setImportContent('');
       refreshCategories();
     } catch (error: any) {
       toast({ title: 'Erro ao importar M3U', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
     }
   };
+
 
   const handleGeneratePreview = async () => {
     if (!selectedListId) return;
@@ -312,17 +329,31 @@ export default function AdminM3UCustomBuilder() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Importar M3U</DialogTitle>
-                        <DialogDescription>Cole a URL do arquivo M3U para importar</DialogDescription>
+                        <DialogDescription>
+                          Você pode importar pela URL (HTTPS recomendado) ou colando o conteúdo do arquivo .m3u
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <Input
-                          value={importUrl}
-                          onChange={(e) => setImportUrl(e.target.value)}
-                          placeholder="https://exemplo.com/playlist.m3u"
-                        />
-                        <Button onClick={handleImportM3U} className="w-full">
+                        <div className="space-y-2">
+                          <Label>URL do arquivo M3U (opcional)</Label>
+                          <Input
+                            value={importUrl}
+                            onChange={(e) => setImportUrl(e.target.value)}
+                            placeholder="https://exemplo.com/playlist.m3u"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Conteúdo do arquivo M3U (opcional)</Label>
+                          <Textarea
+                            value={importContent}
+                            onChange={(e) => setImportContent(e.target.value)}
+                            placeholder="#EXTM3U\n#EXTINF:-1 tvg-id=..."
+                            className="min-h-[160px]"
+                          />
+                        </div>
+                        <Button onClick={handleImportM3U} className="w-full" disabled={isImporting}>
                           <Upload className="h-4 w-4 mr-2" />
-                          Importar
+                          {isImporting ? 'Importando...' : 'Importar'}
                         </Button>
                       </div>
                     </DialogContent>

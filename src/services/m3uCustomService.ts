@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { fetchM3U } from '@/utils/m3uParser';
+import { fetchM3U, parseM3U } from '@/utils/m3uParser';
 
 export interface CustomList {
   id: string;
@@ -238,7 +238,7 @@ export class M3UCustomService {
   }
 
   /**
-   * Importa M3U de URL
+   * Importa M3U de URL (usa Edge Function para evitar Mixed Content)
    */
   async importFromUrl(url: string, listId: string): Promise<{
     categoriesCount: number;
@@ -246,45 +246,69 @@ export class M3UCustomService {
   }> {
     try {
       const playlist = await fetchM3U(url);
-      
-      let categoriesCount = 0;
-      let channelsCount = 0;
-
-      // Criar categorias e canais
-      for (const categoryName of playlist.categories) {
-        const category = await this.addCategory({
-          custom_list_id: listId,
-          name: categoryName,
-          display_name: categoryName,
-          order_position: categoriesCount
-        });
-
-        const channelsInCategory = playlist.channels.filter(
-          ch => ch.category === categoryName
-        );
-
-        for (let i = 0; i < channelsInCategory.length; i++) {
-          const ch = channelsInCategory[i];
-          await this.addChannel({
-            category_id: category.id,
-            name: ch.name,
-            stream_url: ch.url,
-            tvg_id: ch.tvgId,
-            tvg_name: ch.tvgName,
-            tvg_logo: ch.logo,
-            group_title: ch.groupTitle,
-            order_position: i
-          });
-          channelsCount++;
-        }
-
-        categoriesCount++;
-      }
-
-      return { categoriesCount, channelsCount };
+      return this.importParsedPlaylist(playlist, listId);
     } catch (error) {
       throw new Error(`Erro ao importar M3U: ${error}`);
     }
+  }
+
+  /**
+   * Importa M3U a partir do conteúdo bruto (cola do arquivo)
+   */
+  async importFromContent(content: string, listId: string): Promise<{
+    categoriesCount: number;
+    channelsCount: number;
+  }> {
+    try {
+      const playlist = parseM3U(content);
+      return this.importParsedPlaylist(playlist, listId);
+    } catch (error) {
+      throw new Error(`Erro ao importar M3U: ${error}`);
+    }
+  }
+
+  /**
+   * Reutiliza lógica de criação de categorias/canais para uma playlist já parseada
+   */
+  private async importParsedPlaylist(
+    playlist: { channels: any[]; categories: string[] },
+    listId: string
+  ): Promise<{ categoriesCount: number; channelsCount: number }> {
+    let categoriesCount = 0;
+    let channelsCount = 0;
+
+    // Criar categorias e canais
+    for (const categoryName of playlist.categories) {
+      const category = await this.addCategory({
+        custom_list_id: listId,
+        name: categoryName,
+        display_name: categoryName,
+        order_position: categoriesCount,
+      });
+
+      const channelsInCategory = playlist.channels.filter(
+        (ch) => ch.category === categoryName
+      );
+
+      for (let i = 0; i < channelsInCategory.length; i++) {
+        const ch = channelsInCategory[i];
+        await this.addChannel({
+          category_id: category.id,
+          name: ch.name,
+          stream_url: ch.url,
+          tvg_id: ch.tvgId,
+          tvg_name: ch.tvgName,
+          tvg_logo: ch.logo,
+          group_title: ch.groupTitle,
+          order_position: i,
+        });
+        channelsCount++;
+      }
+
+      categoriesCount++;
+    }
+
+    return { categoriesCount, channelsCount };
   }
 
   /**
