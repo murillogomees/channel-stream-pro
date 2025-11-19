@@ -46,6 +46,8 @@ const AdminCustomStatusBadges = lazy(() => import("./pages/AdminCustomStatusBadg
 const AdminStatusHistory = lazy(() => import("./pages/AdminStatusHistory"));
 const AdminM3UUsageReport = lazy(() => import("./pages/AdminM3UUsageReport"));
 const AdminBackupSystem = lazy(() => import("./pages/AdminBackupSystem"));
+const AdminCustomize = lazy(() => import("./pages/AdminCustomize"));
+const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -102,6 +104,8 @@ const App = () => (
           <Route path="/admin/smartone-test" element={<ProtectedRoute requireAdmin><AdminSmartOneTest /></ProtectedRoute>} />
           <Route path="/admin/custom-status-badges" element={<ProtectedRoute requireAdmin><AdminCustomStatusBadges /></ProtectedRoute>} />
           <Route path="/admin/status-history" element={<ProtectedRoute requireAdmin><AdminStatusHistory /></ProtectedRoute>} />
+          <Route path="/admin/customize" element={<ProtectedRoute requireAdmin><AdminCustomize /></ProtectedRoute>} />
+          <Route path="/admin/variables" element={<ProtectedRoute requireAdmin><AdminVariables /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
