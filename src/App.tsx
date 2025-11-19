@@ -44,6 +44,8 @@ const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
 const AdminSmartOneTest = lazy(() => import("./pages/AdminSmartOneTest"));
 const AdminCustomStatusBadges = lazy(() => import("./pages/AdminCustomStatusBadges"));
 const AdminStatusHistory = lazy(() => import("./pages/AdminStatusHistory"));
+const AdminM3UUsageReport = lazy(() => import("./pages/AdminM3UUsageReport"));
+const AdminBackupSystem = lazy(() => import("./pages/AdminBackupSystem"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -75,8 +77,10 @@ const App = () => (
           <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoes /></ProtectedRoute>} />
           <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
           <Route path="/admin/templates" element={<ProtectedRoute requireAdmin><AdminTemplates /></ProtectedRoute>} />
-          <Route path="/admin/m3u-lists" element={<ProtectedRoute requireAdmin><AdminM3ULists /></ProtectedRoute>} />
-          <Route path="/admin/m3u-stats" element={<ProtectedRoute requireAdmin><AdminM3UListStats /></ProtectedRoute>} />
+              <Route path="/admin/m3u-lists" element={<ProtectedRoute requireAdmin><AdminM3ULists /></ProtectedRoute>} />
+              <Route path="/admin/m3u-stats" element={<ProtectedRoute requireAdmin><AdminM3UListStats /></ProtectedRoute>} />
+              <Route path="/admin/m3u-usage-report" element={<ProtectedRoute requireAdmin><AdminM3UUsageReport /></ProtectedRoute>} />
+              <Route path="/admin/backup-system" element={<ProtectedRoute requireAdmin><AdminBackupSystem /></ProtectedRoute>} />
           <Route path="/admin/notification-settings" element={<ProtectedRoute requireAdmin><AdminNotificationSettings /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalytics /></ProtectedRoute>} />
           <Route path="/admin/system-health" element={<ProtectedRoute requireAdmin><AdminSystemHealth /></ProtectedRoute>} />

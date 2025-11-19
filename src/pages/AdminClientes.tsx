@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
@@ -14,6 +14,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -24,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, ExternalLink, Filter, Download } from 'lucide-react';
 import { Cliente } from '@/types/cliente';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +83,65 @@ export default function AdminClientes() {
     macSmartOne: string;
     m3uLists: Array<{ name: string; file_url: string }>;
   } | null>(null);
+
+  // Filtros avançados
+  const [filterPlano, setFilterPlano] = useState<string>('all');
+  const [filterOrigem, setFilterOrigem] = useState<string>('all');
+  const [filterSmartOneStatus, setFilterSmartOneStatus] = useState<string>('all');
+  const [filterVencimento, setFilterVencimento] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filteredClientes = useMemo(() => {
+    return clientes.filter(cliente => {
+      // Filtro de plano
+      if (filterPlano !== 'all' && cliente.plano !== filterPlano) {
+        return false;
+      }
+
+      // Filtro de origem
+      if (filterOrigem !== 'all' && cliente.origemCadastro !== filterOrigem) {
+        return false;
+      }
+
+      // Filtro de status SmartOne
+      if (filterSmartOneStatus !== 'all' && cliente.smartone_status !== filterSmartOneStatus) {
+        return false;
+      }
+
+      // Filtro de vencimento
+      if (filterVencimento !== 'all' && cliente.dataVencimento) {
+        const daysUntilDue = getDaysUntilDue(cliente.dataVencimento);
+        switch (filterVencimento) {
+          case 'vencido':
+            if (daysUntilDue >= 0) return false;
+            break;
+          case 'vence_hoje':
+            if (daysUntilDue !== 0) return false;
+            break;
+          case 'vence_5_dias':
+            if (daysUntilDue < 0 || daysUntilDue > 5) return false;
+            break;
+          case 'vence_30_dias':
+            if (daysUntilDue < 0 || daysUntilDue > 30) return false;
+            break;
+          default:
+            break;
+        }
+      }
+
+      return true;
+    });
+  }, [clientes, filterPlano, filterOrigem, filterSmartOneStatus, filterVencimento]);
+
+  const resetFilters = () => {
+    setFilterPlano('all');
+    setFilterOrigem('all');
+    setFilterSmartOneStatus('all');
+    setFilterVencimento('all');
+  };
+
+  const hasActiveFilters = filterPlano !== 'all' || filterOrigem !== 'all' || 
+                          filterSmartOneStatus !== 'all' || filterVencimento !== 'all';
 
   if (loading || loadingClientes) {
     return (
@@ -324,11 +390,110 @@ export default function AdminClientes() {
               Gerenciar Clientes
             </h1>
           </div>
-          <Button onClick={() => navigate('/admin/clientes/novo')} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Cliente
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => navigate('/admin/clientes/novo')} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </div>
         </div>
+
+        {/* Filtros Avançados */}
+        {showFilters && (
+          <Card className="p-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Filtros Avançados</h3>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    Limpar Filtros
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Plano</Label>
+                  <Select value={filterPlano} onValueChange={setFilterPlano}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os planos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os planos</SelectItem>
+                      <SelectItem value="Mensal">Mensal</SelectItem>
+                      <SelectItem value="Trimestral">Trimestral</SelectItem>
+                      <SelectItem value="Semestral">Semestral</SelectItem>
+                      <SelectItem value="Anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Origem de Cadastro</Label>
+                  <Select value={filterOrigem} onValueChange={setFilterOrigem}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas as origens" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as origens</SelectItem>
+                      <SelectItem value="Google Ads">Google Ads</SelectItem>
+                      <SelectItem value="Facebook">Facebook</SelectItem>
+                      <SelectItem value="Instagram">Instagram</SelectItem>
+                      <SelectItem value="Indicação">Indicação</SelectItem>
+                      <SelectItem value="Website">Website</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status SmartOne</Label>
+                  <Select value={filterSmartOneStatus} onValueChange={setFilterSmartOneStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="nao_enviado">Não Enviado</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="criado">Criado</SelectItem>
+                      <SelectItem value="erro">Erro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Vencimento</Label>
+                  <Select value={filterVencimento} onValueChange={setFilterVencimento}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="vencido">Vencidos</SelectItem>
+                      <SelectItem value="vence_hoje">Vence Hoje</SelectItem>
+                      <SelectItem value="vence_5_dias">Vence em até 5 dias</SelectItem>
+                      <SelectItem value="vence_30_dias">Vence em até 30 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {hasActiveFilters && (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Mostrando {filteredClientes.length} de {clientes.length} clientes
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card className="p-3 sm:p-4 lg:p-6">
           <div className="overflow-x-auto -mx-3 sm:-mx-4 lg:-mx-6">
@@ -349,7 +514,16 @@ export default function AdminClientes() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientes.map((cliente: Cliente) => (
+                  {filteredClientes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        {hasActiveFilters 
+                          ? 'Nenhum cliente encontrado com os filtros aplicados' 
+                          : 'Nenhum cliente cadastrado ainda'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredClientes.map((cliente: Cliente) => (
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
                       <TableCell className="hidden md:table-cell">{cliente.email}</TableCell>
@@ -576,8 +750,9 @@ export default function AdminClientes() {
                       </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                ))}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
