@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { M3UListSelector } from '@/components/admin/M3UListSelector';
 import { M3UListPreview } from '@/components/admin/M3UListPreview';
 import { SmartOneValidationAlert } from '@/components/admin/SmartOneValidationAlert';
+import { SmartOneDataDialog } from '@/components/admin/SmartOneDataDialog';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -93,6 +94,12 @@ export default function AdminClienteForm() {
     errors: string[];
     warnings: string[];
   }>({ errors: [], warnings: [] });
+  const [showSmartOneData, setShowSmartOneData] = useState(false);
+  const [savedClientData, setSavedClientData] = useState<{
+    nome: string;
+    macSmartOne: string;
+    m3uLists: Array<{ name: string; file_url: string }>;
+  } | null>(null);
 
   const {
     register,
@@ -154,6 +161,17 @@ export default function AdminClienteForm() {
                 setValue(key as keyof ClienteFormData, value, { shouldValidate: false });
               }
             });
+
+            // Buscar M3U lists atribuídas ao cliente
+            const { data: m3uAssignments } = await supabase
+              .from('client_m3u_lists')
+              .select('m3u_list_id')
+              .eq('client_id', id)
+              .eq('is_active', true);
+
+            if (m3uAssignments) {
+              setSelectedM3ULists(m3uAssignments.map(a => a.m3u_list_id));
+            }
           }
         } catch (error) {
           console.error('Erro ao carregar cliente:', error);
@@ -302,6 +320,24 @@ export default function AdminClienteForm() {
           title: "Cliente atualizado",
           description: "Dados salvos com sucesso.",
         });
+        
+        // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
+        if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
+          const selectedM3UData = allM3ULists.filter(list => 
+            selectedM3ULists.includes(list.id)
+          );
+          
+          setSavedClientData({
+            nome: clienteData.nome,
+            macSmartOne: clienteData.macSmartOne,
+            m3uLists: selectedM3UData.map(list => ({
+              name: list.name,
+              file_url: list.file_url,
+            })),
+          });
+          setShowSmartOneData(true);
+          return; // Não navega automaticamente
+        }
       }
 
       // Enviar mensagem de atualização se checkbox estiver marcado
@@ -441,6 +477,24 @@ export default function AdminClienteForm() {
             title: "Cliente cadastrado",
             description: "Dados salvos com sucesso.",
           });
+
+          // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
+          if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
+            const selectedM3UData = allM3ULists.filter(list => 
+              selectedM3ULists.includes(list.id)
+            );
+            
+            setSavedClientData({
+              nome: clienteData.nome,
+              macSmartOne: clienteData.macSmartOne,
+              m3uLists: selectedM3UData.map(list => ({
+                name: list.name,
+                file_url: list.file_url,
+              })),
+            });
+            setShowSmartOneData(true);
+            return; // Não navega automaticamente
+          }
       }
 
       // Boas-vindas serão enviadas automaticamente pelo EventNotificationHandler
@@ -457,7 +511,11 @@ export default function AdminClienteForm() {
         return;
       }
     }
-    navigate('/admin/clientes');
+    
+    // Só navega se não for mostrar o diálogo do SmartOne
+    if (!savedClientData) {
+      navigate('/admin/clientes');
+    }
   };
 
   return (
@@ -703,6 +761,20 @@ export default function AdminClienteForm() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Diálogo com dados para SmartOne */}
+        {savedClientData && (
+          <SmartOneDataDialog
+            open={showSmartOneData}
+            onOpenChange={(open) => {
+              setShowSmartOneData(open);
+              if (!open) {
+                navigate('/admin/clientes');
+              }
+            }}
+            clientData={savedClientData}
+          />
+        )}
       </div>
     </div>
   );
