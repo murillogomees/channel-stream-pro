@@ -9,13 +9,6 @@ export interface SmartOneConfig {
   keyApi: string;
 }
 
-export interface SmartOneSyncResult {
-  success: boolean;
-  status: 'criado' | 'erro';
-  playlistId?: string;
-  rawResponse: any;
-  error?: string;
-}
 
 export interface SmartOneTestPlaylist {
   nome: string;
@@ -109,36 +102,6 @@ export const clearMacHistory = (): void => {
   localStorage.removeItem(MAC_HISTORY_KEY);
 };
 
-// Retry com backoff exponencial
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  let lastError: any;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      
-      // Se for a última tentativa, lança o erro
-      if (attempt === maxRetries - 1) {
-        throw error;
-      }
-      
-      // Calcula delay com backoff exponencial: 1s, 2s, 4s, etc.
-      const delay = baseDelay * Math.pow(2, attempt);
-      console.log(`[SmartOne Retry] Tentativa ${attempt + 1}/${maxRetries} falhou. Tentando novamente em ${delay}ms...`);
-      
-      // Aguarda antes da próxima tentativa
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  throw lastError;
-}
 
 class SmartoneService {
   private config: SmartOneConfig | null = null;
@@ -171,8 +134,8 @@ class SmartoneService {
   }
 
   /**
-   * Valida todas as pré-condições antes de tentar sincronizar com SmartOne
-   * Retorna array de avisos/erros encontrados
+   * Valida pré-condições para operações com SmartOne
+   * Útil para verificar dados antes de operações manuais
    */
   async validateClientForSync(cliente: Cliente): Promise<{
     valid: boolean;
@@ -229,109 +192,6 @@ class SmartoneService {
     };
   }
 
-  async syncPlaylistForClient(
-    cliente: Cliente,
-    updateClienteFn: (id: string, data: Partial<Cliente>) => void
-  ): Promise<SmartOneSyncResult> {
-    // Validação preventiva completa
-    const validation = await this.validateClientForSync(cliente);
-    
-    if (!validation.valid) {
-      const errorMessage = validation.errors.join('; ');
-      console.error('[SmartOne] Validação preventiva falhou:', errorMessage);
-      
-      return {
-        success: false,
-        status: 'erro',
-        rawResponse: { validation },
-        error: errorMessage,
-      };
-    }
-
-    // Mostrar avisos no console se houver
-    if (validation.warnings.length > 0) {
-      console.warn('[SmartOne] Avisos de validação:', validation.warnings);
-    }
-
-    const config = await this.getConfig();
-
-    // Atualizar status para pendente
-    updateClienteFn(cliente.id, {
-      smartone_status: 'pendente',
-      smartone_last_sync_at: new Date().toISOString(),
-    });
-
-    try {
-      // Buscar listas M3U atribuídas ao cliente
-      const { data: clientLists } = await supabase
-        .from('client_m3u_lists')
-        .select('m3u_list_id')
-        .eq('client_id', cliente.id)
-        .eq('is_active', true);
-
-      const m3uListIds = clientLists?.map(cl => cl.m3u_list_id) || [];
-      
-      console.log('[SmartOne] Sincronizando cliente com', m3uListIds.length, 'lista(s) M3U');
-
-      // Chamar edge function com retry automático
-      const result = await retryWithBackoff(async () => {
-        const { data, error } = await supabase.functions.invoke('smartone-sync', {
-          body: {
-            mac: cliente.macSmartOne,
-            clienteNome: cliente.nome,
-            clienteId: cliente.id,
-            m3uListIds: m3uListIds,
-          },
-        });
-
-        if (error) {
-          console.error('[SmartOne] Erro na tentativa de sincronização:', error);
-          throw error;
-        }
-
-        return data;
-      }, 3, 1000); // 3 tentativas com delay inicial de 1s
-
-      // Sucesso
-      updateClienteFn(cliente.id, {
-        smartone_status: 'criado',
-        smartone_playlist_id: result.playlistId || result.id || 'N/A',
-        smartone_raw_response: JSON.stringify(result),
-        smartone_last_sync_at: new Date().toISOString(),
-      });
-
-      return {
-        success: true,
-        status: 'criado',
-        playlistId: result.playlistId || result.id,
-        rawResponse: result,
-      };
-    } catch (error: any) {
-      console.error('[SmartOne] Todas as tentativas de sincronização falharam:', error);
-
-      updateClienteFn(cliente.id, {
-        smartone_status: 'erro',
-        smartone_raw_response: JSON.stringify({ error: error.message }),
-        smartone_last_sync_at: new Date().toISOString(),
-      });
-
-      // Notificar administradores sobre a falha
-      try {
-        const { getSmartOneSyncAlertService } = await import('./smartoneSyncAlertService');
-        const alertService = getSmartOneSyncAlertService();
-        await alertService.notifyAdminsOfSyncFailure(cliente, error.message, 3);
-      } catch (alertError) {
-        console.error('[SmartOne] Erro ao enviar alertas para admins:', alertError);
-      }
-
-      return {
-        success: false,
-        status: 'erro',
-        rawResponse: error,
-        error: error.message,
-      };
-    }
-  }
 
   async testCreatePlaylist(playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
     // Validar MAC Address

@@ -227,11 +227,8 @@ export default function TutorialSmartOne() {
         origemCadastro: formData.origemCadastro,
       });
 
-      // Tentar criar playlist no SmartOne
-      await smartoneService.syncPlaylistForClient(
-        novoCliente,
-        updateCliente
-      );
+      // Cliente cadastrado com sucesso
+      // Nota: Sincronização com SmartOne deve ser feita manualmente pelo admin
 
       // Enviar notificações WhatsApp (cliente e admin)
       await sendClientWelcomeNotification(novoCliente);
