@@ -61,16 +61,34 @@ export class EventNotificationHandler {
     const isTrial = cliente.situacao === 'Testando';
     const eventType = isTrial ? 'welcome_trial' : 'welcome_plan';
 
+    console.log('[EventNotificationHandler] sendWelcomeMessage', {
+      clienteNome: cliente.nome,
+      isTrial,
+      eventType,
+      checkDuplicate,
+      situacao: cliente.situacao
+    });
+
     // Verificar se já enviou boas-vindas para este cliente (apenas se checkDuplicate for true)
     if (checkDuplicate && this.hasEventBeenSent(cliente.id, eventType)) {
-      console.log(`Já enviou boas-vindas para ${cliente.nome}`);
+      console.log(`[EventNotificationHandler] Já enviou boas-vindas para ${cliente.nome}`);
       return false;
     }
 
     // Buscar template correspondente
     const template = this.templateEngine.findTemplateByEvent(eventType);
+    
+    // Mostrar todos os templates disponíveis para debug
+    const allTemplates = this.templateEngine.loadTemplates();
+    console.log('[EventNotificationHandler] Templates disponíveis:', 
+      allTemplates.map(t => ({ name: t.name, eventType: t.eventType }))
+    );
+    console.log('[EventNotificationHandler] Template encontrado:', template ? template.name : 'NENHUM');
+    
     if (!template) {
-      console.log(`Template de ${eventType} não encontrado`);
+      console.error(`[EventNotificationHandler] Template de ${eventType} não encontrado. Tipos disponíveis:`, 
+        allTemplates.map(t => t.eventType)
+      );
       return false;
     }
 
