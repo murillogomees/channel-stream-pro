@@ -6,6 +6,7 @@ const HeroSection = lazy(() => import("@/components/HeroSection"));
 const DevicesSection = lazy(() => import("@/components/DevicesSection"));
 const PlansSection = lazy(() => import("@/components/PlansSection"));
 const ComparisonSection = lazy(() => import("@/components/ComparisonSection"));
+const SavingsCalculator = lazy(() => import("@/components/SavingsCalculator"));
 const ChannelsSection = lazy(() => import("@/components/ChannelsSection"));
 const MoviesSection = lazy(() => import("@/components/MoviesSection"));
 const ContactSection = lazy(() => import("@/components/ContactSection"));
@@ -37,6 +38,11 @@ const Index = () => {
         <section id="comparacao">
           <Suspense fallback={<div className="py-20 bg-background" />}>
             <ComparisonSection />
+          </Suspense>
+        </section>
+        <section id="calculadora">
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <SavingsCalculator />
           </Suspense>
         </section>
         <section id="canais">
