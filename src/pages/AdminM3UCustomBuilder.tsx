@@ -46,6 +46,14 @@ export default function AdminM3UCustomBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<string>("");
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editListName, setEditListName] = useState("");
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [editChannelName, setEditChannelName] = useState("");
+  const [transferChannelId, setTransferChannelId] = useState<string | null>(null);
+  const [transferToCategoryId, setTransferToCategoryId] = useState("");
 
   const selectedList = lists.find(l => l.id === selectedListId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
@@ -206,6 +214,77 @@ export default function AdminM3UCustomBuilder() {
     }
   };
 
+  const handleEditList = (list: any) => {
+    setEditingListId(list.id);
+    setEditListName(list.name);
+  };
+
+  const handleSaveListName = async () => {
+    if (!editingListId || !editListName.trim()) return;
+    
+    try {
+      await m3uCustomService.updateList(editingListId, { name: editListName.trim() });
+      toast({ title: 'Nome da lista atualizado!' });
+      setEditingListId(null);
+      refreshLists();
+    } catch (error: any) {
+      toast({ title: 'Erro ao atualizar lista', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleEditCategory = (category: any) => {
+    setEditingCategoryId(category.id);
+    setEditCategoryName(category.display_name);
+  };
+
+  const handleSaveCategoryName = async () => {
+    if (!editingCategoryId || !editCategoryName.trim()) return;
+    
+    try {
+      await m3uCustomService.updateCategory(editingCategoryId, { 
+        display_name: editCategoryName.trim(),
+        name: editCategoryName.trim().toLowerCase().replace(/\s+/g, '_')
+      });
+      toast({ title: 'Nome da categoria atualizado!' });
+      setEditingCategoryId(null);
+      refreshCategories();
+    } catch (error: any) {
+      toast({ title: 'Erro ao atualizar categoria', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleEditChannel = (channel: any) => {
+    setEditingChannelId(channel.id);
+    setEditChannelName(channel.name);
+  };
+
+  const handleSaveChannelName = async () => {
+    if (!editingChannelId || !editChannelName.trim()) return;
+    
+    try {
+      await m3uCustomService.updateChannel(editingChannelId, { name: editChannelName.trim() });
+      toast({ title: 'Nome do canal atualizado!' });
+      setEditingChannelId(null);
+      refreshChannels();
+    } catch (error: any) {
+      toast({ title: 'Erro ao atualizar canal', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleTransferChannel = async () => {
+    if (!transferChannelId || !transferToCategoryId) return;
+    
+    try {
+      await m3uCustomService.updateChannel(transferChannelId, { category_id: transferToCategoryId });
+      toast({ title: 'Canal transferido!' });
+      setTransferChannelId(null);
+      setTransferToCategoryId("");
+      refreshChannels();
+    } catch (error: any) {
+      toast({ title: 'Erro ao transferir canal', description: error.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -282,30 +361,58 @@ export default function AdminM3UCustomBuilder() {
                   onClick={() => setSelectedListId(list.id)}
                 >
                   <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{list.name}</h3>
-                        <p className="text-xs text-muted-foreground">{list.slug}</p>
-                        <div className="flex gap-2 mt-2">
-                          <Badge variant="secondary">{list.total_categories} categorias</Badge>
-                          <Badge variant="secondary">{list.total_channels} canais</Badge>
-                          <Badge variant={list.status === 'active' ? 'default' : 'outline'}>
-                            {list.status}
-                          </Badge>
+                    <div className="flex justify-between items-start gap-2">
+                      {editingListId === list.id ? (
+                        <div className="flex-1 flex gap-2">
+                          <Input
+                            value={editListName}
+                            onChange={(e) => setEditListName(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8"
+                          />
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleSaveListName(); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteList(list.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      ) : (
+                        <>
+                          <div className="flex-1">
+                            <h3 className="font-semibold">{list.name}</h3>
+                            <p className="text-xs text-muted-foreground">{list.slug}</p>
+                            <div className="flex gap-2 mt-2">
+                              <Badge variant="secondary">{list.total_categories} categorias</Badge>
+                              <Badge variant="secondary">{list.total_channels} canais</Badge>
+                              <Badge variant={list.status === 'active' ? 'default' : 'outline'}>
+                                {list.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditList(list);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteList(list.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    {list.cdn_url && (
+                    {list.cdn_url && !editingListId && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -435,14 +542,43 @@ export default function AdminM3UCustomBuilder() {
                   onClick={() => setSelectedCategoryId(category.id)}
                 >
                   <CardContent className="p-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="font-medium">{category.display_name}</h4>
-                        <p className="text-xs text-muted-foreground">{category.name}</p>
-                      </div>
-                      <Badge variant="secondary">
-                        {channels.filter(ch => ch.category_id === category.id).length} canais
-                      </Badge>
+                    <div className="flex justify-between items-center gap-2">
+                      {editingCategoryId === category.id ? (
+                        <div className="flex-1 flex gap-2">
+                          <Input
+                            value={editCategoryName}
+                            onChange={(e) => setEditCategoryName(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8"
+                          />
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleSaveCategoryName(); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{category.display_name}</h4>
+                            <p className="text-xs text-muted-foreground">{category.name}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {channels.filter(ch => ch.category_id === category.id).length} canais
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditCategory(category);
+                              }}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -543,7 +679,40 @@ export default function AdminM3UCustomBuilder() {
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{channel.name}</h4>
+                        {editingChannelId === channel.id ? (
+                          <div className="flex gap-2 mb-2">
+                            <Input
+                              value={editChannelName}
+                              onChange={(e) => setEditChannelName(e.target.value)}
+                              className="h-8"
+                            />
+                            <Button size="sm" onClick={handleSaveChannelName}>
+                              <Save className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h4 className="font-medium truncate flex-1">{channel.name}</h4>
+                            <div className="flex gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleEditChannel(channel)}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setTransferChannelId(channel.id)}
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground truncate">{channel.stream_url}</p>
                       </div>
                     </div>
@@ -554,6 +723,31 @@ export default function AdminM3UCustomBuilder() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de transferência de canal */}
+      <Dialog open={!!transferChannelId} onOpenChange={() => { setTransferChannelId(null); setTransferToCategoryId(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transferir Canal</DialogTitle>
+            <DialogDescription>Selecione a categoria de destino</DialogDescription>
+          </DialogHeader>
+          <Select value={transferToCategoryId} onValueChange={setTransferToCategoryId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.filter(c => c.id !== selectedCategoryId).map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.display_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={handleTransferChannel} disabled={!transferToCategoryId}>
+            Transferir
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {/* Actions */}
       {selectedListId && (
