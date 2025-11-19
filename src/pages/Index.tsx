@@ -5,9 +5,11 @@ const Navigation = lazy(() => import("@/components/Navigation"));
 const HeroSection = lazy(() => import("@/components/HeroSection"));
 const DevicesSection = lazy(() => import("@/components/DevicesSection"));
 const PlansSection = lazy(() => import("@/components/PlansSection"));
+const SectionNavigation = lazy(() => import("@/components/SectionNavigation"));
 const ComparisonSection = lazy(() => import("@/components/ComparisonSection"));
 const SavingsCalculator = lazy(() => import("@/components/SavingsCalculator"));
 const FAQSection = lazy(() => import("@/components/FAQSection"));
+const TestimonialsSection = lazy(() => import("@/components/TestimonialsSection"));
 const ChannelsSection = lazy(() => import("@/components/ChannelsSection"));
 const MoviesSection = lazy(() => import("@/components/MoviesSection"));
 const ContactSection = lazy(() => import("@/components/ContactSection"));
@@ -36,6 +38,24 @@ const Index = () => {
             <PlansSection />
           </Suspense>
         </section>
+        
+        {/* Section Navigation */}
+        <div className="bg-gradient-to-b from-card to-background">
+          <div className="container mx-auto max-w-7xl px-4">
+            <Suspense fallback={null}>
+              <SectionNavigation
+                sections={[
+                  { id: "planos", label: "Planos" },
+                  { id: "comparacao", label: "Comparação" },
+                  { id: "calculadora", label: "Calculadora" },
+                  { id: "faq", label: "FAQ" },
+                  { id: "depoimentos", label: "Depoimentos" }
+                ]}
+              />
+            </Suspense>
+          </div>
+        </div>
+
         <section id="comparacao">
           <Suspense fallback={<div className="py-20 bg-background" />}>
             <ComparisonSection />
@@ -49,6 +69,11 @@ const Index = () => {
         <section id="faq">
           <Suspense fallback={<div className="py-20 bg-background" />}>
             <FAQSection />
+          </Suspense>
+        </section>
+        <section id="depoimentos">
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <TestimonialsSection />
           </Suspense>
         </section>
         <section id="canais">
