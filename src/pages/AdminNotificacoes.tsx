@@ -7,6 +7,7 @@ import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

@@ -432,30 +432,6 @@ const AdminSystemHealth = () => {
             </TabsContent>
           </Tabs>
         )}
-
-        {/* Alerts */}
-        {alerts.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Alertas Não Reconhecidos ({alerts.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {alerts.slice(0, 5).map(alert => (
-                <div key={alert.id} className="p-3 border rounded-lg">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-semibold">{alert.title}</div>
-                      <div className="text-sm text-muted-foreground">{alert.message}</div>
-                    </div>
-                    <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
-                      {alert.severity}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
