@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { validateBrazilianPhone } from "@/utils/phoneValidator";
 import { supabase } from "@/integrations/supabase/client";
+import { useWhatsAppConfig } from "@/hooks/useWhatsAppConfig";
 
 interface NotificationPhone {
   id: string;
@@ -27,6 +28,10 @@ const AdminNotificationSettings = () => {
   const [newName, setNewName] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState(true);
+  
+  // WhatsApp config para alertas de vencimento
+  const { config, saveConfig } = useWhatsAppConfig();
+  const [newAdminPhone, setNewAdminPhone] = useState("");
 
   // Carregar configurações e setup realtime
   useEffect(() => {
@@ -156,7 +161,41 @@ const AdminNotificationSettings = () => {
     return phone;
   };
 
+  const handleAddAdminPhone = () => {
+    if (!newAdminPhone.trim()) {
+      toast.error("Digite um número de telefone");
+      return;
+    }
 
+    const validation = validateBrazilianPhone(newAdminPhone);
+    if (!validation.isValid) {
+      toast.error(`Número inválido: ${validation.error}`);
+      return;
+    }
+
+    const formatted = validation.formatted || newAdminPhone;
+    const adminPhones = config.adminPhones || [];
+
+    if (adminPhones.includes(formatted)) {
+      toast.error("Este número já está cadastrado");
+      return;
+    }
+
+    saveConfig({
+      adminPhones: [...adminPhones, formatted]
+    });
+
+    setNewAdminPhone("");
+    toast.success("Telefone de administrador adicionado!");
+  };
+
+  const handleRemoveAdminPhone = (phone: string) => {
+    const adminPhones = config.adminPhones || [];
+    saveConfig({
+      adminPhones: adminPhones.filter(p => p !== phone)
+    });
+    toast.success("Telefone removido!");
+  };
 
   const activeCount = phones.filter(p => p.active).length;
 
@@ -190,6 +229,95 @@ const AdminNotificationSettings = () => {
               Receba alertas no desktop quando erros críticos ocorrerem, mesmo com o dashboard fechado
             </CardDescription>
           </CardHeader>
+        </Card>
+
+        {/* Alertas de Vencimento para Administradores */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Alertas de Vencimento - Administradores
+            </CardTitle>
+            <CardDescription>
+              Configure telefones de administradores que receberão alertas via WhatsApp quando clientes tiverem assinaturas vencidas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Formulário para adicionar novo telefone */}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label htmlFor="admin-phone">Telefone do Administrador</Label>
+                <Input
+                  id="admin-phone"
+                  type="tel"
+                  placeholder="(61) 99999-9999"
+                  value={newAdminPhone}
+                  onChange={(e) => setNewAdminPhone(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddAdminPhone();
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                onClick={handleAddAdminPhone}
+                className="mt-6"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar
+              </Button>
+            </div>
+
+            {/* Lista de telefones cadastrados */}
+            {config.adminPhones && config.adminPhones.length > 0 ? (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead className="w-[100px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {config.adminPhones.map((phone) => (
+                      <TableRow key={phone}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-mono">{formatPhoneDisplay(phone)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveAdminPhone(phone)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhum telefone de administrador cadastrado</p>
+                <p className="text-sm mt-1">Adicione telefones para receber alertas de vencimento</p>
+              </div>
+            )}
+
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Como funciona:</strong> Quando a assinatura de um cliente vencer (dia 0 ou após), 
+                todos os administradores cadastrados acima receberão automaticamente uma mensagem via WhatsApp 
+                com os detalhes do cliente e alerta de vencimento.
+              </p>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

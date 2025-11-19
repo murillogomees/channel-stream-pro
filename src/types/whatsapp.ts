@@ -71,6 +71,7 @@ export interface WhatsAppConfig {
   daysToNotify: number[];
   testPhoneNumber: string;
   testContacts: TestContact[];
+  adminPhones: string[]; // Telefones de administradores para receber alertas
 }
 
 export interface BotBotResponse {

@@ -192,6 +192,7 @@ export class AutoNotificationScheduler {
         daysToNotify: [],
         testPhoneNumber: '',
         testContacts: [],
+        adminPhones: [],
       };
     }
     return JSON.parse(stored);
