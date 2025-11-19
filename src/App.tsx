@@ -26,7 +26,6 @@ const AdminNotificationRetry = lazy(() => import("./pages/AdminNotificationRetry
 const AdminNotificationStats = lazy(() => import("./pages/AdminNotificationStats"));
 const AdminNotificationAlerts = lazy(() => import("./pages/AdminNotificationAlerts"));
 const AdminNotificationLive = lazy(() => import("./pages/AdminNotificationLive"));
-const AdminSmartOneConfig = lazy(() => import("./pages/AdminSmartOneConfig"));
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
@@ -92,7 +91,6 @@ const App = () => (
           <Route path="/admin/notification-stats" element={<ProtectedRoute requireAdmin><AdminNotificationStats /></ProtectedRoute>} />
           <Route path="/admin/notification-alerts" element={<ProtectedRoute requireAdmin><AdminNotificationAlerts /></ProtectedRoute>} />
           <Route path="/admin/notification-live" element={<ProtectedRoute requireAdmin><AdminNotificationLive /></ProtectedRoute>} />
-          <Route path="/admin/smartone-config" element={<ProtectedRoute requireAdmin><AdminSmartOneConfig /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalytics /></ProtectedRoute>} />
           <Route path="/admin/system-health" element={<ProtectedRoute requireAdmin><AdminSystemHealth /></ProtectedRoute>} />
           <Route path="/admin/user-roles" element={<ProtectedRoute requireAdmin><AdminUserRoles /></ProtectedRoute>} />
