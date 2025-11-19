@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
-import { smartoneAutoSyncService } from "@/services/smartoneAutoSyncService";
 import { smartoneService } from "@/services/smartoneService";
 import { Cliente } from "@/types/cliente";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -164,14 +163,39 @@ const AdminSmartOneSync = () => {
     try {
       setSyncing(cliente.id);
       
-      const result = await smartoneAutoSyncService.syncClient({
-        user_id: cliente.user_id,
-        cliente_id: cliente.id,
+      // Criar objeto Cliente compatível com smartoneService
+      const clienteObj: Cliente = {
+        id: cliente.id,
         nome: cliente.profiles.nome,
         telefone: cliente.profiles.telefone,
+        telegram: '',
         email: cliente.profiles.email,
-        mac_smart_one: cliente.mac_smart_one,
-      });
+        macSmartOne: cliente.mac_smart_one,
+        situacao: 'Ativo',
+        plano: 'Mensal',
+        clienteAtivo: true,
+        dataCadastro: new Date().toISOString(),
+        dataUltimaEdicao: new Date().toISOString(),
+        dataContratacao: new Date().toISOString(),
+        dataVencimento: new Date().toISOString(),
+        valorPago: 0,
+        dataUltimoPagamento: '',
+        formaUltimoPagamento: '',
+        smartone_status: cliente.smartone_status as any,
+        smartone_last_sync_at: cliente.smartone_last_sync_at,
+      };
+
+      const result = await smartoneService.syncPlaylistForClient(
+        clienteObj,
+        (id, updates) => {
+          // Atualizar cliente localmente após sync
+          setClientes(prev => prev.map(c => 
+            c.id === id 
+              ? { ...c, smartone_status: updates.smartone_status || c.smartone_status }
+              : c
+          ));
+        }
+      );
 
       if (result.success) {
         toast({

@@ -51,6 +51,8 @@ const corsHeaders = {
 const syncRequestSchema = z.object({
   mac: z.string().trim().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, "MAC address inválido"),
   clienteNome: z.string().trim().min(2).max(200),
+  clienteId: z.string().uuid().optional(), // ID do cliente para buscar listas
+  m3uListIds: z.array(z.string().uuid()).optional(), // IDs das listas M3U selecionadas
 });
 
 serve(async (req) => {
@@ -192,7 +194,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const validated = syncRequestSchema.parse(body);
-    const { mac, clienteNome } = validated;
+    const { mac, clienteNome, clienteId, m3uListIds: requestM3uListIds } = validated;
 
     const SMARTONE_API_BASE_URL = Deno.env.get('SMARTONE_API_BASE_URL');
     const SMARTONE_CLIENT_API = Deno.env.get('SMARTONE_CLIENT_API');
@@ -206,48 +208,67 @@ serve(async (req) => {
       );
     }
 
-    // Buscar dados do cliente para determinar o plano
-    const { data: clienteData, error: clienteError } = await supabaseService
-      .from('clientes')
-      .select('situacao, plano, mac_smart_one')
-      .eq('mac_smart_one', mac)
-      .maybeSingle();
+    // Determinar quais listas M3U usar
+    let m3uListIds: string[] = [];
 
-    if (clienteError) {
-      console.warn('[smartone-sync] Cliente data fetch warning');
-    }
-
-    // Buscar a lista M3U apropriada baseada no plano do cliente usando a função SQL
-    let m3uListId = null;
-    
-    if (clienteData?.plano && clienteData?.situacao) {
-      const { data: listId, error: rpcError } = await supabaseService
-        .rpc('get_m3u_for_client_plan', {
-          cliente_plano: clienteData.plano,
-          cliente_situacao: clienteData.situacao,
-        });
-
-      if (!rpcError && listId) {
-        m3uListId = listId;
+    // 1. Prioridade: usar listas específicas fornecidas na requisição
+    if (requestM3uListIds && requestM3uListIds.length > 0) {
+      m3uListIds = requestM3uListIds;
+      console.log('[smartone-sync] Usando listas fornecidas na requisição:', m3uListIds.length);
+    } 
+    // 2. Segunda prioridade: buscar listas atribuídas ao cliente
+    else if (clienteId) {
+      const { data: clientLists, error: clientListsError } = await supabaseService
+        .from('client_m3u_lists')
+        .select('m3u_list_id')
+        .eq('client_id', clienteId)
+        .eq('is_active', true);
+      
+      if (!clientListsError && clientLists && clientLists.length > 0) {
+        m3uListIds = clientLists.map(cl => cl.m3u_list_id);
+        console.log('[smartone-sync] Usando listas do cliente:', m3uListIds.length);
       }
     }
 
-    // Fallback: buscar lista padrão se não encontrar pela função
-    if (!m3uListId) {
-      const { data: defaultList, error: defaultError } = await supabaseService
+    // 3. Fallback: buscar lista baseada no plano do cliente
+    if (m3uListIds.length === 0) {
+      const { data: clienteData } = await supabaseService
+        .from('clientes')
+        .select('situacao, plano')
+        .eq('mac_smart_one', mac)
+        .maybeSingle();
+
+      if (clienteData?.plano && clienteData?.situacao) {
+        const { data: listId } = await supabaseService
+          .rpc('get_m3u_for_client_plan', {
+            cliente_plano: clienteData.plano,
+            cliente_situacao: clienteData.situacao,
+          });
+
+        if (listId) {
+          m3uListIds = [listId];
+          console.log('[smartone-sync] Usando lista do plano do cliente');
+        }
+      }
+    }
+
+    // 4. Último fallback: lista padrão
+    if (m3uListIds.length === 0) {
+      const { data: defaultList } = await supabaseService
         .from('m3u_lists')
         .select('id')
         .eq('is_default', true)
         .eq('status', 'active')
         .maybeSingle();
 
-      if (!defaultError && defaultList) {
-        m3uListId = defaultList.id;
+      if (defaultList) {
+        m3uListIds = [defaultList.id];
+        console.log('[smartone-sync] Usando lista padrão');
       }
     }
 
-    // Buscar URL da lista selecionada
-    if (!m3uListId) {
+    // Verificar se encontrou pelo menos uma lista
+    if (m3uListIds.length === 0) {
       console.error('[smartone-sync] Nenhuma lista M3U disponível');
       return new Response(
         JSON.stringify({ error: 'Nenhuma lista M3U disponível' }),
@@ -255,60 +276,109 @@ serve(async (req) => {
       );
     }
 
-    const { data: m3uList, error: dbError } = await supabaseService
-      .from('m3u_lists')
-      .select('file_url, name')
-      .eq('id', m3uListId)
-      .single();
-
-    if (dbError || !m3uList) {
-      console.error('[smartone-sync] M3U list error:', dbError);
-      return new Response(
-        JSON.stringify({ error: 'Lista M3U não encontrada' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // SmartOne API call com autenticação via headers
-    const formBody = new URLSearchParams({
-      form_action: 'generate_m3u_playlist',
-      mac: mac,
-      m3u_name: clienteNome,
-      m3u_playlist: m3uList.file_url,
-      note: `Auto-sync ${new Date().toISOString()}`,
-    });
+    // Sincronizar TODAS as listas M3U
+    const syncResults = [];
     
-    const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Client-API': SMARTONE_CLIENT_API,
-        'X-Key-API': SMARTONE_KEY_API,
-      },
-      body: formBody.toString(),
-    });
+    for (const listId of m3uListIds) {
+      try {
+        const { data: m3uList, error: dbError } = await supabaseService
+          .from('m3u_lists')
+          .select('file_url, name')
+          .eq('id', listId)
+          .single();
 
-    const responseText = await smartoneResponse.text();
-    let smartoneData;
-    
-    try {
-      smartoneData = JSON.parse(responseText);
-    } catch {
-      smartoneData = { success: smartoneResponse.ok, error: 'Resposta inválida', raw_response: responseText };
+        if (dbError || !m3uList) {
+          console.error(`[smartone-sync] M3U list ${listId} not found:`, dbError);
+          syncResults.push({
+            m3uListId: listId,
+            success: false,
+            error: 'Lista M3U não encontrada',
+          });
+          continue;
+        }
+
+        // Nome da playlist: "Cliente - Lista"
+        const playlistName = `${clienteNome} - ${m3uList.name}`;
+        console.log(`[smartone-sync] Criando playlist: ${playlistName}`);
+
+        const formBody = new URLSearchParams({
+          form_action: 'generate_m3u_playlist',
+          mac: mac,
+          m3u_name: playlistName,
+          m3u_playlist: m3uList.file_url,
+          note: `Auto-sync ${new Date().toISOString()}`,
+        });
+        
+        const smartoneResponse = await fetch(
+          `${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-Client-API': SMARTONE_CLIENT_API,
+              'X-Key-API': SMARTONE_KEY_API,
+            },
+            body: formBody.toString(),
+          }
+        );
+
+        const responseText = await smartoneResponse.text();
+        let responseData;
+        
+        try {
+          responseData = JSON.parse(responseText);
+        } catch {
+          responseData = { 
+            success: smartoneResponse.ok, 
+            error: 'Resposta inválida', 
+            raw_response: responseText 
+          };
+        }
+
+        syncResults.push({
+          m3uListId: listId,
+          m3uListName: m3uList.name,
+          playlistName: playlistName,
+          success: smartoneResponse.ok && responseData.success !== false,
+          statusCode: smartoneResponse.status,
+          response: responseData,
+        });
+
+        console.log(`[smartone-sync] Resultado para ${playlistName}:`, {
+          success: smartoneResponse.ok,
+          status: smartoneResponse.status,
+        });
+
+      } catch (error) {
+        console.error(`[smartone-sync] Erro ao sincronizar lista ${listId}:`, error);
+        syncResults.push({
+          m3uListId: listId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Erro desconhecido',
+        });
+      }
     }
 
-    if (smartoneResponse.ok && smartoneData.success !== false) {
-      return new Response(
-        JSON.stringify({ success: true, message: 'Playlist criada com sucesso', data: smartoneData }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      console.error('[smartone-sync] Failed:', smartoneData);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Falha ao sincronizar', details: smartoneData }),
-        { status: smartoneResponse.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Retornar resultado agregado
+    const allSuccess = syncResults.every(r => r.success);
+    const successCount = syncResults.filter(r => r.success).length;
+
+    return new Response(
+      JSON.stringify({
+        success: allSuccess,
+        message: allSuccess 
+          ? `${successCount} playlist(s) criada(s) com sucesso` 
+          : `${successCount} de ${syncResults.length} playlist(s) criada(s)`,
+        results: syncResults,
+        totalLists: syncResults.length,
+        successCount: successCount,
+        failedCount: syncResults.length - successCount,
+      }),
+      { 
+        status: allSuccess ? 200 : 207, // 207 Multi-Status para sucesso parcial
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   } catch (error) {
     console.error('[smartone-sync] Error:', error);
     

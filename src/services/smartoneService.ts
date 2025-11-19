@@ -262,12 +262,25 @@ class SmartoneService {
     });
 
     try {
+      // Buscar listas M3U atribuídas ao cliente
+      const { data: clientLists } = await supabase
+        .from('client_m3u_lists')
+        .select('m3u_list_id')
+        .eq('client_id', cliente.id)
+        .eq('is_active', true);
+
+      const m3uListIds = clientLists?.map(cl => cl.m3u_list_id) || [];
+      
+      console.log('[SmartOne] Sincronizando cliente com', m3uListIds.length, 'lista(s) M3U');
+
       // Chamar edge function com retry automático
       const result = await retryWithBackoff(async () => {
         const { data, error } = await supabase.functions.invoke('smartone-sync', {
           body: {
             mac: cliente.macSmartOne,
             clienteNome: cliente.nome,
+            clienteId: cliente.id,
+            m3uListIds: m3uListIds,
           },
         });
 
