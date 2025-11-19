@@ -300,33 +300,100 @@ serve(async (req) => {
         const playlistName = `${clienteNome} - ${m3uList.name}`;
         console.log(`[smartone-sync] Criando playlist: ${playlistName}`);
 
-        // Primeiro, obter o CSRF token da página de add_playlist
+        // Passo 1: Fazer login no SmartOne para obter cookies de sessão
+        const SMARTONE_LOGIN_EMAIL = Deno.env.get('SMARTONE_LOGIN_EMAIL');
+        const SMARTONE_LOGIN_PASSWORD = Deno.env.get('SMARTONE_LOGIN_PASSWORD');
+
+        if (!SMARTONE_LOGIN_EMAIL || !SMARTONE_LOGIN_PASSWORD) {
+          console.error('[smartone-sync] Credenciais de login não configuradas');
+          syncResults.push({
+            m3uListId: listId,
+            success: false,
+            error: 'Credenciais de login SmartOne não configuradas',
+          });
+          continue;
+        }
+
+        let sessionCookies = '';
         let csrfToken = '';
+
         try {
-          const csrfResponse = await fetch(
+          // Obter página de login para pegar CSRF token inicial
+          console.log('[smartone-sync] Obtendo página de login...');
+          const loginPageResponse = await fetch(`${SMARTONE_API_BASE_URL}/client/login/`, {
+            method: 'GET',
+          });
+
+          // Capturar cookies da página de login
+          const loginPageCookies = loginPageResponse.headers.get('set-cookie') || '';
+          sessionCookies = loginPageCookies.split(';')[0]; // Pegar primeiro cookie
+
+          const loginPageHtml = await loginPageResponse.text();
+          const loginCsrfMatch = loginPageHtml.match(/name="_csrf_token"\s+value="([^"]+)"/);
+          
+          if (loginCsrfMatch && loginCsrfMatch[1]) {
+            csrfToken = loginCsrfMatch[1];
+            console.log('[smartone-sync] CSRF token de login obtido');
+          }
+
+          // Fazer login
+          console.log('[smartone-sync] Fazendo login...');
+          const loginFormData = new URLSearchParams({
+            _csrf_token: csrfToken,
+            username: SMARTONE_LOGIN_EMAIL,
+            password: SMARTONE_LOGIN_PASSWORD,
+          });
+
+          const loginResponse = await fetch(`${SMARTONE_API_BASE_URL}/client/login/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Cookie': sessionCookies,
+            },
+            body: loginFormData.toString(),
+            redirect: 'manual', // Não seguir redirecionamentos automaticamente
+          });
+
+          // Capturar cookies de sessão autenticada
+          const authCookies = loginResponse.headers.get('set-cookie');
+          if (authCookies) {
+            sessionCookies = authCookies.split(',').map(c => c.split(';')[0]).join('; ');
+            console.log('[smartone-sync] Login bem-sucedido, cookies de sessão obtidos');
+          }
+
+          // Obter página de add_playlist autenticada para pegar CSRF token válido
+          console.log('[smartone-sync] Obtendo CSRF token autenticado...');
+          const addPlaylistPageResponse = await fetch(
             `${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`,
             {
               method: 'GET',
               headers: {
-                'X-Client-API': SMARTONE_CLIENT_API,
-                'X-Key-API': SMARTONE_KEY_API,
+                'Cookie': sessionCookies,
               },
             }
           );
+
+          const addPlaylistHtml = await addPlaylistPageResponse.text();
+          const csrfMatch = addPlaylistHtml.match(/name="_csrf_token"\s+value="([^"]+)"/);
           
-          const htmlText = await csrfResponse.text();
-          const csrfMatch = htmlText.match(/name="_csrf_token"\s+value="([^"]+)"/);
           if (csrfMatch && csrfMatch[1]) {
             csrfToken = csrfMatch[1];
-            console.log('[smartone-sync] CSRF token obtido com sucesso');
+            console.log('[smartone-sync] CSRF token autenticado obtido');
           } else {
-            console.warn('[smartone-sync] CSRF token não encontrado na página');
+            console.warn('[smartone-sync] CSRF token não encontrado na página autenticada');
           }
-        } catch (csrfError) {
-          console.error('[smartone-sync] Erro ao obter CSRF token:', csrfError);
+
+        } catch (authError) {
+          console.error('[smartone-sync] Erro na autenticação:', authError);
+          syncResults.push({
+            m3uListId: listId,
+            success: false,
+            error: 'Falha na autenticação SmartOne',
+          });
+          continue;
         }
 
-        // Montar o formBody com todos os campos necessários
+        // Passo 2: Criar playlist usando sessão autenticada
         const formBody = new URLSearchParams({
           _csrf_token: csrfToken,
           form_action: 'generate_xtream_playlist',
@@ -336,14 +403,14 @@ serve(async (req) => {
           note: `Auto-sync ${new Date().toISOString()}`,
         });
         
+        console.log('[smartone-sync] Enviando requisição de criação de playlist...');
         const smartoneResponse = await fetch(
           `${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
-              'X-Client-API': SMARTONE_CLIENT_API,
-              'X-Key-API': SMARTONE_KEY_API,
+              'Cookie': sessionCookies,
             },
             body: formBody.toString(),
           }
