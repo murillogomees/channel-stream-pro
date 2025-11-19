@@ -87,6 +87,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ab_test_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ab_test_results_test_id_fkey"
             columns: ["test_id"]
             isOneToOne: false
@@ -405,6 +412,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_m3u_lists_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_m3u_lists_m3u_list_id_fkey"
             columns: ["m3u_list_id"]
             isOneToOne: false
@@ -424,6 +438,7 @@ export type Database = {
           email: string | null
           forma_ultimo_pagamento: string | null
           id: string
+          is_recorrente: boolean | null
           mac_smart_one: string | null
           nome: string
           origem_cadastro: Database["public"]["Enums"]["origem_cadastro"] | null
@@ -450,6 +465,7 @@ export type Database = {
           email?: string | null
           forma_ultimo_pagamento?: string | null
           id?: string
+          is_recorrente?: boolean | null
           mac_smart_one?: string | null
           nome: string
           origem_cadastro?:
@@ -480,6 +496,7 @@ export type Database = {
           email?: string | null
           forma_ultimo_pagamento?: string | null
           id?: string
+          is_recorrente?: boolean | null
           mac_smart_one?: string | null
           nome?: string
           origem_cadastro?:
@@ -577,6 +594,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversion_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversion_metrics_coupon_used_fkey"
             columns: ["coupon_used"]
             isOneToOne: false
@@ -616,6 +640,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_usage_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
             referencedColumns: ["id"]
           },
           {
@@ -1229,6 +1260,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notification_logs_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_retry_queue: {
@@ -1295,6 +1333,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_retry_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -1491,6 +1536,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_health_checks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -1893,6 +1945,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "smartone_sync_retry_queue_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
         ]
       }
       status_change_history: {
@@ -1994,6 +2053,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trial_behavior_tracking_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -2019,7 +2085,61 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_expiration_summary: {
+        Row: {
+          data_ultimo_pagamento: string | null
+          data_vencimento: string | null
+          dias_ate_vencimento: number | null
+          email: string | null
+          forma_ultimo_pagamento: string | null
+          id: string | null
+          is_recorrente: boolean | null
+          nome: string | null
+          origem_cadastro: Database["public"]["Enums"]["origem_cadastro"] | null
+          pagamento_recente: boolean | null
+          plano: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone: string | null
+          valor_pago: number | null
+        }
+        Insert: {
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dias_ate_vencimento?: never
+          email?: string | null
+          forma_ultimo_pagamento?: string | null
+          id?: string | null
+          is_recorrente?: boolean | null
+          nome?: string | null
+          origem_cadastro?:
+            | Database["public"]["Enums"]["origem_cadastro"]
+            | null
+          pagamento_recente?: never
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone?: string | null
+          valor_pago?: number | null
+        }
+        Update: {
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dias_ate_vencimento?: never
+          email?: string | null
+          forma_ultimo_pagamento?: string | null
+          id?: string | null
+          is_recorrente?: boolean | null
+          nome?: string | null
+          origem_cadastro?:
+            | Database["public"]["Enums"]["origem_cadastro"]
+            | null
+          pagamento_recente?: never
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone?: string | null
+          valor_pago?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_and_block_ip: {

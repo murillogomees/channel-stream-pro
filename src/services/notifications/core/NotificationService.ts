@@ -2,6 +2,7 @@ import { Cliente } from '@/types/cliente';
 import { WhatsappTemplate, NotificationLog } from '@/types/whatsapp';
 import { TemplateEngine } from './TemplateEngine';
 import { WhatsAppAdapter } from './WhatsAppAdapter';
+import { adminNotificationService } from '@/services/adminNotificationService';
 
 export interface SendNotificationOptions {
   cliente: Cliente;
@@ -81,6 +82,11 @@ export class NotificationService {
 
       addLog(log);
       console.log(`✅ Notificação enviada: ${cliente.nome} - ${template.name}`);
+      
+      // Enviar alerta para admins (não bloqueia o fluxo principal)
+      adminNotificationService.notifyMessageSent(cliente, template, true).catch(err => {
+        console.error('Erro ao enviar alerta para admins:', err);
+      });
     } catch (error) {
       // Log de erro
       const errorLog: NotificationLog = {
@@ -97,6 +103,17 @@ export class NotificationService {
 
       addLog(errorLog);
       console.error(`❌ Erro ao enviar: ${cliente.nome} - ${template.name}`);
+      
+      // Enviar alerta de erro para admins (não bloqueia o fluxo principal)
+      adminNotificationService.notifyMessageSent(
+        cliente, 
+        template, 
+        false, 
+        error instanceof Error ? error.message : 'Erro desconhecido'
+      ).catch(err => {
+        console.error('Erro ao enviar alerta de erro para admins:', err);
+      });
+      
       throw error;
     }
   }
