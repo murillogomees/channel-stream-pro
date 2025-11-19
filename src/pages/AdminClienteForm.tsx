@@ -459,6 +459,37 @@ export default function AdminClienteForm() {
           }
         }
 
+        // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
+        if (enviarWhatsApp) {
+          try {
+            const clienteCompleto: Cliente = {
+              ...clienteData,
+              id: clientId,
+              dataCadastro: new Date().toISOString(),
+              dataUltimaEdicao: new Date().toISOString(),
+            };
+
+            // Importar dinamicamente e enviar boas-vindas diretamente
+            const { EventNotificationHandler } = await import('@/services/notifications');
+            const eventHandler = new EventNotificationHandler();
+            const sent = await eventHandler.sendWelcomeToNewClient(clienteCompleto, addLog);
+            
+            if (sent) {
+              toast({
+                title: 'Mensagem enviada',
+                description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
+              });
+            }
+          } catch (error) {
+            console.error('Erro ao enviar mensagem de boas-vindas:', error);
+            toast({
+              title: 'Erro ao enviar WhatsApp',
+              description: error instanceof Error ? error.message : 'Erro desconhecido',
+              variant: 'destructive',
+            });
+          }
+        }
+
         // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
         if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
           const selectedM3UData = allM3ULists.filter(list => 
@@ -475,32 +506,6 @@ export default function AdminClienteForm() {
           });
           setShowSmartOneData(true);
           return; // Não navega automaticamente - aguarda confirmação do modal
-        }
-
-        // Enviar mensagem de boas-vindas via WhatsApp
-        if (enviarWhatsApp) {
-          try {
-            const clienteCompleto: Cliente = {
-              ...clienteData,
-              id: clientId,
-              dataCadastro: new Date().toISOString(),
-              dataUltimaEdicao: new Date().toISOString(),
-            };
-
-            // Importar dinamicamente e enviar
-            const { EventNotificationHandler } = await import('@/services/notifications');
-            const eventHandler = new EventNotificationHandler();
-            const result = await eventHandler.processEvents([clienteCompleto], [], addLog);
-            
-            if (result.welcomeSent > 0) {
-              toast({
-                title: 'Mensagem enviada',
-                description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
-              });
-            }
-          } catch (error) {
-            console.error('Erro ao enviar mensagem de boas-vindas:', error);
-          }
         }
       } catch (error) {
         console.error('Error creating client:', error);
