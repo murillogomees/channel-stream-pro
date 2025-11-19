@@ -504,7 +504,13 @@ export default function AdminClienteForm() {
 
         // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
         if (enviarWhatsApp) {
-          console.log('Tentando enviar WhatsApp de boas-vindas para:', clienteData.nome);
+          console.log('========================================');
+          console.log('INICIANDO ENVIO DE MENSAGEM DE BOAS-VINDAS');
+          console.log('Cliente:', clienteData.nome);
+          console.log('Telefone:', clienteData.telefone);
+          console.log('Situação:', clienteData.situacao);
+          console.log('========================================');
+          
           try {
             const clienteCompleto: Cliente = {
               ...clienteData,
@@ -513,16 +519,26 @@ export default function AdminClienteForm() {
               dataUltimaEdicao: new Date().toISOString(),
             };
 
-            console.log('Cliente completo para envio:', clienteCompleto);
+            console.log('Cliente completo criado:', {
+              id: clienteCompleto.id,
+              nome: clienteCompleto.nome,
+              telefone: clienteCompleto.telefone,
+              situacao: clienteCompleto.situacao
+            });
 
             // Importar dinamicamente e enviar boas-vindas diretamente
+            console.log('Importando EventNotificationHandler...');
             const { EventNotificationHandler } = await import('@/services/notifications');
+            console.log('EventNotificationHandler importado, criando instância...');
+            
             const eventHandler = new EventNotificationHandler();
-            console.log('EventHandler criado, enviando...');
+            console.log('EventHandler criado, chamando sendWelcomeToNewClient...');
             
             const sent = await eventHandler.sendWelcomeToNewClient(clienteCompleto, addLog);
             
-            console.log('Resultado do envio:', sent);
+            console.log('========================================');
+            console.log('RESULTADO DO ENVIO:', sent);
+            console.log('========================================');
             
             if (sent) {
               // Registrar atividade de notificação enviada
@@ -539,7 +555,13 @@ export default function AdminClienteForm() {
                 description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
               });
             } else {
-              console.warn('Mensagem não foi enviada - verificar configuração');
+              console.warn('========================================');
+              console.warn('MENSAGEM NÃO FOI ENVIADA');
+              console.warn('Verifique:');
+              console.warn('1. Configuração do WhatsApp');
+              console.warn('2. Templates disponíveis');
+              console.warn('3. Logs acima para detalhes');
+              console.warn('========================================');
               
               // Registrar falha na notificação
               await activityLogService.logActivity(
@@ -547,7 +569,7 @@ export default function AdminClienteForm() {
                 `Falha ao enviar mensagem de boas-vindas para ${clienteData.nome}`,
                 'cliente',
                 clientId,
-                { tipo: 'boas_vindas', telefone: clienteData.telefone, motivo: 'configuracao' }
+                { tipo: 'boas_vindas', telefone: clienteData.telefone, motivo: 'verificar_configuracao' }
               );
               
               toast({
@@ -557,7 +579,26 @@ export default function AdminClienteForm() {
               });
             }
           } catch (error) {
-            console.error('Erro ao enviar mensagem de boas-vindas:', error);
+            console.error('========================================');
+            console.error('ERRO CAPTURADO NO CATCH:');
+            console.error('Tipo:', error);
+            console.error('Mensagem:', error instanceof Error ? error.message : 'Erro desconhecido');
+            console.error('Stack:', error instanceof Error ? error.stack : 'N/A');
+            console.error('========================================');
+            
+            // Registrar erro no log de atividades
+            await activityLogService.logActivity(
+              'notification_error',
+              `Erro ao enviar mensagem de boas-vindas para ${clienteData.nome}`,
+              'cliente',
+              clientId,
+              { 
+                tipo: 'boas_vindas', 
+                telefone: clienteData.telefone, 
+                erro: error instanceof Error ? error.message : String(error)
+              }
+            );
+            
             toast({
               title: 'Erro ao enviar WhatsApp',
               description: error instanceof Error ? error.message : 'Erro desconhecido',

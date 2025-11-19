@@ -50,7 +50,10 @@ export class EventNotificationHandler {
   // Método público para enviar boas-vindas para um cliente específico (cadastro manual via formulário)
   // Não verifica duplicação, sempre envia a mensagem
   async sendWelcomeToNewClient(cliente: Cliente, addLog: (log: NotificationLog) => void): Promise<boolean> {
-    return await this.sendWelcomeMessage(cliente, addLog, false); // skipDuplicateCheck = false
+    console.log('[EventNotificationHandler] sendWelcomeToNewClient iniciado para:', cliente.nome);
+    const result = await this.sendWelcomeMessage(cliente, addLog, false); // checkDuplicate = false (não verifica duplicatas)
+    console.log('[EventNotificationHandler] sendWelcomeToNewClient resultado:', result);
+    return result;
   }
 
   private async sendWelcomeMessage(
@@ -71,9 +74,11 @@ export class EventNotificationHandler {
 
     // Verificar se já enviou boas-vindas para este cliente (apenas se checkDuplicate for true)
     if (checkDuplicate && this.hasEventBeenSent(cliente.id, eventType)) {
-      console.log(`[EventNotificationHandler] Já enviou boas-vindas para ${cliente.nome}`);
+      console.log(`[EventNotificationHandler] Já enviou boas-vindas para ${cliente.nome} - pulando envio`);
       return false;
     }
+    
+    console.log(`[EventNotificationHandler] Prosseguindo com envio (checkDuplicate=${checkDuplicate})`);
 
     // Buscar template correspondente
     const template = this.templateEngine.findTemplateByEvent(eventType);
@@ -86,11 +91,13 @@ export class EventNotificationHandler {
     console.log('[EventNotificationHandler] Template encontrado:', template ? template.name : 'NENHUM');
     
     if (!template) {
-      console.error(`[EventNotificationHandler] Template de ${eventType} não encontrado. Tipos disponíveis:`, 
+      console.error(`[EventNotificationHandler] ❌ ERRO: Template de ${eventType} não encontrado. Tipos disponíveis:`, 
         allTemplates.map(t => t.eventType)
       );
       return false;
     }
+
+    console.log('[EventNotificationHandler] ✅ Template encontrado, enviando mensagem...');
 
     try {
       const extraVars: Record<string, string> = {
@@ -98,6 +105,8 @@ export class EventNotificationHandler {
         telefone: cliente.telefone || '',
       };
 
+      console.log('[EventNotificationHandler] Chamando notificationService.send...');
+      
       await this.notificationService.send({
         cliente,
         template,
@@ -105,7 +114,14 @@ export class EventNotificationHandler {
         addLog,
       });
 
-      this.addSentEvent(cliente.id, eventType);
+      console.log('[EventNotificationHandler] Mensagem enviada com sucesso!');
+      
+      // Salvar evento apenas se checkDuplicate estiver ativo
+      if (checkDuplicate) {
+        this.addSentEvent(cliente.id, eventType);
+        console.log('[EventNotificationHandler] Evento salvo para evitar duplicatas');
+      }
+      
       console.log(`✅ Boas-vindas enviadas para ${cliente.nome} (${eventType})`);
       return true;
     } catch (error) {
