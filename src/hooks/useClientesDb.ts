@@ -48,7 +48,7 @@ export function useClientesDb() {
 
       setClientes((data || []).map(mapDbToCliente));
     } catch (e: any) {
-      console.error('[useClientesDb] Erro ao carregar clientes:', e);
+      console.error('Erro ao carregar clientes:', e);
       setError(e?.message || 'Erro ao carregar clientes');
     } finally {
       setLoading(false);

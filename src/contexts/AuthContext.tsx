@@ -25,8 +25,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
-      console.log('[AuthContext] Buscando dados do usuário:', userId);
-      
       // 1. Buscar perfil
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -38,8 +36,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('[AuthContext] Erro ao buscar perfil:', profileError);
         return null;
       }
-      
-      console.log('[AuthContext] Perfil encontrado:', profile);
 
       // 2. Buscar roles com fallback robusto (RLS-safe)
       let roles: AppRole[] = [];
@@ -50,12 +46,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('user_id', userId);
 
         if (rolesError) {
-          console.warn('[AuthContext] Erro ao buscar roles via tabela, tentando fallback RPC:', rolesError);
         } else {
           roles = (rolesData || []).map((r) => r.role as AppRole);
         }
       } catch (e) {
-        console.warn('[AuthContext] Exceção ao buscar roles via tabela, tentando fallback RPC:', e);
       }
 
       // Fallback: usar RPC has_role (SECURITY DEFINER) para ignorar RLS
@@ -68,10 +62,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (isAdminRpc) roles = Array.from(new Set([...roles, 'admin' as AppRole]));
         if (isClientRpc) roles = Array.from(new Set([...roles, 'client' as AppRole]));
       } catch (e) {
-        console.warn('[AuthContext] Fallback RPC has_role falhou:', e);
+        // Silenciar erro
       }
-
-      console.log('[AuthContext] Roles finais:', roles);
 
       // 3. Buscar dados de cliente (se existir)
       const { data: clienteData } = await supabase
@@ -100,14 +92,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } : undefined
       };
 
-      console.log('[AuthContext] Usuário unificado criado:', {
-        email: unifiedUser.email,
-        roles: unifiedUser.roles,
-        isAdmin: unifiedUser.isAdmin,
-        isSuperAdmin: unifiedUser.isSuperAdmin,
-        isClient: unifiedUser.isClient
-      });
-
       return unifiedUser;
     } catch (error) {
       console.error('Erro ao buscar dados do usuário:', error);
@@ -128,7 +112,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (currentSession?.user) {
       const userData = await fetchUserData(currentSession.user.id);
-      console.log('[AuthContext] Dados do usuário carregados:', !!userData);
       setUser(userData);
       
       // Registrar login
@@ -141,7 +124,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }, 0);
       }
     } else {
-      console.log('[AuthContext] Sem sessão, limpando usuário');
       setUser(null);
     }
     
