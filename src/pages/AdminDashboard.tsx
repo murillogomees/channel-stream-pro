@@ -19,7 +19,6 @@ import { useClientesDb } from "@/hooks/useClientesDb";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
-import { SmartOneRetryQueueWidget } from "@/components/admin/SmartOneRetryQueueWidget";
 import { NotificationRetryWidget } from '@/components/admin/NotificationRetryWidget';
 import { NotificationStatsWidget } from '@/components/admin/NotificationStatsWidget';
 
@@ -196,11 +195,8 @@ const AdminDashboard = () => {
             
             <QuickShortcuts />
             
-            {/* Widgets Grid - 2 lado a lado em desktop, 1 em mobile */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <SmartOneRetryQueueWidget />
-              <NotificationRetryWidget />
-            </div>
+            {/* Notification Widgets */}
+            <NotificationRetryWidget />
             
             {/* Notification Stats ocupa largura total */}
             <NotificationStatsWidget />
