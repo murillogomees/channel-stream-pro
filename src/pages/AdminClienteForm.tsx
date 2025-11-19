@@ -297,38 +297,11 @@ export default function AdminClienteForm() {
           (!!clienteOriginal?.smartone_status || clienteOriginal?.smartone_status === 'nao_enviado' || clienteOriginal?.smartone_status === 'erro'));
 
       if (precisaSyncSmartone) {
-        setIsSyncingSmartone(true);
+        // Cliente salvo com sucesso
         toast({
-          title: "Sincronizando com SmartOne",
-          description: "Criando playlist no SmartOne IPTV...",
+          title: "Cliente atualizado",
+          description: "Dados salvos com sucesso.",
         });
-
-        const clienteAtualizado: Cliente = {
-          ...clienteData,
-          id: id,
-          dataCadastro: clienteOriginal.dataCadastro,
-          dataUltimaEdicao: new Date().toISOString(),
-        };
-
-        const result = await smartoneService.syncPlaylistForClient(
-          clienteAtualizado,
-          updateCliente
-        );
-
-        setIsSyncingSmartone(false);
-
-        if (result.success) {
-          toast({
-            title: "SmartOne sincronizado",
-            description: "Playlist criada com sucesso no SmartOne IPTV.",
-          });
-        } else {
-          toast({
-            title: "Erro ao sincronizar SmartOne",
-            description: result.error || "Não foi possível criar a playlist no SmartOne.",
-            variant: "destructive",
-          });
-        }
       }
 
       // Enviar mensagem de atualização se checkbox estiver marcado
@@ -463,32 +436,11 @@ export default function AdminClienteForm() {
             return;
           }
 
-          // Prosseguir com sincronização
-          setIsSyncingSmartone(true);
+          // Cliente salvo com sucesso
           toast({
-            title: "Sincronizando com SmartOne",
-            description: "Criando playlist no SmartOne IPTV...",
+            title: "Cliente cadastrado",
+            description: "Dados salvos com sucesso.",
           });
-
-          const result = await smartoneService.syncPlaylistForClient(
-            clienteCompleto,
-            updateCliente
-          );
-
-          setIsSyncingSmartone(false);
-
-        if (result.success) {
-          toast({
-            title: "SmartOne sincronizado",
-            description: "Playlist criada com sucesso no SmartOne IPTV.",
-          });
-        } else {
-          toast({
-            title: "Erro ao sincronizar SmartOne",
-            description: result.error || "Não foi possível criar a playlist no SmartOne.",
-            variant: "destructive",
-          });
-        }
       }
 
       // Boas-vindas serão enviadas automaticamente pelo EventNotificationHandler
