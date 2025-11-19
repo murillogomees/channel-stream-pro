@@ -45,6 +45,7 @@ export default function AdminM3UCustomBuilder() {
   const [m3uPreview, setM3uPreview] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<string>("");
 
   const selectedList = lists.find(l => l.id === selectedListId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
@@ -114,9 +115,24 @@ export default function AdminM3UCustomBuilder() {
     
     try {
       setIsImporting(true);
-      const result = importContent.trim()
-        ? await m3uCustomService.importFromContent(importContent, selectedListId)
-        : await m3uCustomService.importFromUrl(importUrl, selectedListId);
+      setImportProgress("");
+      
+      let result;
+      if (importContent.trim()) {
+        setImportProgress("Processando conteúdo M3U...");
+        result = await m3uCustomService.importFromContent(importContent, selectedListId);
+      } else {
+        setImportProgress("Conectando ao servidor...");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        setImportProgress("Baixando arquivo M3U (até 60MB)...");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        result = await m3uCustomService.importFromUrl(importUrl, selectedListId);
+        
+        setImportProgress("Processando canais...");
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
       
       toast({
         title: 'M3U importado com sucesso!',
@@ -125,11 +141,13 @@ export default function AdminM3UCustomBuilder() {
       setIsImportDialogOpen(false);
       setImportUrl('');
       setImportContent('');
+      setImportProgress("");
       refreshCategories();
     } catch (error: any) {
       toast({ title: 'Erro ao importar M3U', description: error.message, variant: 'destructive' });
     } finally {
       setIsImporting(false);
+      setImportProgress("");
     }
   };
 
@@ -353,7 +371,12 @@ export default function AdminM3UCustomBuilder() {
                         </div>
                         <Button onClick={handleImportM3U} className="w-full" disabled={isImporting}>
                           <Upload className="h-4 w-4 mr-2" />
-                          {isImporting ? 'Importando...' : 'Importar'}
+                          {isImporting ? (
+                            <span className="flex items-center gap-2">
+                              <span className="animate-spin">⏳</span>
+                              {importProgress || "Importando..."}
+                            </span>
+                          ) : 'Importar'}
                         </Button>
                       </div>
                     </DialogContent>
