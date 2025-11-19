@@ -76,7 +76,7 @@ serve(async (req) => {
     }
 
     // Buscar categorias
-    const { data: categories } = await supabase
+    const { data: categories } = await supabaseService
       .from('m3u_categories')
       .select('*')
       .eq('custom_list_id', customListId)
@@ -91,7 +91,7 @@ serve(async (req) => {
     let totalChannels = 0;
 
     for (const category of categories) {
-      const { data: channels } = await supabase
+      const { data: channels } = await supabaseService
         .from('m3u_channels')
         .select('*')
         .eq('category_id', category.id)
@@ -120,7 +120,7 @@ serve(async (req) => {
     const uploadTime = Date.now() - startTime - generationTime;
 
     // Atualizar lista com CDN URL
-    await supabase
+    await supabaseService
       .from('m3u_custom_lists')
       .update({
         cdn_url: cdnUrl,
@@ -132,7 +132,7 @@ serve(async (req) => {
       .eq('id', customListId);
 
     // Registrar log
-    await supabase
+    await supabaseService
       .from('m3u_generation_logs')
       .insert({
         custom_list_id: customListId,

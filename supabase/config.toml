@@ -28,19 +28,23 @@ verify_jwt = false
 [functions.validate-password-signup]
 verify_jwt = false
 
-# Cron job for escalating security alerts - public for cron access
+# Cron job for escalating security alerts - public for cron access with secret verification
 [functions.escalate-security-alerts]
 verify_jwt = false
 
+# Webhook endpoint - kept public with HMAC signature verification
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+# Admin-only function for M3U generation - requires authentication
 [functions.generate-m3u-file]
-verify_jwt = false
+verify_jwt = true
 
+# Cron job for daily M3U regeneration - public for cron access with secret verification
 [functions.daily-m3u-regeneration]
 verify_jwt = false
 
+# Webhook endpoint - kept public with signature verification
 [functions.confirm-security-alert]
 verify_jwt = false
 
@@ -48,15 +52,15 @@ verify_jwt = false
 [functions.check-playlist-health]
 verify_jwt = true
 
-# Cron job for alerting about inactive playlists - public for cron access
+# Cron job for alerting about inactive playlists - public for cron access with secret verification
 [functions.alert-inactive-playlists]
 verify_jwt = false
 
-# Cron job for daily expiration summary - public for cron access
+# Cron job for daily expiration summary - public for cron access with secret verification
 [functions.daily-expiration-summary]
 verify_jwt = false
 
-# Cron job for weekly expiration summary - public for cron access
+# Cron job for weekly expiration summary - public for cron access with secret verification
 [functions.weekly-expiration-summary]
 verify_jwt = false
 
