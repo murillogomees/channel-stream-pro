@@ -44,16 +44,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Validar webhook do WhatsApp (BotBot)
-    const authHeader = req.headers.get('authorization');
+    // ✅ SECURITY: Validate webhook with HMAC signature
     const webhookSecret = Deno.env.get('WHATSAPP_WEBHOOK_SECRET');
     
-    if (webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
-      console.log('[WhatsAppWebhook] Unauthorized webhook attempt');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (webhookSecret) {
+      const signature = req.headers.get('x-webhook-signature');
+      const authHeader = req.headers.get('authorization');
+      
+      // Support both HMAC signature and Bearer token authentication
+      let isAuthenticated = false;
+      
+      if (signature) {
+        // Verify HMAC signature
+        const rawBody = await req.clone().text();
+        const encoder = new TextEncoder();
+        const keyData = encoder.encode(webhookSecret);
+        const messageData = encoder.encode(rawBody);
+        
+        const cryptoKey = await crypto.subtle.importKey(
+          'raw',
+          keyData,
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        
+        const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+        const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        isAuthenticated = signature === expectedSignature;
+      } else if (authHeader === `Bearer ${webhookSecret}`) {
+        // Fallback to Bearer token (legacy support)
+        isAuthenticated = true;
+      }
+      
+      if (!isAuthenticated) {
+        console.log('[WhatsAppWebhook] Invalid signature or token');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized - Invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const event: WhatsAppWebhookEvent = await req.json();
