@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.418.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,39 +133,40 @@ serve(async (req) => {
 });
 
 /**
- * Upload para CDN (implementação simplificada - requer configuração de R2 ou S3)
+ * Upload para Cloudflare R2
  */
 async function uploadToCDN(slug: string, content: string): Promise<string> {
-  // TODO: Implementar upload real para Cloudflare R2 ou Amazon S3
-  // Por enquanto, retorna uma URL simulada
-  
-  // Exemplo de implementação com R2:
-  /*
   const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
   const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
   const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
   const R2_BUCKET = Deno.env.get('R2_BUCKET_NAME');
-  
-  const s3 = new S3Client({
+  const R2_PUBLIC_DOMAIN = Deno.env.get('R2_PUBLIC_DOMAIN');
+
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY || !R2_SECRET_KEY || !R2_BUCKET) {
+    throw new Error('R2 credentials not configured. Please set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME secrets.');
+  }
+
+  const s3Client = new S3Client({
     region: 'auto',
     endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: R2_ACCESS_KEY,
-      secretAccessKey: R2_SECRET_KEY
-    }
+      secretAccessKey: R2_SECRET_KEY,
+    },
   });
 
-  await s3.send(new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: `${slug}.m3u`,
-    Body: content,
-    ContentType: 'audio/x-mpegurl'
-  }));
+  const fileName = `playlists/${slug}.m3u`;
 
-  return `https://cdn.seudominio.com/${slug}.m3u`;
-  */
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: fileName,
+      Body: content,
+      ContentType: 'audio/x-mpegurl',
+      CacheControl: 'public, max-age=3600',
+    })
+  );
 
-  // URL simulada para desenvolvimento
-  const cdnDomain = Deno.env.get('CDN_DOMAIN') || 'cdn.iptv-link.com.br';
-  return `https://${cdnDomain}/playlists/${slug}.m3u`;
+  const publicDomain = R2_PUBLIC_DOMAIN || `${R2_BUCKET}.r2.dev`;
+  return `https://${publicDomain}/${fileName}`;
 }
