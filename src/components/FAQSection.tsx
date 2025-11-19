@@ -11,7 +11,7 @@ const FAQSection = () => {
   const faqs = [
     {
       question: "Como funciona o período de teste grátis?",
-      answer: "Você tem direito a 24 horas de teste grátis em qualquer plano. Durante esse período, você terá acesso completo a todos os 10.000+ canais, filmes e séries em Full HD e 4K. Não é necessário cadastrar cartão de crédito para o teste."
+      answer: "Você tem direito a 15 dias de teste grátis em qualquer plano. Durante esse período, você terá acesso completo a todos os 10.000+ canais, filmes e séries em Full HD e 4K. Não é necessário cadastrar cartão de crédito para o teste."
     },
     {
       question: "Quais são as formas de pagamento aceitas?",
