@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calculator, TrendingDown, Sparkles } from "lucide-react";
+import { useCountUp } from "@/hooks/useCountUp";
 
 const SavingsCalculator = () => {
   const [selectedPlan, setSelectedPlan] = useState("trimestral");
@@ -25,6 +26,11 @@ const SavingsCalculator = () => {
   };
 
   const result = calculateSavings(selectedPlan);
+
+  // Animated counters
+  const animatedMonthlyTotal = useCountUp(result.monthlyTotal, 600);
+  const animatedPlanPrice = useCountUp(result.plan.price, 600);
+  const animatedSavings = useCountUp(result.savings, 600);
 
   return (
     <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-card">
@@ -78,12 +84,12 @@ const SavingsCalculator = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Monthly Total */}
-                <div className="bg-background/80 rounded-lg p-4 text-center">
+                <div className="bg-background/80 rounded-lg p-4 text-center transition-all duration-300">
                   <div className="text-sm text-muted-foreground mb-1">
                     Pagamento Mensal
                   </div>
-                  <div className="text-2xl font-bold">
-                    R$ {result.monthlyTotal.toFixed(2).replace('.', ',')}
+                  <div className="text-2xl font-bold animate-fade-in">
+                    R$ {animatedMonthlyTotal.toFixed(2).replace('.', ',')}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {result.plan.months}x de R$ {monthlyPrice.toFixed(2).replace('.', ',')}
@@ -91,12 +97,12 @@ const SavingsCalculator = () => {
                 </div>
 
                 {/* Selected Plan */}
-                <div className="bg-primary/20 rounded-lg p-4 text-center border-2 border-primary">
+                <div className="bg-primary/20 rounded-lg p-4 text-center border-2 border-primary transition-all duration-300">
                   <div className="text-sm text-primary-foreground/80 mb-1">
                     Plano {result.plan.name}
                   </div>
-                  <div className="text-2xl font-bold text-primary-foreground">
-                    R$ {result.plan.price.toFixed(2).replace('.', ',')}
+                  <div className="text-2xl font-bold text-primary-foreground animate-fade-in">
+                    R$ {animatedPlanPrice.toFixed(2).replace('.', ',')}
                   </div>
                   <div className="text-xs text-primary-foreground/80 mt-1">
                     Pagamento único
@@ -104,13 +110,13 @@ const SavingsCalculator = () => {
                 </div>
 
                 {/* Savings */}
-                <div className="bg-green-500/20 rounded-lg p-4 text-center border-2 border-green-500/50">
+                <div className="bg-green-500/20 rounded-lg p-4 text-center border-2 border-green-500/50 transition-all duration-300">
                   <div className="text-sm text-green-700 dark:text-green-400 mb-1 flex items-center justify-center gap-1">
                     <TrendingDown className="h-4 w-4" />
                     Você Economiza
                   </div>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    R$ {result.savings.toFixed(2).replace('.', ',')}
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400 animate-fade-in">
+                    R$ {animatedSavings.toFixed(2).replace('.', ',')}
                   </div>
                   <div className="text-xs text-green-700 dark:text-green-400 mt-1">
                     {result.savingsPercent}% de desconto
