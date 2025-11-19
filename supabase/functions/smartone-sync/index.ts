@@ -300,7 +300,35 @@ serve(async (req) => {
         const playlistName = `${clienteNome} - ${m3uList.name}`;
         console.log(`[smartone-sync] Criando playlist: ${playlistName}`);
 
+        // Primeiro, obter o CSRF token da página de add_playlist
+        let csrfToken = '';
+        try {
+          const csrfResponse = await fetch(
+            `${SMARTONE_API_BASE_URL}/plugin/smart_one/client_main/add_playlist/`,
+            {
+              method: 'GET',
+              headers: {
+                'X-Client-API': SMARTONE_CLIENT_API,
+                'X-Key-API': SMARTONE_KEY_API,
+              },
+            }
+          );
+          
+          const htmlText = await csrfResponse.text();
+          const csrfMatch = htmlText.match(/name="_csrf_token"\s+value="([^"]+)"/);
+          if (csrfMatch && csrfMatch[1]) {
+            csrfToken = csrfMatch[1];
+            console.log('[smartone-sync] CSRF token obtido com sucesso');
+          } else {
+            console.warn('[smartone-sync] CSRF token não encontrado na página');
+          }
+        } catch (csrfError) {
+          console.error('[smartone-sync] Erro ao obter CSRF token:', csrfError);
+        }
+
+        // Montar o formBody com todos os campos necessários
         const formBody = new URLSearchParams({
+          _csrf_token: csrfToken,
           form_action: 'generate_xtream_playlist',
           mac: mac,
           xtream_name: playlistName,
