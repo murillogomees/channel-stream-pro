@@ -119,39 +119,39 @@ const ChannelsSection = () => {
                   key={index}
                   className="bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-card group h-full flex flex-col"
                 >
-                  <CardContent className="p-6 text-center space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-4">
+                  <CardContent className="p-4 sm:p-5 md:p-6 text-center space-y-3 sm:space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-3 sm:space-y-4">
                       <div className="flex justify-center">
-                        <div className={`p-4 rounded-full ${category.bgColor} group-hover:scale-110 transition-smooth`}>
-                          <IconComponent className={`h-8 w-8 ${category.color}`} />
+                        <div className={`p-3 sm:p-4 rounded-full ${category.bgColor} group-hover:scale-110 transition-smooth`}>
+                          <IconComponent className={`h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 ${category.color}`} />
                         </div>
                       </div>
                       
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-bold leading-tight min-h-[3rem] flex items-center justify-center">
+                      <div className="space-y-2 sm:space-y-3">
+                        <h3 className="text-base sm:text-lg md:text-xl font-bold leading-tight min-h-[2.5rem] sm:min-h-[3rem] flex items-center justify-center">
                           {category.name}
                         </h3>
-                        <Badge variant="secondary" className="text-sm font-semibold mx-auto">
+                        <Badge variant="secondary" className="text-xs sm:text-sm font-semibold mx-auto px-2 sm:px-3 py-0.5 sm:py-1">
                           {category.count} canais
                         </Badge>
                       </div>
                     </div>
 
                     {/* Channel Examples */}
-                    <div className="space-y-3">
-                      <div className="text-sm text-muted-foreground font-medium">Exemplos:</div>
-                      <div className="flex flex-wrap gap-2 justify-center">
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="text-xs sm:text-sm text-muted-foreground font-medium">Exemplos:</div>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                         {category.channels.slice(0, 6).map((channel, channelIndex) => (
                           <Badge
                             key={channelIndex}
                             variant="outline"
-                            className="text-xs px-2 py-1 font-medium"
+                            className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 font-medium"
                           >
                             {channel}
                           </Badge>
                         ))}
                         {category.channels.length > 6 && (
-                          <Badge variant="outline" className="text-xs px-2 py-1 font-medium">
+                          <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 font-medium">
                             +{category.channels.length - 6}
                           </Badge>
                         )}

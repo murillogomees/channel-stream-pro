@@ -138,26 +138,27 @@ export default function VideoTutorial() {
         </div>
 
         {/* Step Counter */}
-        <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium">
+        <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-background/80 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
           {currentStep + 1} / {tutorialSteps.length}
         </div>
       </div>
 
       {/* Controls */}
-      <div className="p-6 space-y-4">
-        <div>
-          <h3 className="text-xl font-semibold mb-2">{currentStepData.title}</h3>
-          <p className="text-muted-foreground">{currentStepData.description}</p>
+      <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="px-2">
+          <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2">{currentStepData.title}</h3>
+          <p className="text-sm sm:text-base text-muted-foreground">{currentStepData.description}</p>
         </div>
 
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="icon"
             onClick={handleRestart}
             disabled={currentStep === 0 && progress === 0}
+            className="h-9 w-9 sm:h-10 sm:w-10"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
 
           <Button
@@ -165,19 +166,20 @@ export default function VideoTutorial() {
             size="icon"
             onClick={handlePrevious}
             disabled={currentStep === 0}
+            className="h-9 w-9 sm:h-10 sm:w-10"
           >
-            <SkipBack className="h-4 w-4" />
+            <SkipBack className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
 
           <Button
             size="icon"
-            className="h-12 w-12"
+            className="h-10 w-10 sm:h-12 sm:w-12"
             onClick={handlePlayPause}
           >
             {isPlaying ? (
-              <Pause className="h-5 w-5" />
+              <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
             ) : (
-              <Play className="h-5 w-5" />
+              <Play className="h-4 w-4 sm:h-5 sm:w-5" />
             )}
           </Button>
 
@@ -186,13 +188,14 @@ export default function VideoTutorial() {
             size="icon"
             onClick={handleNext}
             disabled={currentStep === tutorialSteps.length - 1}
+            className="h-9 w-9 sm:h-10 sm:w-10"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
 
         {/* Step Indicators */}
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-1.5 sm:gap-2 px-2">
           {tutorialSteps.map((_, index) => (
             <button
               key={index}
@@ -201,12 +204,12 @@ export default function VideoTutorial() {
                 setProgress(0);
                 setIsPlaying(false);
               }}
-              className={`h-2 rounded-full transition-all ${
+              className={`h-1.5 sm:h-2 rounded-full transition-all ${
                 index === currentStep
-                  ? 'w-8 bg-primary'
+                  ? 'w-6 sm:w-8 bg-primary'
                   : index < currentStep
-                  ? 'w-2 bg-primary/50'
-                  : 'w-2 bg-muted'
+                  ? 'w-1.5 sm:w-2 bg-primary/50'
+                  : 'w-1.5 sm:w-2 bg-muted'
               }`}
             />
           ))}

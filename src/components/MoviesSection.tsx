@@ -137,25 +137,25 @@ const MoviesSection = () => {
 
   return (
     <section className="py-20 px-6 bg-gradient-to-b from-background to-card">
-      <div className="container mx-auto">
+      <div className="container mx-auto max-w-7xl">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+        <div className="text-center mb-8 sm:mb-12 lg:mb-16 px-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">
             <span className="text-gradient-accent">{settings.movies?.title?.split(' ')[0] || 'Filmes'}</span> e{" "}
             <span className="text-gradient-primary">{settings.movies?.title?.split(' ')[2] || 'séries'}</span> atualizados
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-3xl mx-auto">
             {settings.movies?.description || 'Catálogo atualizado semanalmente com os últimos lançamentos.'}
           </p>
         </div>
 
         {/* Featured Movies */}
-        <div className="mb-16">
-          <div className="mb-8">
-            <h3 className="text-3xl font-bold">🎬 Filmes em Destaque</h3>
+        <div className="mb-10 sm:mb-12 lg:mb-16">
+          <div className="mb-6 sm:mb-8 px-2 sm:px-4">
+            <h3 className="text-2xl sm:text-3xl font-bold">🎬 Filmes em Destaque</h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {featuredMovies.map((movie, index) => (
                 <Card
                 key={index}
@@ -176,7 +176,7 @@ const MoviesSection = () => {
                     <img
                       src={movie.image}
                       alt={`Pôster do filme ${movie.title} (${movie.year}) - ${movie.genre} - Avaliação ${movie.rating} estrelas - Duração ${movie.duration}`}
-                      className="w-full h-80 object-cover group-hover:scale-110 transition-smooth"
+                      className="w-full h-64 sm:h-72 md:h-80 object-cover group-hover:scale-110 transition-smooth"
                       width="512"
                       height="768"
                       loading="lazy"
@@ -187,19 +187,19 @@ const MoviesSection = () => {
                     <Button
                       variant="hero"
                       size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-smooth"
+                      className="h-10 w-10 sm:h-12 sm:w-12 opacity-0 group-hover:opacity-100 transition-smooth"
                       aria-label={`Reproduzir trailer de ${movie.title}`}
                     >
-                      <Play className="h-6 w-6" aria-hidden="true" />
+                      <Play className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>
-                <CardContent className="p-4 flex-1 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <h4 className="font-bold text-sm leading-tight line-clamp-2 text-center min-h-[2.5rem] flex items-center justify-center">
+                <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2 sm:space-y-3">
+                    <h4 className="font-bold text-xs sm:text-sm leading-tight line-clamp-2 text-center min-h-[2rem] sm:min-h-[2.5rem] flex items-center justify-center">
                       {movie.title}
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground font-medium">{movie.year}</span>
                         <div className="flex items-center gap-1">
@@ -207,12 +207,12 @@ const MoviesSection = () => {
                           <span className="font-semibold">{movie.rating}</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center justify-center gap-1 sm:gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         <span>{movie.duration}</span>
                       </div>
                       <div className="flex justify-center">
-                        <Badge variant="outline" className="text-xs font-medium">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5">
                           {movie.genre}
                         </Badge>
                       </div>
