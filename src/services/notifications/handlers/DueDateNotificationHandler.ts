@@ -75,10 +75,83 @@ export class DueDateNotificationHandler {
       });
 
       console.log(`✅ Notificação de vencimento enviada para ${cliente.nome} (${daysBeforeDue} dias)`);
+
+      // Enviar alerta ao administrador se for vencimento (dia 0 ou depois)
+      if (daysBeforeDue <= 0) {
+        await this.sendAdminAlert(cliente, daysBeforeDue, addLog);
+      }
+
       return true;
     } catch (error) {
       console.error(`❌ Erro ao enviar notificação de vencimento para ${cliente.nome}:`, error);
       return false;
+    }
+  }
+
+  private async sendAdminAlert(
+    cliente: Cliente,
+    daysBeforeDue: number,
+    addLog: (log: NotificationLog) => void
+  ): Promise<void> {
+    try {
+      // Carregar telefones de administradores
+      const configStored = localStorage.getItem('whatsapp_config');
+      if (!configStored) return;
+
+      const config = JSON.parse(configStored);
+      const adminPhones = config.adminPhones || [];
+
+      if (adminPhones.length === 0) {
+        console.log('⚠️ Nenhum telefone de administrador configurado para alertas');
+        return;
+      }
+
+      // Criar mensagem de alerta para admin
+      const statusMsg = daysBeforeDue === 0 
+        ? 'venceu hoje' 
+        : `venceu há ${Math.abs(daysBeforeDue)} dias`;
+
+      const adminMessage = `🚨 *ALERTA DE VENCIMENTO*\n\n` +
+        `Cliente: *${cliente.nome}*\n` +
+        `Telefone: ${cliente.telefone}\n` +
+        `Plano: ${cliente.plano || 'Não definido'}\n` +
+        `Status: Assinatura ${statusMsg}\n` +
+        `Data de vencimento: ${cliente.dataVencimento ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR') : 'Não definida'}\n\n` +
+        `⚠️ Ação necessária: Entre em contato com o cliente.`;
+
+      // Enviar para cada administrador configurado
+      for (const adminPhone of adminPhones) {
+        try {
+          const adminCliente: Cliente = {
+            ...cliente,
+            id: `admin-alert-${cliente.id}`,
+            nome: 'Administrador',
+            telefone: adminPhone,
+          };
+
+          const adminTemplate = {
+            id: 'admin-expiration-alert',
+            name: 'Alerta Admin - Vencimento',
+            message: adminMessage,
+            variables: [],
+            type: 'local' as const,
+            eventType: 'payment_reminder' as const,
+          };
+
+          await this.notificationService.send({
+            cliente: adminCliente,
+            template: adminTemplate,
+            extraVars: {},
+            addLog,
+          });
+
+          console.log(`✅ Alerta de vencimento enviado ao admin: ${adminPhone}`);
+        } catch (error) {
+          console.error(`❌ Erro ao enviar alerta ao admin ${adminPhone}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao processar alertas de administrador:', error);
     }
   }
 }

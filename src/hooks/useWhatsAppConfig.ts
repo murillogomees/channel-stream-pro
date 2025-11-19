@@ -10,6 +10,7 @@ const DEFAULT_CONFIG: WhatsAppConfig = {
   daysToNotify: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
   testPhoneNumber: '5561996975924',
   testContacts: [],
+  adminPhones: [], // Telefones de administradores para alertas de vencimento
 };
 
 export function useWhatsAppConfig() {
@@ -28,6 +29,7 @@ export function useWhatsAppConfig() {
             ? parsed.daysToNotify.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
             : DEFAULT_CONFIG.daysToNotify,
           testContacts: Array.isArray(parsed?.testContacts) ? parsed.testContacts : [],
+          adminPhones: Array.isArray(parsed?.adminPhones) ? parsed.adminPhones : [],
         };
         setConfig(safe);
         localStorage.setItem('whatsapp_config', JSON.stringify(safe));
@@ -47,6 +49,7 @@ export function useWhatsAppConfig() {
         ? merged.daysToNotify.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
         : DEFAULT_CONFIG.daysToNotify,
       testContacts: Array.isArray(merged.testContacts) ? merged.testContacts as TestContact[] : [],
+      adminPhones: Array.isArray(merged.adminPhones) ? merged.adminPhones : [],
     };
     setConfig(updated);
     localStorage.setItem('whatsapp_config', JSON.stringify(updated));
