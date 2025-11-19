@@ -11,7 +11,9 @@ const PlansSection = () => {
       period: "/mês",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte 24/7", "Sem contrato"],
       ctaText: "Assinar Agora",
-      highlighted: false
+      highlighted: false,
+      savings: null,
+      savingsPercent: null
     },
     {
       name: "Trimestral",
@@ -20,7 +22,9 @@ const PlansSection = () => {
       period: "/3 meses",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte prioritário 24/7", "Sem contrato", "Economize R$ 10"],
       ctaText: "Assinar Agora",
-      highlighted: true
+      highlighted: true,
+      savings: 10.10,
+      savingsPercent: 11.2
     },
     {
       name: "Semestral",
@@ -29,7 +33,9 @@ const PlansSection = () => {
       period: "/6 meses",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP 24/7", "Sem contrato", "Economize R$ 30"],
       ctaText: "Assinar Agora",
-      highlighted: false
+      highlighted: false,
+      savings: 30.10,
+      savingsPercent: 16.7
     },
     {
       name: "Anual",
@@ -38,7 +44,9 @@ const PlansSection = () => {
       period: "/ano",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP dedicado 24/7", "Sem contrato", "Economize R$ 80"],
       ctaText: "Assinar Agora",
-      highlighted: false
+      highlighted: false,
+      savings: 80.10,
+      savingsPercent: 22.3
     }
   ];
   return <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-card">
@@ -63,6 +71,15 @@ const PlansSection = () => {
                       Mais Popular
                     </div>
                   </div>}
+
+                {plan.savingsPercent && (
+                  <div className="absolute -top-3 right-4">
+                    <div className="bg-green-500 text-white rounded-full text-xs font-bold shadow-lg py-1.5 px-3 flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      -{plan.savingsPercent}%
+                    </div>
+                  </div>
+                )}
 
                 <CardHeader className="text-center pb-4 flex-shrink-0">
                   <div className="flex justify-center mb-4">
