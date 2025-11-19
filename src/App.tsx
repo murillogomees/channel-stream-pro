@@ -42,6 +42,8 @@ const Admin2FASettings = lazy(() => import("./pages/Admin2FASettings"));
 const AdminSuspiciousLogins = lazy(() => import("./pages/AdminSuspiciousLogins"));
 const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
 const AdminSmartOneTest = lazy(() => import("./pages/AdminSmartOneTest"));
+const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
+const AdminM3UCustomDashboard = lazy(() => import("./pages/AdminM3UCustomDashboard"));
 const AdminCustomStatusBadges = lazy(() => import("./pages/AdminCustomStatusBadges"));
 const AdminStatusHistory = lazy(() => import("./pages/AdminStatusHistory"));
 const AdminM3UUsageReport = lazy(() => import("./pages/AdminM3UUsageReport"));
@@ -105,6 +107,8 @@ const App = () => (
           <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
           <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
           <Route path="/admin/smartone-test" element={<ProtectedRoute requireAdmin><AdminSmartOneTest /></ProtectedRoute>} />
+          <Route path="/admin/m3u-custom-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
+          <Route path="/admin/m3u-custom-dashboard" element={<ProtectedRoute requireAdmin><AdminM3UCustomDashboard /></ProtectedRoute>} />
           <Route path="/admin/custom-status-badges" element={<ProtectedRoute requireAdmin><AdminCustomStatusBadges /></ProtectedRoute>} />
           <Route path="/admin/status-history" element={<ProtectedRoute requireAdmin><AdminStatusHistory /></ProtectedRoute>} />
           <Route path="/admin/customize" element={<ProtectedRoute requireAdmin><AdminCustomize /></ProtectedRoute>} />
