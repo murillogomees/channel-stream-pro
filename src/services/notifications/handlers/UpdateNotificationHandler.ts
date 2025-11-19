@@ -2,7 +2,6 @@ import { Cliente } from '@/types/cliente';
 import { NotificationLog } from '@/types/whatsapp';
 import { ClientChangeDetector } from '../detectors/ClientChangeDetector';
 import { WhatsAppAdapter } from '../core/WhatsAppAdapter';
-import { getRealtimeService } from '../../realtimeNotificationService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -55,16 +54,6 @@ export class UpdateNotificationHandler {
       };
 
       addLog(log);
-
-      // Broadcast evento
-      const realtimeService = getRealtimeService();
-      await realtimeService.broadcastNotificationSent({
-        clienteId: clienteAtualizado.id,
-        clienteNome: clienteAtualizado.nome,
-        telefone: clienteAtualizado.telefone,
-        template: 'Atualização de Cadastro',
-        status: 'success',
-      });
 
       console.log(`✅ Notificação de atualização enviada para ${clienteAtualizado.nome}`);
       return true;

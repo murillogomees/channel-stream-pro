@@ -44,8 +44,8 @@ export default function AdminNotificacoes() {
   const { isAdmin, loading } = useAuth();
   const { clientes } = useClientesDb();
   const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
-  const { logs, addLog, clearLogs, getRecentLogs, exportToCSV } = useNotificationLogs();
-  const { isRunning, lastRunState, forceRun, getNextRunTime, getErrorHandler } = useAutoNotifications();
+  const { addLog } = useNotificationLogs();
+  const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [customMessage, setCustomMessage] = useState('');
@@ -68,8 +68,6 @@ export default function AdminNotificacoes() {
   const [testingCredentials, setTestingCredentials] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
-  const errorHandler = getErrorHandler();
-  const recentErrors = errorHandler?.getRecentErrors() || [];
   const nextRunTime = getNextRunTime();
 
   useEffect(() => {
@@ -357,7 +355,23 @@ export default function AdminNotificacoes() {
     }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
-  const recentLogs = getRecentLogs(20);
+  const [logs, setLogs] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const loadLogs = async () => {
+      const { data } = await supabase
+        .from('notification_logs')
+        .select('*')
+        .order('sent_at', { ascending: false })
+        .limit(20);
+      setLogs(data || []);
+    };
+    loadLogs();
+  }, []);
+  
+  const recentLogs = logs;
+  const exportToCSV = () => {};
+  const clearLogs = () => {};
 
   const handleForceRun = async () => {
     setRunningManual(true);
@@ -943,61 +957,6 @@ export default function AdminNotificacoes() {
           </CardContent>
         </Card>
 
-        {/* Erros Recentes */}
-        {recentErrors.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-destructive" />
-                    Erros Recentes
-                  </CardTitle>
-                  <CardDescription>
-                    Últimos erros de envio de notificações
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => errorHandler?.clearErrors()}
-                >
-                  Limpar Erros
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data/Hora</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Erro</TableHead>
-                      <TableHead>Tentativas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentErrors.map((error, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-sm">
-                          {new Date(error.timestamp).toLocaleString('pt-BR')}
-                        </TableCell>
-                        <TableCell>{error.clienteNome}</TableCell>
-                        <TableCell className="max-w-md truncate text-sm text-destructive">
-                          {error.error}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{error.retryCount}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Histórico de Envios */}
         <Card>
@@ -1010,14 +969,6 @@ export default function AdminNotificacoes() {
                 </CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={exportToCSV}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar CSV
-                </Button>
-                <Button variant="outline" size="sm" onClick={clearLogs}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Limpar
-                </Button>
               </div>
             </div>
           </CardHeader>

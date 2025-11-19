@@ -41,7 +41,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
-import { LOCAL_TEMPLATES, sendNotification } from '@/services/notificationScheduler';
+import { loadTemplates } from '@/services/notificationScheduler';
+import { getWhatsAppService } from '@/services/whatsapp';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { getWhatsAppService } from '@/services/whatsapp';
@@ -62,6 +63,7 @@ export default function AdminClientes() {
   const { isConfigured } = useWhatsAppConfig();
   const { addLog } = useNotificationLogs();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const LOCAL_TEMPLATES = loadTemplates();
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -165,7 +167,21 @@ export default function AdminClientes() {
       const template = LOCAL_TEMPLATES.find(t => t.id === selectedTemplate);
       if (!template) throw new Error('Template não encontrado');
 
-      await sendNotification(selectedCliente, template, addLog);
+      const whatsappService = getWhatsAppService();
+      const message = template.message
+        .replace(/{nome}/g, selectedCliente.nome)
+        .replace(/{valor}/g, selectedCliente.valorPago?.toFixed(2) || '0.00')
+        .replace(/{dataVencimento}/g, selectedCliente.dataVencimento ? new Date(selectedCliente.dataVencimento).toLocaleDateString('pt-BR') : '');
+      
+      await whatsappService.sendTextMessage(selectedCliente.telefone, message);
+      await addLog({
+        clienteId: selectedCliente.id,
+        clienteNome: selectedCliente.nome,
+        telefone: selectedCliente.telefone,
+        tipo: template.id,
+        template: template.name,
+        status: 'success',
+      });
       
       toast({
         title: 'Sucesso!',

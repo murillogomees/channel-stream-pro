@@ -2,7 +2,6 @@ import { Cliente } from '@/types/cliente';
 import { WhatsappTemplate, NotificationLog } from '@/types/whatsapp';
 import { TemplateEngine } from './TemplateEngine';
 import { WhatsAppAdapter } from './WhatsAppAdapter';
-import { getRealtimeService } from '../../realtimeNotificationService';
 
 export interface SendNotificationOptions {
   cliente: Cliente;
@@ -71,17 +70,6 @@ export class NotificationService {
       };
 
       addLog(log);
-
-      // Broadcast evento de sucesso
-      const realtimeService = getRealtimeService();
-      await realtimeService.broadcastNotificationSent({
-        clienteId: cliente.id,
-        clienteNome: cliente.nome,
-        telefone: cliente.telefone,
-        template: template.name,
-        status: 'success',
-      });
-
       console.log(`✅ Notificação enviada: ${cliente.nome} - ${template.name}`);
     } catch (error) {
       // Log de erro
@@ -98,18 +86,7 @@ export class NotificationService {
       };
 
       addLog(errorLog);
-
-      // Broadcast evento de erro
-      const realtimeService = getRealtimeService();
-      await realtimeService.broadcastNotificationSent({
-        clienteId: cliente.id,
-        clienteNome: cliente.nome,
-        telefone: cliente.telefone,
-        template: template.name,
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-      });
-
+      console.error(`❌ Erro ao enviar: ${cliente.nome} - ${template.name}`);
       throw error;
     }
   }
@@ -133,6 +110,7 @@ export class NotificationService {
 
     await realtimeService.broadcastBatchCompleted(success, errors);
 
+    console.log(`📊 Lote concluído: ${success} sucessos, ${errors} erros`);
     return { success, errors };
   }
 }

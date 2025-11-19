@@ -53,18 +53,10 @@ export function useAutoNotifications() {
     return null;
   };
 
-  const getErrorHandler = () => {
-    if (schedulerRef.current) {
-      return schedulerRef.current.getErrorHandler();
-    }
-    return null;
-  };
-
   return {
     isRunning,
     lastRunState,
     forceRun,
     getNextRunTime,
-    getErrorHandler,
   };
 }
