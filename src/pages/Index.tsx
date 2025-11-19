@@ -5,6 +5,7 @@ const Navigation = lazy(() => import("@/components/Navigation"));
 const HeroSection = lazy(() => import("@/components/HeroSection"));
 const DevicesSection = lazy(() => import("@/components/DevicesSection"));
 const PlansSection = lazy(() => import("@/components/PlansSection"));
+const ComparisonSection = lazy(() => import("@/components/ComparisonSection"));
 const ChannelsSection = lazy(() => import("@/components/ChannelsSection"));
 const MoviesSection = lazy(() => import("@/components/MoviesSection"));
 const ContactSection = lazy(() => import("@/components/ContactSection"));
@@ -31,6 +32,11 @@ const Index = () => {
         <section id="planos">
           <Suspense fallback={<div className="py-20 bg-background" />}>
             <PlansSection />
+          </Suspense>
+        </section>
+        <section id="comparacao">
+          <Suspense fallback={<div className="py-20 bg-background" />}>
+            <ComparisonSection />
           </Suspense>
         </section>
         <section id="canais">
