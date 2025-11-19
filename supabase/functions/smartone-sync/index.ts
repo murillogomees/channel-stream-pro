@@ -301,10 +301,10 @@ serve(async (req) => {
         console.log(`[smartone-sync] Criando playlist: ${playlistName}`);
 
         const formBody = new URLSearchParams({
-          form_action: 'generate_m3u_playlist',
+          form_action: 'generate_xtream_playlist',
           mac: mac,
-          m3u_name: playlistName,
-          m3u_playlist: m3uList.file_url,
+          xtream_name: playlistName,
+          xtream_playlist: m3uList.file_url,
           note: `Auto-sync ${new Date().toISOString()}`,
         });
         
