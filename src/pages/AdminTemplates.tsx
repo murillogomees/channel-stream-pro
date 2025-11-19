@@ -357,6 +357,34 @@ export default function AdminTemplates() {
     return phone;
   };
 
+  // Verificar templates críticos de boas-vindas
+  const welcomeTrialTemplate = templates.find(t => t.eventType === 'welcome_trial');
+  const welcomePlanTemplate = templates.find(t => t.eventType === 'welcome_plan');
+  const renewalTemplate = templates.find(t => t.eventType === 'renewal');
+
+  const criticalTemplatesStatus = {
+    welcome_trial: {
+      exists: !!welcomeTrialTemplate,
+      template: welcomeTrialTemplate,
+      label: 'Boas-vindas - Teste Grátis',
+      description: 'Enviado quando um cliente se cadastra para período de teste'
+    },
+    welcome_plan: {
+      exists: !!welcomePlanTemplate,
+      template: welcomePlanTemplate,
+      label: 'Boas-vindas - Plano Contratado',
+      description: 'Enviado quando um cliente contrata um plano pago'
+    },
+    renewal: {
+      exists: !!renewalTemplate,
+      template: renewalTemplate,
+      label: 'Renovação Confirmada',
+      description: 'Enviado quando um cliente renova sua assinatura'
+    }
+  };
+
+  const missingCriticalTemplates = Object.entries(criticalTemplatesStatus).filter(([_, status]) => !status.exists);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
@@ -397,6 +425,92 @@ export default function AdminTemplates() {
             </Button>
           </div>
         </div>
+
+        {/* Alerta de Templates Críticos Faltando */}
+        {missingCriticalTemplates.length > 0 && (
+          <Card className="border-destructive bg-destructive/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                Templates Críticos Não Configurados
+              </CardTitle>
+              <CardDescription>
+                Os seguintes templates são essenciais para o funcionamento do sistema de notificações:
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {missingCriticalTemplates.map(([key, status]) => (
+                <div key={key} className="flex items-start gap-2 p-3 rounded-lg bg-background border border-border">
+                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{status.label}</p>
+                    <p className="text-sm text-muted-foreground">{status.description}</p>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="default"
+                onClick={() => {
+                  resetToDefaults();
+                  toast.success('Templates padrão restaurados com sucesso!');
+                }}
+                className="mt-4"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restaurar Templates Padrão
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Status dos Templates Críticos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Status dos Templates Críticos
+            </CardTitle>
+            <CardDescription>
+              Verificação dos templates essenciais para boas-vindas e renovações
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3">
+              {Object.entries(criticalTemplatesStatus).map(([key, status]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between p-4 rounded-lg border border-border bg-card"
+                >
+                  <div className="flex items-start gap-3">
+                    {status.exists ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                    )}
+                    <div>
+                      <p className="font-medium text-foreground">{status.label}</p>
+                      <p className="text-sm text-muted-foreground">{status.description}</p>
+                      {status.exists && status.template && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Template: {status.template.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {status.exists && status.template && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenDialog(status.template)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
