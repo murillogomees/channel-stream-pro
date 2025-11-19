@@ -1,16 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
-import { useSettingsContext } from "@/context/SettingsContext";
 import logoWhite from "@/assets/logo-white-sm.webp";
+import heroBg from "@/assets/hero-bg.jpg";
 
 const HeroSection = () => {
-  const { settings, getAsset, getIcon } = useSettingsContext();
+  const settings = {
+    components: {
+      hero: {
+        description: "Mais de 10.000 canais em Full HD e 4K com qualidade premium e estabilidade incomparável",
+        features: ["Teste Grátis 15 Dias", "Sem Contrato", "Suporte 24/7"],
+        ctaButtons: [
+          { text: "Falar com Suporte", variant: "secondary" }
+        ]
+      }
+    }
+  };
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero px-4 sm:px-6 lg:px-8">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img
-          src={getAsset('heroImage')}
+          src={heroBg}
           alt="Plano de fundo com imagem de streaming de televisão premium em alta qualidade, mostrando uma experiência de entretenimento moderna e imersiva"
           className="w-full h-full object-cover opacity-20"
           width="1920"

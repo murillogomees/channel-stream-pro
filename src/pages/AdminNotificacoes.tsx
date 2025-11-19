@@ -42,7 +42,7 @@ export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, loading } = useAuth();
-  const { clientes } = useClientes();
+  const { clientes } = useClientesDb();
   const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
   const { logs, addLog, clearLogs, getRecentLogs, exportToCSV } = useNotificationLogs();
   const { isRunning, lastRunState, forceRun, getNextRunTime, getErrorHandler } = useAutoNotifications();

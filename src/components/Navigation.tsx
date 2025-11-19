@@ -1,17 +1,27 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, User, Phone, MessageCircle, LayoutDashboard } from "lucide-react";
-import { useSettingsContext } from "@/context/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import logoWhite from "@/assets/logo-white-nav.webp";
+
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { isAuthenticated, loading } = useAuth();
-  const {
-    settings,
-    getAsset
-  } = useSettingsContext();
+  
+  const settings = {
+    header: {
+      logo: {
+        text: "IPTV LINK"
+      },
+      navigation: [
+        { id: 1, label: "Início", href: "#" },
+        { id: 2, label: "Planos", href: "#planos" },
+        { id: 3, label: "Canais", href: "#canais" },
+        { id: 4, label: "Contato", href: "#contato" }
+      ]
+    }
+  };
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);

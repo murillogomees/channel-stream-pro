@@ -1,4 +1,3 @@
-import { useSettingsContext } from "@/context/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
@@ -10,10 +9,19 @@ import tabletIconWebP from "@/assets/icons/tablet-device-sm.webp";
 import smarttvIconWebP from "@/assets/icons/smarttv-device-sm.webp";
 
 const DevicesSection = () => {
-  const { settings } = useSettingsContext();
-  const devicesConfig = settings.devices;
-
-  if (!devicesConfig) return null;
+  const devicesConfig = {
+    title: "Assista em Qualquer Dispositivo",
+    subtitle: "Compatível com todas as plataformas",
+    description: "Acesse seu conteúdo favorito em smartphones, tablets, Smart TVs e computadores",
+    platforms: [
+      { id: "android", name: "Android", enabled: true, downloadUrl: "https://play.google.com" },
+      { id: "ios", name: "iOS", enabled: true, downloadUrl: "https://apps.apple.com" },
+      { id: "windows", name: "Windows", enabled: true, downloadUrl: "#" },
+      { id: "mac", name: "Mac", enabled: true, downloadUrl: "#" },
+      { id: "tablet", name: "Tablet", enabled: true, downloadUrl: "#" },
+      { id: "smarttv", name: "Smart TV", enabled: true, downloadUrl: "#" }
+    ]
+  };
 
   const deviceImageMapWebP: Record<string, string> = {
     android: androidIconWebP,

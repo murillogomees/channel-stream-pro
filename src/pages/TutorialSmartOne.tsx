@@ -61,7 +61,7 @@ export default function TutorialSmartOne() {
   const [macWarning, setMacWarning] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { addCliente, updateCliente, clientes } = useClientes();
+  const { clientes, addCliente, updateCliente } = useClientesDb();
   const navigate = useNavigate();
 
   // Formatar MAC automaticamente durante digitação
@@ -101,7 +101,7 @@ export default function TutorialSmartOne() {
 
     // Verificar se MAC já existe
     const macExistente = clientes.find(c => 
-      c.macSmartOne?.toUpperCase() === mac.toUpperCase()
+      c.mac_smart_one?.toUpperCase() === mac.toUpperCase()
     );
 
     if (macExistente) {
