@@ -49,6 +49,7 @@ export function isValidBrazilianPhone(phone: string): boolean {
 }
 
 export function formatPhoneForDisplay(phone: string): string {
+  if (!phone) return '';
   const cleaned = phone.replace(/\D/g, '');
   
   // Se está em formato internacional (5561999999999)
