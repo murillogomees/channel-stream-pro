@@ -342,25 +342,7 @@ export default function AdminClienteForm() {
         });
       }
 
-      // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
-      if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
-        const selectedM3UData = allM3ULists.filter(list => 
-          selectedM3ULists.includes(list.id)
-        );
-        
-        setSavedClientData({
-          nome: clienteData.nome,
-          macSmartOne: clienteData.macSmartOne,
-          m3uLists: selectedM3UData.map(list => ({
-            name: list.name,
-            file_url: list.file_url,
-          })),
-        });
-        setShowSmartOneData(true);
-        return; // Não navega automaticamente - aguarda confirmação do modal
-      }
-
-      // Enviar mensagem de atualização se checkbox estiver marcado
+      // Enviar mensagem de atualização se checkbox estiver marcado (ANTES de mostrar modal)
       if (enviarWhatsApp && clienteOriginal) {
         try {
           const clienteAtualizado: Cliente = {
@@ -385,7 +367,30 @@ export default function AdminClienteForm() {
           }
         } catch (error) {
           console.error('Erro ao enviar mensagem de atualização:', error);
+          toast({
+            title: 'Erro ao enviar WhatsApp',
+            description: error instanceof Error ? error.message : 'Erro desconhecido',
+            variant: 'destructive',
+          });
         }
+      }
+
+      // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
+      if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
+        const selectedM3UData = allM3ULists.filter(list => 
+          selectedM3ULists.includes(list.id)
+        );
+        
+        setSavedClientData({
+          nome: clienteData.nome,
+          macSmartOne: clienteData.macSmartOne,
+          m3uLists: selectedM3UData.map(list => ({
+            name: list.name,
+            file_url: list.file_url,
+          })),
+        });
+        setShowSmartOneData(true);
+        return; // Não navega automaticamente - aguarda confirmação do modal
       }
     } else {
       // Insert new client directly into Supabase
