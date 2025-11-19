@@ -83,10 +83,20 @@ export function parseM3U(content: string): M3UPlaylist {
  * Fetch and parse M3U from URL
  */
 export async function fetchM3U(url: string): Promise<M3UPlaylist> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch M3U: ${response.statusText}`);
+  // Use Edge Function proxy para evitar Mixed Content errors
+  const { supabase } = await import('@/integrations/supabase/client');
+  
+  const { data, error } = await supabase.functions.invoke('fetch-m3u-url', {
+    body: { url }
+  });
+
+  if (error) {
+    throw new Error(`Failed to fetch M3U: ${error.message}`);
   }
-  const content = await response.text();
-  return parseM3U(content);
+
+  if (!data?.content) {
+    throw new Error('No content received from M3U URL');
+  }
+
+  return parseM3U(data.content);
 }
