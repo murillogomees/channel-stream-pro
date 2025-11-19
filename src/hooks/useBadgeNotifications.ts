@@ -124,7 +124,7 @@ export function useBadgeNotifications(adminId: string | null) {
     // Play sound
     const audio = new Audio('/badge-earned.mp3');
     audio.volume = 0.5;
-    audio.play().catch(e => console.log('Could not play sound:', e));
+    audio.play().catch(() => {});
 
     // Show browser notification
     if ('Notification' in window && Notification.permission === 'granted') {
