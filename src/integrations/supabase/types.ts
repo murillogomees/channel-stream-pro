@@ -14,6 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_offers: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          created_by: string | null
+          end_date: string | null
+          id: string
+          start_date: string | null
+          test_name: string
+          variant_a: Json
+          variant_b: Json
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          test_name: string
+          variant_a: Json
+          variant_b: Json
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          test_name?: string
+          variant_a?: Json
+          variant_b?: Json
+        }
+        Relationships: []
+      }
+      ab_test_results: {
+        Row: {
+          client_id: string | null
+          converted: boolean | null
+          converted_at: string | null
+          id: string
+          shown_at: string | null
+          test_id: string | null
+          variant_shown: string
+        }
+        Insert: {
+          client_id?: string | null
+          converted?: boolean | null
+          converted_at?: string | null
+          id?: string
+          shown_at?: string | null
+          test_id?: string | null
+          variant_shown: string
+        }
+        Update: {
+          client_id?: string | null
+          converted?: boolean | null
+          converted_at?: string | null
+          id?: string
+          shown_at?: string | null
+          test_id?: string | null
+          variant_shown?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_results_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_test_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activation_keys: {
         Row: {
           id: string
@@ -447,6 +528,105 @@ export type Database = {
         }
         Relationships: []
       }
+      conversion_metrics: {
+        Row: {
+          client_id: string | null
+          conversion_date: string | null
+          converted: boolean | null
+          converted_to_plan: string | null
+          coupon_used: string | null
+          created_at: string | null
+          days_to_convert: number | null
+          id: string
+          touchpoints: Json | null
+          trial_end_date: string
+          trial_start_date: string
+        }
+        Insert: {
+          client_id?: string | null
+          conversion_date?: string | null
+          converted?: boolean | null
+          converted_to_plan?: string | null
+          coupon_used?: string | null
+          created_at?: string | null
+          days_to_convert?: number | null
+          id?: string
+          touchpoints?: Json | null
+          trial_end_date: string
+          trial_start_date: string
+        }
+        Update: {
+          client_id?: string | null
+          conversion_date?: string | null
+          converted?: boolean | null
+          converted_to_plan?: string | null
+          coupon_used?: string | null
+          created_at?: string | null
+          days_to_convert?: number | null
+          id?: string
+          touchpoints?: Json | null
+          trial_end_date?: string
+          trial_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_metrics_coupon_used_fkey"
+            columns: ["coupon_used"]
+            isOneToOne: false
+            referencedRelation: "discount_coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupon_usage: {
+        Row: {
+          client_id: string | null
+          coupon_id: string | null
+          discount_applied: number | null
+          id: string
+          order_value: number | null
+          used_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          coupon_id?: string | null
+          discount_applied?: number | null
+          id?: string
+          order_value?: number | null
+          used_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          coupon_id?: string | null
+          discount_applied?: number | null
+          id?: string
+          order_value?: number | null
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_usage_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_usage_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "discount_coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_status_badges: {
         Row: {
           color: string
@@ -483,6 +663,57 @@ export type Database = {
           label?: string
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      discount_coupons: {
+        Row: {
+          active: boolean | null
+          auto_generated: boolean | null
+          code: string
+          conditions: Json | null
+          created_at: string | null
+          created_by: string | null
+          current_uses: number | null
+          discount_type: string
+          discount_value: number
+          id: string
+          max_uses: number | null
+          target_plan: string | null
+          valid_from: string
+          valid_until: string
+        }
+        Insert: {
+          active?: boolean | null
+          auto_generated?: boolean | null
+          code: string
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          current_uses?: number | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          max_uses?: number | null
+          target_plan?: string | null
+          valid_from?: string
+          valid_until: string
+        }
+        Update: {
+          active?: boolean | null
+          auto_generated?: boolean | null
+          code?: string
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          current_uses?: number | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          max_uses?: number | null
+          target_plan?: string | null
+          valid_from?: string
+          valid_until?: string
         }
         Relationships: []
       }
@@ -1733,6 +1964,38 @@ export type Database = {
         }
         Relationships: []
       }
+      trial_behavior_tracking: {
+        Row: {
+          client_id: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          timestamp: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          timestamp?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_behavior_tracking_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1858,6 +2121,15 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_conversion_rate: {
+        Args: { days_period?: number }
+        Returns: {
+          avg_days_to_convert: number
+          conversion_rate: number
+          total_conversions: number
+          total_trials: number
+        }[]
+      }
       get_m3u_for_client_plan: {
         Args: { cliente_plano: string; cliente_situacao: string }
         Returns: string
