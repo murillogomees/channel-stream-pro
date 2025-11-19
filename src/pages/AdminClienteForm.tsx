@@ -75,6 +75,7 @@ const clienteSchema = z.object({
     .optional()
     .or(z.literal('')),
   clienteAtivo: z.boolean().optional(),
+  origemCadastro: z.enum(['Google Ads', 'Facebook', 'Instagram', 'Indicação', 'Website', 'Outro', '']).optional(),
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
@@ -298,6 +299,7 @@ export default function AdminClienteForm() {
       formaUltimoPagamento: sanitizeString(data.formaUltimoPagamento || ''),
       macSmartOne: sanitizeMac(data.macSmartOne || ''),
       clienteAtivo: data.clienteAtivo ?? false,
+      origemCadastro: data.origemCadastro as any || null,
       smartone_status: 'nao_enviado',
     };
 
@@ -700,6 +702,27 @@ export default function AdminClienteForm() {
                 <div className="space-y-2">
                   <Label htmlFor="telegram">Telegram</Label>
                   <Input id="telegram" {...register('telegram')} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="origemCadastro">Como conheceu o sistema</Label>
+                  <Select
+                    onValueChange={(value) => setValue('origemCadastro', value === "0" ? undefined : value as any)}
+                    value={watch('origemCadastro') || "0"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma opção" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0" disabled>Selecione uma opção</SelectItem>
+                      <SelectItem value="Google Ads">Google Ads</SelectItem>
+                      <SelectItem value="Facebook">Facebook</SelectItem>
+                      <SelectItem value="Instagram">Instagram</SelectItem>
+                      <SelectItem value="Indicação">Indicação</SelectItem>
+                      <SelectItem value="Website">Website</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
