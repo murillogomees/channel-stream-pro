@@ -59,6 +59,68 @@ export function useClientesDb() {
     fetchClientes();
   }, [fetchClientes]);
 
+  const addCliente = useCallback(async (clienteData: Partial<Cliente>) => {
+    const { data, error } = await supabase
+      .from('clientes')
+      .insert({
+        nome: clienteData.nome,
+        telefone: clienteData.telefone,
+        telegram: clienteData.telegram || null,
+        email: clienteData.email || null,
+        situacao: clienteData.situacao,
+        data_contratacao: clienteData.dataContratacao || null,
+        data_vencimento: clienteData.dataVencimento || null,
+        plano: clienteData.plano,
+        valor_pago: clienteData.valorPago || null,
+        data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
+        forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
+        mac_smart_one: clienteData.macSmartOne || null,
+        cliente_ativo: clienteData.clienteAtivo ?? true,
+        origem_cadastro: clienteData.origemCadastro || null,
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    if (data) {
+      const newCliente = mapDbToCliente(data);
+      setClientes(prev => [newCliente, ...prev]);
+      return newCliente;
+    }
+  }, []);
+
+  const updateCliente = useCallback(async (id: string, clienteData: Partial<Cliente>) => {
+    const { data, error } = await supabase
+      .from('clientes')
+      .update({
+        nome: clienteData.nome,
+        telefone: clienteData.telefone,
+        telegram: clienteData.telegram || null,
+        email: clienteData.email || null,
+        situacao: clienteData.situacao,
+        data_contratacao: clienteData.dataContratacao || null,
+        data_vencimento: clienteData.dataVencimento || null,
+        plano: clienteData.plano,
+        valor_pago: clienteData.valorPago || null,
+        data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
+        forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
+        mac_smart_one: clienteData.macSmartOne || null,
+        cliente_ativo: clienteData.clienteAtivo,
+        origem_cadastro: clienteData.origemCadastro || null,
+        data_ultima_edicao: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    if (data) {
+      const updatedCliente = mapDbToCliente(data);
+      setClientes(prev => prev.map(c => c.id === id ? updatedCliente : c));
+      return updatedCliente;
+    }
+  }, []);
+
   const deleteCliente = useCallback(async (id: string) => {
     const { error } = await supabase.from('clientes').delete().eq('id', id);
     if (error) throw error;
@@ -93,6 +155,8 @@ export function useClientesDb() {
     loading,
     error,
     refresh: fetchClientes,
+    addCliente,
+    updateCliente,
     deleteCliente,
     getStats: () => stats,
   };

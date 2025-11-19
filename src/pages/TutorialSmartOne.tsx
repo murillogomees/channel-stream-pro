@@ -101,7 +101,7 @@ export default function TutorialSmartOne() {
 
     // Verificar se MAC já existe
     const macExistente = clientes.find(c => 
-      c.mac_smart_one?.toUpperCase() === mac.toUpperCase()
+      c.macSmartOne?.toUpperCase() === mac.toUpperCase()
     );
 
     if (macExistente) {
@@ -210,7 +210,7 @@ export default function TutorialSmartOne() {
       const senhaM3U = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
       // Criar cliente em período de teste
-      const novoCliente = addCliente({
+      const novoCliente = await addCliente({
         nome: formData.nome,
         telefone: formData.telefone,
         email: formData.email,
