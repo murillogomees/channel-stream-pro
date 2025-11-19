@@ -88,6 +88,7 @@ export default function AdminClienteForm() {
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
   const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
   const [allM3ULists, setAllM3ULists] = useState<any[]>([]);
   const [smartoneValidation, setSmartoneValidation] = useState<{
@@ -268,7 +269,16 @@ export default function AdminClienteForm() {
   }
 
   const onSubmit = async (data: ClienteFormData) => {
-    // Sanitizar dados antes de salvar
+    // Prevenir múltiplos submits
+    if (isSubmitting) {
+      console.log('Já está processando um submit, ignorando...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // Sanitizar dados antes de salvar
     const sanitizeString = (str: string) => str.replace(/[<>"']/g, '');
     const sanitizePhone = (str: string) => str.replace(/[^0-9+\-() ]/g, '');
     const sanitizeMac = (str: string) => str.replace(/[^A-Fa-f0-9:-]/g, '');
@@ -293,7 +303,7 @@ export default function AdminClienteForm() {
     let clientId: string;
     
     if (id) {
-      updateCliente(id, clienteData);
+      await updateCliente(id, clienteData);
       clientId = id;
       toast({
         title: 'Cliente atualizado',
@@ -421,18 +431,17 @@ export default function AdminClienteForm() {
           .select()
           .single();
 
-        if (insertError) throw insertError;
-        if (!newClientData) throw new Error('Failed to create client');
+          if (insertError) throw insertError;
+          if (!newClientData) throw new Error('Failed to create client');
 
-        clientId = newClientData.id;
+          clientId = newClientData.id;
+          
+          console.log('Cliente criado com sucesso:', clientId);
 
-        // Also update local context
-        const novoCliente = addCliente(clienteData);
-        
-        toast({
-          title: 'Cliente cadastrado',
-          description: 'O novo cliente foi adicionado com sucesso.',
-        });
+          toast({
+            title: 'Cliente cadastrado',
+            description: 'O novo cliente foi adicionado com sucesso.',
+          });
 
         // Save M3U list assignments for new clients
         if (selectedM3ULists.length > 0) {
@@ -466,6 +475,7 @@ export default function AdminClienteForm() {
 
         // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
         if (enviarWhatsApp) {
+          console.log('Tentando enviar WhatsApp de boas-vindas para:', clienteData.nome);
           try {
             const clienteCompleto: Cliente = {
               ...clienteData,
@@ -474,15 +484,28 @@ export default function AdminClienteForm() {
               dataUltimaEdicao: new Date().toISOString(),
             };
 
+            console.log('Cliente completo para envio:', clienteCompleto);
+
             // Importar dinamicamente e enviar boas-vindas diretamente
             const { EventNotificationHandler } = await import('@/services/notifications');
             const eventHandler = new EventNotificationHandler();
+            console.log('EventHandler criado, enviando...');
+            
             const sent = await eventHandler.sendWelcomeToNewClient(clienteCompleto, addLog);
+            
+            console.log('Resultado do envio:', sent);
             
             if (sent) {
               toast({
                 title: 'Mensagem enviada',
                 description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
+              });
+            } else {
+              console.warn('Mensagem não foi enviada - verificar configuração');
+              toast({
+                title: 'Aviso',
+                description: 'Cliente cadastrado, mas mensagem não foi enviada. Verifique a configuração do WhatsApp.',
+                variant: 'default',
               });
             }
           } catch (error) {
@@ -519,6 +542,7 @@ export default function AdminClienteForm() {
           description: error instanceof Error ? error.message : "Erro desconhecido",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
     }
@@ -526,6 +550,16 @@ export default function AdminClienteForm() {
     // Só navega se não for mostrar o diálogo do SmartOne
     if (!savedClientData) {
       navigate('/admin/clientes');
+    }
+    } catch (error) {
+      console.error('Erro no submit:', error);
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Erro ao processar',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -765,9 +799,9 @@ export default function AdminClienteForm() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isSyncingSmartone} className="w-full sm:w-auto">
-                  {isSyncingSmartone ? 'Sincronizando...' : id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
-                </Button>
+          <Button type="submit" disabled={isSubmitting || isSyncingSmartone} className="w-full sm:w-auto">
+            {isSubmitting ? 'Salvando...' : isSyncingSmartone ? 'Sincronizando...' : id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+          </Button>
               </div>
             </CardContent>
           </Card>

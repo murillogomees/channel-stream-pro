@@ -22,15 +22,25 @@ export class NotificationService {
   async send(options: SendNotificationOptions): Promise<void> {
     const { cliente, template, extraVars, addLog } = options;
 
+    console.log('[NotificationService] Iniciando envio...', {
+      clienteNome: cliente.nome,
+      telefone: cliente.telefone,
+      templateName: template.name,
+      isConfigured: this.whatsappAdapter.isConfigured()
+    });
+
     if (!this.whatsappAdapter.isConfigured()) {
+      console.error('[NotificationService] WhatsApp não configurado!');
       throw new Error('Serviço WhatsApp não configurado');
     }
 
     if (!cliente.telefone) {
+      console.error('[NotificationService] Cliente sem telefone!');
       throw new Error('Cliente sem telefone cadastrado');
     }
 
     const message = this.templateEngine.fill(template, cliente, extraVars);
+    console.log('[NotificationService] Mensagem preenchida:', message.substring(0, 100) + '...');
     
     try {
       let response;
