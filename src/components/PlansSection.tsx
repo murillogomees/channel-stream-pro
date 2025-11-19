@@ -6,7 +6,7 @@ const PlansSection = () => {
   const plans = [
     {
       name: "Mensal",
-      price: "49,90",
+      price: "30,00",
       currency: "R$",
       period: "/mês",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte 24/7", "Sem contrato"],
@@ -15,7 +15,7 @@ const PlansSection = () => {
     },
     {
       name: "Trimestral",
-      price: "129,90",
+      price: "109,00",
       currency: "R$",
       period: "/3 meses",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte prioritário 24/7", "Sem contrato", "Economia de 15%"],
@@ -24,7 +24,7 @@ const PlansSection = () => {
     },
     {
       name: "Semestral",
-      price: "239,90",
+      price: "200,00",
       currency: "R$",
       period: "/6 meses",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP 24/7", "Sem contrato", "Economia de 20%"],
@@ -33,7 +33,7 @@ const PlansSection = () => {
     },
     {
       name: "Anual",
-      price: "449,90",
+      price: "360,00",
       currency: "R$",
       period: "/ano",
       features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP dedicado 24/7", "Sem contrato", "Economia de 25%"],
