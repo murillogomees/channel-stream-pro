@@ -11,6 +11,7 @@ import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler } from '@/services/notifications';
 import { smartoneService } from '@/services/smartoneService';
 import { supabase } from '@/integrations/supabase/client';
+import { activityLogService } from '@/services/activityLogService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -305,6 +306,16 @@ export default function AdminClienteForm() {
     if (id) {
       await updateCliente(id, clienteData);
       clientId = id;
+      
+      // Registrar atividade de atualização
+      await activityLogService.logActivity(
+        'client_updated',
+        `Cliente ${clienteData.nome} foi atualizado`,
+        'cliente',
+        id,
+        { nome: clienteData.nome, telefone: clienteData.telefone }
+      );
+      
       toast({
         title: 'Cliente atualizado',
         description: 'As informações foram salvas com sucesso.',
@@ -370,6 +381,15 @@ export default function AdminClienteForm() {
           );
           
           if (enviado) {
+            // Registrar atividade de notificação enviada
+            await activityLogService.logActivity(
+              'notification_sent',
+              `Mensagem de atualização enviada para ${clienteData.nome}`,
+              'cliente',
+              id,
+              { tipo: 'atualizacao', telefone: clienteData.telefone }
+            );
+            
             toast({
               title: 'Mensagem enviada',
               description: `WhatsApp de atualização enviado para ${clienteData.nome}`,
@@ -438,6 +458,15 @@ export default function AdminClienteForm() {
           
           console.log('Cliente criado com sucesso:', clientId);
 
+          // Registrar atividade de criação
+          await activityLogService.logActivity(
+            'client_created',
+            `Novo cliente ${clienteData.nome} foi cadastrado`,
+            'cliente',
+            clientId,
+            { nome: clienteData.nome, telefone: clienteData.telefone, plano: clienteData.plano }
+          );
+
           toast({
             title: 'Cliente cadastrado',
             description: 'O novo cliente foi adicionado com sucesso.',
@@ -496,12 +525,31 @@ export default function AdminClienteForm() {
             console.log('Resultado do envio:', sent);
             
             if (sent) {
+              // Registrar atividade de notificação enviada
+              await activityLogService.logActivity(
+                'notification_sent',
+                `Mensagem de boas-vindas enviada para ${clienteData.nome}`,
+                'cliente',
+                clientId,
+                { tipo: 'boas_vindas', telefone: clienteData.telefone }
+              );
+              
               toast({
                 title: 'Mensagem enviada',
                 description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
               });
             } else {
               console.warn('Mensagem não foi enviada - verificar configuração');
+              
+              // Registrar falha na notificação
+              await activityLogService.logActivity(
+                'notification_failed',
+                `Falha ao enviar mensagem de boas-vindas para ${clienteData.nome}`,
+                'cliente',
+                clientId,
+                { tipo: 'boas_vindas', telefone: clienteData.telefone, motivo: 'configuracao' }
+              );
+              
               toast({
                 title: 'Aviso',
                 description: 'Cliente cadastrado, mas mensagem não foi enviada. Verifique a configuração do WhatsApp.',
