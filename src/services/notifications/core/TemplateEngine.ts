@@ -8,7 +8,19 @@ export class TemplateEngine {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsedTemplates = JSON.parse(stored);
+        
+        // Validar que templates têm eventType definido
+        const validTemplates = parsedTemplates.filter((t: WhatsappTemplate) => {
+          return t.eventType && typeof t.eventType === 'string';
+        });
+        
+        if (validTemplates.length === 0) {
+          console.warn('[TemplateEngine] Templates inválidos no localStorage.');
+          return [];
+        }
+        
+        return validTemplates;
       } catch (error) {
         console.error('Erro ao carregar templates:', error);
         return [];

@@ -148,12 +148,28 @@ export const useTemplates = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        setTemplates(JSON.parse(stored));
+        const parsedTemplates = JSON.parse(stored);
+        
+        // Validar que templates têm eventType definido
+        const validTemplates = parsedTemplates.filter((t: WhatsappTemplate) => {
+          return t.eventType && typeof t.eventType === 'string';
+        });
+        
+        // Se templates inválidos ou vazios, usar templates padrão
+        if (validTemplates.length === 0) {
+          console.warn('Templates no localStorage inválidos. Restaurando padrões.');
+          setTemplates(DEFAULT_TEMPLATES);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
+        } else {
+          setTemplates(validTemplates);
+        }
       } catch (error) {
         console.error('Erro ao carregar templates:', error);
         setTemplates(DEFAULT_TEMPLATES);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
       }
     } else {
+      console.log('Nenhum template encontrado. Carregando templates padrão.');
       setTemplates(DEFAULT_TEMPLATES);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
     }
