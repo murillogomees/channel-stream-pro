@@ -7,19 +7,19 @@ const ComparisonSection = () => {
   const plans = [
     {
       name: "Trimestral",
-      price: 109.00,
+      price: 79.90,
       months: 3,
       highlighted: false
     },
     {
       name: "Semestral",
-      price: 200.00,
+      price: 149.90,
       months: 6,
       highlighted: true
     },
     {
       name: "Anual",
-      price: 360.00,
+      price: 279.90,
       months: 12,
       highlighted: false
     }
