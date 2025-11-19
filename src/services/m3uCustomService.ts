@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { parseM3U } from '@/utils/m3uParser';
+import { fetchM3U } from '@/utils/m3uParser';
 
 export interface CustomList {
   id: string;
@@ -245,7 +245,7 @@ export class M3UCustomService {
     channelsCount: number;
   }> {
     try {
-      const playlist = await parseM3U(url);
+      const playlist = await fetchM3U(url);
       
       let categoriesCount = 0;
       let channelsCount = 0;
