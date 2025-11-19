@@ -45,7 +45,6 @@ import { loadTemplates } from '@/services/notificationScheduler';
 import { getWhatsAppService } from '@/services/whatsapp';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getWhatsAppService } from '@/services/whatsapp';
 
 const situacaoColors: Record<string, string> = {
   Testando: 'bg-blue-500',

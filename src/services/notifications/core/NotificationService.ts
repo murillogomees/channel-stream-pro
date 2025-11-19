@@ -95,8 +95,7 @@ export class NotificationService {
     let success = 0;
     let errors = 0;
 
-    const realtimeService = getRealtimeService();
-    await realtimeService.broadcastBatchStarted(notifications.length);
+    console.log(`📤 Iniciando envio em lote de ${notifications.length} notificações`);
 
     for (const notification of notifications) {
       try {
@@ -107,8 +106,6 @@ export class NotificationService {
         errors++;
       }
     }
-
-    await realtimeService.broadcastBatchCompleted(success, errors);
 
     console.log(`📊 Lote concluído: ${success} sucessos, ${errors} erros`);
     return { success, errors };
