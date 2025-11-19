@@ -49,6 +49,8 @@ const AdminBackupSystem = lazy(() => import("./pages/AdminBackupSystem"));
 const AdminCustomize = lazy(() => import("./pages/AdminCustomize"));
 const AdminVariables = lazy(() => import("./pages/AdminVariables"));
 const AdminPermissionTest = lazy(() => import("./pages/AdminPermissionTest"));
+const AdminConversionDashboard = lazy(() => import("./pages/AdminConversionDashboard"));
+const AdminCoupons = lazy(() => import("./pages/AdminCoupons"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -108,6 +110,8 @@ const App = () => (
           <Route path="/admin/customize" element={<ProtectedRoute requireAdmin><AdminCustomize /></ProtectedRoute>} />
           <Route path="/admin/variables" element={<ProtectedRoute requireAdmin><AdminVariables /></ProtectedRoute>} />
           <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
+          <Route path="/admin/conversion-dashboard" element={<ProtectedRoute requireAdmin><AdminConversionDashboard /></ProtectedRoute>} />
+          <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
