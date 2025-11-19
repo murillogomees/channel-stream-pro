@@ -82,7 +82,7 @@ export default function AdminClienteForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, loading } = useAuth();
-  const { addCliente, updateCliente, getClienteById } = useClientes();
+  const { clientes, loading: loadingClientes, addCliente, updateCliente } = useClientesDb();
   const { addLog } = useNotificationLogs();
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);

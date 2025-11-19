@@ -2,7 +2,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Play, Clock, Plus } from "lucide-react";
-import { useSettingsContext } from "@/context/SettingsContext";
 import { useState } from "react";
 import VideoModal from "@/components/VideoModal";
 
@@ -34,8 +33,17 @@ import oppenheimerTrailer from "@/assets/trailers/oppenheimer.mp4";
 import topGunMaverickTrailer from "@/assets/trailers/top-gun-maverick.mp4";
 
 const MoviesSection = () => {
-  const { settings } = useSettingsContext();
   const [selectedTrailer, setSelectedTrailer] = useState<{ src: string; title: string } | null>(null);
+  const settings = {
+    movies: {
+      title: "Filmes e Séries",
+      description: "Catálogo completo com os maiores sucessos",
+      updateSchedule: {
+        title: "Atualizações Semanais",
+        days: ["Segunda", "Quarta", "Sexta"]
+      }
+    }
+  };
 
   const featuredMovies = [
     {

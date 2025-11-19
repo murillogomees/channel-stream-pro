@@ -1,11 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Phone, Mail, MapPin, Clock, Headphones } from "lucide-react";
-import { useSettings } from "@/hooks/useSettings";
 
 const ContactSection = () => {
-  const { settings } = useSettings();
-  
   const whatsappUrl = "https://wa.me/556131425880?text=Olá%21+Gostaria+de+fazer+o+teste+grátis+do+IPTV";
   
   const contactMethods = [
@@ -22,14 +19,14 @@ const ContactSection = () => {
   return (
     <section id="contato" className="py-20 bg-background">
       <div className="container mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gradient-primary mb-4">
-            {settings.contact.title}
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {settings.contact.description}
-          </p>
-        </div>
+      <div className="text-center mb-16">
+        <h2 className="text-4xl font-bold text-gradient-primary mb-4">
+          Entre em Contato
+        </h2>
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          Estamos prontos para atender você e tirar todas as suas dúvidas
+        </p>
+      </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
           {/* Main WhatsApp Contact Card */}
@@ -75,7 +72,7 @@ const ContactSection = () => {
               <CardContent className="flex-1 flex flex-col justify-center">
                 <div className="text-center space-y-2">
                   <span className="text-foreground font-medium block">Atendimento:</span>
-                  <span className="text-muted-foreground">{settings.contact.info.schedule}</span>
+                  <span className="text-muted-foreground">Segunda a Sábado - 9h às 18h</span>
                 </div>
               </CardContent>
             </Card>

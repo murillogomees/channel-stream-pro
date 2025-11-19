@@ -1,26 +1,55 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Crown, Star, Zap } from "lucide-react";
-import { useSettings } from "@/hooks/useSettings";
+
 const PlansSection = () => {
-  const {
-    settings
-  } = useSettings();
-  const iconMap = {
-    "Zap": Zap,
-    "Star": Star,
-    "Crown": Crown
-  };
-  const plans = settings.plans.items;
+  const plans = [
+    {
+      name: "Mensal",
+      price: "49,90",
+      currency: "R$",
+      period: "/mês",
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte 24/7", "Sem contrato"],
+      ctaText: "Assinar Agora",
+      highlighted: false
+    },
+    {
+      name: "Trimestral",
+      price: "129,90",
+      currency: "R$",
+      period: "/3 meses",
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte prioritário 24/7", "Sem contrato", "Economia de 15%"],
+      ctaText: "Assinar Agora",
+      highlighted: true
+    },
+    {
+      name: "Semestral",
+      price: "239,90",
+      currency: "R$",
+      period: "/6 meses",
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP 24/7", "Sem contrato", "Economia de 20%"],
+      ctaText: "Assinar Agora",
+      highlighted: false
+    },
+    {
+      name: "Anual",
+      price: "449,90",
+      currency: "R$",
+      period: "/ano",
+      features: ["Mais de 10.000 canais", "Qualidade Full HD e 4K", "Suporte VIP dedicado 24/7", "Sem contrato", "Economia de 25%"],
+      ctaText: "Assinar Agora",
+      highlighted: false
+    }
+  ];
   return <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-background to-card">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
-            {settings.plans.title}
+            Planos e Preços
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto px-4">
-            {settings.plans.subtitle}
+            Escolha o plano ideal para você e sua família
           </p>
         </div>
 
