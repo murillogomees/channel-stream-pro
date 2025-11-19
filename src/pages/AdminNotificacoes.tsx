@@ -45,7 +45,7 @@ export default function AdminNotificacoes() {
   const { isAdmin, loading } = useAuth();
   const { clientes } = useClientesDb();
   const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
-  const { addLog } = useNotificationLogs();
+  const { addLog, stats, loading: statsLoading } = useNotificationLogs();
   const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -432,7 +432,14 @@ export default function AdminNotificacoes() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Sistema Automático:</span>
+                  <span className="text-sm font-medium">Sistema WhatsApp:</span>
+                  <Badge variant={isConfigured ? 'default' : 'secondary'}>
+                    {isConfigured ? '🟢 Conectado' : '⚫ Não Configurado'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Envio Automático:</span>
                   <Badge variant={config.autoSendEnabled ? 'default' : 'secondary'}>
                     {config.autoSendEnabled ? '🟢 Ativo' : '⚫ Desativado'}
                   </Badge>
@@ -450,12 +457,17 @@ export default function AdminNotificacoes() {
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Última Execução:</span>
+                    <span className="text-sm font-medium">Último Envio:</span>
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {lastRunState?.lastRunDate 
-                      ? new Date(lastRunState.lastRunDate).toLocaleDateString('pt-BR')
-                      : 'Nunca'}
+                    {!statsLoading && stats.lastSentAt
+                      ? stats.lastSentAt.toLocaleString('pt-BR', { 
+                          day: '2-digit', 
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'Nenhum'}
                   </span>
                 </div>
                 
@@ -478,15 +490,19 @@ export default function AdminNotificacoes() {
               </div>
             </div>
 
-            {lastRunState && (
-              <div className="grid grid-cols-2 gap-4 pt-2">
+            {!statsLoading && stats.total24h > 0 && (
+              <div className="grid grid-cols-3 gap-4 pt-2">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Total (24h)</p>
+                  <p className="text-2xl font-bold text-blue-500">{stats.total24h}</p>
+                </div>
                 <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Mensagens Enviadas</p>
-                  <p className="text-2xl font-bold text-green-500">{lastRunState.totalSent}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Sucesso (24h)</p>
+                  <p className="text-2xl font-bold text-green-500">{stats.success24h}</p>
                 </div>
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Erros</p>
-                  <p className="text-2xl font-bold text-red-500">{lastRunState.errors}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Erros (24h)</p>
+                  <p className="text-2xl font-bold text-red-500">{stats.errors24h}</p>
                 </div>
               </div>
             )}
