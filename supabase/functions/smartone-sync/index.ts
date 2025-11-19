@@ -374,13 +374,22 @@ serve(async (req) => {
           );
 
           const addPlaylistHtml = await addPlaylistPageResponse.text();
-          const csrfMatch = addPlaylistHtml.match(/name="_csrf_token"\s+value="([^"]+)"/);
+          
+          // Tentar múltiplos padrões de regex para capturar CSRF token
+          let csrfMatch = addPlaylistHtml.match(/name="_csrf_token"\s+value="([^"]+)"/);
+          if (!csrfMatch) {
+            csrfMatch = addPlaylistHtml.match(/name='_csrf_token'\s+value='([^']+)'/);
+          }
+          if (!csrfMatch) {
+            csrfMatch = addPlaylistHtml.match(/_csrf_token['"]\s*value=["']([^"']+)["']/);
+          }
           
           if (csrfMatch && csrfMatch[1]) {
             csrfToken = csrfMatch[1];
-            console.log('[smartone-sync] CSRF token autenticado obtido');
+            console.log('[smartone-sync] CSRF token autenticado obtido:', csrfToken.substring(0, 20) + '...');
           } else {
-            console.warn('[smartone-sync] CSRF token não encontrado na página autenticada');
+            console.error('[smartone-sync] CSRF token não encontrado na página autenticada');
+            console.log('[smartone-sync] HTML snippet:', addPlaylistHtml.substring(0, 500));
           }
 
         } catch (authError) {
@@ -393,7 +402,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Passo 2: Criar playlist usando sessão autenticada
+        // Passo 2: Criar playlist usando sessão autenticada com campos corretos
         const formBody = new URLSearchParams({
           _csrf_token: csrfToken,
           form_action: 'generate_xtream_playlist',
@@ -401,6 +410,14 @@ serve(async (req) => {
           xtream_name: playlistName,
           xtream_playlist: m3uList.file_url,
           note: `Auto-sync ${new Date().toISOString()}`,
+        });
+        
+        console.log('[smartone-sync] FormData sendo enviado:', {
+          csrf_preview: csrfToken.substring(0, 20) + '...',
+          form_action: 'generate_xtream_playlist',
+          mac: mac,
+          xtream_name: playlistName,
+          xtream_playlist_preview: m3uList.file_url.substring(0, 50) + '...',
         });
         
         console.log('[smartone-sync] Enviando requisição de criação de playlist...');
@@ -419,13 +436,18 @@ serve(async (req) => {
         const responseText = await smartoneResponse.text();
         let responseData;
         
+        console.log('[smartone-sync] Status da resposta:', smartoneResponse.status);
+        console.log('[smartone-sync] Resposta SmartOne (primeiros 200 chars):', responseText.substring(0, 200));
+        
         try {
           responseData = JSON.parse(responseText);
         } catch {
+          // Se não for JSON, pode ser HTML de sucesso ou erro
+          const isSuccess = smartoneResponse.ok && !responseText.includes('error') && !responseText.includes('Error');
           responseData = { 
-            success: smartoneResponse.ok, 
-            error: 'Resposta inválida', 
-            raw_response: responseText 
+            success: isSuccess, 
+            error: isSuccess ? null : 'Resposta não-JSON do SmartOne',
+            raw_response: responseText.substring(0, 500)
           };
         }
 
