@@ -23,6 +23,17 @@ serve(async (req) => {
   }
 
   try {
+    // ✅ SECURITY: Verify cron job authentication
+    const cronSecret = req.headers.get('x-supabase-cron-secret');
+    const expectedSecret = Deno.env.get('CRON_SECRET');
+    
+    if (expectedSecret && cronSecret !== expectedSecret) {
+      console.log('[WeeklyExpiration] Unauthorized cron attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid cron secret' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const whatsappAppkey = Deno.env.get("WHATSAPP_APPKEY");

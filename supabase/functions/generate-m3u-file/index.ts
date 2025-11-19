@@ -13,6 +13,40 @@ serve(async (req) => {
   }
 
   try {
+    // ✅ SECURITY: Require admin authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Autenticação necessária' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create authenticated Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Token inválido ou expirado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check admin role
+    const { data: isAdmin, error: roleError } = await supabase.rpc('is_admin', { uid: user.id });
+    if (roleError || !isAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado - privilégios de administrador necessários' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { customListId } = await req.json();
 
     if (!customListId) {
@@ -22,7 +56,8 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
+    // Use service role for database operations
+    const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -30,7 +65,7 @@ serve(async (req) => {
     const startTime = Date.now();
 
     // Buscar lista personalizada
-    const { data: customList, error: listError } = await supabase
+    const { data: customList, error: listError } = await supabaseService
       .from('m3u_custom_lists')
       .select('*')
       .eq('id', customListId)
