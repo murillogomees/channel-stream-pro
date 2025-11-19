@@ -2,7 +2,6 @@ import { Cliente } from '@/types/cliente';
 import { WhatsAppConfig } from '@/types/whatsapp';
 import { LastRunState } from '@/types/notificationHistory';
 import { PaymentDetector, EventNotificationHandler, DueDateNotificationHandler } from './notifications';
-import { NotificationErrorHandler } from './notificationErrorHandler';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 const LAST_RUN_KEY = 'auto_notification_last_run';
@@ -12,10 +11,8 @@ export class AutoNotificationScheduler {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private lastRunState: LastRunState | null = null;
-  private errorHandler: NotificationErrorHandler;
 
   constructor() {
-    this.errorHandler = new NotificationErrorHandler();
     this.loadLastRunState();
   }
 
@@ -174,7 +171,6 @@ export class AutoNotificationScheduler {
           });
         } catch (error) {
           console.error(`Erro ao enviar para ${cliente.nome}:`, error);
-          this.errorHandler.logError(cliente, error as Error);
           errors++;
           addNotification(cliente.id, cliente.dataVencimento, daysBeforeDue, false);
         }
@@ -299,9 +295,5 @@ export class AutoNotificationScheduler {
     }
 
     return nextRun;
-  }
-
-  getErrorHandler(): NotificationErrorHandler {
-    return this.errorHandler;
   }
 }

@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getRetryQueue } from "./notificationRetryQueue";
 
 interface ProspectData {
   nome: string;
@@ -42,15 +41,6 @@ export async function sendProspectNotifications(prospectData: ProspectData) {
       console.warn('Nenhum administrador ativo encontrado para enviar notificações');
     }
 
-    // Broadcast batch started
-    try {
-      const { getRealtimeService } = await import('./realtimeNotificationService');
-      const realtimeService = getRealtimeService();
-      await realtimeService.broadcastBatchStarted(activeAdmins.length + 1);
-    } catch (e) {
-      console.error('Erro ao enviar evento realtime batch started:', e);
-    }
-
     // Chamar a edge function
     const { data, error } = await supabase.functions.invoke('notify-prospect', {
       body: {
@@ -65,111 +55,10 @@ export async function sendProspectNotifications(prospectData: ProspectData) {
 
     if (error) {
       console.error('Erro ao enviar notificações via edge function:', error);
-      
-      // Broadcast error event
-      try {
-        const { getRealtimeService } = await import('./realtimeNotificationService');
-        const realtimeService = getRealtimeService();
-        await realtimeService.broadcastNotificationSent({
-          clienteId: 'prospect',
-          clienteNome: prospectData.nome,
-          telefone: prospectData.celular,
-          template: 'Boas-vindas Prospecto',
-          status: 'error',
-          error: error.message,
-        });
-      } catch (e) {
-        console.error('Erro ao enviar evento realtime:', e);
-      }
-
-      // Adicionar à fila de retry
-      const retryQueue = getRetryQueue();
-      const now = new Date().toLocaleString('pt-BR', { 
-        timeZone: 'America/Sao_Paulo',
-        dateStyle: 'short',
-        timeStyle: 'short'
-      });
-
-      // Adicionar mensagem de boas-vindas para retry
-      const welcomeMessage = `🎉 *Olá, ${prospectData.nome}!*
-
-Obrigado por se cadastrar na IPTV LINK!
-
-Recebemos seus dados e em breve nossa equipe entrará em contato com você para concluir sua ativação.
-
-📺 *Prepare-se para ter acesso a:*
-• Mais de 10.000 canais em Full HD e 4K
-• Filmes e séries ilimitados
-• Suporte técnico dedicado
-
-Aguarde nosso contato! 🚀`;
-
-      retryQueue.add({
-        type: 'prospect_welcome',
-        prospectData,
-        recipient: { phone: prospectData.celular, name: prospectData.nome },
-        message: welcomeMessage,
-        maxAttempts: 5,
-      });
-
-      // Adicionar notificações para admins
-      const adminMessage = `🔔 *NOVO CADASTRO NO TUTORIAL*
-
-📅 *Data/Hora:* ${now}
-
-👤 *Dados do Prospecto:*
-• *Nome:* ${prospectData.nome}
-• *Email:* ${prospectData.email}
-• *WhatsApp:* ${prospectData.celular}
-• *MAC Address:* ${prospectData.mac}
-
-Entre em contato com o cliente para concluir o processo! 📞`;
-
-      for (const admin of activeAdmins) {
-        retryQueue.add({
-          type: 'admin_notification',
-          prospectData,
-          recipient: { phone: admin.phone, name: admin.name },
-          message: adminMessage,
-          maxAttempts: 5,
-        });
-      }
-
-      console.log('Notificações adicionadas à fila de retry');
       throw error;
     }
 
-    // Broadcast success events
-    try {
-      const { getRealtimeService } = await import('./realtimeNotificationService');
-      const realtimeService = getRealtimeService();
-      
-      // Welcome message
-      await realtimeService.broadcastNotificationSent({
-        clienteId: 'prospect',
-        clienteNome: prospectData.nome,
-        telefone: prospectData.celular,
-        template: 'Boas-vindas Prospecto',
-        status: 'success',
-      });
-
-      // Admin notifications
-      for (const admin of activeAdmins) {
-        await realtimeService.broadcastNotificationSent({
-          clienteId: 'admin',
-          clienteNome: admin.name,
-          telefone: admin.phone,
-          template: 'Notificação Admin - Novo Prospecto',
-          status: 'success',
-        });
-      }
-
-      // Batch completed
-      await realtimeService.broadcastBatchCompleted(activeAdmins.length + 1, 0);
-    } catch (e) {
-      console.error('Erro ao enviar eventos realtime:', e);
-    }
-
+    console.log('✅ Notificações enviadas com sucesso:', data);
     return data;
   } catch (error) {
     console.error('Erro no serviço de notificações:', error);

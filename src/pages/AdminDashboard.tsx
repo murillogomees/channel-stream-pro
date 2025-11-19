@@ -19,8 +19,6 @@ import { useClientesDb } from "@/hooks/useClientesDb";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
-import { NotificationRetryWidget } from '@/components/admin/NotificationRetryWidget';
-import { NotificationStatsWidget } from '@/components/admin/NotificationStatsWidget';
 
 interface QuickStatProps {
   icon: React.ReactNode;
@@ -194,12 +192,6 @@ const AdminDashboard = () => {
             </section>
             
             <QuickShortcuts />
-            
-            {/* Notification Widgets */}
-            <NotificationRetryWidget />
-            
-            {/* Notification Stats ocupa largura total */}
-            <NotificationStatsWidget />
           </div>
 
           <div className="lg:col-span-1">
@@ -268,30 +260,6 @@ const AdminDashboard = () => {
               description="Visualize o histórico de envios"
               icon={<MessageSquare className="h-5 w-5" />}
               path="/admin/notificacoes"
-            />
-            <NavCard
-              title="Estatísticas"
-              description="Análise de performance de envios"
-              icon={<BarChart3 className="h-5 w-5" />}
-              path="/admin/notification-stats"
-            />
-            <NavCard
-              title="Fila de Retry"
-              description="Mensagens aguardando reenvio"
-              icon={<Clock className="h-5 w-5" />}
-              path="/admin/notification-retry"
-            />
-            <NavCard
-              title="Monitor ao Vivo"
-              description="Acompanhe envios em tempo real"
-              icon={<Radio className="h-5 w-5" />}
-              path="/admin/notification-live"
-            />
-            <NavCard
-              title="Alertas"
-              description="Configure alertas de falhas"
-              icon={<AlertTriangle className="h-5 w-5" />}
-              path="/admin/notification-alerts"
             />
           </div>
         </section>

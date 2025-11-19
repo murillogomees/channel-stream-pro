@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getSystemHealthService, SystemHealthStatus } from '@/services/systemHealthService';
 import { getWebSocketMetricsService, WebSocketMetrics, MetricsSnapshot } from '@/services/websocketMetricsService';
-import { getAdminAlertService, AdminAlert } from '@/services/adminAlertService';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,13 +17,11 @@ const AdminSystemHealth = () => {
   const navigate = useNavigate();
   const [health, setHealth] = useState<SystemHealthStatus | null>(null);
   const [metrics, setMetrics] = useState<WebSocketMetrics | null>(null);
-  const [alerts, setAlerts] = useState<AdminAlert[]>([]);
   const [snapshots, setSnapshots] = useState<MetricsSnapshot[]>([]);
 
   useEffect(() => {
     const healthService = getSystemHealthService();
     const metricsService = getWebSocketMetricsService();
-    const alertService = getAdminAlertService();
 
     // Start monitoring
     healthService.startMonitoring(30000);
@@ -32,7 +29,6 @@ const AdminSystemHealth = () => {
     const updateData = () => {
       setHealth(healthService.getStatus());
       setMetrics(metricsService.getMetrics());
-      setAlerts(alertService.getUnacknowledgedAlerts());
       setSnapshots(metricsService.getSnapshotHistory());
     };
 
