@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity, Wifi } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity, Wifi, Copy } from "lucide-react";
 
 interface ClienteComPerfil {
   id: string;
@@ -163,52 +163,46 @@ const AdminSmartOneSync = () => {
     try {
       setSyncing(cliente.id);
       
-      // Criar objeto Cliente compatível com smartoneService
-      const clienteObj: Cliente = {
-        id: cliente.id,
-        nome: cliente.profiles.nome,
-        telefone: cliente.profiles.telefone,
-        telegram: '',
-        email: cliente.profiles.email,
-        macSmartOne: cliente.mac_smart_one,
-        situacao: 'Ativo',
-        plano: 'Mensal',
-        clienteAtivo: true,
-        dataCadastro: new Date().toISOString(),
-        dataUltimaEdicao: new Date().toISOString(),
-        dataContratacao: new Date().toISOString(),
-        dataVencimento: new Date().toISOString(),
-        valorPago: 0,
-        dataUltimoPagamento: '',
-        formaUltimoPagamento: '',
-        smartone_status: cliente.smartone_status as any,
-        smartone_last_sync_at: cliente.smartone_last_sync_at,
-      };
-
-      const result = await smartoneService.syncPlaylistForClient(
-        clienteObj,
-        (id, updates) => {
-          // Atualizar cliente localmente após sync
-          setClientes(prev => prev.map(c => 
-            c.id === id 
-              ? { ...c, smartone_status: updates.smartone_status || c.smartone_status }
-              : c
-          ));
-        }
-      );
-
-      if (result.success) {
-        toast({
-          title: "Sincronização realizada",
-          description: `Cliente ${cliente.profiles.nome} sincronizado com sucesso!`,
-        });
-      } else {
-        toast({
-          title: "Erro na sincronização",
-          description: result.error || "Erro desconhecido",
-          variant: "destructive",
-        });
+      // Buscar lista M3U padrão
+      const { data: defaultM3U } = await supabase
+        .from('m3u_lists')
+        .select('name, file_url')
+        .eq('is_default', true)
+        .eq('status', 'active')
+        .maybeSingle();
+      
+      if (!defaultM3U) {
+        throw new Error('Nenhuma lista M3U padrão configurada');
       }
+      
+      const playlistName = `${cliente.profiles.nome} - ${defaultM3U.name}`;
+      
+      // Formatar dados para copiar
+      const dadosParaCopiar = `═══════════════════════════════════════
+📋 DADOS PARA SMARTONE IPTV
+═══════════════════════════════════════
+
+Cliente: ${cliente.profiles.nome}
+MAC Address: ${cliente.mac_smart_one}
+Nome da Playlist: ${playlistName}
+URL da Playlist: ${defaultM3U.file_url}
+
+═══════════════════════════════════════
+📝 INSTRUÇÕES:
+1. Acesse o painel SmartOne
+2. Vá em "Add Playlist" > aba "XtreamCodes"
+3. Cole os dados acima nos campos correspondentes
+4. Clique em "Add Playlist"
+═══════════════════════════════════════`;
+
+      // Copiar para clipboard
+      await navigator.clipboard.writeText(dadosParaCopiar);
+      
+      toast({
+        title: "✅ Dados copiados!",
+        description: "Cole no painel SmartOne para criar a playlist",
+        duration: 8000,
+      });
 
       await loadClientes();
     } catch (error: any) {
@@ -323,16 +317,17 @@ const AdminSmartOneSync = () => {
                             size="sm"
                             onClick={() => handleSync(cliente)}
                             disabled={syncing === cliente.id}
+                            variant="secondary"
                           >
                             {syncing === cliente.id ? (
                               <>
-                                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                                Sincronizando...
+                                <Copy className="h-3 w-3 mr-1" />
+                                Copiando...
                               </>
                             ) : (
                               <>
-                                <RefreshCw className="h-3 w-3 mr-1" />
-                                Sincronizar
+                                <Copy className="h-3 w-3 mr-1" />
+                                Copiar Dados
                               </>
                             )}
                           </Button>
@@ -395,7 +390,8 @@ const AdminSmartOneSync = () => {
                   setValidationDialog({ open: false, cliente: null, errors: [], warnings: [] });
                   await performSync(validationDialog.cliente!);
                 }}>
-                  Prosseguir mesmo assim
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar Dados
                 </AlertDialogAction>
               )}
             </AlertDialogFooter>
