@@ -342,44 +342,22 @@ export default function AdminClienteForm() {
         });
       }
 
-      // Verificar se devemos sincronizar com SmartOne
-      // Critérios:
-      // - MAC foi alterado/adicionado, OU
-      // - cliente ainda não foi enviado para o SmartOne (status nao_enviado ou erro)
-      const macChanged =
-        !!clienteOriginal &&
-        clienteOriginal.macSmartOne !== clienteData.macSmartOne &&
-        !!clienteData.macSmartOne;
-
-      const precisaSyncSmartone =
-        macChanged ||
-        (!!clienteData.macSmartOne &&
-          (!!clienteOriginal?.smartone_status || clienteOriginal?.smartone_status === 'nao_enviado' || clienteOriginal?.smartone_status === 'erro'));
-
-      if (precisaSyncSmartone) {
-        // Cliente salvo com sucesso
-        toast({
-          title: "Cliente atualizado",
-          description: "Dados salvos com sucesso.",
-        });
+      // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
+      if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
+        const selectedM3UData = allM3ULists.filter(list => 
+          selectedM3ULists.includes(list.id)
+        );
         
-        // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
-        if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
-          const selectedM3UData = allM3ULists.filter(list => 
-            selectedM3ULists.includes(list.id)
-          );
-          
-          setSavedClientData({
-            nome: clienteData.nome,
-            macSmartOne: clienteData.macSmartOne,
-            m3uLists: selectedM3UData.map(list => ({
-              name: list.name,
-              file_url: list.file_url,
-            })),
-          });
-          setShowSmartOneData(true);
-          return; // Não navega automaticamente
-        }
+        setSavedClientData({
+          nome: clienteData.nome,
+          macSmartOne: clienteData.macSmartOne,
+          m3uLists: selectedM3UData.map(list => ({
+            name: list.name,
+            file_url: list.file_url,
+          })),
+        });
+        setShowSmartOneData(true);
+        return; // Não navega automaticamente - aguarda confirmação do modal
       }
 
       // Enviar mensagem de atualização se checkbox estiver marcado
@@ -481,68 +459,49 @@ export default function AdminClienteForm() {
           }
         }
 
-        // Se tem MAC, sincronizar com SmartOne
-        if (clienteData.macSmartOne) {
-          // Validação preventiva
-          const clienteCompleto: Cliente = {
-            ...clienteData,
-            id: clientId,
-            dataCadastro: new Date().toISOString(),
-            dataUltimaEdicao: new Date().toISOString(),
-          };
-
-          const validation = await smartoneService.validateClientForSync(clienteCompleto);
-
-          // Mostrar avisos se houver
-          if (validation.warnings.length > 0) {
-            toast({
-              title: "Avisos de Validação",
-              description: validation.warnings.join('\n'),
-              variant: "default",
-            });
-          }
-
-          // Se houver erros, não sincronizar
-          if (!validation.valid) {
-            toast({
-              title: "Erro de Validação",
-              description: validation.errors.join('\n'),
-              variant: "destructive",
-            });
-            
-            navigate("/admin/clientes");
-            return;
-          }
-
-          // Cliente salvo com sucesso
-          toast({
-            title: "Cliente cadastrado",
-            description: "Dados salvos com sucesso.",
+        // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
+        if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
+          const selectedM3UData = allM3ULists.filter(list => 
+            selectedM3ULists.includes(list.id)
+          );
+          
+          setSavedClientData({
+            nome: clienteData.nome,
+            macSmartOne: clienteData.macSmartOne,
+            m3uLists: selectedM3UData.map(list => ({
+              name: list.name,
+              file_url: list.file_url,
+            })),
           });
+          setShowSmartOneData(true);
+          return; // Não navega automaticamente - aguarda confirmação do modal
+        }
 
-          // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
-          if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
-            const selectedM3UData = allM3ULists.filter(list => 
-              selectedM3ULists.includes(list.id)
-            );
+        // Enviar mensagem de boas-vindas via WhatsApp
+        if (enviarWhatsApp) {
+          try {
+            const clienteCompleto: Cliente = {
+              ...clienteData,
+              id: clientId,
+              dataCadastro: new Date().toISOString(),
+              dataUltimaEdicao: new Date().toISOString(),
+            };
+
+            // Importar dinamicamente e enviar
+            const { EventNotificationHandler } = await import('@/services/notifications');
+            const eventHandler = new EventNotificationHandler();
+            const result = await eventHandler.processEvents([clienteCompleto], [], addLog);
             
-            setSavedClientData({
-              nome: clienteData.nome,
-              macSmartOne: clienteData.macSmartOne,
-              m3uLists: selectedM3UData.map(list => ({
-                name: list.name,
-                file_url: list.file_url,
-              })),
-            });
-            setShowSmartOneData(true);
-            return; // Não navega automaticamente
+            if (result.welcomeSent > 0) {
+              toast({
+                title: 'Mensagem enviada',
+                description: `WhatsApp de boas-vindas enviado para ${clienteData.nome}`,
+              });
+            }
+          } catch (error) {
+            console.error('Erro ao enviar mensagem de boas-vindas:', error);
           }
-      }
-
-      // Boas-vindas serão enviadas automaticamente pelo EventNotificationHandler
-      if (enviarWhatsApp) {
-        console.log('Boas-vindas serão enviadas automaticamente pelo sistema');
-      }
+        }
       } catch (error) {
         console.error('Error creating client:', error);
         toast({

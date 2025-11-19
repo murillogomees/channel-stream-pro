@@ -103,72 +103,72 @@ export function SmartOneDataDialog({ open, onOpenChange, clientData }: SmartOneD
 
           {/* Passo 2: Dados do Cliente */}
           <div className="bg-muted/30 p-5 rounded-lg border-2 border-border">
-            <div className="flex items-start gap-3 mb-4">
+            <div className="flex items-start gap-3">
               <div className="bg-secondary text-secondary-foreground rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0">
                 2
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-foreground mb-1">Copie os Dados do Cliente</h3>
-                <p className="text-sm text-muted-foreground">
-                  Use os botões de copiar para facilitar o preenchimento no painel SmartOne
+                <h3 className="text-lg font-semibold text-foreground mb-2">Copie os Dados do Cliente</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Use os botões de copiar para transferir cada informação para o painel SmartOne
                 </p>
-              </div>
-            </div>
 
-            <div className="space-y-4 ml-11">
-              {/* Nome do Cliente */}
-              <div className="bg-background p-4 rounded-lg border-2 border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 1</span>
-                    Nome do Cliente
-                  </Label>
-                  <CopyButton text={clientData.nome} fieldName="Nome" />
-                </div>
-                <p className="text-base font-mono bg-muted/50 p-3 rounded border border-border">
-                  {clientData.nome}
-                </p>
-              </div>
-
-              {/* MAC Address */}
-              <div className="bg-background p-4 rounded-lg border-2 border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 2</span>
-                    MAC Address
-                  </Label>
-                  <CopyButton text={clientData.macSmartOne} fieldName="MAC Address" />
-                </div>
-                <p className="text-base font-mono bg-muted/50 p-3 rounded border border-border">
-                  {clientData.macSmartOne}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  ⚠️ Atenção: O MAC Address deve ser único no SmartOne
-                </p>
-              </div>
-
-              {/* Playlists M3U */}
-              {clientData.m3uLists.length > 0 && (
-                <div className="bg-background p-4 rounded-lg border-2 border-border">
-                  <Label className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 3</span>
-                    URL da Playlist M3U
-                  </Label>
-                  <div className="space-y-3">
-                    {clientData.m3uLists.map((playlist, index) => (
-                      <div key={index} className="bg-muted/50 p-3 rounded border border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium text-foreground">{playlist.name}</p>
-                          <CopyButton text={playlist.file_url} fieldName={`URL - ${playlist.name}`} />
-                        </div>
-                        <p className="text-xs font-mono text-muted-foreground break-all bg-background p-2 rounded">
-                          {playlist.file_url}
-                        </p>
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  {/* Nome do Cliente */}
+                  <div className="bg-background p-4 rounded-lg border-2 border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 1</span>
+                        Nome do Cliente
+                      </Label>
+                      <CopyButton text={clientData.nome} fieldName="Nome" />
+                    </div>
+                    <p className="text-base font-mono bg-muted/50 p-3 rounded border border-border">
+                      {clientData.nome}
+                    </p>
                   </div>
+
+                  {/* MAC Address */}
+                  <div className="bg-background p-4 rounded-lg border-2 border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 2</span>
+                        MAC Address
+                      </Label>
+                      <CopyButton text={clientData.macSmartOne} fieldName="MAC Address" />
+                    </div>
+                    <p className="text-base font-mono bg-muted/50 p-3 rounded border border-border">
+                      {clientData.macSmartOne}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      ⚠️ Atenção: O MAC Address deve ser único no SmartOne
+                    </p>
+                  </div>
+
+                  {/* URLs das Playlists M3U */}
+                  {clientData.m3uLists.length > 0 && (
+                    <div className="bg-background p-4 rounded-lg border-2 border-border">
+                      <Label className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">Campo 3</span>
+                        URLs das Playlists M3U
+                      </Label>
+                      <div className="space-y-3">
+                        {clientData.m3uLists.map((playlist, index) => (
+                          <div key={index} className="bg-muted/50 p-3 rounded border border-border">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium text-foreground">{playlist.name}</p>
+                              <CopyButton text={playlist.file_url} fieldName={`URL - ${playlist.name}`} />
+                            </div>
+                            <p className="text-xs font-mono text-muted-foreground break-all bg-background p-2 rounded">
+                              {playlist.file_url}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
