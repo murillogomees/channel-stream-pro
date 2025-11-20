@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const video = videoRef.current;
@@ -24,13 +25,35 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     setIsLoading(true);
     setHasError(false);
+    setErrorMessage('');
 
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
-    const handleError = () => {
+    const handleError = (e: Event) => {
       setIsLoading(false);
       setHasError(true);
-      const errorMsg = 'Erro ao carregar o canal';
+      
+      let errorMsg = 'Erro ao carregar o canal';
+      
+      // Detectar erros específicos
+      if (video.error) {
+        switch (video.error.code) {
+          case MediaError.MEDIA_ERR_NETWORK:
+            errorMsg = 'Erro de conexão. Verifique sua internet.';
+            break;
+          case MediaError.MEDIA_ERR_DECODE:
+            errorMsg = 'Erro ao decodificar o vídeo.';
+            break;
+          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+            errorMsg = 'Formato de vídeo não suportado.';
+            break;
+          case MediaError.MEDIA_ERR_ABORTED:
+            errorMsg = 'Reprodução cancelada.';
+            break;
+        }
+      }
+      
+      setErrorMessage(errorMsg);
       toast.error(errorMsg);
       onError?.(errorMsg);
     };
@@ -63,6 +86,16 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     }
   };
 
+  const handleRetry = () => {
+    if (videoRef.current) {
+      setHasError(false);
+      setErrorMessage('');
+      setIsLoading(true);
+      videoRef.current.load();
+      videoRef.current.play();
+    }
+  };
+
   return (
     <div className={`relative bg-black aspect-video ${className}`}>
       {/* Channel Info Overlay */}
@@ -90,44 +123,54 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       />
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+      {isLoading && !hasError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-white" />
+          <p className="text-white text-sm">Carregando stream...</p>
         </div>
       )}
 
       {/* Error State */}
       {hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white">
-          <p className="text-xl mb-2">Erro ao carregar canal</p>
-          <p className="text-sm text-white/60">Tente outro canal</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white gap-4">
+          <AlertCircle className="w-16 h-16 text-red-500" />
+          <p className="text-xl mb-2">{errorMessage}</p>
+          <Button
+            onClick={handleRetry}
+            variant="secondary"
+            className="mt-4"
+          >
+            Tentar Novamente
+          </Button>
         </div>
       )}
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
+      {!hasError && (
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                className="text-white hover:bg-white/20"
+              >
+                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </Button>
+            </div>
+            
             <Button
               variant="ghost"
               size="icon"
-              onClick={toggleMute}
+              onClick={toggleFullscreen}
               className="text-white hover:bg-white/20"
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </Button>
           </div>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="text-white hover:bg-white/20"
-          >
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
