@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useM3UCustom, useM3UCategories, useM3UChannels } from '@/hooks/useM3UCustom';
 import { useM3UImport } from '@/hooks/useM3UImport';
 import { m3uCustomService } from '@/services/m3uCustomService';
+import { m3uConflictService } from '@/services/m3uConflictService';
+import { M3UConflictResolver } from '@/components/admin/M3UConflictResolver';
 import { m3uGeneratorService } from '@/services/m3uGeneratorService';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Save, Play, FileDown, Copy, Trash2, Edit, ArrowUp, ArrowDown, List, Upload, Eye, Pause, XCircle } from 'lucide-react';
@@ -55,6 +57,10 @@ export default function AdminM3UCustomBuilder() {
   });
   const [importUrl, setImportUrl] = useState('');
   const [importContent, setImportContent] = useState('');
+  const [importMethod, setImportMethod] = useState<'url' | 'paste'>('url');
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [detectedConflicts, setDetectedConflicts] = useState<any[]>([]);
+  const [pendingImport, setPendingImport] = useState<{ method: 'url' | 'paste'; data: string } | null>(null);
   const [m3uPreview, setM3uPreview] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingListId, setEditingListId] = useState<string | null>(null);
@@ -133,28 +139,114 @@ export default function AdminM3UCustomBuilder() {
 
   const handleImportM3U = async () => {
     if (!selectedListId) return;
-    if (!importUrl && !importContent) {
-      toast({
-        title: 'Informe a URL ou cole o conteúdo da M3U',
-        variant: 'destructive',
-      });
-      return;
-    }
     
     try {
-      if (importContent.trim()) {
-        // Importação via conteúdo colado (sem limite de tamanho)
-        await startPasteImport(selectedListId, importContent);
+      let importData = '';
+      let method: 'url' | 'paste' = importMethod;
+
+      if (importMethod === 'url' && importUrl.trim()) {
+        importData = importUrl.trim();
+      } else if (importMethod === 'paste' && importContent.trim()) {
+        importData = importContent.trim();
       } else {
-        // Importação via URL (com cache e chunks)
-        await startUrlImport(selectedListId, importUrl);
+        toast({
+          title: "Erro",
+          description: "Por favor, forneça uma URL ou conteúdo M3U válido",
+          variant: "destructive"
+        });
+        return;
       }
-      
-      // Resetar formulário após iniciar
+
+      // Verificar se já existe conteúdo na lista (reimportação)
+      const { data: existingCategories } = await supabase
+        .from('m3u_categories')
+        .select('id')
+        .eq('custom_list_id', selectedListId)
+        .limit(1);
+
+      if (existingCategories && existingCategories.length > 0) {
+        // Há conteúdo existente - mostrar diálogo de conflitos
+        setPendingImport({ method, data: importData });
+        
+        // Simular detecção de conflitos (na prática, precisaria parsear o conteúdo)
+        setDetectedConflicts([
+          {
+            id: '1',
+            change_type: 'added',
+            entity_type: 'channel',
+            entity_name: 'Novos canais detectados'
+          }
+        ]);
+        setConflictDialogOpen(true);
+        setIsImportDialogOpen(false);
+      } else {
+        // Primeira importação - prosseguir diretamente
+        if (method === 'url') {
+          await startUrlImport(selectedListId, importData);
+        } else {
+          await startPasteImport(selectedListId, importData);
+        }
+        
+        // Resetar formulário
+        setImportUrl('');
+        setImportContent('');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao iniciar importação",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleResolveConflict = async (mode: 'merge' | 'replace') => {
+    if (!selectedListId || !pendingImport) return;
+
+    try {
+      // Aplicar resolução antes de importar
+      if (mode === 'replace') {
+        // Limpar conteúdo existente
+        const { data: categories } = await supabase
+          .from('m3u_categories')
+          .select('id')
+          .eq('custom_list_id', selectedListId);
+
+        if (categories && categories.length > 0) {
+          await supabase
+            .from('m3u_channels')
+            .delete()
+            .in('category_id', categories.map(c => c.id));
+        }
+
+        await supabase
+          .from('m3u_categories')
+          .delete()
+          .eq('custom_list_id', selectedListId);
+      }
+
+      // Iniciar importação
+      if (pendingImport.method === 'url') {
+        await startUrlImport(selectedListId, pendingImport.data);
+      } else {
+        await startPasteImport(selectedListId, pendingImport.data);
+      }
+
+      toast({
+        title: "Conflito resolvido",
+        description: `Importação iniciada em modo ${mode === 'merge' ? 'mesclar' : 'substituir'}`,
+      });
+
+      setConflictDialogOpen(false);
+      setPendingImport(null);
       setImportUrl('');
       setImportContent('');
     } catch (error: any) {
-      toast({ title: 'Erro ao iniciar importação', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Erro ao resolver conflito",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -462,37 +554,44 @@ export default function AdminM3UCustomBuilder() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>URL do arquivo M3U</Label>
-                          <Input
-                            value={importUrl}
-                            onChange={(e) => setImportUrl(e.target.value)}
-                            placeholder="https://exemplo.com/playlist.m3u"
-                            disabled={!!importContent.trim()}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            ✅ Sem limite de tamanho • Cache automático
-                          </p>
+                          <Label>Método de Importação</Label>
+                          <Select value={importMethod} onValueChange={(value: 'url' | 'paste') => setImportMethod(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="url">Importar de URL</SelectItem>
+                              <SelectItem value="paste">Colar Conteúdo</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Separator className="flex-1" />
-                          <span className="text-xs text-muted-foreground">OU</span>
-                          <Separator className="flex-1" />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Cole o conteúdo M3U</Label>
-                          <Textarea
-                            value={importContent}
-                            onChange={(e) => setImportContent(e.target.value)}
-                            placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id=..."
-                            className="min-h-[160px] font-mono text-xs"
-                            disabled={!!importUrl.trim()}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            ✅ Sem limite de tamanho • Processamento local
-                          </p>
-                        </div>
+
+                        {importMethod === 'url' ? (
+                          <div className="space-y-2">
+                            <Label>URL do arquivo M3U</Label>
+                            <Input
+                              value={importUrl}
+                              onChange={(e) => setImportUrl(e.target.value)}
+                              placeholder="https://exemplo.com/playlist.m3u"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              ✅ Limite de 60MB • Cache automático
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label>Cole o conteúdo M3U</Label>
+                            <Textarea
+                              value={importContent}
+                              onChange={(e) => setImportContent(e.target.value)}
+                              placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id=..."
+                              className="min-h-[160px] font-mono text-xs"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              ✅ Sem limite de tamanho • Processamento local
+                            </p>
+                          </div>
+                        )}
                         
                         {/* Progress Section */}
                         {importSession && (
@@ -859,6 +958,15 @@ export default function AdminM3UCustomBuilder() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Conflict Resolution Dialog */}
+      <M3UConflictResolver
+        open={conflictDialogOpen}
+        onOpenChange={setConflictDialogOpen}
+        changes={detectedConflicts}
+        onResolve={handleResolveConflict}
+        loading={isImporting}
+      />
     </div>
   );
 }

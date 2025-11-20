@@ -1207,6 +1207,60 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_import_changes: {
+        Row: {
+          change_type: string
+          created_at: string | null
+          custom_list_id: string | null
+          entity_id: string | null
+          entity_name: string
+          entity_type: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          session_id: string | null
+        }
+        Insert: {
+          change_type: string
+          created_at?: string | null
+          custom_list_id?: string | null
+          entity_id?: string | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          session_id?: string | null
+        }
+        Update: {
+          change_type?: string
+          created_at?: string | null
+          custom_list_id?: string | null
+          entity_id?: string | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_import_changes_custom_list_id_fkey"
+            columns: ["custom_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_custom_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "m3u_import_changes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_import_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_import_queue: {
         Row: {
           completed_at: string | null
@@ -1253,8 +1307,12 @@ export type Database = {
       }
       m3u_import_sessions: {
         Row: {
+          auto_resolved: boolean | null
           batch_size: number | null
           completed_at: string | null
+          conflict_resolution_mode: string | null
+          conflicts_detected: number | null
+          conflicts_resolved: number | null
           created_at: string | null
           created_by: string | null
           current_batch: number | null
@@ -1271,8 +1329,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          auto_resolved?: boolean | null
           batch_size?: number | null
           completed_at?: string | null
+          conflict_resolution_mode?: string | null
+          conflicts_detected?: number | null
+          conflicts_resolved?: number | null
           created_at?: string | null
           created_by?: string | null
           current_batch?: number | null
@@ -1289,8 +1351,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          auto_resolved?: boolean | null
           batch_size?: number | null
           completed_at?: string | null
+          conflict_resolution_mode?: string | null
+          conflicts_detected?: number | null
+          conflicts_resolved?: number | null
           created_at?: string | null
           created_by?: string | null
           current_batch?: number | null
