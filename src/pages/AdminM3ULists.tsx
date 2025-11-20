@@ -130,16 +130,20 @@ export default function AdminM3ULists() {
       
       const { data, error } = await supabase
         .from('m3u_lists')
-        .select('*')
+        .select(`
+          *,
+          client_m3u_lists(count)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Carregar tags para cada lista
+      // Carregar tags e adicionar contagem de uso para cada lista
       const listsWithTags = await Promise.all(
         (data || []).map(async (list) => {
           const tags = await getListTags(list.id);
-          return { ...list, tags };
+          const usage_count = list.client_m3u_lists?.[0]?.count || 0;
+          return { ...list, tags, usage_count };
         })
       );
 
@@ -760,7 +764,7 @@ export default function AdminM3ULists() {
                 <TableHead>Nome</TableHead>
                 <TableHead className="max-w-xs">Descrição</TableHead>
                 <TableHead>Tags</TableHead>
-                <TableHead>Prioridade</TableHead>
+                <TableHead>Em Uso</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -846,8 +850,10 @@ export default function AdminM3ULists() {
                        </div>
                      </TableCell>
                      <TableCell>
-                      <Badge variant="outline">{list.priority || 0}</Badge>
-                    </TableCell>
+                       <Badge variant="outline" className="font-mono">
+                         {(list as any).usage_count || 0} {(list as any).usage_count === 1 ? 'cliente' : 'clientes'}
+                       </Badge>
+                     </TableCell>
                     <TableCell>
                       <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
                         {list.status === 'active' ? 'Ativa' : 'Inativa'}
