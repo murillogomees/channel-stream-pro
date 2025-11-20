@@ -1,5 +1,6 @@
 import { Cliente } from '@/types/cliente';
 import { WhatsappTemplate } from '@/types/whatsapp';
+import { DEFAULT_TEMPLATES } from '@/constants/defaultTemplates';
 
 const STORAGE_KEY = 'whatsapp_templates';
 
@@ -15,18 +16,17 @@ export class TemplateEngine {
           return t.eventType && typeof t.eventType === 'string';
         });
         
-        if (validTemplates.length === 0) {
-          console.warn('[TemplateEngine] Templates inválidos no localStorage.');
-          return [];
+        if (validTemplates.length > 0) {
+          return validTemplates;
         }
-        
-        return validTemplates;
       } catch (error) {
-        console.error('Erro ao carregar templates:', error);
-        return [];
+        console.error('[TemplateEngine] Erro ao carregar templates do localStorage:', error);
       }
     }
-    return [];
+    
+    // Fallback para templates padrão se localStorage estiver vazio ou inválido
+    console.info('[TemplateEngine] Usando templates padrão');
+    return DEFAULT_TEMPLATES;
   }
 
   fill(template: WhatsappTemplate, cliente: Cliente, extraVars?: Record<string, string>): string {
