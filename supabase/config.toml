@@ -43,6 +43,10 @@ verify_jwt = true
 [functions.fetch-m3u-url]
 verify_jwt = false
 
+# Public endpoint for stream proxy - kept public with token verification
+[functions.stream-proxy]
+verify_jwt = false
+
 # Cron job for daily M3U regeneration - public for cron access with secret verification
 [functions.daily-m3u-regeneration]
 verify_jwt = false
