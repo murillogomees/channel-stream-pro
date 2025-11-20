@@ -219,7 +219,6 @@ export default function TutorialSmartOne() {
         nome: formData.nome,
         telefone: formData.telefone,
         email: formData.email,
-        telegram: '',
         situacao: 'Testando', // Status de teste
         dataContratacao: hoje.toISOString().split('T')[0],
         dataVencimento: dataVencimento.toISOString().split('T')[0],

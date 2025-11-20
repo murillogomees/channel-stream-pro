@@ -48,11 +48,6 @@ const clienteSchema = z.object({
     .min(10, 'Telefone deve ter no mínimo 10 dígitos')
     .max(20, 'Telefone muito longo')
     .regex(/^[\d\s\(\)\-\+]+$/, 'Telefone inválido'),
-  telegram: z.string()
-    .trim()
-    .max(50, 'Telegram muito longo')
-    .optional()
-    .or(z.literal('')),
   email: z.string()
     .trim()
     .email('Email inválido')
@@ -136,7 +131,6 @@ export default function AdminClienteForm() {
               id: data.id,
               nome: data.nome,
               telefone: data.telefone,
-              telegram: data.telegram || '',
               email: data.email || '',
               situacao: data.situacao as SituacaoCliente,
               dataContratacao: data.data_contratacao || '',
@@ -288,7 +282,6 @@ export default function AdminClienteForm() {
     const clienteData: Omit<Cliente, 'id' | 'dataCadastro' | 'dataUltimaEdicao'> = {
       nome: sanitizeString(data.nome || ''),
       telefone: sanitizePhone(data.telefone || ''),
-      telegram: sanitizeString(data.telegram || ''),
       email: (data.email || '').toLowerCase(),
       situacao: (data.situacao || 'Lead') as SituacaoCliente,
       dataContratacao: data.dataContratacao || '',
@@ -435,7 +428,6 @@ export default function AdminClienteForm() {
           .insert({
             nome: clienteData.nome,
             telefone: clienteData.telefone,
-            telegram: clienteData.telegram || null,
             email: clienteData.email || null,
             situacao: clienteData.situacao,
             data_contratacao: clienteData.dataContratacao || null,
@@ -717,11 +709,6 @@ export default function AdminClienteForm() {
                     placeholder="(11) 99999-9999"
                   />
                   {errors.telefone && <p className="text-sm text-destructive">{errors.telefone.message}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="telegram">Telegram</Label>
-                  <Input id="telegram" {...register('telegram')} />
                 </div>
 
                 <div className="space-y-2">

@@ -54,7 +54,6 @@ export function useClientesDb() {
       .update({
         nome: clienteData.nome,
         telefone: clienteData.telefone,
-        telegram: clienteData.telegram || null,
         email: clienteData.email || null,
         situacao: clienteData.situacao,
         data_contratacao: clienteData.dataContratacao || null,

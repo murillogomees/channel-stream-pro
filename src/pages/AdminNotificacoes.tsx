@@ -248,9 +248,8 @@ export default function AdminNotificacoes() {
     ...(config.testContacts || []).map(contact => ({
       id: contact.id,
       nome: `${contact.name} (Teste)`,
-      telefone: contact.phone,
-      telegram: '',
-      email: '',
+        telefone: contact.phone,
+        email: '',
       situacao: 'Testando' as const,
       dataContratacao: contact.addedAt,
       dataVencimento: contact.addedAt,

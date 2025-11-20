@@ -7,8 +7,6 @@ interface AdminPhone {
   id: string;
   name: string;
   phone: string;
-  active: boolean;
-  telegram_id?: string;
   phone_sms?: string;
   notification_channels?: string[];
   schedule_enabled?: boolean;
@@ -19,6 +17,7 @@ interface AdminPhone {
       end: string;
     };
   };
+  active: boolean;
 }
 
 interface AlertConfig {
@@ -183,14 +182,6 @@ class SecurityWhatsAppAlertService {
             }
             break;
           
-          case 'telegram':
-            if (admin.telegram_id) {
-              await this.sendTelegram(admin.telegram_id, messageWithActions);
-              results.push({ channel: 'telegram', success: true });
-              console.log(`[SecurityAlert] Telegram enviado para ${admin.name}`);
-            }
-            break;
-          
           case 'sms':
             if (admin.phone_sms) {
               await this.sendSMS(admin.phone_sms, message); // SMS sem botões por limitação
@@ -256,15 +247,6 @@ ${this.generateConfirmationLink(eventId, adminId)}
     // Usar o edge function em vez de link local
     const projectId = 'sdvyxdghxqmntyoweqbd';
     return `https://${projectId}.supabase.co/functions/v1/confirm-security-alert?deliveryId=${eventId}&adminId=${adminId}`;
-  }
-
-  /**
-   * Envia mensagem via Telegram (placeholder - necessita implementação)
-   */
-  private async sendTelegram(telegramId: string, message: string): Promise<void> {
-    // TODO: Implementar integração com Telegram Bot API
-    console.log('[SecurityAlert] Telegram não implementado ainda');
-    throw new Error('Telegram não configurado');
   }
 
   /**
