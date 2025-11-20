@@ -87,8 +87,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           valor_pago: clienteData.valor_pago,
           cliente_ativo: clienteData.cliente_ativo,
           mac_smart_one: clienteData.mac_smart_one,
-          usuario_m3u: clienteData.usuario_m3u,
-          senha_m3u: clienteData.senha_m3u,
         } : undefined
       };
 
