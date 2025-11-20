@@ -506,16 +506,36 @@ export default function AdminClienteForm() {
 
         // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
         if (enviarWhatsApp) {
+          // Pegar telefone diretamente do formulário (não do clienteData que pode estar desatualizado)
+          const telefoneAtual = watch('telefone') || data.telefone || clienteData.telefone;
+          
           console.log('========================================');
           console.log('INICIANDO ENVIO DE MENSAGEM DE BOAS-VINDAS');
           console.log('Cliente:', clienteData.nome);
-          console.log('Telefone:', clienteData.telefone);
+          console.log('Telefone do form (watch):', watch('telefone'));
+          console.log('Telefone do data:', data.telefone);
+          console.log('Telefone do clienteData:', clienteData.telefone);
+          console.log('Telefone FINAL usado:', telefoneAtual);
           console.log('Situação:', clienteData.situacao);
           console.log('========================================');
+
+          // Validar se há telefone
+          if (!telefoneAtual || telefoneAtual.trim() === '') {
+            console.error('❌ ERRO: Telefone está vazio! Não é possível enviar WhatsApp.');
+            toast({
+              title: 'Erro ao enviar WhatsApp',
+              description: 'O campo telefone está vazio. Preencha o telefone antes de enviar.',
+              variant: 'destructive',
+            });
+            setIsSubmitting(false);
+            return;
+          }
           
           try {
+            // Usar telefone diretamente do input do formulário
             const clienteCompleto: Cliente = {
               ...clienteData,
+              telefone: telefoneAtual, // Garantir que usa o telefone do formulário
               id: clientId,
               dataCadastro: new Date().toISOString(),
               dataUltimaEdicao: new Date().toISOString(),
