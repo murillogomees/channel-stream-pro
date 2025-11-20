@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Phone, Mail, MapPin, Clock, Headphones } from "lucide-react";
+import { trackEvent } from "@/services/metaPixelService";
 
 const ContactSection = () => {
   const whatsappUrl = "https://wa.me/556131425880?text=Olá%21+Gostaria+de+fazer+o+teste+grátis+do+IPTV";
@@ -47,7 +48,10 @@ const ContactSection = () => {
                 <Button
                   variant="default"
                   className="w-full font-semibold"
-                  onClick={() => window.open(whatsappUrl, "_blank")}
+                  onClick={() => {
+                    trackEvent('Contact', { content_name: 'Contact Section WhatsApp', content_category: 'button' });
+                    window.open(whatsappUrl, "_blank");
+                  }}
                 >
                   Chamar no WhatsApp
                 </Button>

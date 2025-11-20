@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
 import logoWhite from "@/assets/logo-white-sm.webp";
 import heroBg from "@/assets/hero-bg.jpg";
+import { trackEvent } from "@/services/metaPixelService";
 
 const HeroSection = () => {
   const settings = {
@@ -73,7 +74,10 @@ const HeroSection = () => {
               variant="hero"
               size="lg" 
               className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-              onClick={() => window.location.href = "/tutorial"}
+              onClick={() => {
+                trackEvent('InitiateCheckout', { content_name: 'Hero CTA - Ativar Acesso', content_category: 'button' });
+                window.location.href = "/tutorial";
+              }}
             >
               <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
               Ativar Meu Acesso Agora
@@ -84,7 +88,10 @@ const HeroSection = () => {
                 variant={button.variant === "primary" ? "cta" : "outline"} 
                 size="lg" 
                 className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-                onClick={() => window.location.href = "https://wa.me/556131425880?text=" + encodeURIComponent("Olá! Gostaria de fazer o teste grátis do IPTV.")}
+                onClick={() => {
+                  trackEvent('Contact', { content_name: 'Hero CTA - WhatsApp', content_category: 'button' });
+                  window.location.href = "https://wa.me/556131425880?text=" + encodeURIComponent("Olá! Gostaria de fazer o teste grátis do IPTV.");
+                }}
               >
                 {index === 0 ? <Play className="h-5 w-5 sm:h-6 sm:w-6" /> : <Tv className="h-5 w-5 sm:h-6 sm:w-6" />}
                 {button.text}

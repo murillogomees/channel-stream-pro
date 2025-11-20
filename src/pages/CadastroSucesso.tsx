@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { trackCompleteRegistration } from '@/services/metaPixelService';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
@@ -11,6 +12,13 @@ export default function CadastroSucesso() {
   useEffect(() => {
     // Scroll to top on mount
     window.scrollTo(0, 0);
+    
+    // Track successful registration
+    trackCompleteRegistration({ 
+      content_name: 'IPTV Registration', 
+      value: 0,
+      currency: 'BRL' 
+    });
   }, []);
 
   return (

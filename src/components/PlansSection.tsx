@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Crown, Star, Zap } from "lucide-react";
+import { trackEvent } from "@/services/metaPixelService";
 
 const PlansSection = () => {
   const plans = [
@@ -116,6 +117,12 @@ const PlansSection = () => {
                       size="default" 
                       className="w-full font-semibold"
                       onClick={() => {
+                        trackEvent('AddToCart', { 
+                          content_name: `Plano ${plan.name}`, 
+                          content_type: 'product',
+                          value: parseFloat(plan.price.replace(',', '.')),
+                          currency: 'BRL'
+                        });
                         const message = `Olá! Tenho interesse no plano ${plan.name}. Gostaria de mais informações.`;
                         window.location.href = `https://wa.me/556131425880?text=${encodeURIComponent(message)}`;
                       }}

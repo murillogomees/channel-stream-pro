@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { trackEvent } from "@/services/metaPixelService";
 
 // Lazy load components for better performance
 const Navigation = lazy(() => import("@/components/Navigation"));
@@ -17,6 +18,10 @@ const Footer = lazy(() => import("@/components/Footer"));
 const FloatingButtons = lazy(() => import("@/components/FloatingButtons"));
 
 const Index = () => {
+  useEffect(() => {
+    trackEvent('ViewContent', { content_name: 'Homepage', content_type: 'page' });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Suspense fallback={<div className="h-16 bg-background" />}>

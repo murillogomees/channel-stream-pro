@@ -1,5 +1,6 @@
 import { MessageCircle, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/services/metaPixelService";
 
 const FloatingButtons = () => {
   const whatsappUrl = "https://wa.me/556131425880?text=Olá%21+Gostaria+de+fazer+o+teste+grátis+do+IPTV";
@@ -12,7 +13,10 @@ const FloatingButtons = () => {
         variant="default"
         size="icon"
         className="h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all"
-        onClick={() => window.open(whatsappUrl, "_blank")}
+        onClick={() => {
+          trackEvent('Contact', { content_name: 'Floating WhatsApp Button', content_category: 'button' });
+          window.open(whatsappUrl, "_blank");
+        }}
         aria-label="Falar no WhatsApp"
       >
         <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -21,7 +25,10 @@ const FloatingButtons = () => {
       {/* Instagram Button */}
       <button
         className="h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-glow hover:shadow-elevated hover:scale-110 transition-all bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white flex items-center justify-center"
-        onClick={() => window.open(instagramUrl, "_blank")}
+        onClick={() => {
+          trackEvent('ViewContent', { content_name: 'Instagram Profile', content_type: 'social_media' });
+          window.open(instagramUrl, "_blank");
+        }}
         aria-label="Seguir no Instagram"
       >
         <Instagram className="h-5 w-5 sm:h-6 sm:w-6" />
