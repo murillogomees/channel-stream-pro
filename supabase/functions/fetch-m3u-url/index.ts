@@ -49,19 +49,19 @@ serve(async (req) => {
       throw new Error(`Falha ao buscar M3U: ${response.status} ${response.statusText}`);
     }
 
-    // Limitar tamanho máximo para evitar memory issues (60MB)
-    const MAX_SIZE = 60 * 1024 * 1024;
+    // Limitar tamanho máximo para evitar memory issues (30MB - reduzido para margem de segurança)
+    const MAX_SIZE = 30 * 1024 * 1024;
     const contentLength = response.headers.get('content-length');
     
     if (contentLength && parseInt(contentLength) > MAX_SIZE) {
-      throw new Error('Arquivo M3U muito grande (máximo 60MB)');
+      throw new Error('Arquivo M3U muito grande (máximo 30MB). Para arquivos maiores, cole o conteúdo diretamente.');
     }
 
     const content = await response.text();
     
     // Verificação adicional de tamanho
     if (content.length > MAX_SIZE) {
-      throw new Error('Arquivo M3U muito grande (máximo 60MB)');
+      throw new Error('Arquivo M3U muito grande (máximo 30MB). Para arquivos maiores, cole o conteúdo diretamente.');
     }
     
     console.log(`[FetchM3U] Conteúdo obtido com sucesso (${content.length} bytes)`);
