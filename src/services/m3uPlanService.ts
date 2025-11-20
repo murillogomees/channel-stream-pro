@@ -5,10 +5,11 @@ export interface M3UList {
   name: string;
   file_url: string;
   status: string;
-  priority: number;
   is_default: boolean;
   created_at: string;
   description?: string;
+  plan_type?: string[];
+  usage_count?: number;
 }
 
 /**
@@ -28,9 +29,9 @@ export const m3uPlanService = {
         .select('file_url')
         .eq('status', 'active')
         .order('is_default', { ascending: false })
-        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         console.error('Erro ao buscar lista M3U:', error);
@@ -50,8 +51,10 @@ export const m3uPlanService = {
   async getAllLists(): Promise<M3UList[]> {
     const { data, error } = await supabase
       .from('m3u_lists')
-      .select('*')
-      .order('priority', { ascending: false })
+      .select(`
+        *,
+        client_m3u_lists(count)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -59,7 +62,10 @@ export const m3uPlanService = {
       return [];
     }
 
-    return (data || []) as M3UList[];
+    return ((data || []) as any[]).map(list => ({
+      ...list,
+      usage_count: list.client_m3u_lists?.[0]?.count || 0
+    }));
   },
 
   /**
@@ -68,37 +74,24 @@ export const m3uPlanService = {
   async getActiveLists(): Promise<M3UList[]> {
     const { data, error } = await supabase
       .from('m3u_lists')
-      .select('*')
+      .select(`
+        *,
+        client_m3u_lists(count)
+      `)
       .eq('status', 'active')
-      .order('priority', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar listas ativas:', error);
       return [];
     }
 
-    return (data || []) as M3UList[];
+    return ((data || []) as any[]).map(list => ({
+      ...list,
+      usage_count: list.client_m3u_lists?.[0]?.count || 0
+    }));
   },
 
-  /**
-   * Atualiza a prioridade de uma lista M3U
-   */
-  async updateListPriority(
-    listId: string,
-    priority: number
-  ): Promise<boolean> {
-    const { error } = await supabase
-      .from('m3u_lists')
-      .update({ priority })
-      .eq('id', listId);
-
-    if (error) {
-      console.error('Erro ao atualizar prioridade da lista:', error);
-      return false;
-    }
-
-    return true;
-  },
 
   /**
    * Define lista como padrão
@@ -123,16 +116,24 @@ export const m3uPlanService = {
   async getListById(listId: string): Promise<M3UList | null> {
     const { data, error } = await supabase
       .from('m3u_lists')
-      .select('*')
+      .select(`
+        *,
+        client_m3u_lists(count)
+      `)
       .eq('id', listId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Erro ao buscar lista M3U:', error);
       return null;
     }
 
-    return data as M3UList;
+    if (!data) return null;
+
+    return {
+      ...data,
+      usage_count: data.client_m3u_lists?.[0]?.count || 0
+    } as M3UList;
   },
 
   /**

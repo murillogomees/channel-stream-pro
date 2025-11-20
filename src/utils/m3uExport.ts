@@ -3,12 +3,11 @@ export interface M3UListExport {
   name: string;
   file_url: string;
   description?: string;
-  priority?: number;
+  plan_type?: string[];
   status: string;
   is_default?: boolean;
   created_at: string;
   updated_at: string;
-  tags?: string;
 }
 
 export function exportToCSV(data: M3UListExport[], filename: string = 'listas-m3u.csv') {
@@ -17,10 +16,9 @@ export function exportToCSV(data: M3UListExport[], filename: string = 'listas-m3
     'Nome',
     'URL',
     'Descrição',
-    'Prioridade',
+    'Tipos de Plano',
     'Status',
     'Padrão',
-    'Tags',
     'Criado em',
     'Atualizado em'
   ];
@@ -30,10 +28,9 @@ export function exportToCSV(data: M3UListExport[], filename: string = 'listas-m3
     escapeCSV(list.name),
     escapeCSV(list.file_url),
     escapeCSV(list.description || ''),
-    list.priority || 0,
+    escapeCSV((list.plan_type || []).join(', ')),
     list.status === 'active' ? 'Ativa' : 'Inativa',
     list.is_default ? 'Sim' : 'Não',
-    escapeCSV(list.tags || ''),
     formatDate(list.created_at),
     formatDate(list.updated_at)
   ]);

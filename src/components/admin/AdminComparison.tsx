@@ -9,8 +9,9 @@ interface M3UList {
   description: string | null;
   file_url: string;
   status: string;
-  priority: number;
-  tags?: Array<{ id: string; name: string; color: string | null }>;
+  plan_type?: string[];
+  usage_count?: number;
+  is_default?: boolean;
 }
 
 interface AdminComparisonProps {
@@ -28,8 +29,8 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
     description: list1.description !== list2.description,
     fileUrl: list1.file_url !== list2.file_url,
     status: list1.status !== list2.status,
-    priority: list1.priority !== list2.priority,
-    tags: JSON.stringify(list1.tags) !== JSON.stringify(list2.tags),
+    planType: JSON.stringify(list1.plan_type) !== JSON.stringify(list2.plan_type),
+    usage: list1.usage_count !== list2.usage_count,
   };
 
   const hasDifferences = Object.values(differences).some(d => d);
@@ -73,8 +74,8 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
                 <div className="py-2">Descrição</div>
                 <div className="py-2">URL</div>
                 <div className="py-2">Status</div>
-                <div className="py-2">Prioridade</div>
-                <div className="py-2">Tags</div>
+                <div className="py-2">Tipos de Plano</div>
+                <div className="py-2">Uso</div>
               </div>
             </div>
 
@@ -95,21 +96,11 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
                     {list1.status === 'active' ? 'Ativa' : 'Inativa'}
                   </Badge>
                 </div>
-                <div className={`py-2 ${differences.priority ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list1.priority}
+                <div className={`py-2 ${differences.planType ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {(list1.plan_type || []).join(', ') || 'Nenhum'}
                 </div>
-                <div className={`py-2 ${differences.tags ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  <div className="flex flex-wrap gap-1">
-                    {list1.tags && list1.tags.length > 0 ? (
-                      list1.tags.map(tag => (
-                        <Badge key={tag.id} variant="outline" className="text-xs">
-                          {tag.name}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground italic text-sm">Sem tags</span>
-                    )}
-                  </div>
+                <div className={`py-2 ${differences.usage ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list1.usage_count || 0} clientes
                 </div>
               </div>
             </div>
@@ -131,29 +122,14 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
                     {list2.status === 'active' ? 'Ativa' : 'Inativa'}
                   </Badge>
                 </div>
-                <div className={`py-2 ${differences.priority ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list2.priority}
+                <div className={`py-2 ${differences.planType ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {(list2.plan_type || []).join(', ') || 'Nenhum'}
                 </div>
-                <div className={`py-2 ${differences.tags ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  <div className="flex flex-wrap gap-1">
-                    {list2.tags && list2.tags.length > 0 ? (
-                      list2.tags.map(tag => (
-                        <Badge key={tag.id} variant="outline" className="text-xs">
-                          {tag.name}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground italic text-sm">Sem tags</span>
-                    )}
-                  </div>
+                <div className={`py-2 ${differences.usage ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
+                  {list2.usage_count || 0} clientes
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-4 h-4 bg-yellow-500/10 rounded"></div>
-            <span>Campos com diferenças</span>
           </div>
         </div>
       </DialogContent>
