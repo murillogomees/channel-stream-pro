@@ -40,8 +40,8 @@ export function M3UListPreview({ selectedLists, allLists }: M3UListPreviewProps)
                 <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
                   {list.status === 'active' ? 'Ativa' : 'Inativa'}
                 </Badge>
-                {list.priority !== undefined && (
-                  <Badge variant="outline">Prioridade: {list.priority}</Badge>
+                {list.usage_count !== undefined && (
+                  <Badge variant="outline">Em uso: {list.usage_count} clientes</Badge>
                 )}
               </div>
             </div>

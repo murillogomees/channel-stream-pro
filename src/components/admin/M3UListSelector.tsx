@@ -11,7 +11,7 @@ interface M3UList {
   name: string;
   file_url: string;
   status: string;
-  plan_type?: ('teste' | 'basico' | 'premium')[];
+  plan_type?: string[];
   is_default?: boolean;
 }
 
