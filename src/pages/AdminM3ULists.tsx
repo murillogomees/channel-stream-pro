@@ -43,10 +43,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useM3UTags, M3UTag } from '@/hooks/useM3UTags';
 import { useM3UViewHistory } from '@/hooks/useM3UViewHistory';
 import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
-import { M3UTagSelector } from '@/components/admin/M3UTagSelector';
 import { M3UViewHistoryDialog } from '@/components/admin/M3UViewHistoryDialog';
 import { AdminComparison } from '@/components/admin/AdminComparison';
 import { M3UListFilters } from '@/components/admin/M3UListFilters';
@@ -60,11 +58,11 @@ interface M3UList {
   created_at: string;
   updated_at: string;
   is_default?: boolean;
-  priority?: number;
   description?: string;
   created_by?: string;
   updated_by?: string;
-  tags?: M3UTag[];
+  plan_type?: string[];
+  usage_count?: number;
 }
 
 interface M3UAuditLog {
@@ -81,7 +79,6 @@ interface M3UAuditLog {
 export default function AdminM3ULists() {
   const navigate = useNavigate();
   const { isAdmin, loading: authLoading } = useAuth();
-  const { tags, getListTags, updateListTags } = useM3UTags();
   const { logView, getListHistory } = useM3UViewHistory();
   const { isFavorite, toggleFavorite } = useM3UListFavorites();
   
@@ -93,13 +90,12 @@ export default function AdminM3ULists() {
   const [listName, setListName] = useState('');
   const [listUrl, setListUrl] = useState('');
   const [listDescription, setListDescription] = useState('');
-  const [priority, setPriority] = useState(0);
+  const [planTypes, setPlanTypes] = useState<string[]>(['mensal']);
   const [isActive, setIsActive] = useState(true);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [auditLogs, setAuditLogs] = useState<M3UAuditLog[]>([]);
   const [showAuditHistory, setShowAuditHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [currentListHistory, setCurrentListHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);

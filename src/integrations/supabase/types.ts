@@ -1200,42 +1200,6 @@ export type Database = {
           },
         ]
       }
-      m3u_list_tags: {
-        Row: {
-          created_at: string | null
-          id: string
-          m3u_list_id: string
-          tag_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          m3u_list_id: string
-          tag_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          m3u_list_id?: string
-          tag_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "m3u_list_tags_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "m3u_list_tags_tag_id_fkey"
-            columns: ["tag_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_tags"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       m3u_lists: {
         Row: {
           created_at: string | null
@@ -1246,7 +1210,7 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
-          priority: number | null
+          plan_type: string[] | null
           status: string | null
           updated_at: string | null
           updated_by: string | null
@@ -1260,7 +1224,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
-          priority?: number | null
+          plan_type?: string[] | null
           status?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -1274,7 +1238,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
-          priority?: number | null
+          plan_type?: string[] | null
           status?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -1318,33 +1282,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      m3u_tags: {
-        Row: {
-          category: string
-          color: string | null
-          created_at: string | null
-          created_by: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          category: string
-          color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          category?: string
-          color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
       }
       m3u_view_history: {
         Row: {
