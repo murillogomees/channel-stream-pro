@@ -41,8 +41,6 @@ export interface UnifiedUser extends UserProfile {
     valor_pago: number;
     cliente_ativo: boolean;
     mac_smart_one?: string;
-    usuario_m3u?: string;
-    senha_m3u?: string;
   };
 }
 

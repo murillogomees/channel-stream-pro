@@ -1,33 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Cliente, PlanoCliente, SituacaoCliente } from '@/types/cliente';
-
-// Mapeia o registro do banco (snake_case) para o tipo Cliente (camelCase)
-function mapDbToCliente(row: any): Cliente {
-  return {
-    id: row.id,
-    nome: row.nome ?? '',
-    telefone: row.telefone ?? '',
-    telegram: row.telegram ?? '',
-    email: row.email ?? '',
-    situacao: (row.situacao as SituacaoCliente) ?? 'Testando',
-    dataContratacao: row.data_contratacao ?? '',
-    dataVencimento: row.data_vencimento ?? '',
-    plano: (row.plano as PlanoCliente) ?? 'Mensal',
-    valorPago: row.valor_pago ?? 0,
-    dataUltimoPagamento: row.data_ultimo_pagamento ?? '',
-    formaUltimoPagamento: row.forma_ultimo_pagamento ?? '',
-    macSmartOne: row.mac_smart_one ?? '',
-    dataCadastro: row.data_cadastro ?? row.created_at ?? '',
-    dataUltimaEdicao: row.data_ultima_edicao ?? row.updated_at ?? '',
-    clienteAtivo: row.cliente_ativo ?? undefined,
-    smartone_status: row.smartone_status ?? undefined,
-    smartone_playlist_id: row.smartone_playlist_id ?? undefined,
-    smartone_raw_response: row.smartone_raw_response ?? undefined,
-    smartone_last_sync_at: row.smartone_last_sync_at ?? undefined,
-    origemCadastro: row.origem_cadastro ?? undefined,
-  };
-}
+import { Cliente, ClienteDb, dbToCliente, clienteToDb } from '@/types/cliente';
 
 export function useClientesDb() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -46,7 +19,7 @@ export function useClientesDb() {
 
       if (error) throw error;
 
-      setClientes((data || []).map(mapDbToCliente));
+      setClientes((data || []).map(dbToCliente));
     } catch (e: any) {
       console.error('Erro ao carregar clientes:', e);
       setError(e?.message || 'Erro ao carregar clientes');
@@ -60,30 +33,16 @@ export function useClientesDb() {
   }, [fetchClientes]);
 
   const addCliente = useCallback(async (clienteData: Partial<Cliente>) => {
+    const dbData = clienteToDb(clienteData);
     const { data, error } = await supabase
       .from('clientes')
-      .insert({
-        nome: clienteData.nome,
-        telefone: clienteData.telefone,
-        telegram: clienteData.telegram || null,
-        email: clienteData.email || null,
-        situacao: clienteData.situacao,
-        data_contratacao: clienteData.dataContratacao || null,
-        data_vencimento: clienteData.dataVencimento || null,
-        plano: clienteData.plano,
-        valor_pago: clienteData.valorPago || null,
-        data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
-        forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
-        mac_smart_one: clienteData.macSmartOne || null,
-        cliente_ativo: clienteData.clienteAtivo ?? true,
-        origem_cadastro: clienteData.origemCadastro || null,
-      })
+      .insert([dbData as any])
       .select()
       .single();
     
     if (error) throw error;
     if (data) {
-      const newCliente = mapDbToCliente(data);
+      const newCliente = dbToCliente(data);
       setClientes(prev => [newCliente, ...prev]);
       return newCliente;
     }
@@ -115,7 +74,7 @@ export function useClientesDb() {
     
     if (error) throw error;
     if (data) {
-      const updatedCliente = mapDbToCliente(data);
+      const updatedCliente = dbToCliente(data);
       setClientes(prev => prev.map(c => c.id === id ? updatedCliente : c));
       return updatedCliente;
     }
