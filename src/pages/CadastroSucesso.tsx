@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { trackCompleteRegistration } from '@/services/metaPixelService';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
+import { CheckCircle2, Home, MessageCircle, LayoutDashboard, ArrowLeft } from 'lucide-react';
 import VideoTutorial from '@/components/VideoTutorial';
 
 export default function CadastroSucesso() {
@@ -24,6 +24,17 @@ export default function CadastroSucesso() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
       <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
         {/* Success Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-500/10 rounded-full mb-6">

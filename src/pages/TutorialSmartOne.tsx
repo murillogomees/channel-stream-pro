@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { smartoneService } from '@/services/smartoneService';
 import { sendClientWelcomeNotification } from '@/services/prospectNotificationService';
-import { Loader2, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 import { PlanoCliente } from '@/types/cliente';
 
 import step1 from '@/assets/tutorial/step1-app-search.png';
@@ -48,6 +48,7 @@ const tutorialSteps = [
 ];
 
 export default function TutorialSmartOne() {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     nome: '',
@@ -63,7 +64,6 @@ export default function TutorialSmartOne() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { clientes, addCliente, updateCliente } = useClientesDb();
-  const navigate = useNavigate();
 
   useEffect(() => {
     trackEvent('ViewContent', { content_name: 'Tutorial Page', content_type: 'page' });
@@ -269,8 +269,21 @@ export default function TutorialSmartOne() {
   return (
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-6xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Como Ativar seu SmartOne IPTV</h1>
+          </div>
+        </div>
+        
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Como Ativar seu SmartOne IPTV</h1>
           <p className="text-muted-foreground text-lg mb-6">
             Siga o passo a passo abaixo para instalar o aplicativo e ativar seu acesso
           </p>

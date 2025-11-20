@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, User, Mail, Phone, Calendar, LogOut } from 'lucide-react';
+import { Loader2, User, Mail, Phone, Calendar, LogOut, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -108,6 +108,17 @@ export default function ClienteAccount() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted p-4">
       <div className="max-w-4xl mx-auto space-y-6 py-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </div>
+        
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Minha Conta</h1>
           <Button onClick={handleLogout} variant="outline">

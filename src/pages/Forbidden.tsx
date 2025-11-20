@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ShieldAlert, Home, LogOut } from 'lucide-react';
+import { ShieldAlert, Home, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function Forbidden() {
   const navigate = useNavigate();
@@ -28,6 +28,17 @@ export default function Forbidden() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="absolute top-4 left-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/')}
+          className="hover:bg-primary/10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+      </div>
+      
       <Card className="max-w-md w-full p-8 text-center space-y-6">
         <div className="flex justify-center">
           <div className="rounded-full bg-destructive/10 p-4">
