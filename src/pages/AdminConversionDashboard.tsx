@@ -4,9 +4,12 @@ import { useConversionMetrics } from '@/hooks/useConversionMetrics';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Target, Clock, Award, Calendar } from 'lucide-react';
+import { TrendingUp, Users, Target, Clock, Award, Calendar, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 export default function AdminConversionDashboard() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState(30);
   const { metrics, stats, loading } = useConversionMetrics(period);
 
@@ -72,6 +75,17 @@ export default function AdminConversionDashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/admin/dashboard')}
+          className="hover:bg-primary/10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+      </div>
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard de Conversão</h1>
