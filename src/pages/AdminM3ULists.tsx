@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Star, LinkIcon, Check, RefreshCw, Save } from 'lucide-react';
+import { Plus, Trash2, Loader2, Star, LinkIcon, Check, RefreshCw, Pencil, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -361,7 +361,7 @@ export default function AdminM3ULists() {
                           onClick={() => handleOpenDialog(list)}
                           title="Editar"
                         >
-                          <Save className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         {!list.is_default && (
                           <Button
