@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { trackLead, trackEvent } from '@/services/metaPixelService';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,10 @@ export default function TutorialSmartOne() {
   const { toast } = useToast();
   const { clientes, addCliente, updateCliente } = useClientesDb();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    trackEvent('ViewContent', { content_name: 'Tutorial Page', content_type: 'page' });
+  }, []);
 
   // Formatar MAC automaticamente durante digitação
   const formatMacAddress = (value: string): string => {
@@ -232,6 +237,13 @@ export default function TutorialSmartOne() {
 
       // Enviar notificações WhatsApp (cliente e admin)
       await sendClientWelcomeNotification(novoCliente);
+
+      // Track lead conversion
+      trackLead({ 
+        content_name: 'Tutorial Form Submission',
+        value: 0,
+        currency: 'BRL'
+      });
 
       toast({
         title: '✅ Cadastro realizado!',
