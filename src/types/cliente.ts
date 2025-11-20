@@ -13,7 +13,6 @@ export interface ClienteDb {
   user_id?: string;
   nome: string;
   telefone: string;
-  telegram?: string;
   email?: string;
   situacao: SituacaoCliente;
   data_contratacao: string;
@@ -45,7 +44,6 @@ export interface Cliente {
   userId?: string;
   nome: string;
   telefone: string;
-  telegram?: string;
   email?: string;
   situacao: SituacaoCliente;
   dataContratacao: string;
@@ -77,7 +75,6 @@ export function dbToCliente(db: ClienteDb): Cliente {
     userId: db.user_id,
     nome: db.nome,
     telefone: db.telefone,
-    telegram: db.telegram,
     email: db.email,
     situacao: db.situacao,
     dataContratacao: db.data_contratacao,
@@ -110,7 +107,6 @@ export function clienteToDb(cliente: Partial<Cliente>): Partial<ClienteDb> {
     user_id: cliente.userId,
     nome: cliente.nome,
     telefone: cliente.telefone,
-    telegram: cliente.telegram,
     email: cliente.email,
     situacao: cliente.situacao,
     data_contratacao: cliente.dataContratacao,

@@ -26,7 +26,6 @@ export class TrialRetentionService {
         id: clientData.id,
         nome: clientData.nome,
         telefone: clientData.telefone,
-        telegram: clientData.telegram || '',
         email: clientData.email || '',
         situacao: clientData.situacao || 'Testando',
         dataContratacao: clientData.data_contratacao || '',

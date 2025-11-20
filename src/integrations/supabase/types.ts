@@ -239,7 +239,6 @@ export type Database = {
           phone_sms: string | null
           schedule_config: Json | null
           schedule_enabled: boolean | null
-          telegram_id: string | null
         }
         Insert: {
           active?: boolean | null
@@ -251,7 +250,6 @@ export type Database = {
           phone_sms?: string | null
           schedule_config?: Json | null
           schedule_enabled?: boolean | null
-          telegram_id?: string | null
         }
         Update: {
           active?: boolean | null
@@ -263,7 +261,6 @@ export type Database = {
           phone_sms?: string | null
           schedule_config?: Json | null
           schedule_enabled?: boolean | null
-          telegram_id?: string | null
         }
         Relationships: []
       }
@@ -523,7 +520,6 @@ export type Database = {
           smartone_raw_response: string | null
           smartone_status: Database["public"]["Enums"]["smartone_status"] | null
           telefone: string
-          telegram: string | null
           user_id: string | null
           usuario_m3u: string | null
           valor_pago: number | null
@@ -554,7 +550,6 @@ export type Database = {
             | Database["public"]["Enums"]["smartone_status"]
             | null
           telefone: string
-          telegram?: string | null
           user_id?: string | null
           usuario_m3u?: string | null
           valor_pago?: number | null
@@ -585,7 +580,6 @@ export type Database = {
             | Database["public"]["Enums"]["smartone_status"]
             | null
           telefone?: string
-          telegram?: string | null
           user_id?: string | null
           usuario_m3u?: string | null
           valor_pago?: number | null

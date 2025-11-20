@@ -15,7 +15,6 @@ interface AdminPhone {
   id: string;
   name: string;
   phone: string;
-  telegram_id?: string;
   phone_sms?: string;
   notification_channels?: string[];
   schedule_enabled?: boolean;
@@ -40,7 +39,6 @@ const DAYS_PT = {
 
 const CHANNELS = [
   { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'telegram', label: 'Telegram' },
   { value: 'sms', label: 'SMS' }
 ];
 
@@ -80,7 +78,6 @@ export default function AdminScheduleConfig() {
       const { error } = await supabase
         .from('admin_phones')
         .update({
-          telegram_id: admin.telegram_id,
           phone_sms: admin.phone_sms,
           notification_channels: admin.notification_channels,
           schedule_enabled: admin.schedule_enabled,
@@ -225,18 +222,6 @@ export default function AdminScheduleConfig() {
                         ))}
                       </div>
                     </div>
-
-                    {selectedAdmin.notification_channels?.includes('telegram') && (
-                      <div>
-                        <Label htmlFor="telegram_id">ID do Telegram</Label>
-                        <Input
-                          id="telegram_id"
-                          value={selectedAdmin.telegram_id || ''}
-                          onChange={(e) => setSelectedAdmin({...selectedAdmin, telegram_id: e.target.value})}
-                          placeholder="@username ou ID numérico"
-                        />
-                      </div>
-                    )}
 
                     {selectedAdmin.notification_channels?.includes('sms') && (
                       <div>
