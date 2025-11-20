@@ -662,8 +662,8 @@ export default function AdminTemplates() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>
               {editingTemplate ? 'Editar Template' : 'Novo Template'}
             </DialogTitle>
@@ -672,7 +672,7 @@ export default function AdminTemplates() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-2 pointer-events-auto">{/* Conteúdo scrollable */}
             <div>
               <Label htmlFor="name">Nome do Template</Label>
               <Input
@@ -875,9 +875,9 @@ export default function AdminTemplates() {
                 </div>
               )}
             </div>
-          </div>
+          </div>{/* Fim do conteúdo scrollable */}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-col sm:flex-row gap-2 flex-shrink-0 pt-4 border-t">{/* Footer fixo */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button 
                 variant="outline" 
