@@ -15,44 +15,20 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminClientes = lazy(() => import("./pages/AdminClientes"));
 const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
-const AdminNotificacoes = lazy(() => import("./pages/AdminNotificacoes"));
+// Consolidated admin pages
+const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
+const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
+const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
+const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
+const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
+const AdminIntegrations = lazy(() => import("./pages/AdminIntegrations"));
+const AdminUsersPermissions = lazy(() => import("./pages/AdminUsersPermissions"));
+
+// Standalone pages
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
-const AdminTemplates = lazy(() => import("./pages/AdminTemplates"));
-const AdminM3ULists = lazy(() => import("./pages/AdminM3ULists"));
-const AdminM3UListStats = lazy(() => import("./pages/AdminM3UListStats"));
-const AdminNotificationSettings = lazy(() => import("./pages/AdminNotificationSettings"));
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
-const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
-const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
-const AdminUserRoles = lazy(() => import("./pages/AdminUserRoles"));
-const AdminSmartOneSync = lazy(() => import("./pages/AdminSmartOneSync"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
-const AdminSecurityMonitor = lazy(() => import("./pages/AdminSecurityMonitor"));
-const AdminSecurityAnalytics = lazy(() => import("./pages/AdminSecurityAnalytics"));
-const AdminSecurityAlerts = lazy(() => import("./pages/AdminSecurityAlerts"));
-const AdminSecurityEscalation = lazy(() => import("./pages/AdminSecurityEscalation"));
-const AdminScheduleConfig = lazy(() => import("./pages/AdminScheduleConfig"));
-const AdminIPBlocking = lazy(() => import("./pages/AdminIPBlocking"));
-const AdminLeaderboard = lazy(() => import("./pages/AdminLeaderboard"));
-const AdminPlaylistHealth = lazy(() => import("./pages/AdminPlaylistHealth"));
-const AdminAutoNotifications = lazy(() => import("./pages/AdminAutoNotifications"));
-const AdminRoleAudit = lazy(() => import("./pages/AdminRoleAudit"));
-const Admin2FASettings = lazy(() => import("./pages/Admin2FASettings"));
-const AdminSuspiciousLogins = lazy(() => import("./pages/AdminSuspiciousLogins"));
-const AdminIPWhitelist = lazy(() => import("./pages/AdminIPWhitelist"));
-const AdminSmartOneTest = lazy(() => import("./pages/AdminSmartOneTest"));
-const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
-const AdminM3UCustomDashboard = lazy(() => import("./pages/AdminM3UCustomDashboard"));
-const AdminCustomStatusBadges = lazy(() => import("./pages/AdminCustomStatusBadges"));
-const AdminStatusHistory = lazy(() => import("./pages/AdminStatusHistory"));
-const AdminM3UUsageReport = lazy(() => import("./pages/AdminM3UUsageReport"));
-const AdminBackupSystem = lazy(() => import("./pages/AdminBackupSystem"));
-const AdminCustomize = lazy(() => import("./pages/AdminCustomize"));
-const AdminVariables = lazy(() => import("./pages/AdminVariables"));
-const AdminPermissionTest = lazy(() => import("./pages/AdminPermissionTest"));
-const AdminConversionDashboard = lazy(() => import("./pages/AdminConversionDashboard"));
-const AdminCoupons = lazy(() => import("./pages/AdminCoupons"));
 
 const AutoNotificationProvider = () => {
   useAutoNotifications();
@@ -81,41 +57,51 @@ const App = () => (
           <Route path="/admin/clientes/novo" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
           <Route path="/admin/clientes/editar/:id" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
           <Route path="/admin/clientes/:id/m3u" element={<ProtectedRoute requireAdmin><AdminClientM3U /></ProtectedRoute>} />
-          <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoes /></ProtectedRoute>} />
           <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
-          <Route path="/admin/templates" element={<ProtectedRoute requireAdmin><AdminTemplates /></ProtectedRoute>} />
-              <Route path="/admin/m3u-lists" element={<ProtectedRoute requireAdmin><AdminM3ULists /></ProtectedRoute>} />
-              <Route path="/admin/m3u-stats" element={<ProtectedRoute requireAdmin><AdminM3UListStats /></ProtectedRoute>} />
-              <Route path="/admin/m3u-usage-report" element={<ProtectedRoute requireAdmin><AdminM3UUsageReport /></ProtectedRoute>} />
-              <Route path="/admin/backup-system" element={<ProtectedRoute requireAdmin><AdminBackupSystem /></ProtectedRoute>} />
-          <Route path="/admin/notification-settings" element={<ProtectedRoute requireAdmin><AdminNotificationSettings /></ProtectedRoute>} />
-          <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalytics /></ProtectedRoute>} />
-          <Route path="/admin/system-health" element={<ProtectedRoute requireAdmin><AdminSystemHealth /></ProtectedRoute>} />
-          <Route path="/admin/user-roles" element={<ProtectedRoute requireAdmin><AdminUserRoles /></ProtectedRoute>} />
-          <Route path="/admin/security-monitor" element={<ProtectedRoute requireAdmin><AdminSecurityMonitor /></ProtectedRoute>} />
-          <Route path="/admin/security-analytics" element={<ProtectedRoute requireAdmin><AdminSecurityAnalytics /></ProtectedRoute>} />
-          <Route path="/admin/security-alerts" element={<ProtectedRoute requireAdmin><AdminSecurityAlerts /></ProtectedRoute>} />
-          <Route path="/admin/security-escalation" element={<ProtectedRoute requireAdmin><AdminSecurityEscalation /></ProtectedRoute>} />
-          <Route path="/admin/schedule-config" element={<ProtectedRoute requireAdmin><AdminScheduleConfig /></ProtectedRoute>} />
-          <Route path="/admin/leaderboard" element={<ProtectedRoute requireAdmin><AdminLeaderboard /></ProtectedRoute>} />
-          <Route path="/admin/ip-blocking" element={<ProtectedRoute requireAdmin><AdminIPBlocking /></ProtectedRoute>} />
-          <Route path="/admin/smartone-sync" element={<ProtectedRoute requireAdmin><AdminSmartOneSync /></ProtectedRoute>} />
-          <Route path="/admin/playlist-health" element={<ProtectedRoute requireAdmin><AdminPlaylistHealth /></ProtectedRoute>} />
-          <Route path="/admin/auto-notifications" element={<ProtectedRoute requireAdmin><AdminAutoNotifications /></ProtectedRoute>} />
-          <Route path="/admin/role-audit" element={<ProtectedRoute requireAdmin><AdminRoleAudit /></ProtectedRoute>} />
-          <Route path="/admin/2fa-settings" element={<ProtectedRoute requireAdmin><Admin2FASettings /></ProtectedRoute>} />
-          <Route path="/admin/suspicious-logins" element={<ProtectedRoute requireAdmin><AdminSuspiciousLogins /></ProtectedRoute>} />
-          <Route path="/admin/ip-whitelist" element={<ProtectedRoute requireAdmin><AdminIPWhitelist /></ProtectedRoute>} />
-          <Route path="/admin/smartone-test" element={<ProtectedRoute requireAdmin><AdminSmartOneTest /></ProtectedRoute>} />
-          <Route path="/admin/m3u-custom-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
-          <Route path="/admin/m3u-custom-dashboard" element={<ProtectedRoute requireAdmin><AdminM3UCustomDashboard /></ProtectedRoute>} />
-          <Route path="/admin/custom-status-badges" element={<ProtectedRoute requireAdmin><AdminCustomStatusBadges /></ProtectedRoute>} />
-          <Route path="/admin/status-history" element={<ProtectedRoute requireAdmin><AdminStatusHistory /></ProtectedRoute>} />
-          <Route path="/admin/customize" element={<ProtectedRoute requireAdmin><AdminCustomize /></ProtectedRoute>} />
-          <Route path="/admin/variables" element={<ProtectedRoute requireAdmin><AdminVariables /></ProtectedRoute>} />
-          <Route path="/admin/permission-test" element={<ProtectedRoute requireAdmin><AdminPermissionTest /></ProtectedRoute>} />
-          <Route path="/admin/conversion-dashboard" element={<ProtectedRoute requireAdmin><AdminConversionDashboard /></ProtectedRoute>} />
-          <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
+          
+          {/* Consolidated Admin Pages */}
+          <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
+          <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
+          <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
+          <Route path="/admin/system" element={<ProtectedRoute requireAdmin><AdminSystemSettings /></ProtectedRoute>} />
+          <Route path="/admin/integrations" element={<ProtectedRoute requireAdmin><AdminIntegrations /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPermissions /></ProtectedRoute>} />
+          
+          {/* Legacy routes - redirect to consolidated pages */}
+          <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u-stats" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u-custom-builder" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u-custom-dashboard" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u-usage-report" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/notificacoes" element={<Navigate to="/admin/notifications" replace />} />
+          <Route path="/admin/notification-settings" element={<Navigate to="/admin/notifications" replace />} />
+          <Route path="/admin/auto-notifications" element={<Navigate to="/admin/notifications" replace />} />
+          <Route path="/admin/templates" element={<Navigate to="/admin/notifications" replace />} />
+          <Route path="/admin/conversion-dashboard" element={<Navigate to="/admin/analytics" replace />} />
+          <Route path="/admin/coupons" element={<Navigate to="/admin/analytics" replace />} />
+          <Route path="/admin/security-alerts" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/security-monitor" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/security-analytics" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/security-escalation" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/suspicious-logins" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/ip-blocking" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/ip-whitelist" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/2fa-settings" element={<Navigate to="/admin/security" replace />} />
+          <Route path="/admin/system-health" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/playlist-health" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/backup-system" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/customize" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/variables" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/status-history" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/custom-status-badges" element={<Navigate to="/admin/system" replace />} />
+          <Route path="/admin/smartone-sync" element={<Navigate to="/admin/integrations" replace />} />
+          <Route path="/admin/smartone-test" element={<Navigate to="/admin/integrations" replace />} />
+          <Route path="/admin/user-roles" element={<Navigate to="/admin/users" replace />} />
+          <Route path="/admin/role-audit" element={<Navigate to="/admin/users" replace />} />
+          <Route path="/admin/permission-test" element={<Navigate to="/admin/users" replace />} />
+          <Route path="/admin/leaderboard" element={<Navigate to="/admin/users" replace />} />
+          <Route path="/admin/schedule-config" element={<Navigate to="/admin/users" replace />} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
