@@ -43,6 +43,15 @@ verify_jwt = false
 [functions.fetch-m3u-url]
 verify_jwt = false
 
+[functions.download-vod]
+verify_jwt = true
+
+[functions.schedule-vod-downloads]
+verify_jwt = false
+
+[functions.cleanup-old-vod]
+verify_jwt = false
+
 # Public endpoint for stream proxy - kept public with token verification
 [functions.stream-proxy]
 verify_jwt = false
