@@ -21,25 +21,27 @@ export interface AdminPhone {
 
 export class ConfigManager {
   /**
-   * Busca credenciais WhatsApp
-   * TODO: Migrar de localStorage para Supabase
+   * Busca credenciais WhatsApp do Supabase
    */
   async getWhatsAppCredentials(): Promise<WhatsAppCredentials | null> {
-    // Temporário: ainda usa localStorage
-    const configStr = localStorage.getItem('whatsapp_config');
-    if (!configStr) return null;
+    const { data, error } = await supabase
+      .from('whatsapp_config')
+      .select('appkey, authkey')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    try {
-      const config = JSON.parse(configStr);
-      if (!config.appkey || !config.authkey) return null;
-      
-      return {
-        appkey: config.appkey,
-        authkey: config.authkey,
-      };
-    } catch {
+    if (error || !data) {
+      console.error('[ConfigManager] Erro ao buscar WhatsApp config:', error);
       return null;
     }
+
+    if (!data.appkey || !data.authkey) return null;
+    
+    return {
+      appkey: data.appkey,
+      authkey: data.authkey,
+    };
   }
 
   /**
@@ -60,27 +62,26 @@ export class ConfigManager {
   }
 
   /**
-   * Busca configuração completa de notificações
-   * TODO: Migrar completamente para Supabase
+   * Busca configuração completa de notificações do Supabase
    */
   async getNotificationConfig(): Promise<NotificationConfig | null> {
     const whatsapp = await this.getWhatsAppCredentials();
     if (!whatsapp) return null;
 
-    // Temporário: configurações de agendamento ainda em localStorage
-    const autoConfigStr = localStorage.getItem('auto_notification_config');
-    let autoConfig = { enabled: false, sendHour: 10 };
-    
-    if (autoConfigStr) {
-      try {
-        autoConfig = JSON.parse(autoConfigStr);
-      } catch {}
+    const { data: autoConfig, error } = await supabase
+      .from('auto_notification_config')
+      .select('enabled, send_hour')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[ConfigManager] Erro ao buscar auto config:', error);
     }
 
     return {
       whatsapp,
-      autoSendEnabled: autoConfig.enabled,
-      sendHour: autoConfig.sendHour,
+      autoSendEnabled: autoConfig?.enabled || false,
+      sendHour: autoConfig?.send_hour || 10,
     };
   }
 

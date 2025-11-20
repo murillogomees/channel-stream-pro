@@ -333,6 +333,30 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_notification_config: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          send_hour: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          send_hour?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          send_hour?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       automatic_notification_rules: {
         Row: {
           active: boolean | null
@@ -1450,6 +1474,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_history: {
+        Row: {
+          cliente_id: string | null
+          created_at: string | null
+          data_vencimento_atual: string
+          days_before_due: number
+          id: string
+          sent_at: string | null
+          success: boolean | null
+          template_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string | null
+          data_vencimento_atual: string
+          days_before_due: number
+          id?: string
+          sent_at?: string | null
+          success?: boolean | null
+          template_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string | null
+          data_vencimento_atual?: string
+          days_before_due?: number
+          id?: string
+          sent_at?: string | null
+          success?: boolean | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_history_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_history_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           cliente_id: string | null
@@ -2309,6 +2381,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_config: {
+        Row: {
+          appkey: string
+          authkey: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          appkey: string
+          authkey: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          appkey?: string
+          authkey?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }

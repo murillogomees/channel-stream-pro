@@ -1,75 +1,156 @@
 import { useState, useEffect } from 'react';
 import { WhatsappTemplate } from '@/types/whatsapp';
 import { DEFAULT_TEMPLATES } from '@/constants/defaultTemplates';
-
-const STORAGE_KEY = 'whatsapp_templates';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useTemplates = () => {
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsedTemplates = JSON.parse(stored);
-        
-        // Validar que templates têm eventType definido
-        const validTemplates = parsedTemplates.filter((t: WhatsappTemplate) => {
-          return t.eventType && typeof t.eventType === 'string';
-        });
-        
-        // Se templates inválidos ou vazios, usar templates padrão
-        if (validTemplates.length === 0) {
-          console.warn('Templates no localStorage inválidos. Restaurando padrões.');
-          setTemplates(DEFAULT_TEMPLATES);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
-        } else {
-          setTemplates(validTemplates);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar templates:', error);
-        setTemplates(DEFAULT_TEMPLATES);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
-      }
-    } else {
-      console.log('Nenhum template encontrado. Carregando templates padrão.');
-      setTemplates(DEFAULT_TEMPLATES);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
-    }
+    loadTemplates();
   }, []);
 
-  const addTemplate = (template: Omit<WhatsappTemplate, 'id'>) => {
-    const novoTemplate: WhatsappTemplate = {
-      ...template,
-      id: crypto.randomUUID(),
-    };
-    const novosTemplates = [...templates, novoTemplate];
-    setTemplates(novosTemplates);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosTemplates));
-    return novoTemplate;
+  const loadTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_templates')
+        .select('*')
+        .eq('active', true);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const mappedTemplates: WhatsappTemplate[] = data.map(t => ({
+          id: t.id,
+          name: t.name,
+          message: t.content,
+          eventType: (t.variables as any)?.eventType || 'custom',
+          daysBeforeDue: (t.variables as any)?.daysBeforeDue,
+          botbotTemplateId: (t.variables as any)?.botbotTemplateId,
+        }));
+        setTemplates(mappedTemplates);
+      } else {
+        setTemplates(DEFAULT_TEMPLATES);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+      setTemplates(DEFAULT_TEMPLATES);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateTemplate = (id: string, data: Partial<WhatsappTemplate>) => {
-    const novosTemplates = templates.map(t =>
-      t.id === id ? { ...t, ...data } : t
-    );
-    setTemplates(novosTemplates);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosTemplates));
+  const addTemplate = async (template: Omit<WhatsappTemplate, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_templates')
+        .insert({
+          name: template.name,
+          content: template.message,
+          variables: {
+            eventType: template.eventType,
+            daysBeforeDue: template.daysBeforeDue,
+            botbotTemplateId: template.botbotTemplateId,
+          },
+          active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newTemplate: WhatsappTemplate = {
+        id: data.id,
+        name: data.name,
+        message: data.content,
+        eventType: (data.variables as any).eventType,
+        daysBeforeDue: (data.variables as any).daysBeforeDue,
+        botbotTemplateId: (data.variables as any).botbotTemplateId,
+      };
+
+      setTemplates([...templates, newTemplate]);
+      return newTemplate;
+    } catch (error) {
+      console.error('Erro ao adicionar template:', error);
+      throw error;
+    }
   };
 
-  const deleteTemplate = (id: string) => {
-    const novosTemplates = templates.filter(t => t.id !== id);
-    setTemplates(novosTemplates);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(novosTemplates));
+  const updateTemplate = async (id: string, data: Partial<WhatsappTemplate>) => {
+    try {
+      const { error } = await supabase
+        .from('notification_templates')
+        .update({
+          name: data.name,
+          content: data.message,
+          variables: {
+            eventType: data.eventType,
+            daysBeforeDue: data.daysBeforeDue,
+            botbotTemplateId: data.botbotTemplateId,
+          },
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const updated = templates.map(t => 
+        t.id === id ? { ...t, ...data } : t
+      );
+      setTemplates(updated);
+    } catch (error) {
+      console.error('Erro ao atualizar template:', error);
+      throw error;
+    }
+  };
+
+  const deleteTemplate = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notification_templates')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const updated = templates.filter(t => t.id !== id);
+      setTemplates(updated);
+    } catch (error) {
+      console.error('Erro ao deletar template:', error);
+      throw error;
+    }
   };
 
   const getTemplateById = (id: string) => {
     return templates.find(t => t.id === id);
   };
 
-  const resetToDefaults = () => {
-    setTemplates(DEFAULT_TEMPLATES);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
+  const resetToDefaults = async () => {
+    try {
+      // Delete all existing templates
+      await supabase.from('notification_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // Insert default templates
+      const { error } = await supabase.from('notification_templates').insert(
+        DEFAULT_TEMPLATES.map(t => ({
+          name: t.name,
+          content: t.message,
+          variables: {
+            eventType: t.eventType,
+            daysBeforeDue: t.daysBeforeDue,
+            botbotTemplateId: t.botbotTemplateId,
+          },
+          active: true,
+        }))
+      );
+
+      if (error) throw error;
+
+      await loadTemplates();
+    } catch (error) {
+      console.error('Erro ao resetar templates:', error);
+      throw error;
+    }
   };
 
   const extractVariables = (message: string): string[] => {
@@ -80,6 +161,7 @@ export const useTemplates = () => {
 
   return {
     templates,
+    loading,
     addTemplate,
     updateTemplate,
     deleteTemplate,
