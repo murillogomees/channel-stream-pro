@@ -35,18 +35,25 @@ export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UL
       
       const { data, error } = await supabase
         .from('m3u_lists')
-        .select('*')
-        .eq('status', 'active')
-        .order('priority', { ascending: false });
+        .select(`
+          *,
+          client_m3u_lists(count)
+        `)
+        .eq('status', 'active');
 
       if (error) throw error;
 
-      const loadedLists = (data || []) as M3UList[];
-      setLists(loadedLists);
+      // Adicionar contagem de uso e ordenar por MENOR uso (rotação balanceada)
+      const listsWithUsage = (data || []).map(list => ({
+        ...list,
+        usage_count: list.client_m3u_lists?.[0]?.count || 0
+      })).sort((a, b) => a.usage_count - b.usage_count); // Menor uso primeiro
+
+      setLists(listsWithUsage as M3UList[]);
       
       // Notify parent component about loaded lists
       if (onListsLoaded) {
-        onListsLoaded(loadedLists);
+        onListsLoaded(listsWithUsage);
       }
     } catch (error: any) {
       console.error('Error loading M3U lists:', error);
@@ -113,6 +120,9 @@ export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UL
               className="font-medium cursor-pointer flex items-center gap-2"
             >
               {list.name}
+              <Badge variant="outline" className="text-xs font-mono">
+                {(list as any).usage_count || 0} em uso
+              </Badge>
               {list.is_default && (
                 <Badge variant="outline" className="text-xs">
                   Padrão
