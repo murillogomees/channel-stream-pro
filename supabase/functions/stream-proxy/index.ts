@@ -114,11 +114,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Retransmitir o stream com headers apropriados
+    // Retransmitir o stream com headers apropriados + CDN optimization
     const headers = new Headers(corsHeaders);
     headers.set('Content-Type', streamResponse.headers.get('Content-Type') || 'video/mp2t');
-    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     headers.set('Connection', 'keep-alive');
+    
+    // Cache headers otimizados para CDN (Cloudflare)
+    if (decodedStreamUrl.includes('.m3u8')) {
+      // HLS manifests: cache curto (atualiza frequentemente)
+      headers.set('Cache-Control', 'public, max-age=10, s-maxage=30');
+      headers.set('CDN-Cache-Control', 'public, max-age=30');
+    } else if (decodedStreamUrl.includes('.ts')) {
+      // Segmentos de vídeo: cache longo (imutáveis)
+      headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, immutable');
+      headers.set('CDN-Cache-Control', 'public, max-age=86400');
+    } else {
+      // Outros conteúdos: cache moderado
+      headers.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+      headers.set('CDN-Cache-Control', 'public, max-age=300');
+    }
+    
+    // Headers para Cloudflare
+    headers.set('Cloudflare-CDN-Cache-Control', 'max-age=31536000');
     
     // Manter headers importantes do stream original
     const keepHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];

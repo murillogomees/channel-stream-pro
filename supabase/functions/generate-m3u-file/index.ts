@@ -100,11 +100,16 @@ serve(async (req) => {
 
       if (channels && channels.length > 0) {
         for (const channel of channels) {
-          // Codificar URL original para passar como parâmetro
-          const encodedStreamUrl = encodeURIComponent(channel.stream_url);
+          let streamUrl;
           
-          // Gerar URL do proxy (cliente e token serão validados no momento da requisição)
-          const proxyUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedStreamUrl}&list=${customListId}`;
+          // ✅ LÓGICA VOD: Se é VOD e já foi uploadado para R2, usar URL do R2 diretamente
+          if (channel.is_vod && channel.r2_uploaded && channel.r2_url) {
+            streamUrl = channel.r2_url; // URL direta do R2, sem proxy
+          } else {
+            // Live stream ou VOD ainda não baixado: usar proxy
+            const encodedStreamUrl = encodeURIComponent(channel.stream_url);
+            streamUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedStreamUrl}&list=${customListId}`;
+          }
           
           const tvgId = channel.tvg_id ? ` tvg-id="${channel.tvg_id}"` : '';
           const tvgName = channel.tvg_name ? ` tvg-name="${channel.tvg_name}"` : '';
@@ -112,7 +117,7 @@ serve(async (req) => {
           const groupTitle = ` group-title="${category.display_name}"`;
 
           m3uContent += `#EXTINF:-1${tvgId}${tvgName}${tvgLogo}${groupTitle},${channel.name}\n`;
-          m3uContent += `${proxyUrl}\n\n`;
+          m3uContent += `${streamUrl}\n\n`;
           totalChannels++;
         }
       }
