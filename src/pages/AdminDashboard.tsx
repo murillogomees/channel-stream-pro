@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
@@ -6,11 +6,9 @@ import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
 import { RecentActivities } from "@/components/admin/RecentActivities";
 import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
-  Users, Bell, Smartphone, Shield, BarChart3, Settings, 
-  LogOut, User, Palette, FileText, Variable, MessageSquare,
-  Radio, PieChart, Activity, Lock, UserCog, Package, 
-  ListChecks, TrendingUp, Clock, Zap, Database, AlertTriangle,
-  CheckCircle, XCircle, Timer, Target, Bug, TestTube
+  Users, Bell, Shield, BarChart3, Settings, 
+  LogOut, User, Package, Clock, AlertTriangle,
+  Plug, UserCog
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +16,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useClientesDb } from "@/hooks/useClientesDb";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { BadgeNotificationToast } from "@/components/admin/BadgeNotificationToast";
 
 interface QuickStatProps {
   icon: React.ReactNode;
@@ -65,7 +62,7 @@ const NavCard = ({ title, description, icon, path, badge }: NavCardProps) => {
 
   return (
     <Card 
-      className="hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in" 
+      className="hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in hover:border-primary/50" 
       onClick={() => navigate(path)}
     >
       <CardHeader className="pb-3">
@@ -91,7 +88,6 @@ const AdminDashboard = () => {
   const { getStats, loading: statsLoading } = useClientesDb();
   const stats = getStats();
 
-
   useEffect(() => {
     if (!loading && !isAdmin) {
       toast({
@@ -116,7 +112,7 @@ const AdminDashboard = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Activity className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
           <p className="text-muted-foreground">Carregando dashboard...</p>
         </div>
       </div>
@@ -130,7 +126,7 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-card sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -159,7 +155,10 @@ const AdminDashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2 space-y-4">
             <section>
-              <h2 className="text-lg font-semibold mb-4">Visão Geral</h2>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Visão Geral
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {statsLoading ? (
                   <>
@@ -199,16 +198,18 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        <Separator className="my-8" />
+
         {/* Gestão de Clientes */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Gestão de Clientes</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <NavCard
               title="Lista de Clientes"
-              description="Visualize e gerencie todos os clientes cadastrados"
+              description="Visualize e gerencie todos os clientes"
               icon={<Users className="h-5 w-5" />}
               path="/admin/clientes"
             />
@@ -219,10 +220,11 @@ const AdminDashboard = () => {
               path="/admin/clientes/novo"
             />
             <NavCard
-              title="Listas M3U"
-              description="Configure playlists M3U por plano"
+              title="Gestão M3U"
+              description="Gerencie playlists, canais e VOD"
               icon={<Package className="h-5 w-5" />}
-              path="/admin/m3u-lists"
+              path="/admin/m3u"
+              badge="Consolidado"
             />
           </div>
         </section>
@@ -235,239 +237,108 @@ const AdminDashboard = () => {
             <Bell className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Sistema de Notificações</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <NavCard
-              title="Configurações"
-              description="Configure credenciais e horários de envio"
-              icon={<Settings className="h-5 w-5" />}
-              path="/admin/notification-settings"
-            />
-            <NavCard
-              title="Templates"
-              description="Gerencie templates de mensagens"
-              icon={<FileText className="h-5 w-5" />}
-              path="/admin/templates"
-            />
-            <NavCard
-              title="Notificações Automáticas"
-              description="Configure regras de envio automático"
-              icon={<Zap className="h-5 w-5" />}
-              path="/admin/auto-notifications"
-              badge="Novo"
-            />
-            <NavCard
-              title="Histórico"
-              description="Visualize o histórico de envios"
-              icon={<MessageSquare className="h-5 w-5" />}
-              path="/admin/notificacoes"
+              title="Notificações"
+              description="Histórico, templates, automáticas e configurações"
+              icon={<Bell className="h-5 w-5" />}
+              path="/admin/notifications"
+              badge="Consolidado"
             />
           </div>
         </section>
 
         <Separator className="my-8" />
 
-        {/* SmartOne */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Smartphone className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Integração SmartOne</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NavCard
-              title="Configuração"
-              description="Configure e teste a API SmartOne"
-              icon={<Settings className="h-5 w-5" />}
-              path="/admin/smartone-config"
-            />
-            <NavCard
-              title="Sincronização"
-              description="Sincronize clientes com SmartOne"
-              icon={<Target className="h-5 w-5" />}
-              path="/admin/smartone-sync"
-            />
-            <NavCard
-              title="Teste de Conectividade"
-              description="Valide credenciais e disponibilidade"
-              icon={<TestTube className="h-5 w-5" />}
-              path="/admin/smartone-test"
-              badge="Novo"
-            />
-            <NavCard
-              title="Saúde das Playlists"
-              description="Monitore status das URLs M3U"
-              icon={<Activity className="h-5 w-5" />}
-              path="/admin/playlist-health"
-            />
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Segurança */}
+        {/* Segurança & Monitoramento */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Shield className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Segurança e Monitoramento</h2>
+            <h2 className="text-lg font-semibold">Segurança & Monitoramento</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <NavCard
-              title="Monitor de Segurança"
-              description="Eventos de segurança em tempo real"
+              title="Centro de Segurança"
+              description="Alertas, monitoramento, IP blocking e 2FA"
               icon={<Shield className="h-5 w-5" />}
-              path="/admin/security-monitor"
-            />
-            <NavCard
-              title="Analytics de Segurança"
-              description="Análise de ameaças e padrões"
-              icon={<PieChart className="h-5 w-5" />}
-              path="/admin/security-analytics"
-            />
-            <NavCard
-              title="Alertas de Segurança"
-              description="Configure alertas automáticos"
-              icon={<Bell className="h-5 w-5" />}
-              path="/admin/security-alerts"
-            />
-            <NavCard
-              title="Escalonamento"
-              description="Regras de escalonamento de alertas"
-              icon={<TrendingUp className="h-5 w-5" />}
-              path="/admin/security-escalation"
-            />
-            <NavCard
-              title="Bloqueio de IPs"
-              description="Gerencie IPs bloqueados"
-              icon={<Lock className="h-5 w-5" />}
-              path="/admin/ip-blocking"
-            />
-            <NavCard
-              title="Estatísticas de Alertas"
-              description="Performance do sistema de alertas"
-              icon={<BarChart3 className="h-5 w-5" />}
-              path="/admin/alert-stats"
-            />
-            <NavCard
-              title="Timeline de Alertas"
-              description="Histórico cronológico de alertas"
-              icon={<Clock className="h-5 w-5" />}
-              path="/admin/alert-timeline"
-            />
-            <NavCard
-              title="Leaderboard"
-              description="Ranking de performance dos admins"
-              icon={<Target className="h-5 w-5" />}
-              path="/admin/leaderboard"
-            />
-            <NavCard
-              title="Status de Autenticação"
-              description="Sessões ativas e histórico de logins"
-              icon={<Activity className="h-5 w-5" />}
-              path="/admin/auth-status"
-            />
-            <NavCard
-              title="Auditoria de Permissões"
-              description="Histórico de alterações de roles"
-              icon={<Shield className="h-5 w-5" />}
-              path="/admin/role-audit"
-            />
-            <NavCard
-              title="Tentativas Suspeitas"
-              description="Monitoramento de logins suspeitos"
-              icon={<AlertTriangle className="h-5 w-5" />}
-              path="/admin/suspicious-logins"
-            />
-            <NavCard
-              title="Whitelist de IPs"
-              description="IPs confiáveis que nunca são bloqueados"
-              icon={<Shield className="h-5 w-5" />}
-              path="/admin/ip-whitelist"
-            />
-            <NavCard
-              title="Diagnóstico de Permissões"
-              description="Ferramentas de debug para roles e autenticação"
-              icon={<Database className="h-5 w-5" />}
-              path="/admin/diagnostic"
-              badge="Debug"
+              path="/admin/security"
+              badge="Consolidado"
             />
           </div>
         </section>
 
         <Separator className="my-8" />
 
-        {/* Sistema e Configurações */}
+        {/* Analytics & Conversão */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Analytics & Conversão</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <NavCard
+              title="Analytics Hub"
+              description="Métricas gerais, conversão e cupons"
+              icon={<BarChart3 className="h-5 w-5" />}
+              path="/admin/analytics"
+              badge="Consolidado"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Sistema & Configurações */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Settings className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Sistema e Configurações</h2>
+            <h2 className="text-lg font-semibold">Sistema & Configurações</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <NavCard
-              title="Analytics"
-              description="Métricas e análises do sistema"
-              icon={<BarChart3 className="h-5 w-5" />}
-              path="/admin/analytics"
-            />
-            <NavCard
-              title="Saúde do Sistema"
-              description="Status de serviços e integrações"
-              icon={<Activity className="h-5 w-5" />}
-              path="/admin/system-health"
-            />
-            <NavCard
-              title="Histórico de Status"
-              description="Timeline de mudanças de status"
-              icon={<Clock className="h-5 w-5" />}
-              path="/admin/status-history"
-              badge="Novo"
-            />
-            <NavCard
-              title="Badges Personalizados"
-              description="Crie status customizados"
-              icon={<CheckCircle className="h-5 w-5" />}
-              path="/admin/custom-status-badges"
-              badge="Novo"
-            />
-            <NavCard
-              title="Gestão de Usuários"
-              description="Controle de permissões e roles"
-              icon={<UserCog className="h-5 w-5" />}
-              path="/admin/user-roles"
-            />
-            <NavCard
-              title="Agendamentos"
-              description="Configure horários de alertas"
-              icon={<Clock className="h-5 w-5" />}
-              path="/admin/schedule-config"
+              title="Configurações do Sistema"
+              description="Saúde, playlist, backup, customização e variáveis"
+              icon={<Settings className="h-5 w-5" />}
+              path="/admin/system"
+              badge="Consolidado"
             />
           </div>
         </section>
 
         <Separator className="my-8" />
 
-        {/* Personalização */}
+        {/* Integrações */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Palette className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Personalização</h2>
+            <Plug className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Integrações Externas</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <NavCard
-              title="Customização"
-              description="Personalize cores e aparência"
-              icon={<Palette className="h-5 w-5" />}
-              path="/admin/customize"
+              title="SmartOne IPTV"
+              description="Sincronização e testes de conectividade"
+              icon={<Plug className="h-5 w-5" />}
+              path="/admin/integrations"
+              badge="Consolidado"
             />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Usuários & Permissões */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <UserCog className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Usuários & Permissões</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <NavCard
-              title="Variáveis"
-              description="Gerencie variáveis do sistema"
-              icon={<Variable className="h-5 w-5" />}
-              path="/admin/variables"
-            />
-            <NavCard
-              title="Banco de Dados"
-              description="Visualize estrutura do banco"
-              icon={<Database className="h-5 w-5" />}
-              path="/admin/permission-test"
+              title="Gestão de Usuários"
+              description="Roles, auditoria, leaderboard e agenda"
+              icon={<UserCog className="h-5 w-5" />}
+              path="/admin/users"
+              badge="Consolidado"
             />
           </div>
         </section>

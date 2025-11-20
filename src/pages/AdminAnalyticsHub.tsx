@@ -1,22 +1,16 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import AdminAnalytics from "./AdminAnalytics";
 import AdminConversionDashboard from "./AdminConversionDashboard";
 import AdminCoupons from "./AdminCoupons";
 
 export default function AdminAnalyticsHub() {
-  const navigate = useNavigate();
-
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/dashboard")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-3xl font-bold">Analytics & Conversão</h1>
-      </div>
+      <PageHeader
+        title="Analytics & Conversão"
+        description="Métricas, análise de conversão e gestão de cupons"
+      />
 
       <Tabs defaultValue="analytics" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">

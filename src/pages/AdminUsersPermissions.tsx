@@ -1,7 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import AdminUserRoles from "./AdminUserRoles";
 import AdminRoleAudit from "./AdminRoleAudit";
 import AdminPermissionTest from "./AdminPermissionTest";
@@ -9,16 +7,12 @@ import AdminLeaderboard from "./AdminLeaderboard";
 import AdminScheduleConfig from "./AdminScheduleConfig";
 
 export default function AdminUsersPermissions() {
-  const navigate = useNavigate();
-
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/dashboard")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-3xl font-bold">Usuários & Permissões</h1>
-      </div>
+      <PageHeader
+        title="Usuários & Permissões"
+        description="Gerenciamento de usuários, roles e permissões"
+      />
 
       <Tabs defaultValue="roles" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
