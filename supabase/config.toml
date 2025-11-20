@@ -36,9 +36,9 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
-# Admin-only function for M3U generation - requires authentication
+# Admin-only function for M3U generation - JWT verificação feita dentro da função
 [functions.generate-m3u-file]
-verify_jwt = true
+verify_jwt = false
 
 [functions.fetch-m3u-url]
 verify_jwt = false
