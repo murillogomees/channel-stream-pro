@@ -8,7 +8,7 @@ import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
   Users, Bell, Shield, BarChart3, Settings, 
   LogOut, User, Package, Clock, AlertTriangle,
-  Plug, UserCog
+  Plug, UserCog, ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -125,15 +125,24 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Bem-vindo de volta, {user?.email?.split('@')[0] || 'Admin'}
-              </p>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="hover:bg-primary/10"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Bem-vindo de volta, {user?.email?.split('@')[0] || 'Admin'}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <GlobalSearch />
