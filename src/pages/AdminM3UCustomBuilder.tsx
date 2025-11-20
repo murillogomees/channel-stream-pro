@@ -17,10 +17,12 @@ import { m3uConflictService } from '@/services/m3uConflictService';
 import { M3UConflictResolver } from '@/components/admin/M3UConflictResolver';
 import { m3uGeneratorService } from '@/services/m3uGeneratorService';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Save, Play, FileDown, Copy, Trash2, Edit, ArrowUp, ArrowDown, List, Upload, Eye, Pause, XCircle } from 'lucide-react';
+import { Plus, Save, Play, FileDown, Copy, Trash2, Edit, ArrowUp, ArrowDown, List, Upload, Eye, Pause, XCircle, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminM3UCustomBuilder() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { lists, isLoading, refresh: refreshLists } = useM3UCustom();
   const {
     session: importSession,
@@ -536,6 +538,14 @@ export default function AdminM3UCustomBuilder() {
               </div>
               {selectedListId && (
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/admin/m3u-import-history')}
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Histórico
+                  </Button>
                   <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="icon">

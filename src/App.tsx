@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { M3UImportNotifications } from "@/components/admin/M3UImportNotifications";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -18,6 +19,7 @@ const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
 // Consolidated admin pages
 const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
 const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
+const AdminM3UImportHistory = lazy(() => import("./pages/AdminM3UImportHistory"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
@@ -40,6 +42,7 @@ const App = () => (
   <ThemeProvider>
     <TooltipProvider>
       <AutoNotificationProvider />
+      <M3UImportNotifications />
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -63,6 +66,7 @@ const App = () => (
           {/* Consolidated Admin Pages */}
           <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
           <Route path="/admin/m3u-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
+          <Route path="/admin/m3u-import-history" element={<ProtectedRoute requireAdmin><AdminM3UImportHistory /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
