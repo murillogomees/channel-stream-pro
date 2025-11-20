@@ -86,3 +86,7 @@ verify_jwt = true
 
 [functions.verify-totp-token]
 verify_jwt = true
+
+# Background processor for M3U imports - requires authentication
+[functions.process-m3u-import]
+verify_jwt = true

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,16 +8,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useM3UCustom, useM3UCategories, useM3UChannels } from '@/hooks/useM3UCustom';
+import { useM3UImport } from '@/hooks/useM3UImport';
 import { m3uCustomService } from '@/services/m3uCustomService';
 import { m3uGeneratorService } from '@/services/m3uGeneratorService';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Save, Play, FileDown, Copy, Trash2, Edit, ArrowUp, ArrowDown, List, Upload, Eye } from 'lucide-react';
+import { Plus, Save, Play, FileDown, Copy, Trash2, Edit, ArrowUp, ArrowDown, List, Upload, Eye, Pause, XCircle } from 'lucide-react';
 
 export default function AdminM3UCustomBuilder() {
   const { toast } = useToast();
   const { lists, isLoading, refresh: refreshLists } = useM3UCustom();
+  const {
+    session: importSession,
+    progress: importProgress,
+    isImporting,
+    error: importError,
+    startUrlImport,
+    startPasteImport,
+    pauseImport,
+    resumeImport,
+    cancelImport,
+  } = useM3UImport();
   
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -44,8 +57,6 @@ export default function AdminM3UCustomBuilder() {
   const [importContent, setImportContent] = useState('');
   const [m3uPreview, setM3uPreview] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState<string>("");
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
@@ -57,6 +68,15 @@ export default function AdminM3UCustomBuilder() {
 
   const selectedList = lists.find(l => l.id === selectedListId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+
+  // Fechar diálogo quando importação completar
+  useEffect(() => {
+    if (importSession?.status === 'completed') {
+      setIsImportDialogOpen(false);
+      refreshCategories();
+      refreshChannels();
+    }
+  }, [importSession?.status]);
 
   const handleCreateList = async () => {
     try {
@@ -122,40 +142,19 @@ export default function AdminM3UCustomBuilder() {
     }
     
     try {
-      setIsImporting(true);
-      setImportProgress("");
-      
-      let result;
       if (importContent.trim()) {
-        setImportProgress("Processando conteúdo M3U...");
-        result = await m3uCustomService.importFromContent(importContent, selectedListId);
+        // Importação via conteúdo colado (sem limite de tamanho)
+        await startPasteImport(selectedListId, importContent);
       } else {
-        setImportProgress("Conectando ao servidor...");
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-        setImportProgress("Baixando arquivo M3U (até 60MB)...");
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-        result = await m3uCustomService.importFromUrl(importUrl, selectedListId);
-        
-        setImportProgress("Processando canais...");
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Importação via URL (com cache e chunks)
+        await startUrlImport(selectedListId, importUrl);
       }
       
-      toast({
-        title: 'M3U importado com sucesso!',
-        description: `${result.categoriesCount} categorias e ${result.channelsCount} canais importados`,
-      });
-      setIsImportDialogOpen(false);
+      // Resetar formulário após iniciar
       setImportUrl('');
       setImportContent('');
-      setImportProgress("");
-      refreshCategories();
     } catch (error: any) {
-      toast({ title: 'Erro ao importar M3U', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsImporting(false);
-      setImportProgress("");
+      toast({ title: 'Erro ao iniciar importação', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -453,37 +452,113 @@ export default function AdminM3UCustomBuilder() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Importar M3U</DialogTitle>
+                        <DialogTitle>Importar M3U - Sistema Avançado</DialogTitle>
                         <DialogDescription>
-                          Você pode importar pela URL (HTTPS recomendado) ou colando o conteúdo do arquivo .m3u
+                          🚀 <strong>Suporta arquivos grandes (100MB+)</strong> com processamento em background<br/>
+                          💾 Cache inteligente evita re-importar o mesmo arquivo<br/>
+                          ⏸️ Pause/retome importações a qualquer momento<br/>
+                          📊 Acompanhe o progresso em tempo real
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>URL do arquivo M3U (opcional)</Label>
+                          <Label>URL do arquivo M3U</Label>
                           <Input
                             value={importUrl}
                             onChange={(e) => setImportUrl(e.target.value)}
                             placeholder="https://exemplo.com/playlist.m3u"
+                            disabled={!!importContent.trim()}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            ✅ Sem limite de tamanho • Cache automático
+                          </p>
                         </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Separator className="flex-1" />
+                          <span className="text-xs text-muted-foreground">OU</span>
+                          <Separator className="flex-1" />
+                        </div>
+                        
                         <div className="space-y-2">
-                          <Label>Conteúdo do arquivo M3U (opcional)</Label>
+                          <Label>Cole o conteúdo M3U</Label>
                           <Textarea
                             value={importContent}
                             onChange={(e) => setImportContent(e.target.value)}
-                            placeholder="#EXTM3U\n#EXTINF:-1 tvg-id=..."
-                            className="min-h-[160px]"
+                            placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id=..."
+                            className="min-h-[160px] font-mono text-xs"
+                            disabled={!!importUrl.trim()}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            ✅ Sem limite de tamanho • Processamento local
+                          </p>
                         </div>
+                        
+                        {/* Progress Section */}
+                        {importSession && (
+                          <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-medium">Status:</span>
+                              <Badge variant={
+                                importSession.status === 'completed' ? 'default' :
+                                importSession.status === 'failed' ? 'destructive' :
+                                importSession.status === 'paused' ? 'secondary' :
+                                'outline'
+                              }>
+                                {importSession.status === 'pending' ? 'Pendente' :
+                                 importSession.status === 'processing' ? 'Processando' :
+                                 importSession.status === 'completed' ? 'Concluído' :
+                                 importSession.status === 'failed' ? 'Falhou' :
+                                 'Pausado'}
+                              </Badge>
+                            </div>
+                            
+                            <Progress value={importProgress} className="h-2" />
+                            
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                              <span>{importSession.processedChannels} / {importSession.totalChannels} canais</span>
+                              <span>{importProgress.toFixed(1)}%</span>
+                            </div>
+                            
+                            {importSession.status === 'processing' && (
+                              <div className="text-xs text-muted-foreground">
+                                Batch {importSession.currentBatch} • {importSession.batchSize} canais/batch
+                              </div>
+                            )}
+                            
+                            {importError && (
+                              <div className="text-sm text-destructive">
+                                Erro: {importError}
+                              </div>
+                            )}
+                            
+                            {/* Controls */}
+                            {importSession.status !== 'completed' && importSession.status !== 'failed' && (
+                              <div className="flex gap-2">
+                                {importSession.status === 'processing' && (
+                                  <Button onClick={pauseImport} size="sm" variant="outline">
+                                    <Pause className="h-3 w-3 mr-1" />
+                                    Pausar
+                                  </Button>
+                                )}
+                                {importSession.status === 'paused' && (
+                                  <Button onClick={resumeImport} size="sm" variant="outline">
+                                    <Play className="h-3 w-3 mr-1" />
+                                    Retomar
+                                  </Button>
+                                )}
+                                <Button onClick={cancelImport} size="sm" variant="destructive">
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Cancelar
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
                         <Button onClick={handleImportM3U} className="w-full" disabled={isImporting}>
                           <Upload className="h-4 w-4 mr-2" />
-                          {isImporting ? (
-                            <span className="flex items-center gap-2">
-                              <span className="animate-spin">⏳</span>
-                              {importProgress || "Importando..."}
-                            </span>
-                          ) : 'Importar'}
+                          {isImporting ? 'Importando...' : 'Iniciar Importação'}
                         </Button>
                       </div>
                     </DialogContent>

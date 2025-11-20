@@ -1171,6 +1171,151 @@ export type Database = {
           },
         ]
       }
+      m3u_import_cache: {
+        Row: {
+          categories_data: Json
+          channel_count: number
+          channels_data: Json
+          created_at: string | null
+          id: string
+          last_used_at: string | null
+          source_hash: string
+          source_url: string | null
+          use_count: number | null
+        }
+        Insert: {
+          categories_data: Json
+          channel_count: number
+          channels_data: Json
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          source_hash: string
+          source_url?: string | null
+          use_count?: number | null
+        }
+        Update: {
+          categories_data?: Json
+          channel_count?: number
+          channels_data?: Json
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          source_hash?: string
+          source_url?: string | null
+          use_count?: number | null
+        }
+        Relationships: []
+      }
+      m3u_import_queue: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          max_retries: number | null
+          priority: number | null
+          retry_count: number | null
+          session_id: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          max_retries?: number | null
+          priority?: number | null
+          retry_count?: number | null
+          session_id?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          max_retries?: number | null
+          priority?: number | null
+          retry_count?: number | null
+          session_id?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_import_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_import_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_import_sessions: {
+        Row: {
+          batch_size: number | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          current_batch: number | null
+          custom_list_id: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          processed_channels: number | null
+          source_hash: string | null
+          source_type: string
+          source_url: string | null
+          status: string | null
+          total_channels: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_size?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_batch?: number | null
+          custom_list_id?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processed_channels?: number | null
+          source_hash?: string | null
+          source_type: string
+          source_url?: string | null
+          status?: string | null
+          total_channels?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_size?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_batch?: number | null
+          custom_list_id?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processed_channels?: number | null
+          source_hash?: string | null
+          source_type?: string
+          source_url?: string | null
+          status?: string | null
+          total_channels?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_import_sessions_custom_list_id_fkey"
+            columns: ["custom_list_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_custom_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       m3u_list_favorites: {
         Row: {
           admin_id: string
@@ -2419,6 +2564,7 @@ export type Database = {
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
+      cleanup_old_import_cache: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
@@ -2510,6 +2656,18 @@ export type Database = {
           conversion_rate: number
           total_conversions: number
           total_trials: number
+        }[]
+      }
+      get_import_statistics: {
+        Args: never
+        Returns: {
+          avg_channels_per_import: number
+          cache_hits: number
+          completed_imports: number
+          failed_imports: number
+          pending_imports: number
+          processing_imports: number
+          total_imports: number
         }[]
       }
       get_m3u_for_client_plan: {
