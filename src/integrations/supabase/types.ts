@@ -339,6 +339,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           send_hour: number | null
+          test_phone_number: string | null
           updated_at: string | null
         }
         Insert: {
@@ -346,6 +347,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           send_hour?: number | null
+          test_phone_number?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -353,6 +355,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           send_hour?: number | null
+          test_phone_number?: string | null
           updated_at?: string | null
         }
         Relationships: []

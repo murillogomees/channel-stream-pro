@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { TestContact } from '@/types/whatsapp';
+import { WhatsAppConfig, TestContact } from '@/types/whatsapp';
 import { supabase } from '@/integrations/supabase/client';
-
-export interface WhatsAppConfig {
-  appkey: string;
-  authkey: string;
-  testContacts: TestContact[];
-}
 
 const DEFAULT_CONFIG: WhatsAppConfig = {
   appkey: '',
   authkey: '',
+  enabled: false,
+  autoSendEnabled: false,
+  sendHour: 10,
+  daysToNotify: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+  testPhoneNumber: '',
   testContacts: [],
+  adminPhones: [],
 };
 
 export function useWhatsAppConfig() {
@@ -24,22 +24,44 @@ export function useWhatsAppConfig() {
 
   const loadConfig = async () => {
     try {
-      const { data, error } = await supabase
+      // Load WhatsApp credentials
+      const { data: whatsappData, error: whatsappError } = await supabase
         .from('whatsapp_config')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (whatsappError) throw whatsappError;
 
-      if (data) {
-        setConfig({
-          appkey: data.appkey || '',
-          authkey: data.authkey || '',
-          testContacts: [],
-        });
-      }
+      // Load auto notification config
+      const { data: autoData, error: autoError } = await supabase
+        .from('auto_notification_config')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (autoError) throw autoError;
+
+      // Load admin phones
+      const { data: adminPhonesData, error: adminPhonesError } = await supabase
+        .from('admin_phones')
+        .select('phone')
+        .eq('active', true);
+
+      if (adminPhonesError) throw adminPhonesError;
+
+      setConfig({
+        appkey: whatsappData?.appkey || '',
+        authkey: whatsappData?.authkey || '',
+        enabled: !!whatsappData?.appkey && !!whatsappData?.authkey,
+        autoSendEnabled: autoData?.enabled || false,
+        sendHour: autoData?.send_hour || 10,
+        daysToNotify: DEFAULT_CONFIG.daysToNotify,
+        testPhoneNumber: autoData?.test_phone_number || '',
+        testContacts: [],
+        adminPhones: adminPhonesData?.map(p => p.phone) || [],
+      });
     } catch (error) {
       console.error('Erro ao carregar configuração do WhatsApp:', error);
     } finally {
@@ -49,37 +71,53 @@ export function useWhatsAppConfig() {
 
   const saveConfig = async (newConfig: Partial<WhatsAppConfig>) => {
     try {
-      const updated = {
-        appkey: typeof newConfig.appkey === 'string' ? newConfig.appkey : config.appkey,
-        authkey: typeof newConfig.authkey === 'string' ? newConfig.authkey : config.authkey,
-      };
+      // Save WhatsApp credentials if provided
+      if (newConfig.appkey !== undefined || newConfig.authkey !== undefined) {
+        const whatsappUpdate = {
+          appkey: typeof newConfig.appkey === 'string' ? newConfig.appkey : config.appkey,
+          authkey: typeof newConfig.authkey === 'string' ? newConfig.authkey : config.authkey,
+        };
 
-      // Check if config exists
-      const { data: existing } = await supabase
-        .from('whatsapp_config')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+        const { data: existing } = await supabase
+          .from('whatsapp_config')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
 
-      if (existing) {
-        const { error } = await supabase
-          .from('whatsapp_config')
-          .update(updated)
-          .eq('id', existing.id);
-        
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('whatsapp_config')
-          .insert(updated);
-        
-        if (error) throw error;
+        if (existing) {
+          await supabase.from('whatsapp_config').update(whatsappUpdate).eq('id', existing.id);
+        } else {
+          await supabase.from('whatsapp_config').insert(whatsappUpdate);
+        }
       }
 
+      // Save auto notification config if provided
+      if (newConfig.autoSendEnabled !== undefined || newConfig.sendHour !== undefined || newConfig.testPhoneNumber !== undefined) {
+        const autoUpdate: any = {
+          enabled: newConfig.autoSendEnabled !== undefined ? newConfig.autoSendEnabled : config.autoSendEnabled,
+          send_hour: newConfig.sendHour !== undefined ? newConfig.sendHour : config.sendHour,
+          test_phone_number: newConfig.testPhoneNumber !== undefined ? newConfig.testPhoneNumber : config.testPhoneNumber,
+        };
+
+        const { data: existing } = await supabase
+          .from('auto_notification_config')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('auto_notification_config').update(autoUpdate).eq('id', existing.id);
+        }
+      }
+
+      // Update local state
       setConfig({
-        ...updated,
-        testContacts: config.testContacts,
+        ...config,
+        ...newConfig,
       });
+
+      // Reload to ensure consistency
+      await loadConfig();
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
       throw error;
