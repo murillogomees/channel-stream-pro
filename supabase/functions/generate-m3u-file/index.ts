@@ -86,22 +86,10 @@ serve(async (req) => {
       throw new Error('Lista sem categorias configuradas');
     }
 
-    // Função para gerar token de autenticação
-    const generateStreamToken = async (clientId: string): Promise<string> => {
-      const secret = Deno.env.get('STREAM_PROXY_SECRET') || 'default-secret';
-      const data = `${clientId}-${secret}`;
-      const hashBuffer = await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode(data)
-      );
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      return hashHex.substring(0, 32);
-    };
-
     // Gerar conteúdo M3U
     let m3uContent = '#EXTM3U\n\n';
     let totalChannels = 0;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 
     for (const category of categories) {
       const { data: channels } = await supabaseService
@@ -112,25 +100,11 @@ serve(async (req) => {
 
       if (channels && channels.length > 0) {
         for (const channel of channels) {
-          // Buscar clientes atribuídos a esta lista
-          const { data: assignments } = await supabaseService
-            .from('client_m3u_custom_assignments')
-            .select('cliente_id')
-            .eq('custom_list_id', customListId);
-
-          // Usar primeiro cliente ou 'default'
-          const clientId = assignments && assignments.length > 0 
-            ? assignments[0].cliente_id 
-            : 'default';
-          
-          const token = await generateStreamToken(clientId);
-          
-          // Codificar URL original
+          // Codificar URL original para passar como parâmetro
           const encodedStreamUrl = encodeURIComponent(channel.stream_url);
           
-          // Gerar URL do proxy
-          const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-          const proxyUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedStreamUrl}&token=${token}&client=${clientId}`;
+          // Gerar URL do proxy (cliente e token serão validados no momento da requisição)
+          const proxyUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedStreamUrl}&list=${customListId}`;
           
           const tvgId = channel.tvg_id ? ` tvg-id="${channel.tvg_id}"` : '';
           const tvgName = channel.tvg_name ? ` tvg-name="${channel.tvg_name}"` : '';

@@ -14,34 +14,55 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const streamUrl = url.searchParams.get('url');
-    const token = url.searchParams.get('token');
-    const clientId = url.searchParams.get('client');
+    const listId = url.searchParams.get('list');
 
-    if (!streamUrl || !token || !clientId) {
+    if (!streamUrl || !listId) {
       return new Response('Missing parameters', { 
         status: 400,
         headers: corsHeaders 
       });
     }
 
-    // Decodificar a URL do stream
-    const decodedStreamUrl = decodeURIComponent(streamUrl);
+    // Verificar autenticação via Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response('Unauthorized - No auth token', { 
+        status: 401,
+        headers: corsHeaders 
+      });
+    }
 
-    // Verificar autenticação do cliente
+    // Criar cliente autenticado
     const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verificar usuário autenticado
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response('Unauthorized - Invalid token', { 
+        status: 401,
+        headers: corsHeaders 
+      });
+    }
+
+    // Buscar cliente associado ao usuário
+    const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: cliente, error: clientError } = await supabase
+    const { data: cliente, error: clientError } = await supabaseService
       .from('clientes')
       .select('id, cliente_ativo, data_vencimento')
-      .eq('id', clientId)
+      .eq('user_id', user.id)
       .single();
 
     if (clientError || !cliente) {
       console.error('Cliente não encontrado:', clientError);
-      return new Response('Unauthorized', { 
+      return new Response('Unauthorized - No client found', { 
         status: 401,
         headers: corsHeaders 
       });
@@ -58,21 +79,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verificar token (simples verificação - pode ser melhorada com JWT)
-    const expectedToken = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(`${clientId}-${Deno.env.get('STREAM_PROXY_SECRET') || 'default-secret'}`)
-    );
-    const expectedTokenHex = Array.from(new Uint8Array(expectedToken))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    // Verificar se o cliente tem acesso a esta lista
+    const { data: assignment } = await supabaseService
+      .from('client_m3u_custom_assignments')
+      .select('id')
+      .eq('cliente_id', cliente.id)
+      .eq('custom_list_id', listId)
+      .single();
 
-    if (token !== expectedTokenHex.substring(0, 32)) {
-      return new Response('Invalid token', { 
-        status: 401,
+    if (!assignment) {
+      return new Response('Forbidden - No access to this playlist', { 
+        status: 403,
         headers: corsHeaders 
       });
     }
+
+    // Decodificar a URL do stream
+    const decodedStreamUrl = decodeURIComponent(streamUrl);
 
     // Fazer proxy do stream
     console.log(`Proxying stream for client ${clientId}: ${decodedStreamUrl}`);
