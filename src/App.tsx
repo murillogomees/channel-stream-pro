@@ -17,6 +17,7 @@ const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
 // Consolidated admin pages
 const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
+const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
@@ -61,6 +62,7 @@ const App = () => (
           
           {/* Consolidated Admin Pages */}
           <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
+          <Route path="/admin/m3u-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
@@ -71,7 +73,6 @@ const App = () => (
           {/* Legacy routes - redirect to consolidated pages */}
           <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-stats" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-custom-builder" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-custom-dashboard" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-usage-report" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/notificacoes" element={<Navigate to="/admin/notifications" replace />} />

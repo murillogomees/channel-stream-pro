@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useM3UCustom } from '@/hooks/useM3UCustom';
 import { supabase } from '@/integrations/supabase/client';
-import { List, Tv, Cloud, Activity, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { List, Tv, Cloud, Activity, CheckCircle, XCircle, Clock, Pencil, Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 interface GenerationLog {
   id: string;
@@ -22,6 +24,7 @@ interface GenerationLog {
 }
 
 export default function AdminM3UCustomDashboard() {
+  const navigate = useNavigate();
   const { lists, isLoading } = useM3UCustom();
   const [logs, setLogs] = useState<GenerationLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
@@ -70,9 +73,15 @@ export default function AdminM3UCustomDashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard M3U Personalizado</h1>
-        <p className="text-muted-foreground">Monitoramento e estatísticas das listas M3U</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard M3U Personalizado</h1>
+          <p className="text-muted-foreground">Monitoramento e estatísticas das listas M3U</p>
+        </div>
+        <Button onClick={() => navigate('/admin/m3u-builder')}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Lista Personalizada
+        </Button>
       </div>
 
       {/* Cards de Estatísticas */}
@@ -151,6 +160,7 @@ export default function AdminM3UCustomDashboard() {
                   <TableHead>Canais</TableHead>
                   <TableHead>Última Geração</TableHead>
                   <TableHead>URL CDN</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -188,11 +198,108 @@ export default function AdminM3UCustomDashboard() {
                         <span className="text-muted-foreground text-sm">Não gerado</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/admin/m3u-builder?list=${list.id}`)}
+                          title="Editar Lista"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {list.cdn_url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => window.open(list.cdn_url, '_blank')}
+                            title="Visualizar M3U"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Informações sobre Otimização R2 */}
+      <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cloud className="h-5 w-5 text-blue-500" />
+            Otimizações Cloudflare R2 Ativas
+          </CardTitle>
+          <CardDescription>
+            Seu conteúdo já está otimizado com tecnologias avançadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">CDN Global</p>
+                  <p className="text-xs text-muted-foreground">
+                    Conteúdo distribuído globalmente com latência mínima
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">Cache Agressivo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Manifests HLS cached (30s), segments (24h) para performance máxima
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">Zero Egress Fees</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sem custos de saída de dados, economize até 90% vs S3
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">VOD Hosting</p>
+                  <p className="text-xs text-muted-foreground">
+                    Conteúdo VOD hospedado no R2 para independência total
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">Stream Proxy</p>
+                  <p className="text-xs text-muted-foreground">
+                    Autenticação e controle de acesso em tempo real
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">Regeneração Automática</p>
+                  <p className="text-xs text-muted-foreground">
+                    M3U regenerados diariamente e enviados ao CDN
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
