@@ -1,23 +1,17 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import AdminNotificacoes from "./AdminNotificacoes";
 import AdminNotificationSettings from "./AdminNotificationSettings";
 import AdminAutoNotifications from "./AdminAutoNotifications";
 import AdminTemplates from "./AdminTemplates";
 
 export default function AdminNotifications() {
-  const navigate = useNavigate();
-
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/dashboard")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-3xl font-bold">Sistema de Notificações</h1>
-      </div>
+      <PageHeader
+        title="Sistema de Notificações"
+        description="Gerencie notificações, templates e configurações"
+      />
 
       <Tabs defaultValue="main" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
