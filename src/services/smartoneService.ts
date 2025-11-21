@@ -134,8 +134,8 @@ class SmartoneService {
   }
 
   /**
-   * Valida pré-condições para operações com SmartOne
-   * Útil para verificar dados antes de operações manuais
+   * Valida pré-condições para operações com SmartOne (workflow manual)
+   * Apenas valida formato do MAC e dados básicos do cliente
    */
   async validateClientForSync(cliente: Cliente): Promise<{
     valid: boolean;
@@ -145,19 +145,9 @@ class SmartoneService {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Verificar configuração SmartOne
-    const config = await this.getConfig();
-    if (!config.enabled) {
-      errors.push('Integração SmartOne está desabilitada');
-    }
-
-    if (!config.baseUrl || !config.clientApi || !config.keyApi) {
-      errors.push('Credenciais da API SmartOne não configuradas');
-    }
-
     // Validar MAC Address
     if (!cliente.macSmartOne) {
-      errors.push('Cliente não possui MAC address cadastrado');
+      warnings.push('Cliente não possui MAC address cadastrado');
     } else {
       const macValidation = validateMacAddress(cliente.macSmartOne);
       if (!macValidation.valid) {
@@ -168,11 +158,6 @@ class SmartoneService {
     // Validar dados básicos do cliente
     if (!cliente.nome || cliente.nome.trim().length < 2) {
       errors.push('Nome do cliente inválido ou muito curto');
-    }
-
-    // Verificar se já existe sincronização pendente
-    if (cliente.smartone_status === 'pendente') {
-      warnings.push('Cliente possui sincronização em andamento');
     }
 
     // Verificar se já foi sincronizado com sucesso recentemente
