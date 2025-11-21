@@ -44,7 +44,8 @@ export default function AdminNotificacoes() {
   const { toast } = useToast();
   const { isAdmin, loading } = useAuth();
   const { clientes } = useClientesDb();
-  const { config, saveConfig, isConfigured, addTestContact, removeTestContact } = useWhatsAppConfig();
+  const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
+  const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
   const { addLog, stats, loading: statsLoading } = useNotificationLogs();
   const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
@@ -173,7 +174,7 @@ export default function AdminNotificacoes() {
     }
   };
 
-  if (loading) {
+  if (loading || configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
@@ -433,10 +434,8 @@ export default function AdminNotificacoes() {
                 </div>
                 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Status Atual:</span>
-                  <Badge variant={isRunning ? 'default' : 'outline'}>
-                    {isRunning ? '⚡ Processando' : '💤 Aguardando'}
-                  </Badge>
+                  <span className="text-sm font-medium">Horário Configurado:</span>
+                  <span className="text-sm font-medium">{config.sendHour}:00h</span>
                 </div>
               </div>
 

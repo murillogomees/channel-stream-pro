@@ -19,7 +19,7 @@ export function useAutoNotifications() {
 
     if (config.autoSendEnabled) {
       scheduler.start();
-      setIsRunning(true);
+      setIsRunning(config.autoSendEnabled);
     } else {
       scheduler.stop();
       setIsRunning(false);
@@ -28,7 +28,7 @@ export function useAutoNotifications() {
     // Atualizar estado a cada minuto
     const interval = setInterval(() => {
       setLastRunState(scheduler.getLastRunState());
-      setIsRunning(scheduler.getIsRunning());
+      setIsRunning(config.autoSendEnabled);
     }, 60000);
 
     return () => {
@@ -47,10 +47,20 @@ export function useAutoNotifications() {
   };
 
   const getNextRunTime = () => {
-    if (schedulerRef.current) {
-      return schedulerRef.current.getNextRunTime(config);
+    if (!config.autoSendEnabled) {
+      return null;
     }
-    return null;
+    
+    const now = new Date();
+    const nextRun = new Date();
+    nextRun.setHours(config.sendHour, 0, 0, 0);
+    
+    // Se já passou da hora de hoje, agendar para amanhã
+    if (now.getHours() >= config.sendHour) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+    
+    return nextRun;
   };
 
   return {

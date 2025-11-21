@@ -66,7 +66,8 @@ export default function AdminClientes() {
   const { toast } = useToast();
   const { isAdmin, loading } = useAuth();
   const { clientes, deleteCliente, loading: loadingClientes } = useClientesDb();
-  const { isConfigured } = useWhatsAppConfig();
+  const { config } = useWhatsAppConfig();
+  const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
   const { addLog } = useNotificationLogs();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const LOCAL_TEMPLATES = loadTemplates();
