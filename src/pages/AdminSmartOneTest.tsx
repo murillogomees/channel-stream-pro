@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -16,8 +19,10 @@ import {
   Wifi, 
   WifiOff,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  PlayCircle
 } from "lucide-react";
+import { validateMacAddress, normalizeMacAddress } from "@/services/smartoneService";
 
 interface TestResult {
   test: string;
@@ -35,6 +40,15 @@ const AdminSmartOneTest = () => {
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [overallStatus, setOverallStatus] = useState<'idle' | 'success' | 'error' | 'warning'>('idle');
+  
+  // Playlist creation test states
+  const [testingPlaylist, setTestingPlaylist] = useState(false);
+  const [playlistTestResult, setPlaylistTestResult] = useState<any>(null);
+  const [playlistForm, setPlaylistForm] = useState({
+    nome: '',
+    mac: '',
+    m3uUrl: ''
+  });
 
   if (!authLoading && !isAdmin) {
     navigate('/auth');
@@ -227,6 +241,128 @@ const AdminSmartOneTest = () => {
     }
   };
 
+  const runPlaylistCreationTest = async () => {
+    // Validar formulário
+    if (!playlistForm.nome.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "Informe o nome da playlist/cliente",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!playlistForm.mac.trim()) {
+      toast({
+        title: "MAC obrigatório",
+        description: "Informe o endereço MAC",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar MAC
+    const macValidation = validateMacAddress(playlistForm.mac);
+    if (!macValidation.valid) {
+      toast({
+        title: "MAC inválido",
+        description: macValidation.error || "Formato de MAC inválido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!playlistForm.m3uUrl.trim()) {
+      toast({
+        title: "URL M3U obrigatória",
+        description: "Informe a URL da playlist M3U",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar URL
+    try {
+      new URL(playlistForm.m3uUrl);
+    } catch {
+      toast({
+        title: "URL inválida",
+        description: "Informe uma URL válida para a playlist M3U",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingPlaylist(true);
+    setPlaylistTestResult(null);
+
+    try {
+      const startTime = Date.now();
+
+      // Normalizar MAC
+      const normalizedMac = normalizeMacAddress(playlistForm.mac);
+
+      const { data, error } = await supabase.functions.invoke('smartone-test', {
+        body: {
+          action: 'create',
+          playlist: {
+            nome: playlistForm.nome,
+            mac: normalizedMac,
+            m3u_url: playlistForm.m3uUrl,
+          }
+        }
+      });
+
+      const latency = Date.now() - startTime;
+
+      if (error) {
+        setPlaylistTestResult({
+          success: false,
+          error: error.message,
+          latency_ms: latency,
+        });
+        
+        toast({
+          title: "Erro no teste",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        setPlaylistTestResult({
+          ...data,
+          latency_ms: latency,
+        });
+
+        if (data.success) {
+          toast({
+            title: "Teste bem-sucedido!",
+            description: `Playlist criada com sucesso no SmartOne em ${latency}ms`,
+          });
+        } else {
+          toast({
+            title: "Falha no teste",
+            description: data.error || "Erro desconhecido",
+            variant: "destructive",
+          });
+        }
+      }
+
+    } catch (error: any) {
+      setPlaylistTestResult({
+        success: false,
+        error: error.message,
+      });
+
+      toast({
+        title: "Erro ao executar teste",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setTestingPlaylist(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -297,6 +433,123 @@ const AdminSmartOneTest = () => {
                 </>
               )}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Teste de Criação de Playlist */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Simulador de Criação de Playlist</CardTitle>
+            <CardDescription>
+              Teste a criação de uma playlist no SmartOne com dados customizados
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome do Cliente/Playlist</Label>
+                <Input
+                  id="nome"
+                  placeholder="Ex: João Silva"
+                  value={playlistForm.nome}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, nome: e.target.value })}
+                  disabled={testingPlaylist}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mac">MAC Address</Label>
+                <Input
+                  id="mac"
+                  placeholder="Ex: 00:1A:2B:3C:4D:5E"
+                  value={playlistForm.mac}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, mac: e.target.value })}
+                  disabled={testingPlaylist}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Formatos aceitos: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX ou XXXXXXXXXXXX
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="m3uUrl">URL da Playlist M3U</Label>
+              <Input
+                id="m3uUrl"
+                placeholder="Ex: https://exemplo.com/playlist.m3u"
+                value={playlistForm.m3uUrl}
+                onChange={(e) => setPlaylistForm({ ...playlistForm, m3uUrl: e.target.value })}
+                disabled={testingPlaylist}
+              />
+            </div>
+
+            <Button
+              onClick={runPlaylistCreationTest}
+              disabled={testingPlaylist}
+              className="w-full md:w-auto"
+            >
+              {testingPlaylist ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Testando Criação...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  Testar Criação de Playlist
+                </>
+              )}
+            </Button>
+
+            {/* Resultado do teste de playlist */}
+            {playlistTestResult && (
+              <div className="mt-6">
+                <Alert variant={playlistTestResult.success ? 'default' : 'destructive'}>
+                  {playlistTestResult.success ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  <AlertTitle>
+                    {playlistTestResult.success ? 'Playlist Criada com Sucesso' : 'Falha na Criação'}
+                  </AlertTitle>
+                  <AlertDescription className="space-y-2">
+                    <p>
+                      {playlistTestResult.success 
+                        ? `A playlist foi criada no SmartOne com sucesso!`
+                        : playlistTestResult.error || 'Erro desconhecido ao criar playlist'
+                      }
+                    </p>
+                    
+                    {playlistTestResult.latency_ms && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-3 w-3" />
+                        <span>Tempo de resposta: {playlistTestResult.latency_ms}ms</span>
+                      </div>
+                    )}
+
+                    {playlistTestResult.playlistId && (
+                      <div className="text-sm">
+                        <strong>ID da Playlist:</strong> {playlistTestResult.playlistId}
+                      </div>
+                    )}
+
+                    {playlistTestResult.data && (
+                      <details className="text-xs mt-2">
+                        <summary className="cursor-pointer hover:text-foreground">
+                          Ver resposta completa do SmartOne
+                        </summary>
+                        <pre className="mt-2 p-2 bg-muted rounded overflow-auto">
+                          {JSON.stringify(playlistTestResult.data, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
           </CardContent>
         </Card>
 
