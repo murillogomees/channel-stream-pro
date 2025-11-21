@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/admin/PageHeader";
 import AdminSmartOneSync from "./AdminSmartOneSync";
 import AdminSmartOneTest from "./AdminSmartOneTest";
+import AdminSmartOneCredentials from "./AdminSmartOneCredentials";
 
 export default function AdminIntegrations() {
   return (
@@ -11,11 +12,16 @@ export default function AdminIntegrations() {
         description="Gerenciamento de integrações com SmartOne IPTV"
       />
 
-      <Tabs defaultValue="sync" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="credentials" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="credentials">Validar Credenciais</TabsTrigger>
           <TabsTrigger value="sync">SmartOne Sync</TabsTrigger>
           <TabsTrigger value="test">SmartOne Test</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="credentials" className="space-y-4">
+          <AdminSmartOneCredentials />
+        </TabsContent>
 
         <TabsContent value="sync" className="space-y-4">
           <AdminSmartOneSync />
