@@ -101,11 +101,22 @@ const AdminSmartOneSync = () => {
           description: `${result.playlists?.length || 0} playlists encontradas no SmartOne`,
         });
       } else {
-        toast({
-          title: "Erro ao carregar playlists",
-          description: result.error,
-          variant: "destructive",
-        });
+        // Mensagem específica para bloqueio do Cloudflare
+        if (result.error?.includes('bloqueando requisições automáticas')) {
+          toast({
+            title: "SmartOne bloqueou a requisição",
+            description: "O SmartOne está protegendo contra bots. Acesse o painel SmartOne manualmente para visualizar as playlists.",
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          toast({
+            title: "Erro ao carregar playlists",
+            description: result.error,
+            variant: "destructive",
+          });
+        }
+        setSmartOnePlaylists([]);
       }
     } catch (error: any) {
       toast({
@@ -113,6 +124,7 @@ const AdminSmartOneSync = () => {
         description: error.message,
         variant: "destructive",
       });
+      setSmartOnePlaylists([]);
     } finally {
       setLoadingPlaylists(false);
     }
@@ -314,6 +326,30 @@ URL da Playlist: ${defaultM3U.file_url}
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                      Limitação de Acesso Automático
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      O SmartOne IPTV protege seu painel contra requisições automáticas (bots). 
+                      Para visualizar as playlists cadastradas, acesse o painel administrativo do SmartOne manualmente.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 border-amber-300 dark:border-amber-700"
+                      onClick={() => window.open('https://smartone-iptv.com/client/login/', '_blank')}
+                    >
+                      <Wifi className="h-4 w-4 mr-2" />
+                      Acessar Painel SmartOne
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -335,8 +371,12 @@ URL da Playlist: ${defaultM3U.file_url}
                       </TableRow>
                     ) : smartonePlaylists.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">
-                          Nenhuma playlist encontrada no SmartOne
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <div className="flex flex-col items-center gap-2">
+                            <XCircle className="h-8 w-8 text-muted-foreground/50" />
+                            <p>Não foi possível carregar as playlists automaticamente</p>
+                            <p className="text-xs">Acesse o painel SmartOne manualmente usando o botão acima</p>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (
