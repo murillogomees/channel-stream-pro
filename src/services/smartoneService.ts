@@ -291,6 +291,30 @@ class SmartoneService {
     }
   }
 
+  async xtreamApiCall(action: string = 'user_info'): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-xtream-api', {
+        body: { action }
+      });
+
+      if (error) {
+        console.error('Erro ao chamar Xtream API:', error);
+        return {
+          success: false,
+          error: error.message || 'Erro ao acessar API Xtream Codes'
+        };
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('Erro ao comunicar com Xtream API:', error);
+      return {
+        success: false,
+        error: error.message || 'Erro ao comunicar com API Xtream Codes'
+      };
+    }
+  }
+
   async testUpdatePlaylist(playlistId: string, playlist: SmartOneTestPlaylist): Promise<SmartOneTestResult> {
     // Validar MAC Address
     const macValidation = validateMacAddress(playlist.mac);
