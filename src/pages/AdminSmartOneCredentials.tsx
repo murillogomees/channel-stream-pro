@@ -85,6 +85,49 @@ export default function AdminSmartOneCredentials() {
     }
   };
 
+  const testXtreamApi = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-xtream-api', {
+        body: { action: 'user_info' }
+      });
+
+      if (error) {
+        toast({
+          title: "Erro ao testar API Xtream",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "✅ API Xtream Codes funcionando!",
+          description: `Conectado com sucesso. Latência: ${data.latency_ms}ms`,
+          duration: 8000,
+        });
+        console.log('User Info:', data.user_info);
+        console.log('Server Info:', data.server_info);
+      } else {
+        toast({
+          title: "❌ API Xtream falhou",
+          description: data.error || "Erro ao acessar API",
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusIcon = (success: boolean | undefined) => {
     if (success === true) return <CheckCircle className="h-5 w-5 text-green-500" />;
     if (success === false) return <XCircle className="h-5 w-5 text-red-500" />;
@@ -117,14 +160,20 @@ export default function AdminSmartOneCredentials() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Execute o teste de validação para verificar a conectividade e autenticação com a API SmartOne
+              Execute os testes para verificar a conectividade e autenticação com a API SmartOne
             </p>
-            <Button onClick={validateCredentials} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Validando...' : 'Validar Credenciais'}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={validateCredentials} disabled={loading} variant="outline">
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Validando...' : 'Validar Credenciais'}
+              </Button>
+              <Button onClick={testXtreamApi} disabled={loading}>
+                <Activity className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Testando...' : 'Testar API Xtream Codes'}
+              </Button>
+            </div>
           </div>
 
           {result && (
