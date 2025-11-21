@@ -130,6 +130,47 @@ const AdminSmartOneSync = () => {
     }
   };
 
+  const testAlternativeEndpoints = async () => {
+    setLoadingPlaylists(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('smartone-list-playlists-alt');
+
+      if (error) {
+        toast({
+          title: "Erro ao testar endpoints",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        setSmartOnePlaylists(data.playlists || []);
+        toast({
+          title: "✅ Endpoint alternativo funcionou!",
+          description: `${data.working_endpoint} retornou ${data.playlists?.length || 0} playlists`,
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: "Nenhum endpoint funcionou",
+          description: data.recommendation || "Todos os endpoints foram bloqueados",
+          variant: "destructive",
+          duration: 10000,
+        });
+        console.log('Resultados dos testes:', data.all_results);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao testar endpoints",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
   useEffect(() => {
     if (isAdmin) {
       loadClientes();
@@ -315,14 +356,26 @@ URL da Playlist: ${defaultM3U.file_url}
                     Playlists registradas diretamente no sistema SmartOne IPTV
                   </CardDescription>
                 </div>
-                <Button 
-                  onClick={loadSmartOnePlaylists} 
-                  variant="outline"
-                  disabled={loadingPlaylists}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingPlaylists ? 'animate-spin' : ''}`} />
-                  Atualizar
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={loadSmartOnePlaylists} 
+                    variant="outline"
+                    disabled={loadingPlaylists}
+                    size="sm"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loadingPlaylists ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </Button>
+                  <Button 
+                    onClick={testAlternativeEndpoints}
+                    disabled={loadingPlaylists}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Wifi className={`h-4 w-4 mr-2 ${loadingPlaylists ? 'animate-spin' : ''}`} />
+                    Testar Endpoints
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
