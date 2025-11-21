@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Star, LinkIcon, Check, RefreshCw, Pencil, Save } from 'lucide-react';
+import { Plus, Trash2, Loader2, Star, LinkIcon, Check, RefreshCw, Pencil, Save, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
 import { PageHeader } from '@/components/admin/PageHeader';
+import { M3UClientManager } from '@/components/admin/M3UClientManager';
 
 interface M3UList {
   id: string;
@@ -55,6 +56,9 @@ export default function AdminM3ULists() {
   const [listDescription, setListDescription] = useState('');
   const [planTypes, setPlanTypes] = useState<string[]>(['mensal']);
   const [isActive, setIsActive] = useState(true);
+  const [clientManagerOpen, setClientManagerOpen] = useState(false);
+  const [selectedListId, setSelectedListId] = useState<string>('');
+  const [selectedListName, setSelectedListName] = useState<string>('');
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -238,6 +242,12 @@ export default function AdminM3ULists() {
     );
   };
 
+  const handleOpenClientManager = (list: M3UList) => {
+    setSelectedListId(list.id);
+    setSelectedListName(list.name);
+    setClientManagerOpen(true);
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -369,6 +379,14 @@ export default function AdminM3ULists() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenClientManager(list)}
+                          title="Gerenciar clientes"
+                        >
+                          <Users className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -528,6 +546,14 @@ export default function AdminM3ULists() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <M3UClientManager
+        listId={selectedListId}
+        listName={selectedListName}
+        open={clientManagerOpen}
+        onOpenChange={setClientManagerOpen}
+        onUpdate={loadLists}
+      />
     </div>
   );
 }
