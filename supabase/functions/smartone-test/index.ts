@@ -13,6 +13,9 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  console.log('[smartone-test] ===== Nova requisição recebida =====');
+  console.log('[smartone-test] Método:', req.method);
+  console.log('[smartone-test] URL:', req.url);
 
   try {
     // Extract and validate token
@@ -113,10 +116,20 @@ serve(async (req) => {
 
       try {
         if (action === 'create') {
+          console.log('[smartone-test] Iniciando teste de criação de playlist');
+          console.log('[smartone-test] Dados:', {
+            mac: playlist.mac,
+            nome: playlist.nome,
+            m3u_url: playlist.m3u_url?.substring(0, 50) + '...'
+          });
+
           // Test creating a playlist
           const smartoneResponse = await fetch(`${SMARTONE_API_BASE_URL}/playlist/create`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
             body: JSON.stringify({
               client_api: SMARTONE_CLIENT_API,
               key_api: SMARTONE_KEY_API,
@@ -126,21 +139,32 @@ serve(async (req) => {
             }),
           });
 
+          console.log('[smartone-test] Status da resposta:', smartoneResponse.status);
+
           const responseText = await smartoneResponse.text();
+          console.log('[smartone-test] Resposta recebida:', responseText.substring(0, 200));
+          
           let smartoneData;
           
           try {
             smartoneData = JSON.parse(responseText);
-          } catch {
-            smartoneData = { success: false, error: 'Resposta inválida', raw_response: responseText };
+          } catch (parseError) {
+            console.error('[smartone-test] Erro ao fazer parse da resposta:', parseError);
+            smartoneData = { 
+              success: false, 
+              error: 'Resposta inválida do SmartOne', 
+              raw_response: responseText.substring(0, 500)
+            };
           }
 
           result = {
-            success: smartoneResponse.ok && smartoneData.success,
-            playlistId: smartoneData.id || smartoneData.playlist_id,
+            success: smartoneResponse.ok && (smartoneData.success === true || smartoneData.status === 'success'),
+            playlistId: smartoneData.id || smartoneData.playlist_id || smartoneData.data?.id,
             data: smartoneData,
             latency_ms: Date.now() - testStart,
           };
+
+          console.log('[smartone-test] Resultado do teste:', result.success ? 'SUCESSO' : 'FALHOU');
 
         } else if (action === 'update') {
           // Test updating a playlist
@@ -221,12 +245,19 @@ serve(async (req) => {
         );
 
       } catch (error) {
-        console.error(`[smartone-test] Error during ${action}:`, error);
+        console.error(`[smartone-test] Erro durante ${action}:`, error);
+        console.error('[smartone-test] Stack trace:', error.stack);
         
         return new Response(
           JSON.stringify({ 
             success: false,
-            error: error.message,
+            error: error.message || 'Erro desconhecido ao testar playlist',
+            error_type: error.name || 'UnknownError',
+            details: {
+              action,
+              playlist_nome: playlist?.nome,
+              timestamp: new Date().toISOString()
+            },
             latency_ms: Date.now() - testStart,
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -279,13 +310,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('[smartone-test] Unexpected error:', error);
+    console.error('[smartone-test] Erro inesperado:', error);
+    console.error('[smartone-test] Stack trace:', error.stack);
     
     return new Response(
       JSON.stringify({ 
         success: false,
         error: 'Erro interno do servidor',
         details: error.message,
+        error_type: error.name,
+        timestamp: new Date().toISOString(),
         latency_ms: Date.now() - startTime
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
