@@ -65,7 +65,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
   // === LEMBRETES DE VENCIMENTO ===
   {
     id: 'expiration_minus_5',
-    name: '5 dias antes do vencimento',
+    name: 'Faltam 5 dias para vencer',
     message: 'Olá {nome}! Seu plano vence em 5 dias ({dataVencimento}). Valor: R$ {valor}. Renove agora: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
@@ -74,7 +74,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
   },
   {
     id: 'expiration_minus_3',
-    name: '3 dias antes do vencimento',
+    name: 'Faltam 3 dias para vencer',
     message: '⚠️ {nome}, seu plano vence em 3 dias ({dataVencimento}). Garanta seu acesso renovando agora! Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
@@ -83,7 +83,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
   },
   {
     id: 'expiration_minus_1',
-    name: '1 dia antes do vencimento',
+    name: 'Falta 1 dia para vencer',
     message: '🚨 {nome}, AMANHÃ seu plano vence! Data: {dataVencimento}. Renove hoje para não perder acesso! Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
@@ -92,7 +92,7 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
   },
   {
     id: 'expiration_zero',
-    name: 'Dia do vencimento',
+    name: 'Vence hoje',
     message: `Olá {nome}! 👋
 Passando para avisar que seu plano no valor de R$ {valor} vence hoje.
 
@@ -111,7 +111,7 @@ IPTV LINK`,
   },
   {
     id: 'expiration_plus_1',
-    name: '1 dia após vencimento',
+    name: 'Vencido há 1 dia',
     message: '❌ {nome}, seu plano venceu ontem. Regularize para reativar seu acesso. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
@@ -120,7 +120,7 @@ IPTV LINK`,
   },
   {
     id: 'expiration_plus_3',
-    name: '3 dias após vencimento',
+    name: 'Vencido há 3 dias',
     message: '🔴 {nome}, seu plano está vencido há 3 dias. Última chance para reativar antes do bloqueio permanente. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
@@ -129,7 +129,7 @@ IPTV LINK`,
   },
   {
     id: 'expiration_plus_5',
-    name: '5 dias após vencimento (Bloqueio)',
+    name: 'Vencido há 5 dias (Bloqueio)',
     message: '❌ {nome}, seu acesso foi bloqueado por falta de pagamento. Para reativar, regularize seu plano. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',

@@ -942,28 +942,50 @@ export default function AdminNotificacoes() {
                 <TableBody>
                   {clientesComVencimento.slice(0, 10).map((cliente) => {
                     // Determinar qual será a próxima notificação baseado nos dias até vencer
-                    let nextNotificationDays = 0;
+                    let nextNotificationDate = new Date();
                     let nextNotificationType = '';
+                    const vencimento = new Date(cliente.dataVencimento);
                     
                     if (cliente.daysUntil > 5) {
-                      nextNotificationDays = cliente.daysUntil - 5;
-                      nextNotificationType = '5 dias antes';
+                      // Próxima notificação: quando faltarem 5 dias
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() - 5);
+                      nextNotificationType = 'Faltam 5 dias';
                     } else if (cliente.daysUntil > 3) {
-                      nextNotificationDays = cliente.daysUntil - 3;
-                      nextNotificationType = '3 dias antes';
+                      // Próxima notificação: quando faltarem 3 dias
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() - 3);
+                      nextNotificationType = 'Faltam 3 dias';
                     } else if (cliente.daysUntil > 1) {
-                      nextNotificationDays = cliente.daysUntil - 1;
-                      nextNotificationType = '1 dia antes';
-                    } else if (cliente.daysUntil === 0) {
-                      nextNotificationDays = 0;
+                      // Próxima notificação: quando faltar 1 dia
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() - 1);
+                      nextNotificationType = 'Falta 1 dia';
+                    } else if (cliente.daysUntil === 1) {
+                      // Próxima notificação: no dia do vencimento
+                      nextNotificationDate = new Date(vencimento);
                       nextNotificationType = 'Vence hoje';
+                    } else if (cliente.daysUntil === 0) {
+                      // Próxima notificação: 1 dia após vencer
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() + 1);
+                      nextNotificationType = 'Vencido há 1 dia';
+                    } else if (cliente.daysUntil >= -2) {
+                      // Próxima notificação: 3 dias após vencer
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() + 3);
+                      nextNotificationType = 'Vencido há 3 dias';
+                    } else if (cliente.daysUntil >= -4) {
+                      // Próxima notificação: 5 dias após vencer (bloqueio)
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() + 5);
+                      nextNotificationType = 'Vencido há 5 dias';
                     } else {
-                      nextNotificationDays = Math.abs(cliente.daysUntil);
-                      nextNotificationType = 'Vencido';
+                      // Já passou de todas as notificações
+                      nextNotificationDate = new Date(vencimento);
+                      nextNotificationDate.setDate(vencimento.getDate() + 5);
+                      nextNotificationType = 'Bloqueado';
                     }
-                    
-                    const nextNotificationDate = new Date(cliente.dataVencimento);
-                    nextNotificationDate.setDate(nextNotificationDate.getDate() - nextNotificationDays);
                     
                     return (
                       <TableRow key={cliente.id}>
