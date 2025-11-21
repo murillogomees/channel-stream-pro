@@ -33,21 +33,34 @@ export const M3UListSelector = ({ selectedLists, onChange, onListsLoaded }: M3UL
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase
+      // Buscar listas ativas
+      const { data: lists, error: listsError } = await supabase
         .from('m3u_lists')
-        .select(`
-          *,
-          client_m3u_lists(count)
-        `)
+        .select('*')
         .eq('status', 'active');
 
-      if (error) throw error;
+      if (listsError) throw listsError;
+
+      // Buscar vínculos ativos
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('client_m3u_lists')
+        .select('m3u_list_id')
+        .eq('is_active', true);
+
+      if (assignmentsError) throw assignmentsError;
+
+      // Contar vínculos por lista
+      const usageMap = new Map<string, number>();
+      assignments?.forEach(assignment => {
+        const current = usageMap.get(assignment.m3u_list_id) || 0;
+        usageMap.set(assignment.m3u_list_id, current + 1);
+      });
 
       // Adicionar contagem de uso e ordenar por MENOR uso (rotação balanceada)
-      const listsWithUsage = (data || []).map(list => ({
+      const listsWithUsage = (lists || []).map(list => ({
         ...list,
-        usage_count: list.client_m3u_lists?.[0]?.count || 0
-      })).sort((a, b) => a.usage_count - b.usage_count); // Menor uso primeiro
+        usage_count: usageMap.get(list.id) || 0
+      })).sort((a, b) => (a.usage_count || 0) - (b.usage_count || 0));
 
       setLists(listsWithUsage as M3UList[]);
       

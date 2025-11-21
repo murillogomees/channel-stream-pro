@@ -72,19 +72,33 @@ export default function AdminM3ULists() {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase
+      // Buscar todas as listas
+      const { data: lists, error: listsError } = await supabase
         .from('m3u_lists')
-        .select(`
-          *,
-          client_m3u_lists(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (listsError) throw listsError;
 
-      const listsWithUsage = (data || []).map(list => ({
+      // Buscar vínculos ativos
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('client_m3u_lists')
+        .select('m3u_list_id')
+        .eq('is_active', true);
+
+      if (assignmentsError) throw assignmentsError;
+
+      // Contar vínculos por lista
+      const usageMap = new Map<string, number>();
+      assignments?.forEach(assignment => {
+        const current = usageMap.get(assignment.m3u_list_id) || 0;
+        usageMap.set(assignment.m3u_list_id, current + 1);
+      });
+
+      // Mapear listas com contagem correta
+      const listsWithUsage = (lists || []).map(list => ({
         ...list,
-        usage_count: list.client_m3u_lists?.[0]?.count || 0
+        usage_count: usageMap.get(list.id) || 0
       }));
 
       setLists(listsWithUsage as M3UList[]);

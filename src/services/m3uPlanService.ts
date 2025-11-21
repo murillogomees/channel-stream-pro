@@ -49,22 +49,39 @@ export const m3uPlanService = {
    * Lista todas as listas M3U ativas
    */
   async getAllLists(): Promise<M3UList[]> {
-    const { data, error } = await supabase
+    // Buscar todas as listas
+    const { data: lists, error: listsError } = await supabase
       .from('m3u_lists')
-      .select(`
-        *,
-        client_m3u_lists(count)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Erro ao listar M3U:', error);
+    if (listsError) {
+      console.error('Erro ao listar M3U:', listsError);
       return [];
     }
 
-    return ((data || []) as any[]).map(list => ({
+    // Buscar todos os vínculos ativos
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('client_m3u_lists')
+      .select('m3u_list_id')
+      .eq('is_active', true);
+
+    if (assignmentsError) {
+      console.error('Erro ao buscar vínculos:', assignmentsError);
+      return [];
+    }
+
+    // Contar vínculos por lista
+    const usageMap = new Map<string, number>();
+    assignments?.forEach(assignment => {
+      const current = usageMap.get(assignment.m3u_list_id) || 0;
+      usageMap.set(assignment.m3u_list_id, current + 1);
+    });
+
+    // Mapear listas com contagem correta
+    return (lists || []).map(list => ({
       ...list,
-      usage_count: list.client_m3u_lists?.[0]?.count || 0
+      usage_count: usageMap.get(list.id) || 0
     }));
   },
 
@@ -72,23 +89,40 @@ export const m3uPlanService = {
    * Busca listas ativas
    */
   async getActiveLists(): Promise<M3UList[]> {
-    const { data, error } = await supabase
+    // Buscar listas ativas
+    const { data: lists, error: listsError } = await supabase
       .from('m3u_lists')
-      .select(`
-        *,
-        client_m3u_lists(count)
-      `)
+      .select('*')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Erro ao buscar listas ativas:', error);
+    if (listsError) {
+      console.error('Erro ao buscar listas ativas:', listsError);
       return [];
     }
 
-    return ((data || []) as any[]).map(list => ({
+    // Buscar todos os vínculos ativos
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('client_m3u_lists')
+      .select('m3u_list_id')
+      .eq('is_active', true);
+
+    if (assignmentsError) {
+      console.error('Erro ao buscar vínculos:', assignmentsError);
+      return [];
+    }
+
+    // Contar vínculos por lista
+    const usageMap = new Map<string, number>();
+    assignments?.forEach(assignment => {
+      const current = usageMap.get(assignment.m3u_list_id) || 0;
+      usageMap.set(assignment.m3u_list_id, current + 1);
+    });
+
+    // Mapear listas com contagem correta
+    return (lists || []).map(list => ({
       ...list,
-      usage_count: list.client_m3u_lists?.[0]?.count || 0
+      usage_count: usageMap.get(list.id) || 0
     }));
   },
 
