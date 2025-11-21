@@ -355,21 +355,9 @@ export default function AdminNotificacoes() {
     }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
-  const [logs, setLogs] = useState<any[]>([]);
-  
-  useEffect(() => {
-    const loadLogs = async () => {
-      const { data } = await supabase
-        .from('notification_logs')
-        .select('*')
-        .order('sent_at', { ascending: false })
-        .limit(20);
-      setLogs(data || []);
-    };
-    loadLogs();
-  }, []);
-  
-  const recentLogs = logs;
+  // Usar logs do hook
+  const { logs: logsFromHook } = useNotificationLogs();
+  const recentLogs = logsFromHook;
   const exportToCSV = () => {};
   const clearLogs = () => {};
 
@@ -946,27 +934,61 @@ export default function AdminNotificacoes() {
                     <TableHead>Telefone</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Dias até vencer</TableHead>
+                    <TableHead>Próxima Notificação</TableHead>
+                    <TableHead>Tipo da Notificação</TableHead>
                     <TableHead>Situação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientesComVencimento.slice(0, 10).map((cliente) => (
-                    <TableRow key={cliente.id}>
-                      <TableCell className="font-medium">{cliente.nome}</TableCell>
-                      <TableCell>{formatPhoneForDisplay(cliente.telefone)}</TableCell>
-                      <TableCell>
-                        {new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={cliente.daysUntil < 0 ? 'destructive' : cliente.daysUntil <= 2 ? 'default' : 'secondary'}>
-                          {cliente.daysUntil > 0 ? `${cliente.daysUntil} dias` : cliente.daysUntil === 0 ? 'Hoje' : `${Math.abs(cliente.daysUntil)} dias vencido`}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>{cliente.situacao}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {clientesComVencimento.slice(0, 10).map((cliente) => {
+                    // Determinar qual será a próxima notificação baseado nos dias até vencer
+                    let nextNotificationDays = 0;
+                    let nextNotificationType = '';
+                    
+                    if (cliente.daysUntil > 5) {
+                      nextNotificationDays = cliente.daysUntil - 5;
+                      nextNotificationType = '5 dias antes';
+                    } else if (cliente.daysUntil > 3) {
+                      nextNotificationDays = cliente.daysUntil - 3;
+                      nextNotificationType = '3 dias antes';
+                    } else if (cliente.daysUntil > 1) {
+                      nextNotificationDays = cliente.daysUntil - 1;
+                      nextNotificationType = '1 dia antes';
+                    } else if (cliente.daysUntil === 0) {
+                      nextNotificationDays = 0;
+                      nextNotificationType = 'Vence hoje';
+                    } else {
+                      nextNotificationDays = Math.abs(cliente.daysUntil);
+                      nextNotificationType = 'Vencido';
+                    }
+                    
+                    const nextNotificationDate = new Date(cliente.dataVencimento);
+                    nextNotificationDate.setDate(nextNotificationDate.getDate() - nextNotificationDays);
+                    
+                    return (
+                      <TableRow key={cliente.id}>
+                        <TableCell className="font-medium">{cliente.nome}</TableCell>
+                        <TableCell>{formatPhoneForDisplay(cliente.telefone)}</TableCell>
+                        <TableCell>
+                          {new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={cliente.daysUntil < 0 ? 'destructive' : cliente.daysUntil <= 2 ? 'default' : 'secondary'}>
+                            {cliente.daysUntil > 0 ? `${cliente.daysUntil} dias` : cliente.daysUntil === 0 ? 'Hoje' : `${Math.abs(cliente.daysUntil)} dias vencido`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {nextNotificationDate.toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{nextNotificationType}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge>{cliente.situacao}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -1004,11 +1026,13 @@ export default function AdminNotificacoes() {
                   {recentLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="text-sm">
-                        {new Date(log.dataEnvio).toLocaleString('pt-BR')}
+                        {new Date(log.sent_at).toLocaleString('pt-BR')}
                       </TableCell>
-                      <TableCell className="font-medium">{log.clienteNome}</TableCell>
-                      <TableCell>{formatPhoneForDisplay(log.telefone)}</TableCell>
-                      <TableCell className="text-sm">{log.template}</TableCell>
+                      <TableCell className="font-medium">
+                        {log.clientes?.nome || 'N/A'}
+                      </TableCell>
+                      <TableCell>{formatPhoneForDisplay(log.phone)}</TableCell>
+                      <TableCell className="text-sm">{log.template_name}</TableCell>
                       <TableCell>
                         {log.status === 'success' ? (
                           <Badge variant="default" className="bg-green-500">

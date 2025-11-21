@@ -45,7 +45,15 @@ export function useNotificationLogs() {
     try {
       const { data, error } = await supabase
         .from('notification_logs')
-        .select('*')
+        .select(`
+          *,
+          clientes:cliente_id (
+            nome,
+            telefone,
+            data_vencimento,
+            situacao
+          )
+        `)
         .order('sent_at', { ascending: false })
         .limit(50);
 
