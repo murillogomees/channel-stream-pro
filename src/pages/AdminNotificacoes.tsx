@@ -46,7 +46,7 @@ export default function AdminNotificacoes() {
   const { clientes } = useClientesDb();
   const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
-  const { addLog, stats, loading: statsLoading } = useNotificationLogs();
+  const { addLog, stats, logs, loading: statsLoading } = useNotificationLogs();
   const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -357,8 +357,7 @@ export default function AdminNotificacoes() {
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
   // Usar logs do hook
-  const { logs: logsFromHook } = useNotificationLogs();
-  const recentLogs = logsFromHook;
+  const recentLogs = logs;
   const exportToCSV = () => {};
   const clearLogs = () => {};
 
