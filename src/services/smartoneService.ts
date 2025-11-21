@@ -265,38 +265,28 @@ class SmartoneService {
 
   async listPlaylists(): Promise<{ success: boolean; playlists?: any[]; error?: string }> {
     try {
-      const config = await this.getConfig();
-      
-      if (!config.enabled) {
-        return { success: false, error: 'Integração SmartOne desabilitada' };
-      }
+      const { data, error } = await supabase.functions.invoke('smartone-list-playlists');
 
-      const response = await fetch(`${config.baseUrl}/playlist/list`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.keyApi}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (error) {
+        console.error('Erro ao chamar Edge Function:', error);
         return {
           success: false,
-          error: data.message || 'Erro ao listar playlists'
+          error: error.message || 'Erro ao listar playlists',
+          playlists: []
         };
       }
 
       return {
-        success: true,
-        playlists: data.playlists || data.data || []
+        success: data.success,
+        playlists: data.playlists || [],
+        error: data.error
       };
     } catch (error: any) {
       console.error('Erro ao listar playlists do SmartOne:', error);
       return {
         success: false,
-        error: error.message || 'Erro ao comunicar com SmartOne API'
+        error: error.message || 'Erro ao comunicar com SmartOne API',
+        playlists: []
       };
     }
   }

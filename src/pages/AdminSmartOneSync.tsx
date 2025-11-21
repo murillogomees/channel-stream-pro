@@ -31,7 +31,9 @@ const AdminSmartOneSync = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteComPerfil[]>([]);
+  const [smartonePlaylists, setSmartOnePlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -87,9 +89,39 @@ const AdminSmartOneSync = () => {
     }
   };
 
+  const loadSmartOnePlaylists = async () => {
+    try {
+      setLoadingPlaylists(true);
+      const result = await smartoneService.listPlaylists();
+      
+      if (result.success) {
+        setSmartOnePlaylists(result.playlists || []);
+        toast({
+          title: "Playlists carregadas",
+          description: `${result.playlists?.length || 0} playlists encontradas no SmartOne`,
+        });
+      } else {
+        toast({
+          title: "Erro ao carregar playlists",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
   useEffect(() => {
     if (isAdmin) {
       loadClientes();
+      loadSmartOnePlaylists();
       
       // Real-time subscription for cliente changes
       const channel = supabase
@@ -260,86 +292,162 @@ URL da Playlist: ${defaultM3U.file_url}
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Gerenciamento de Sincronização SmartOne</CardTitle>
-            <CardDescription>
-              Sincronize manualmente clientes com o SmartOne IPTV
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 flex gap-4">
-              <Input
-                placeholder="Buscar por nome, email ou MAC..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
-              />
-              <Button onClick={loadClientes} variant="outline">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
-              </Button>
-            </div>
-
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>MAC Address</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Última Sinc.</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredClientes.length === 0 ? (
+        <div className="grid gap-6">
+          {/* Tabela de Playlists do SmartOne */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Playlists Cadastradas no SmartOne</CardTitle>
+                  <CardDescription>
+                    Playlists registradas diretamente no sistema SmartOne IPTV
+                  </CardDescription>
+                </div>
+                <Button 
+                  onClick={loadSmartOnePlaylists} 
+                  variant="outline"
+                  disabled={loadingPlaylists}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingPlaylists ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        Nenhum cliente encontrado
-                      </TableCell>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>MAC Address</TableHead>
+                      <TableHead>URL M3U</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Data Criação</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredClientes.map((cliente) => (
-                      <TableRow key={cliente.id}>
-                        <TableCell className="font-medium">{cliente.profiles.nome}</TableCell>
-                        <TableCell>{cliente.profiles.email}</TableCell>
-                        <TableCell className="font-mono text-sm">{cliente.mac_smart_one}</TableCell>
-                        <TableCell>{getStatusBadge(cliente.smartone_status)}</TableCell>
-                        <TableCell>
-                          {cliente.smartone_last_sync_at
-                            ? new Date(cliente.smartone_last_sync_at).toLocaleString('pt-BR')
-                            : 'Nunca'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            onClick={() => handleSync(cliente)}
-                            disabled={syncing === cliente.id}
-                            variant="secondary"
-                          >
-                            {syncing === cliente.id ? (
-                              <>
-                                <Copy className="h-3 w-3 mr-1" />
-                                Copiando...
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3 w-3 mr-1" />
-                                Copiar Dados
-                              </>
-                            )}
-                          </Button>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingPlaylists ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <RefreshCw className="h-4 w-4 animate-spin inline mr-2" />
+                          Carregando playlists...
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                    ) : smartonePlaylists.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          Nenhuma playlist encontrada no SmartOne
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      smartonePlaylists.map((playlist) => (
+                        <TableRow key={playlist.id || playlist.playlist_id}>
+                          <TableCell className="font-medium">{playlist.nome || playlist.name}</TableCell>
+                          <TableCell className="font-mono text-sm">{playlist.mac || playlist.mac_address}</TableCell>
+                          <TableCell className="text-xs truncate max-w-xs">
+                            {playlist.m3u_url || playlist.url}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={playlist.active ? "default" : "secondary"}>
+                              {playlist.active ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {playlist.created_at 
+                              ? new Date(playlist.created_at).toLocaleDateString('pt-BR')
+                              : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabela de Clientes Locais */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Clientes Locais com MAC Cadastrado</CardTitle>
+              <CardDescription>
+                Clientes cadastrados localmente que precisam ser sincronizados com o SmartOne
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex gap-4">
+                <Input
+                  placeholder="Buscar por nome, email ou MAC..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Button onClick={loadClientes} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>MAC Address</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Última Sinc.</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClientes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          Nenhum cliente encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredClientes.map((cliente) => (
+                        <TableRow key={cliente.id}>
+                          <TableCell className="font-medium">{cliente.profiles.nome}</TableCell>
+                          <TableCell>{cliente.profiles.email}</TableCell>
+                          <TableCell className="font-mono text-sm">{cliente.mac_smart_one}</TableCell>
+                          <TableCell>{getStatusBadge(cliente.smartone_status)}</TableCell>
+                          <TableCell>
+                            {cliente.smartone_last_sync_at
+                              ? new Date(cliente.smartone_last_sync_at).toLocaleString('pt-BR')
+                              : 'Nunca'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSync(cliente)}
+                              disabled={syncing === cliente.id}
+                              variant="secondary"
+                            >
+                              {syncing === cliente.id ? (
+                                <>
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copiando...
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copiar Dados
+                                </>
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Dialog de Validação */}
         <AlertDialog open={validationDialog.open} onOpenChange={(open) => setValidationDialog({ ...validationDialog, open })}>
