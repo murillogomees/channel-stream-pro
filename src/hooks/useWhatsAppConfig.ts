@@ -20,6 +20,13 @@ export function useWhatsAppConfig() {
 
   useEffect(() => {
     loadConfig();
+    
+    // Atualizar configuração a cada 30 segundos
+    const interval = setInterval(() => {
+      loadConfig();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadConfig = async () => {
@@ -107,6 +114,8 @@ export function useWhatsAppConfig() {
 
         if (existing) {
           await supabase.from('auto_notification_config').update(autoUpdate).eq('id', existing.id);
+        } else {
+          await supabase.from('auto_notification_config').insert(autoUpdate);
         }
       }
 
@@ -122,10 +131,6 @@ export function useWhatsAppConfig() {
       console.error('Erro ao salvar configuração:', error);
       throw error;
     }
-  };
-
-  const isConfigured = () => {
-    return config.appkey.length > 0 && config.authkey.length > 0;
   };
 
   const addTestContact = (name: string, phone: string) => {
@@ -165,7 +170,6 @@ export function useWhatsAppConfig() {
     config,
     loading,
     saveConfig,
-    isConfigured,
     addTestContact,
     removeTestContact,
     updateTestContact,
