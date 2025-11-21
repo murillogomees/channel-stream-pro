@@ -53,6 +53,22 @@ serve(async (req) => {
     const responseText = await response.text();
     console.log('[smartone-list-playlists] Resposta (primeiros 500 chars):', responseText.substring(0, 500));
 
+    // Verificar se é uma página HTML (Cloudflare challenge)
+    if (response.status === 403 || responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+      console.error('[smartone-list-playlists] SmartOne bloqueou a requisição (Cloudflare)');
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'SmartOne está bloqueando requisições automáticas. Por favor, acesse o painel SmartOne manualmente para visualizar as playlists.',
+          blocked_by_cloudflare: true,
+          latency_ms: latency,
+          playlists: []
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Tentar fazer parse do JSON
     let smartoneData;
     try {
