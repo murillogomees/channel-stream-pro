@@ -3,6 +3,21 @@ export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
 export type FormaPagamento = 'Pix' | 'TED' | 'Boleto' | 'Cartão de Crédito' | 'Cartão de Débito' | 'Dinheiro';
 export type OrigemCadastro = 'Google Ads' | 'Facebook' | 'Instagram' | 'Indicação' | 'Website' | 'Outro';
 export type SmartoneStatus = 'nao_enviado' | 'pendente' | 'criado' | 'erro';
+export type DispositivoTipo = 
+  | 'smart_tv'
+  | 'roku_tv'
+  | 'fire_stick'
+  | 'android_tv'
+  | 'celular_android'
+  | 'celular_ios'
+  | 'computador'
+  | 'mac'
+  | 'tablet_android'
+  | 'tablet_ios'
+  | 'chromecast'
+  | 'apple_tv'
+  | 'xbox'
+  | 'playstation';
 
 /**
  * TIPO UNIFICADO - Fonte única da verdade
@@ -33,6 +48,7 @@ export interface ClienteDb {
   smartone_last_sync_at?: string;
   origem_cadastro?: OrigemCadastro;
   is_recorrente?: boolean;
+  dispositivo_contratado?: DispositivoTipo;
 }
 
 /**
@@ -64,6 +80,7 @@ export interface Cliente {
   smartone_last_sync_at?: string;
   origemCadastro?: OrigemCadastro;
   isRecorrente?: boolean;
+  dispositivoContratado?: DispositivoTipo;
 }
 
 /**
@@ -95,6 +112,7 @@ export function dbToCliente(db: ClienteDb): Cliente {
     smartone_last_sync_at: db.smartone_last_sync_at,
     origemCadastro: db.origem_cadastro,
     isRecorrente: db.is_recorrente,
+    dispositivoContratado: db.dispositivo_contratado,
   };
 }
 
@@ -127,5 +145,6 @@ export function clienteToDb(cliente: Partial<Cliente>): Partial<ClienteDb> {
     smartone_last_sync_at: cliente.smartone_last_sync_at,
     origem_cadastro: cliente.origemCadastro,
     is_recorrente: cliente.isRecorrente,
+    dispositivo_contratado: cliente.dispositivoContratado,
   };
 }

@@ -505,6 +505,9 @@ export type Database = {
           data_ultima_edicao: string | null
           data_ultimo_pagamento: string | null
           data_vencimento: string | null
+          dispositivo_contratado:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email: string | null
           forma_ultimo_pagamento: string | null
           id: string
@@ -531,6 +534,9 @@ export type Database = {
           data_ultima_edicao?: string | null
           data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email?: string | null
           forma_ultimo_pagamento?: string | null
           id?: string
@@ -561,6 +567,9 @@ export type Database = {
           data_ultima_edicao?: string | null
           data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email?: string | null
           forma_ultimo_pagamento?: string | null
           id?: string
@@ -2854,6 +2863,21 @@ export type Database = {
     }
     Enums: {
       app_role: "client" | "admin" | "super_admin"
+      dispositivo_tipo:
+        | "smart_tv"
+        | "roku_tv"
+        | "fire_stick"
+        | "android_tv"
+        | "celular_android"
+        | "celular_ios"
+        | "computador"
+        | "mac"
+        | "tablet_android"
+        | "tablet_ios"
+        | "chromecast"
+        | "apple_tv"
+        | "xbox"
+        | "playstation"
       origem_cadastro:
         | "Google Ads"
         | "Facebook"
@@ -2994,6 +3018,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["client", "admin", "super_admin"],
+      dispositivo_tipo: [
+        "smart_tv",
+        "roku_tv",
+        "fire_stick",
+        "android_tv",
+        "celular_android",
+        "celular_ios",
+        "computador",
+        "mac",
+        "tablet_android",
+        "tablet_ios",
+        "chromecast",
+        "apple_tv",
+        "xbox",
+        "playstation",
+      ],
       origem_cadastro: [
         "Google Ads",
         "Facebook",
