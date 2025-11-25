@@ -333,6 +333,7 @@ export type Database = {
       auto_notification_config: {
         Row: {
           created_at: string | null
+          days_to_notify: number[] | null
           enabled: boolean | null
           id: string
           send_hour: number | null
@@ -341,6 +342,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          days_to_notify?: number[] | null
           enabled?: boolean | null
           id?: string
           send_hour?: number | null
@@ -349,6 +351,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          days_to_notify?: number[] | null
           enabled?: boolean | null
           id?: string
           send_hour?: number | null

@@ -64,7 +64,7 @@ export function useWhatsAppConfig() {
         enabled: !!whatsappData?.appkey && !!whatsappData?.authkey,
         autoSendEnabled: autoData?.enabled || false,
         sendHour: autoData?.send_hour || 10,
-        daysToNotify: DEFAULT_CONFIG.daysToNotify,
+        daysToNotify: autoData?.days_to_notify || DEFAULT_CONFIG.daysToNotify,
         testPhoneNumber: autoData?.test_phone_number || '',
         testContacts: [],
         adminPhones: adminPhonesData?.map(p => p.phone) || [],
@@ -99,11 +99,17 @@ export function useWhatsAppConfig() {
       }
 
       // Save auto notification config if provided
-      if (newConfig.autoSendEnabled !== undefined || newConfig.sendHour !== undefined || newConfig.testPhoneNumber !== undefined) {
+      if (
+        newConfig.autoSendEnabled !== undefined || 
+        newConfig.sendHour !== undefined || 
+        newConfig.testPhoneNumber !== undefined ||
+        newConfig.daysToNotify !== undefined
+      ) {
         const autoUpdate: any = {
           enabled: newConfig.autoSendEnabled !== undefined ? newConfig.autoSendEnabled : config.autoSendEnabled,
           send_hour: newConfig.sendHour !== undefined ? newConfig.sendHour : config.sendHour,
           test_phone_number: newConfig.testPhoneNumber !== undefined ? newConfig.testPhoneNumber : config.testPhoneNumber,
+          days_to_notify: newConfig.daysToNotify !== undefined ? newConfig.daysToNotify : config.daysToNotify,
         };
 
         const { data: existing } = await supabase

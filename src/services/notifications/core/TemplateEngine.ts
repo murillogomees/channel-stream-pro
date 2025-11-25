@@ -8,31 +8,71 @@ import { WhatsappTemplate } from '@/types/whatsapp';
 import { DEFAULT_TEMPLATES } from '@/constants/defaultTemplates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-const STORAGE_KEY = 'whatsapp_templates';
+import { supabase } from '@/integrations/supabase/client';
 
 export class TemplateEngine {
+  private templatesCache: WhatsappTemplate[] | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
   /**
-   * Carrega templates do localStorage com fallback para padrões
+   * Carrega templates do Supabase com cache
+   */
+  async loadTemplatesAsync(): Promise<WhatsappTemplate[]> {
+    const now = Date.now();
+    
+    // Retornar cache se ainda for válido
+    if (this.templatesCache && (now - this.cacheTimestamp) < this.CACHE_DURATION) {
+      return this.templatesCache;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_templates')
+        .select('*')
+        .eq('active', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const mappedTemplates: WhatsappTemplate[] = data.map(t => ({
+          id: t.id,
+          name: t.name,
+          message: t.message,
+          variables: t.variables || [],
+          type: t.type as 'local' | 'botbot',
+          eventType: t.event_type as any,
+          daysBeforeDue: t.days_before_due,
+          botbotTemplateId: t.botbot_template_id,
+          arquivo: t.arquivo as any,
+        }));
+
+        this.templatesCache = mappedTemplates;
+        this.cacheTimestamp = now;
+        return mappedTemplates;
+      }
+    } catch (error) {
+      console.error('[TemplateEngine] Erro ao carregar templates do Supabase:', error);
+    }
+
+    // Fallback para templates padrões
+    this.templatesCache = DEFAULT_TEMPLATES;
+    this.cacheTimestamp = now;
+    return DEFAULT_TEMPLATES;
+  }
+
+  /**
+   * Carrega templates de forma síncrona (para compatibilidade)
+   * Retorna cache se disponível, senão retorna templates padrão
    */
   loadTemplates(): WhatsappTemplate[] {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsedTemplates = JSON.parse(stored);
-        
-        const validTemplates = parsedTemplates.filter((t: WhatsappTemplate) => {
-          return t.eventType && typeof t.eventType === 'string';
-        });
-        
-        if (validTemplates.length > 0) {
-          return validTemplates;
-        }
-      } catch (error) {
-        console.error('[TemplateEngine] Erro ao carregar templates:', error);
-      }
+    if (this.templatesCache) {
+      return this.templatesCache;
     }
     
+    // Se não tem cache, disparar load assíncrono mas retornar padrões
+    this.loadTemplatesAsync().catch(console.error);
     return DEFAULT_TEMPLATES;
   }
 
@@ -86,7 +126,20 @@ export class TemplateEngine {
   }
 
   /**
-   * Busca template por tipo de evento
+   * Busca template por tipo de evento (versão assíncrona)
+   */
+  async findTemplateByEventAsync(eventType: string, daysBeforeDue?: number): Promise<WhatsappTemplate | undefined> {
+    const templates = await this.loadTemplatesAsync();
+    
+    if (eventType === 'expiration' && daysBeforeDue !== undefined) {
+      return templates.find(t => t.eventType === 'expiration' && t.daysBeforeDue === daysBeforeDue);
+    }
+    
+    return templates.find(t => t.eventType === eventType);
+  }
+
+  /**
+   * Busca template por tipo de evento (versão síncrona para compatibilidade)
    */
   findTemplateByEvent(eventType: string, daysBeforeDue?: number): WhatsappTemplate | undefined {
     const templates = this.loadTemplates();
