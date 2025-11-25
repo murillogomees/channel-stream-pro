@@ -2798,7 +2798,7 @@ export type Database = {
       save_monthly_leaderboard: { Args: never; Returns: undefined }
     }
     Enums: {
-      app_role: "client" | "admin"
+      app_role: "client" | "admin" | "super_admin"
       origem_cadastro:
         | "Google Ads"
         | "Facebook"
@@ -2938,7 +2938,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["client", "admin"],
+      app_role: ["client", "admin", "super_admin"],
       origem_cadastro: [
         "Google Ads",
         "Facebook",
