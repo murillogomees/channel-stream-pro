@@ -9,9 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { smartoneService } from '@/services/smartoneService';
-import { sendClientWelcomeNotification } from '@/services/prospectNotificationService';
 import { Loader2, CheckCircle2, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
-import { PlanoCliente } from '@/types/cliente';
 
 import step1 from '@/assets/tutorial/step1-app-search.png';
 import step2 from '@/assets/tutorial/step2-app-install.png';
@@ -55,8 +53,6 @@ export default function TutorialSmartOne() {
     telefone: '',
     email: '',
     macSmartOne: '',
-    plano: 'Mensal' as PlanoCliente,
-    valorPago: 0,
     origemCadastro: 'Website' as 'Google Ads' | 'Facebook' | 'Instagram' | 'Indicação' | 'Website' | 'Outro',
   });
   const [macError, setMacError] = useState('');
@@ -204,38 +200,31 @@ export default function TutorialSmartOne() {
     setIsSubmitting(true);
 
     try {
-      // Cadastro externo SEMPRE dá 15 dias grátis para teste
+      // Cadastro via tutorial: 14 dias de teste grátis
       const hoje = new Date();
       const dataVencimento = new Date(hoje);
-      dataVencimento.setDate(hoje.getDate() + 15); // 15 dias de teste grátis
-
-      // Gerar credenciais M3U únicas para o cliente
-      const timestamp = Date.now();
-      const usuarioM3U = `user_${timestamp}`;
-      const senhaM3U = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      dataVencimento.setDate(hoje.getDate() + 14); // 14 dias de teste grátis
 
       // Criar cliente em período de teste
       const novoCliente = await addCliente({
         nome: formData.nome,
         telefone: formData.telefone,
         email: formData.email,
-        situacao: 'Testando', // Status de teste
+        situacao: 'Testando',
         dataContratacao: hoje.toISOString().split('T')[0],
         dataVencimento: dataVencimento.toISOString().split('T')[0],
-        plano: formData.plano,
-        valorPago: 0, // Teste grátis, sem pagamento inicial
-        dataUltimoPagamento: '',
+        plano: 'Mensal', // Plano padrão para teste
+        valorPago: 0, // Teste grátis
+        dataUltimoPagamento: hoje.toISOString().split('T')[0],
         formaUltimoPagamento: '',
         macSmartOne: formData.macSmartOne.toUpperCase(),
         clienteAtivo: true,
-        origemCadastro: formData.origemCadastro,
+        origemCadastro: 'Website',
       });
 
-      // Cliente cadastrado com sucesso
-      // Nota: Sincronização com SmartOne deve ser feita manualmente pelo admin
-
-      // Enviar notificações WhatsApp (cliente e admin)
-      await sendClientWelcomeNotification(novoCliente);
+      // Enviar notificação para admins
+      const { sendTutorialClientNotification } = await import('@/services/prospectNotificationService');
+      await sendTutorialClientNotification(novoCliente);
 
       // Track lead conversion
       trackLead({ 
@@ -245,14 +234,14 @@ export default function TutorialSmartOne() {
       });
 
       toast({
-        title: '✅ Cadastro realizado!',
-        description: 'Redirecionando...',
+        title: '✅ Cadastro realizado com sucesso!',
+        description: 'Um representante entrará em contato com você em breve.',
       });
 
       // Redirecionar para página de sucesso
       setTimeout(() => {
         navigate('/cadastro-sucesso');
-      }, 1500);
+      }, 2000);
 
     } catch (error) {
       console.error('Erro ao processar cadastro:', error);
@@ -426,39 +415,6 @@ export default function TutorialSmartOne() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="plano">Plano *</Label>
-                <Select
-                  value={formData.plano}
-                  onValueChange={(value) => handleInputChange('plano', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Mensal">Mensal - R$ 29,90</SelectItem>
-                    <SelectItem value="Trimestral">Trimestral - R$ 79,90</SelectItem>
-                    <SelectItem value="Semestral">Semestral - R$ 149,90</SelectItem>
-                    <SelectItem value="Anual">Anual - R$ 279,90</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="valorPago">Valor Pago (R$)</Label>
-                <Input
-                  id="valorPago"
-                  type="number"
-                  step="0.01"
-                  placeholder="29.90"
-                  value={formData.valorPago || ''}
-                  onChange={(e) => handleInputChange('valorPago', parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Deixe em branco para usar o valor padrão do plano
-                </p>
-              </div>
-
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="origemCadastro">Como nos conheceu? (opcional)</Label>
                 <Select
@@ -483,6 +439,7 @@ export default function TutorialSmartOne() {
             <div className="bg-muted p-4 rounded-lg">
               <h3 className="font-semibold mb-2">🎉 O que você vai receber:</h3>
               <ul className="space-y-1 text-sm text-foreground">
+                <li>✓ 14 dias de teste grátis</li>
                 <li>✓ Acesso imediato ao SmartOne IPTV</li>
                 <li>✓ Playlist configurada automaticamente</li>
                 <li>✓ Mensagem no WhatsApp com todos os detalhes</li>

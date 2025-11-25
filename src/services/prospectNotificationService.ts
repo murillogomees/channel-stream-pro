@@ -200,7 +200,7 @@ export async function sendClientWelcomeNotification(
   }
 }
 
-// Enviar notificação para administrador(es)
+// Enviar notificação para administrador(es) - Cadastro via Tutorial
 async function sendAdminNotification(cliente: Cliente): Promise<void> {
   const whatsappService = getWhatsAppService();
 
@@ -240,5 +240,100 @@ async function sendAdminNotification(cliente: Cliente): Promise<void> {
     }
   } catch (error) {
     console.error('Erro ao processar notificações admin:', error);
+  }
+}
+
+// ==== NOTIFICAÇÃO ESPECÍFICA PARA CADASTRO VIA TUTORIAL ====
+
+// Gerar mensagem limpa e intuitiva para admin sobre novo cadastro via tutorial
+function generateTutorialAdminMessage(cliente: Cliente): string {
+  const dataVencimento = cliente.dataVencimento
+    ? format(new Date(cliente.dataVencimento), 'dd/MM/yyyy')
+    : 'Não definida';
+
+  const dataContratacao = format(new Date(cliente.dataContratacao), 'dd/MM/yyyy HH:mm');
+
+  const mensagem = `🎓 *NOVO CADASTRO VIA TUTORIAL*
+
+━━━━━━━━━━━━━━━━━━━━
+
+👤 *DADOS DO CLIENTE*
+• Nome: ${cliente.nome}
+• WhatsApp: ${cliente.telefone}
+• E-mail: ${cliente.email || 'Não informado'}
+
+━━━━━━━━━━━━━━━━━━━━
+
+📱 *DISPOSITIVO*
+• MAC Address: ${cliente.macSmartOne}
+
+━━━━━━━━━━━━━━━━━━━━
+
+📋 *INFORMAÇÕES DO TESTE*
+• Status: 🟢 Testando (14 dias)
+• Cadastro: ${dataContratacao}
+• Vencimento: ${dataVencimento}
+• Origem: Website (Tutorial)
+
+━━━━━━━━━━━━━━━━━━━━
+
+💡 *PRÓXIMOS PASSOS*
+1. Verificar MAC no SmartOne
+2. Ativar playlist do cliente
+3. Acompanhar uso durante teste
+4. Contato comercial próximo ao fim
+
+━━━━━━━━━━━━━━━━━━━━
+
+_Cadastro automático via formulário do tutorial_`;
+
+  return mensagem;
+}
+
+// Enviar notificação específica para cadastro via tutorial
+export async function sendTutorialClientNotification(
+  cliente: Cliente
+): Promise<void> {
+  const whatsappService = getWhatsAppService();
+
+  if (!whatsappService) {
+    console.log('Serviço WhatsApp não configurado');
+    return;
+  }
+
+  // Buscar lista de telefones de administradores
+  const adminSettingsStr = localStorage.getItem('admin_notification_settings');
+  if (!adminSettingsStr) {
+    console.log('Configurações de admin não encontradas');
+    return;
+  }
+
+  try {
+    const adminSettings = JSON.parse(adminSettingsStr);
+    const activeAdmins: AdminPhone[] = (adminSettings.phones || [])
+      .filter((p: any) => p.active)
+      .map((p: any) => ({ phone: p.phone, name: p.name }));
+
+    if (activeAdmins.length === 0) {
+      console.log('Nenhum admin ativo configurado');
+      return;
+    }
+
+    const mensagem = generateTutorialAdminMessage(cliente);
+
+    // Enviar para cada administrador
+    for (const admin of activeAdmins) {
+      try {
+        await whatsappService.sendTextMessage(admin.phone, mensagem, 2);
+        console.log('✅ Notificação de tutorial enviada para:', admin.name);
+        
+        // Pequeno delay entre envios
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`❌ Erro ao enviar para admin ${admin.phone}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao processar notificações de tutorial:', error);
   }
 }
