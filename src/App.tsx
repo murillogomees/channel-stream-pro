@@ -26,6 +26,7 @@ const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
 const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
 const AdminIntegrations = lazy(() => import("./pages/AdminIntegrations"));
 const AdminUsersPermissions = lazy(() => import("./pages/AdminUsersPermissions"));
+const AdminCreateUser = lazy(() => import("./pages/AdminCreateUser"));
 
 // Standalone pages
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
@@ -73,6 +74,7 @@ const App = () => (
           <Route path="/admin/system" element={<ProtectedRoute requireAdmin><AdminSystemSettings /></ProtectedRoute>} />
           <Route path="/admin/integrations" element={<ProtectedRoute requireAdmin><AdminIntegrations /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPermissions /></ProtectedRoute>} />
+          <Route path="/admin/create-user" element={<ProtectedRoute requireSuperAdmin><AdminCreateUser /></ProtectedRoute>} />
           
           {/* Legacy routes - redirect to consolidated pages */}
           <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
