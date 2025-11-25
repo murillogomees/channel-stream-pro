@@ -69,6 +69,26 @@ export default function AdminM3ULists() {
   useEffect(() => {
     if (isAdmin) {
       loadLists();
+
+      // Subscrição em tempo real para mudanças nas atribuições
+      const channel = supabase
+        .channel('client_m3u_lists_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'client_m3u_lists'
+          },
+          () => {
+            loadLists();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [isAdmin]);
 
