@@ -11,37 +11,31 @@ import { useClientesDb } from '@/hooks/useClientesDb';
 import { smartoneService } from '@/services/smartoneService';
 import { Loader2, CheckCircle2, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 
-import step1 from '@/assets/tutorial/step1-app-search.png';
-import step2 from '@/assets/tutorial/step2-app-install.png';
-import step3 from '@/assets/tutorial/step3-app-home.png';
-import step4 from '@/assets/tutorial/step4-settings.png';
-import step5 from '@/assets/tutorial/smartone-mac-real.png';
-
 const tutorialSteps = [
   {
     title: '1. Procure o App na Loja',
     description: 'Abra a loja de aplicativos da sua Smart TV e procure por "SmartOne IPTV"',
-    image: step1,
+    image: '/tutorial/step1-app-search.png',
   },
   {
     title: '2. Instale o Aplicativo',
     description: 'Clique em "Instalar" e aguarde o download ser concluído',
-    image: step2,
+    image: '/tutorial/step2-app-install.png',
   },
   {
     title: '3. Abra o SmartOne IPTV',
     description: 'Após a instalação, abra o aplicativo',
-    image: step3,
+    image: '/tutorial/step3-app-home.png',
   },
   {
     title: '4. Acesse as Configurações',
     description: 'No menu principal, navegue até "Configurações" ou "Settings"',
-    image: step4,
+    image: '/tutorial/step4-settings.png',
   },
   {
     title: '5. Copie o Endereço MAC',
     description: 'Em "Informações do Dispositivo", copie o endereço MAC e insira no formulário abaixo',
-    image: step5,
+    image: '/tutorial/smartone-mac-real.png',
   },
 ];
 
