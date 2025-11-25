@@ -71,6 +71,23 @@ const clienteSchema = z.object({
     .or(z.literal('')),
   clienteAtivo: z.boolean().optional(),
   origemCadastro: z.enum(['Google Ads', 'Facebook', 'Instagram', 'Indicação', 'Website', 'Outro', '']).optional(),
+  dispositivoContratado: z.enum([
+    'smart_tv',
+    'roku_tv', 
+    'fire_stick',
+    'android_tv',
+    'celular_android',
+    'celular_ios',
+    'computador',
+    'mac',
+    'tablet_android',
+    'tablet_ios',
+    'chromecast',
+    'apple_tv',
+    'xbox',
+    'playstation',
+    ''
+  ]).optional(),
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
@@ -148,6 +165,7 @@ export default function AdminClienteForm() {
               smartone_raw_response: data.smartone_raw_response,
               smartone_last_sync_at: data.smartone_last_sync_at,
               origemCadastro: data.origem_cadastro,
+              dispositivoContratado: data.dispositivo_contratado,
             };
 
             setClienteOriginal(cliente);
@@ -293,6 +311,7 @@ export default function AdminClienteForm() {
       macSmartOne: sanitizeMac(data.macSmartOne || ''),
       clienteAtivo: data.clienteAtivo ?? false,
       origemCadastro: data.origemCadastro as any || null,
+      dispositivoContratado: data.dispositivoContratado as any || undefined,
       smartone_status: 'nao_enviado',
     };
 
@@ -728,6 +747,35 @@ export default function AdminClienteForm() {
                       <SelectItem value="Indicação">Indicação</SelectItem>
                       <SelectItem value="Website">Website</SelectItem>
                       <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dispositivoContratado">Dispositivo Contratado</Label>
+                  <Select
+                    onValueChange={(value) => setValue('dispositivoContratado', value === "0" ? undefined : value as any)}
+                    value={watch('dispositivoContratado') || "0"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o dispositivo" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background z-50">
+                      <SelectItem value="0" disabled>Selecione o dispositivo</SelectItem>
+                      <SelectItem value="smart_tv">Smart TV</SelectItem>
+                      <SelectItem value="roku_tv">Roku TV</SelectItem>
+                      <SelectItem value="fire_stick">Fire Stick</SelectItem>
+                      <SelectItem value="android_tv">Android TV</SelectItem>
+                      <SelectItem value="celular_android">Celular Android</SelectItem>
+                      <SelectItem value="celular_ios">Celular iOS (iPhone)</SelectItem>
+                      <SelectItem value="computador">Computador</SelectItem>
+                      <SelectItem value="mac">Mac</SelectItem>
+                      <SelectItem value="tablet_android">Tablet Android</SelectItem>
+                      <SelectItem value="tablet_ios">Tablet iOS (iPad)</SelectItem>
+                      <SelectItem value="chromecast">Chromecast</SelectItem>
+                      <SelectItem value="apple_tv">Apple TV</SelectItem>
+                      <SelectItem value="xbox">Xbox</SelectItem>
+                      <SelectItem value="playstation">PlayStation</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
