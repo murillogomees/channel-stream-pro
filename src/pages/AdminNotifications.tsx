@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import AdminNotificacoes from "./AdminNotificacoes";
 import AdminNotificationSettings from "./AdminNotificationSettings";
 import AdminAutoNotifications from "./AdminAutoNotifications";
+import AdminNotificationQueue from "./AdminNotificationQueue";
 import AdminTemplates from "./AdminTemplates";
 
 export default function AdminNotifications() {
@@ -14,10 +15,11 @@ export default function AdminNotifications() {
       />
 
       <Tabs defaultValue="main" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="main">Notificações</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
           <TabsTrigger value="auto">Automáticas</TabsTrigger>
+          <TabsTrigger value="queue">Fila</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
 
@@ -31,6 +33,10 @@ export default function AdminNotifications() {
 
         <TabsContent value="auto" className="space-y-4">
           <AdminAutoNotifications />
+        </TabsContent>
+
+        <TabsContent value="queue" className="space-y-4">
+          <AdminNotificationQueue />
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">

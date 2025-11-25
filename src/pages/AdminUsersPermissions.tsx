@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/admin/PageHeader";
 import AdminUserRoles from "./AdminUserRoles";
+import AdminCreateUser from "./AdminCreateUser";
 import AdminRoleAudit from "./AdminRoleAudit";
 import AdminPermissionTest from "./AdminPermissionTest";
 import AdminLeaderboard from "./AdminLeaderboard";
@@ -15,8 +16,9 @@ export default function AdminUsersPermissions() {
       />
 
       <Tabs defaultValue="roles" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="create">Criar Usuário</TabsTrigger>
           <TabsTrigger value="audit">Auditoria</TabsTrigger>
           <TabsTrigger value="test">Teste</TabsTrigger>
           <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
@@ -25,6 +27,10 @@ export default function AdminUsersPermissions() {
 
         <TabsContent value="roles" className="space-y-4">
           <AdminUserRoles />
+        </TabsContent>
+
+        <TabsContent value="create" className="space-y-4">
+          <AdminCreateUser />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">
