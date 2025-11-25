@@ -2620,6 +2620,51 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_templates: {
+        Row: {
+          active: boolean | null
+          arquivo: Json | null
+          botbot_template_id: string | null
+          created_at: string | null
+          days_before_due: number | null
+          event_type: string
+          id: string
+          message: string
+          name: string
+          type: string
+          updated_at: string | null
+          variables: string[] | null
+        }
+        Insert: {
+          active?: boolean | null
+          arquivo?: Json | null
+          botbot_template_id?: string | null
+          created_at?: string | null
+          days_before_due?: number | null
+          event_type: string
+          id?: string
+          message: string
+          name: string
+          type?: string
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Update: {
+          active?: boolean | null
+          arquivo?: Json | null
+          botbot_template_id?: string | null
+          created_at?: string | null
+          days_before_due?: number | null
+          event_type?: string
+          id?: string
+          message?: string
+          name?: string
+          type?: string
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       vw_expiration_summary: {
