@@ -1,8 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface CreateUserRequest {
@@ -13,8 +14,16 @@ interface CreateUserRequest {
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
@@ -27,32 +36,48 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create Supabase client with the user's token
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // Anon client using the caller's JWT (same pattern as list-users function)
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: {
+        headers: { Authorization: authHeader },
+      },
     });
 
     // Check if the user is authenticated
     const { data: { user }, error: userError } = await anonClient.auth.getUser();
-    
+
     if (userError || !user) {
+      console.error('Auth error in create-admin-user:', userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('Authenticated user in create-admin-user:', user.id);
+
     // Check if user is super_admin
-    const { data: roles, error: rolesError } = await anonClient
+    const { data: roleData, error: rolesError } = await anonClient
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('role', 'super_admin')
+      .maybeSingle();
 
-    if (rolesError || !roles || !roles.some(r => r.role === 'super_admin')) {
+    if (rolesError) {
+      console.error('Role check error in create-admin-user:', rolesError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify super_admin role' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!roleData) {
+      console.log('User is not super_admin:', user.id);
       return new Response(
         JSON.stringify({ error: 'Forbidden: Only super admins can create admin users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -70,7 +95,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create service client for admin operations
+    // Service client for privileged admin operations
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Create the user using admin API
@@ -85,7 +110,7 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      console.error('Error creating user:', createError);
+      console.error('Error creating user in create-admin-user:', createError);
       return new Response(
         JSON.stringify({ error: 'Failed to create user', details: createError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -99,8 +124,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Profile should be created automatically by trigger
-    // Assign admin role
+    // Assign admin role to the new user
     const { error: roleError } = await serviceClient
       .from('user_roles')
       .insert({
@@ -109,19 +133,19 @@ Deno.serve(async (req) => {
       });
 
     if (roleError) {
-      console.error('Error assigning admin role:', roleError);
+      console.error('Error assigning admin role in create-admin-user:', roleError);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'User created but failed to assign admin role',
           details: roleError.message,
-          userId: newUser.user.id 
+          userId: newUser.user.id,
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         user: {
           id: newUser.user.id,
@@ -131,11 +155,11 @@ Deno.serve(async (req) => {
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in create-admin-user:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
