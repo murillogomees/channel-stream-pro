@@ -1782,6 +1782,69 @@ export type Database = {
           },
         ]
       }
+      notification_schedule: {
+        Row: {
+          attempts: number | null
+          cliente_id: string
+          created_at: string | null
+          days_before_due: number | null
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          metadata: Json | null
+          notification_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          cliente_id: string
+          created_at?: string | null
+          days_before_due?: number | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          metadata?: Json | null
+          notification_type: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          cliente_id?: string
+          created_at?: string | null
+          days_before_due?: number | null
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          metadata?: Json | null
+          notification_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_schedule_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_schedule_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_templates: {
         Row: {
           active: boolean | null
