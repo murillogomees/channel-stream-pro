@@ -480,8 +480,8 @@ export default function AdminClientes() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Nome</TableHead>
-                    <TableHead className="whitespace-nowrap hidden md:table-cell">Email</TableHead>
-                    <TableHead className="whitespace-nowrap">Telefone</TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">MAC</TableHead>
+                    <TableHead className="whitespace-nowrap hidden lg:table-cell">Dispositivo</TableHead>
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Situação</TableHead>
                     <TableHead className="whitespace-nowrap hidden xl:table-cell">Plano</TableHead>
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
@@ -503,8 +503,8 @@ export default function AdminClientes() {
                     filteredClientes.map((cliente: Cliente) => (
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
-                      <TableCell className="hidden md:table-cell">{cliente.email}</TableCell>
-                      <TableCell className="whitespace-nowrap">{cliente.telefone}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.macSmartOne || 'N/A'}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{cliente.dispositivoContratado || 'N/A'}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <Badge className={situacaoColors[cliente.situacao]}>
                           {cliente.situacao}
