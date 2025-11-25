@@ -21,6 +21,7 @@ const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
 const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
 const AdminM3UImportHistory = lazy(() => import("./pages/AdminM3UImportHistory"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
+const AdminNotificationQueue = lazy(() => import("./pages/AdminNotificationQueue"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
 const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
@@ -69,6 +70,7 @@ const App = () => (
           <Route path="/admin/m3u-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
           <Route path="/admin/m3u-import-history" element={<ProtectedRoute requireAdmin><AdminM3UImportHistory /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
+          <Route path="/admin/notification-queue" element={<ProtectedRoute requireAdmin><AdminNotificationQueue /></ProtectedRoute>} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
           <Route path="/admin/system" element={<ProtectedRoute requireAdmin><AdminSystemSettings /></ProtectedRoute>} />
