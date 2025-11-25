@@ -168,6 +168,11 @@ const AdminNotificationSettings = () => {
       return;
     }
 
+    if (!newName.trim()) {
+      toast.error("Digite um nome para identificar este administrador");
+      return;
+    }
+
     const validation = validateBrazilianPhone(newAdminPhone);
     if (!validation.isValid) {
       toast.error(`Número inválido: ${validation.error}`);
@@ -175,46 +180,69 @@ const AdminNotificationSettings = () => {
     }
 
     const formatted = validation.formatted || newAdminPhone;
-    const adminPhones = config.adminPhones || [];
 
-    if (adminPhones.includes(formatted)) {
+    // Verificar se já existe
+    const phoneExists = phones.some(p => p.phone === formatted);
+    if (phoneExists) {
       toast.error("Este número já está cadastrado");
       return;
     }
 
-    saveConfig({
-      adminPhones: [...adminPhones, formatted]
-    });
+    try {
+      // Inserir no Supabase
+      const { error } = await supabase
+        .from('admin_phones')
+        .insert({
+          phone: formatted,
+          name: newName,
+          active: true
+        });
 
-    // Registrar atividade
-    await activityLogService.logActivity(
-      'config_updated',
-      `Telefone de administrador adicionado: ${formatted}`,
-      'configuracao',
-      undefined,
-      { tipo: 'admin_phone_added', telefone: formatted }
-    );
+      if (error) throw error;
 
-    setNewAdminPhone("");
-    toast.success("Telefone de administrador adicionado!");
+      // Registrar atividade
+      await activityLogService.logActivity(
+        'config_updated',
+        `Telefone de administrador adicionado: ${newName} (${formatted})`,
+        'configuracao',
+        undefined,
+        { tipo: 'admin_phone_added', telefone: formatted, nome: newName }
+      );
+
+      setNewAdminPhone("");
+      setNewName("");
+      toast.success("Telefone de administrador adicionado!");
+    } catch (error) {
+      console.error('Erro ao adicionar telefone:', error);
+      toast.error("Erro ao adicionar telefone");
+    }
   };
 
-  const handleRemoveAdminPhone = async (phone: string) => {
-    const adminPhones = config.adminPhones || [];
-    saveConfig({
-      adminPhones: adminPhones.filter(p => p !== phone)
-    });
-    
-    // Registrar atividade
-    await activityLogService.logActivity(
-      'config_updated',
-      `Telefone de administrador removido: ${phone}`,
-      'configuracao',
-      undefined,
-      { tipo: 'admin_phone_removed', telefone: phone }
-    );
-    
-    toast.success("Telefone removido!");
+  const handleRemoveAdminPhone = async (id: string) => {
+    try {
+      const phone = phones.find(p => p.id === id);
+      
+      const { error } = await supabase
+        .from('admin_phones')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Registrar atividade
+      await activityLogService.logActivity(
+        'config_updated',
+        `Telefone de administrador removido: ${phone?.name} (${phone?.phone})`,
+        'configuracao',
+        undefined,
+        { tipo: 'admin_phone_removed', telefone: phone?.phone, nome: phone?.name }
+      );
+      
+      toast.success("Telefone removido!");
+    } catch (error) {
+      console.error('Erro ao remover telefone:', error);
+      toast.error("Erro ao remover telefone");
+    }
   };
 
   const activeCount = phones.filter(p => p.active).length;
@@ -266,7 +294,17 @@ const AdminNotificationSettings = () => {
             {/* Formulário para adicionar novo telefone */}
             <div className="flex gap-2">
               <div className="flex-1">
-                <Label htmlFor="admin-phone">Telefone do Administrador</Label>
+                <Label htmlFor="admin-name">Nome do Administrador</Label>
+                <Input
+                  id="admin-name"
+                  type="text"
+                  placeholder="Ex: João Silva"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="admin-phone">Telefone</Label>
                 <Input
                   id="admin-phone"
                   type="tel"
@@ -290,29 +328,39 @@ const AdminNotificationSettings = () => {
             </div>
 
             {/* Lista de telefones cadastrados */}
-            {config.adminPhones && config.adminPhones.length > 0 ? (
+            {phones.length > 0 ? (
               <div className="border rounded-lg">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Nome</TableHead>
                       <TableHead>Telefone</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-[100px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {config.adminPhones.map((phone) => (
-                      <TableRow key={phone}>
+                    {phones.map((phone) => (
+                      <TableRow key={phone.id}>
+                        <TableCell>
+                          <span className="font-medium">{phone.name}</span>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-mono">{formatPhoneDisplay(phone)}</span>
+                            <span className="font-mono">{formatPhoneDisplay(phone.phone)}</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={phone.active ? "default" : "secondary"}>
+                            {phone.active ? "Ativo" : "Inativo"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveAdminPhone(phone)}
+                            onClick={() => handleRemoveAdminPhone(phone.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
