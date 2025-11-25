@@ -339,6 +339,157 @@ const AdminNotificationSettings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Configuração de Notificações Automáticas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Notificações Automáticas de Vencimento
+            </CardTitle>
+            <CardDescription>
+              Configure o envio automático de lembretes de vencimento para clientes via WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Ativar Envio Automático</Label>
+                <p className="text-sm text-muted-foreground">
+                  Envia automaticamente mensagens para clientes nos dias configurados antes do vencimento
+                </p>
+              </div>
+              <Switch
+                checked={config.autoSendEnabled}
+                onCheckedChange={async (checked) => {
+                  try {
+                    await saveConfig({ autoSendEnabled: checked });
+                    
+                    // Registrar atividade
+                    await activityLogService.logActivity(
+                      'notification_config_updated',
+                      `Envio automático ${checked ? 'ativado' : 'desativado'}`,
+                      'config',
+                      'auto_notifications'
+                    );
+                    
+                    toast.success(
+                      checked 
+                        ? 'Envio automático ativado com sucesso!' 
+                        : 'Envio automático desativado'
+                    );
+                  } catch (error) {
+                    toast.error('Erro ao atualizar configuração');
+                  }
+                }}
+              />
+            </div>
+
+            {config.autoSendEnabled && (
+              <>
+                <div className="space-y-2">
+                  <Label>Horário de Envio</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={config.sendHour}
+                    onChange={async (e) => {
+                      const hour = parseInt(e.target.value);
+                      if (hour >= 0 && hour <= 23) {
+                        try {
+                          await saveConfig({ sendHour: hour });
+                          await activityLogService.logActivity(
+                            'notification_config_updated',
+                            `Horário de envio alterado para ${hour}:00`,
+                            'config',
+                            'auto_notifications'
+                          );
+                          toast.success('Horário atualizado com sucesso!');
+                        } catch (error) {
+                          toast.error('Erro ao atualizar horário');
+                        }
+                      }
+                    }}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Mensagens serão enviadas diariamente às {config.sendHour}:00
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Dias Antes do Vencimento</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[0, 1, 2, 3, 5, 7, 10, 15].map((day) => (
+                      <button
+                        key={day}
+                        onClick={async () => {
+                          const currentDays = config.daysToNotify || [];
+                          const newDays = currentDays.includes(day)
+                            ? currentDays.filter(d => d !== day)
+                            : [...currentDays, day].sort((a, b) => a - b);
+                          
+                          try {
+                            await saveConfig({ daysToNotify: newDays });
+                            await activityLogService.logActivity(
+                              'notification_config_updated',
+                              `Dias de notificação atualizados: ${newDays.join(', ')}`,
+                              'config',
+                              'auto_notifications'
+                            );
+                            toast.success('Dias de notificação atualizados!');
+                          } catch (error) {
+                            toast.error('Erro ao atualizar dias');
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-md border transition-colors ${
+                          (config.daysToNotify || []).includes(day)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background hover:bg-accent'
+                        }`}
+                      >
+                        {day === 0 ? 'Hoje' : `${day} dia${day > 1 ? 's' : ''}`}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {config.daysToNotify && config.daysToNotify.length > 0 
+                      ? `Lembretes serão enviados ${config.daysToNotify.map(d => 
+                          d === 0 ? 'no dia do vencimento' : `${d} dia${d > 1 ? 's' : ''} antes`
+                        ).join(', ')}`
+                      : 'Selecione ao menos um dia para enviar lembretes'}
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="flex gap-2">
+                    <Bell className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Sistema Ativo</p>
+                      <p className="text-sm text-muted-foreground">
+                        O sistema está configurado e enviará automaticamente lembretes de vencimento 
+                        para seus clientes nos dias selecionados, sempre às {config.sendHour}:00.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Certifique-se de que os <strong>templates de WhatsApp</strong> estão configurados 
+                        corretamente na aba "Templates" para cada dia de notificação.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!config.autoSendEnabled && (
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Ative o envio automático para que o sistema envie lembretes de vencimento 
+                  para seus clientes nos dias que você configurar.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -14,9 +14,10 @@ export const useTemplates = () => {
   const loadTemplates = async () => {
     try {
       const { data, error } = await supabase
-        .from('notification_templates')
+        .from('whatsapp_templates')
         .select('*')
-        .eq('active', true);
+        .eq('active', true)
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
@@ -24,12 +25,13 @@ export const useTemplates = () => {
         const mappedTemplates: WhatsappTemplate[] = data.map(t => ({
           id: t.id,
           name: t.name,
-          message: t.content,
-          variables: t.variables ? Object.keys(t.variables as any) : [],
-          type: ((t.variables as any)?.botbotTemplateId ? 'botbot' : 'local') as 'local' | 'botbot',
-          eventType: (t.variables as any)?.eventType || 'payment_reminder',
-          daysBeforeDue: (t.variables as any)?.daysBeforeDue,
-          botbotTemplateId: (t.variables as any)?.botbotTemplateId,
+          message: t.message,
+          variables: t.variables || [],
+          type: t.type as 'local' | 'botbot',
+          eventType: t.event_type as any,
+          daysBeforeDue: t.days_before_due,
+          botbotTemplateId: t.botbot_template_id,
+          arquivo: t.arquivo as any,
         }));
         setTemplates(mappedTemplates);
       } else {
@@ -46,15 +48,16 @@ export const useTemplates = () => {
   const addTemplate = async (template: Omit<WhatsappTemplate, 'id'>) => {
     try {
       const { data, error } = await supabase
-        .from('notification_templates')
+        .from('whatsapp_templates')
         .insert({
           name: template.name,
-          content: template.message,
-          variables: {
-            eventType: template.eventType,
-            daysBeforeDue: template.daysBeforeDue,
-            botbotTemplateId: template.botbotTemplateId,
-          },
+          message: template.message,
+          variables: template.variables || [],
+          type: template.type,
+          event_type: template.eventType,
+          days_before_due: template.daysBeforeDue,
+          botbot_template_id: template.botbotTemplateId,
+          arquivo: template.arquivo,
           active: true,
         })
         .select()
@@ -65,12 +68,13 @@ export const useTemplates = () => {
       const newTemplate: WhatsappTemplate = {
         id: data.id,
         name: data.name,
-        message: data.content,
-        variables: data.variables ? Object.keys(data.variables as any) : [],
-        type: ((data.variables as any)?.botbotTemplateId ? 'botbot' : 'local') as 'local' | 'botbot',
-        eventType: (data.variables as any).eventType,
-        daysBeforeDue: (data.variables as any).daysBeforeDue,
-        botbotTemplateId: (data.variables as any).botbotTemplateId,
+        message: data.message,
+        variables: data.variables || [],
+        type: data.type as 'local' | 'botbot',
+        eventType: data.event_type as any,
+        daysBeforeDue: data.days_before_due,
+        botbotTemplateId: data.botbot_template_id,
+        arquivo: data.arquivo as any,
       };
 
       setTemplates([...templates, newTemplate]);
@@ -83,17 +87,20 @@ export const useTemplates = () => {
 
   const updateTemplate = async (id: string, data: Partial<WhatsappTemplate>) => {
     try {
+      const updateData: any = {};
+      
+      if (data.name) updateData.name = data.name;
+      if (data.message) updateData.message = data.message;
+      if (data.variables) updateData.variables = data.variables;
+      if (data.type) updateData.type = data.type;
+      if (data.eventType) updateData.event_type = data.eventType;
+      if (data.daysBeforeDue !== undefined) updateData.days_before_due = data.daysBeforeDue;
+      if (data.botbotTemplateId) updateData.botbot_template_id = data.botbotTemplateId;
+      if (data.arquivo) updateData.arquivo = data.arquivo;
+
       const { error } = await supabase
-        .from('notification_templates')
-        .update({
-          name: data.name,
-          content: data.message,
-          variables: {
-            eventType: data.eventType,
-            daysBeforeDue: data.daysBeforeDue,
-            botbotTemplateId: data.botbotTemplateId,
-          },
-        })
+        .from('whatsapp_templates')
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -111,7 +118,7 @@ export const useTemplates = () => {
   const deleteTemplate = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('notification_templates')
+        .from('whatsapp_templates')
         .delete()
         .eq('id', id);
 
@@ -132,18 +139,19 @@ export const useTemplates = () => {
   const resetToDefaults = async () => {
     try {
       // Delete all existing templates
-      await supabase.from('notification_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('whatsapp_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       
       // Insert default templates
-      const { error } = await supabase.from('notification_templates').insert(
+      const { error } = await supabase.from('whatsapp_templates').insert(
         DEFAULT_TEMPLATES.map(t => ({
           name: t.name,
-          content: t.message,
-          variables: {
-            eventType: t.eventType,
-            daysBeforeDue: t.daysBeforeDue,
-            botbotTemplateId: t.botbotTemplateId,
-          },
+          message: t.message,
+          variables: t.variables || [],
+          type: t.type,
+          event_type: t.eventType,
+          days_before_due: t.daysBeforeDue,
+          botbot_template_id: t.botbotTemplateId,
+          arquivo: t.arquivo,
           active: true,
         }))
       );
