@@ -1484,15 +1484,7 @@ export type Database = {
           new_values?: Json | null
           old_values?: Json | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "m3u_lists_audit_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       m3u_view_history: {
         Row: {
