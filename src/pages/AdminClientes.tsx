@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
@@ -77,6 +77,7 @@ export default function AdminClientes() {
   const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [showFileDialog, setShowFileDialog] = useState(false);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
   const [showSmartOneData, setShowSmartOneData] = useState(false);
   const [smartOneClientData, setSmartOneClientData] = useState<{
@@ -84,6 +85,7 @@ export default function AdminClientes() {
     macSmartOne: string;
     m3uLists: Array<{ name: string; file_url: string }>;
   } | null>(null);
+  const [clienteM3ULists, setClienteM3ULists] = useState<Record<string, string>>({});
 
   // Filtros avançados
   const [filterPlano, setFilterPlano] = useState<string>('all');
@@ -136,6 +138,39 @@ export default function AdminClientes() {
 
   const hasActiveFilters = filterPlano !== 'all' || filterOrigem !== 'all' || 
                           filterVencimento !== 'all';
+
+  // Buscar listas M3U dos clientes
+  useEffect(() => {
+    const fetchM3ULists = async () => {
+      if (clientes.length === 0) return;
+
+      try {
+        const clienteIds = clientes.map(c => c.id);
+        const { data, error } = await supabase
+          .from('client_m3u_lists')
+          .select(`
+            client_id,
+            m3u_lists (
+              name
+            )
+          `)
+          .in('client_id', clienteIds)
+          .eq('is_active', true);
+
+        if (error) throw error;
+
+        const m3uMap: Record<string, string> = {};
+        data?.forEach((assignment: any) => {
+          m3uMap[assignment.client_id] = assignment.m3u_lists?.name || 'N/A';
+        });
+        setClienteM3ULists(m3uMap);
+      } catch (error) {
+        console.error('Error fetching M3U lists:', error);
+      }
+    };
+
+    fetchM3ULists();
+  }, [clientes]);
 
   if (loading || loadingClientes) {
     return (
@@ -486,7 +521,7 @@ export default function AdminClientes() {
                     <TableHead className="whitespace-nowrap hidden xl:table-cell">Plano</TableHead>
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Vencimento</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Ativo</TableHead>
+                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Lista M3U</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -520,166 +555,38 @@ export default function AdminClientes() {
                         {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        {cliente.clienteAtivo ? (
-                          <Badge variant="default" className="bg-green-600">
-                            Usando
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-gray-500">
-                            Inativo
-                          </Badge>
-                        )}
+                        {clienteM3ULists[cliente.id] || 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={!isConfigured || !cliente.telefone}
-                            onClick={() => {
-                              setSelectedCliente(cliente);
-                              setSelectedTemplate('');
-                            }}
-                            title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar WhatsApp'}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Enviar WhatsApp para {cliente.nome}</DialogTitle>
-                            <DialogDescription>
-                              Escolha um template de mensagem
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>Template</Label>
-                              <select
-                                className="w-full p-2 border rounded-md bg-background"
-                                value={selectedTemplate}
-                                onChange={(e) => setSelectedTemplate(e.target.value)}
-                              >
-                                <option value="">Selecione um template</option>
-                                {LOCAL_TEMPLATES.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {selectedTemplate && (
-                              <div className="space-y-2">
-                                <Label>Preview da Mensagem</Label>
-                                <Textarea
-                                  value={LOCAL_TEMPLATES.find(t => t.id === selectedTemplate)?.message
-                                    .replace(/{nome}/g, cliente.nome)
-                                    .replace(/{valor}/g, cliente.valorPago.toFixed(2))
-                                    .replace(/{dataVencimento}/g, cliente.dataVencimento ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR') : '')
-                                  }
-                                  readOnly
-                                  rows={4}
-                                />
-                              </div>
-                            )}
-
-                            <Button 
-                              onClick={handleSendWhatsApp} 
-                              disabled={!selectedTemplate || sending}
-                              className="w-full"
-                            >
-                              {sending ? 'Enviando...' : 'Enviar Agora'}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={!isConfigured || !cliente.telefone}
+                        onClick={() => {
+                          setSelectedCliente(cliente);
+                          setSelectedTemplate('');
+                          setShowWhatsAppDialog(true);
+                        }}
+                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar WhatsApp'}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
                       
-                      <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={!isConfigured || !cliente.telefone}
-                            onClick={() => {
-                              setSelectedCliente(cliente);
-                              clearFile();
-                              setFileMessage('');
-                            }}
-                            title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
-                          >
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Enviar Arquivo para {cliente.nome}</DialogTitle>
-                            <DialogDescription>
-                              Selecione um arquivo para enviar via WhatsApp
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>Arquivo</Label>
-                              <Input
-                                type="file"
-                                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-                                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.docx,.xlsx,.csv,.txt,.mp3,.mp4,.ogg,.wav,.opus"
-                              />
-                              {fileError && (
-                                <p className="text-sm text-destructive">{fileError}</p>
-                              )}
-                              {file && !fileError && (
-                                <div className="mt-2 p-3 border rounded-md bg-muted/50">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <FileIcon className="h-4 w-4" />
-                                      <div>
-                                        <p className="text-sm font-medium">{getFileInfo()?.name}</p>
-                                        <p className="text-xs text-muted-foreground">{getFileInfo()?.sizeFormatted}</p>
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={clearFile}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  {preview && (
-                                    <img 
-                                      src={preview} 
-                                      alt="Preview" 
-                                      className="mt-2 max-h-40 rounded-md object-contain"
-                                    />
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Mensagem (opcional)</Label>
-                              <Textarea
-                                value={fileMessage}
-                                onChange={(e) => setFileMessage(e.target.value)}
-                                placeholder="Digite uma mensagem para acompanhar o arquivo..."
-                                rows={3}
-                              />
-                            </div>
-
-                            <Button 
-                              onClick={handleSendFile} 
-                              disabled={!file || sending || !!fileError}
-                              className="w-full"
-                            >
-                              {sending ? 'Enviando...' : 'Enviar Arquivo'}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={!isConfigured || !cliente.telefone}
+                        onClick={() => {
+                          setSelectedCliente(cliente);
+                          clearFile();
+                          setFileMessage('');
+                          setShowFileDialog(true);
+                        }}
+                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
 
                       <Button
                         variant="outline"
@@ -741,6 +648,128 @@ export default function AdminClientes() {
           clientData={smartOneClientData}
         />
       )}
+
+      {/* Dialog de WhatsApp */}
+      <Dialog open={showWhatsAppDialog} onOpenChange={setShowWhatsAppDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar WhatsApp para {selectedCliente?.nome}</DialogTitle>
+            <DialogDescription>
+              Escolha um template de mensagem
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Template</Label>
+              <select
+                className="w-full p-2 border rounded-md bg-background"
+                value={selectedTemplate}
+                onChange={(e) => setSelectedTemplate(e.target.value)}
+              >
+                <option value="">Selecione um template</option>
+                {LOCAL_TEMPLATES.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedTemplate && selectedCliente && (
+              <div className="space-y-2">
+                <Label>Preview da Mensagem</Label>
+                <Textarea
+                  value={LOCAL_TEMPLATES.find(t => t.id === selectedTemplate)?.message
+                    .replace(/{nome}/g, selectedCliente.nome)
+                    .replace(/{valor}/g, selectedCliente.valorPago?.toFixed(2) || '0.00')
+                    .replace(/{dataVencimento}/g, selectedCliente.dataVencimento ? new Date(selectedCliente.dataVencimento).toLocaleDateString('pt-BR') : '')
+                  }
+                  readOnly
+                  rows={4}
+                />
+              </div>
+            )}
+
+            <Button 
+              onClick={handleSendWhatsApp} 
+              disabled={!selectedTemplate || sending}
+              className="w-full"
+            >
+              {sending ? 'Enviando...' : 'Enviar Agora'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Arquivo */}
+      <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar Arquivo para {selectedCliente?.nome}</DialogTitle>
+            <DialogDescription>
+              Selecione um arquivo para enviar via WhatsApp
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Arquivo</Label>
+              <Input
+                type="file"
+                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.docx,.xlsx,.csv,.txt,.mp3,.mp4,.ogg,.wav,.opus"
+              />
+              {fileError && (
+                <p className="text-sm text-destructive">{fileError}</p>
+              )}
+              {file && !fileError && (
+                <div className="mt-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileIcon className="h-4 w-4" />
+                      <div>
+                        <p className="text-sm font-medium">{getFileInfo()?.name}</p>
+                        <p className="text-xs text-muted-foreground">{getFileInfo()?.sizeFormatted}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={clearFile}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {preview && (
+                    <img 
+                      src={preview} 
+                      alt="Preview" 
+                      className="mt-2 max-h-40 rounded-md object-contain"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Mensagem (opcional)</Label>
+              <Textarea
+                value={fileMessage}
+                onChange={(e) => setFileMessage(e.target.value)}
+                placeholder="Digite uma mensagem para acompanhar o arquivo..."
+                rows={3}
+              />
+            </div>
+
+            <Button 
+              onClick={handleSendFile} 
+              disabled={!file || sending || !!fileError}
+              className="w-full"
+            >
+              {sending ? 'Enviando...' : 'Enviar Arquivo'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
