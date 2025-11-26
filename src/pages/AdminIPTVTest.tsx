@@ -179,7 +179,7 @@ export default function AdminIPTVTest() {
     <div className="min-h-screen bg-background">
       {/* Header - Netflix Style */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-sm">
-        <div className="flex items-center justify-between px-4 md:px-12 py-4">
+        <div className="flex items-center justify-between px-6 md:px-16 py-4">
           <div className="flex items-center gap-6">
             <Button
               variant="ghost"
@@ -211,27 +211,27 @@ export default function AdminIPTVTest() {
           </Select>
         </div>
 
-        {/* Navigation Tabs - Netflix Style */}
-        <div className="px-4 md:px-12 pb-2">
+        {/* Navigation Tabs - Netflix Style Full Width */}
+        <div className="w-full">
           <Tabs value={contentType} onValueChange={(v) => setContentType(v as any)} className="w-full">
-            <TabsList className="bg-transparent border-b-2 border-border h-auto p-0 rounded-none gap-6">
+            <TabsList className="w-full bg-transparent border-b-2 border-border h-auto p-0 rounded-none gap-8 justify-start px-6 md:px-16">
               <TabsTrigger 
                 value="live" 
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
                 <Tv className="w-5 h-5 mr-2" />
                 TV ao Vivo
               </TabsTrigger>
               <TabsTrigger 
                 value="movies"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
                 <Film className="w-5 h-5 mr-2" />
                 Filmes
               </TabsTrigger>
               <TabsTrigger 
                 value="series"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
                 <Clapperboard className="w-5 h-5 mr-2" />
                 Séries
@@ -243,20 +243,20 @@ export default function AdminIPTVTest() {
 
       {/* Search and Filters */}
       <div className="fixed top-[136px] left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="px-4 md:px-12 py-3 flex flex-wrap items-center gap-3">
+        <div className="px-6 md:px-16 py-4 flex flex-wrap items-center gap-4">
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-background/50 border-muted-foreground/20"
             />
           </div>
 
           {availableCategories.length > 0 && (
             <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px] bg-background/50 border-muted-foreground/20">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
