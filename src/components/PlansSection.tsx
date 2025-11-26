@@ -75,7 +75,7 @@ const PlansSection = () => {
 
                 {plan.savingsPercent && (
                   <div className="absolute -top-3 right-4">
-                    <div className="bg-green-500 text-white rounded-full text-xs font-bold shadow-lg py-1.5 px-3 flex items-center gap-1">
+                    <div className="bg-success text-success-foreground rounded-full text-xs font-bold shadow-lg py-1.5 px-3 flex items-center gap-1">
                       <Zap className="h-3 w-3" />
                       -{plan.savingsPercent}%
                     </div>
