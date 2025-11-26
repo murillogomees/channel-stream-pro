@@ -41,8 +41,8 @@ const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 
 const App = () => (
-  <ThemeProvider>
-    <AuthProvider>
+  <AuthProvider>
+    <ThemeProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -136,10 +136,10 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
-      </BrowserRouter>
-    </TooltipProvider>
-    </AuthProvider>
-  </ThemeProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
+  </AuthProvider>
 );
 
 export default App;

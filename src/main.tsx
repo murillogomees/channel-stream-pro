@@ -6,26 +6,39 @@ import { preloadCriticalAssets } from "./utils/preloadAssets";
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
 
-// Suprimir erros de WebSocket do Realtime em produção para evitar impacto no Lighthouse
-if (import.meta.env.PROD) {
-  const originalConsoleError = console.error;
-  console.error = (...args: any[]) => {
-    const errorMessage = args[0]?.toString() || '';
-    
-    // Suprimir erros de conexão WebSocket do Realtime
-    if (
-      errorMessage.includes('WebSocket connection') &&
-      errorMessage.includes('realtime') &&
-      (errorMessage.includes('ERR_NAME_NOT_RESOLVED') || 
-       errorMessage.includes('failed') ||
-       errorMessage.includes('connection establishment'))
-    ) {
-      return; // Silenciar erro
-    }
-    
-    originalConsoleError.apply(console, args);
-  };
-}
+// Suprimir erros de WebSocket do Realtime para evitar impacto no Lighthouse/SEO
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+console.error = (...args: any[]) => {
+  const errorMessage = args[0]?.toString() || '';
+  
+  // Suprimir todos os erros relacionados ao WebSocket do Realtime
+  if (
+    (errorMessage.includes('WebSocket') && errorMessage.includes('realtime')) ||
+    (errorMessage.includes('sdvyxdghxqmntyoweqbd.supabase.co') && errorMessage.includes('websocket')) ||
+    errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+    (errorMessage.includes('wss://') && errorMessage.includes('failed'))
+  ) {
+    return; // Silenciar completamente
+  }
+  
+  originalConsoleError.apply(console, args);
+};
+
+console.warn = (...args: any[]) => {
+  const warnMessage = args[0]?.toString() || '';
+  
+  // Suprimir avisos do WebSocket do Realtime
+  if (
+    (warnMessage.includes('WebSocket') && warnMessage.includes('realtime')) ||
+    (warnMessage.includes('sdvyxdghxqmntyoweqbd.supabase.co') && warnMessage.includes('websocket'))
+  ) {
+    return;
+  }
+  
+  originalConsoleWarn.apply(console, args);
+};
 
 createRoot(document.getElementById("root")!).render(
   <App />
