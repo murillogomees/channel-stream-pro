@@ -65,27 +65,29 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     const isHLS = url.includes('.m3u8') || url.includes('application/x-mpegURL') || url.includes('stream-proxy');
 
     if (isHLS && Hls.isSupported()) {
-      // Get auth token for stream proxy
-      const getAuthToken = async () => {
+      // Get auth token for stream proxy (must be done before HLS setup)
+      const initHLS = async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        return session?.access_token || '';
+        const token = session?.access_token || '';
+
+        // Use HLS.js with custom loader for auth headers
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+          xhrSetup: (xhr, url) => {
+            if (token) {
+              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+          },
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
       };
 
-      // Use HLS.js with custom loader for auth headers
-      hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        xhrSetup: async (xhr, url) => {
-          const token = await getAuthToken();
-          if (token) {
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          }
-        },
-      });
-
-      hls.loadSource(url);
-      hls.attachMedia(video);
+      initHLS();
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
