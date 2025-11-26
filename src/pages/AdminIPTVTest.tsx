@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, Heart, Tv, List as ListIcon, Film, Clapperboard } from 'lucide-react';
+import { Loader2, ArrowLeft, X, Search, Tv, Film, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
-import { ChannelList } from '@/components/app/ChannelList';
-import { ChannelGrid } from '@/components/app/ChannelGrid';
-import { IPTVControls } from '@/components/app/IPTVControls';
+import { ContentCarousel } from '@/components/app/ContentCarousel';
+import { ContentCard } from '@/components/app/ContentCard';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -17,6 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function AdminIPTVTest() {
   const navigate = useNavigate();
@@ -39,11 +44,11 @@ export default function AdminIPTVTest() {
   } = useFavoriteChannels();
 
   const [contentType, setContentType] = useState<'live' | 'movies' | 'series'>('live');
-  const [view, setView] = useState<'player' | 'grid' | 'list'>('grid');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
+  const [playerChannel, setPlayerChannel] = useState<any>(null);
+  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
 
   // Categorize content by type
   const categorizedContent = useMemo(() => {
@@ -71,33 +76,20 @@ export default function AdminIPTVTest() {
     return { live, movies, series };
   }, [categories]);
 
-  // Keyboard navigation
+  // Keyboard navigation for player
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (view !== 'player') return;
+    if (!showPlayerDialog) return;
 
-      switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          previousChannel();
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          nextChannel();
-          break;
-        case 'i':
-        case 'I':
-          setShowInfo(prev => !prev);
-          break;
-        case 'Escape':
-          setShowInfo(false);
-          break;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowPlayerDialog(false);
+        setPlayerChannel(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, nextChannel, previousChannel]);
+  }, [showPlayerDialog]);
 
   // Get available categories for current content type
   const availableCategories = useMemo(() => {
@@ -107,9 +99,10 @@ export default function AdminIPTVTest() {
     return cats.map(cat => ({ id: cat.id, name: cat.display_name }));
   }, [contentType, categorizedContent]);
 
-  // Reset selected category when content type changes
+  // Reset filters when content type changes
   useEffect(() => {
     setSelectedCategory(null);
+    setSearchQuery('');
   }, [contentType]);
 
   // Filter channels based on content type
@@ -138,10 +131,8 @@ export default function AdminIPTVTest() {
     }
   }, [contentType, categorizedContent, getFilteredCategories]);
 
-  const allFilteredChannels = currentCategories.flatMap(cat => cat.channels);
-
   // Build stream URL with proxy
-  const getStreamUrl = useCallback((channel: typeof currentChannel) => {
+  const getStreamUrl = useCallback((channel: any) => {
     if (!channel || !customListId) return '';
     
     const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
@@ -149,6 +140,12 @@ export default function AdminIPTVTest() {
     
     return `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
   }, [customListId]);
+
+  // Handle play
+  const handlePlay = (channel: any) => {
+    setPlayerChannel(channel);
+    setShowPlayerDialog(true);
+  };
 
   if (playerLoading || favoritesLoading) {
     return (
@@ -179,209 +176,106 @@ export default function AdminIPTVTest() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="bg-background border-b border-border p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/admin/dashboard')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <Tv className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-bold hidden sm:block">IPTV Player - Teste Admin</h1>
+    <div className="min-h-screen bg-background">
+      {/* Header - Netflix Style */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-sm">
+        <div className="flex items-center justify-between px-4 md:px-12 py-4">
+          <div className="flex items-center gap-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/admin/dashboard')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Tv className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-bold hidden sm:block">IPTV Player</h1>
+            </div>
           </div>
 
           {/* Playlist Selector */}
-          <div className="flex items-center gap-2">
-            <ListIcon className="w-4 h-4 text-muted-foreground hidden sm:block" />
-            <Select value={customListId || undefined} onValueChange={selectList}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Selecione playlist" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableLists.map((list) => (
-                  <SelectItem key={list.id} value={list.id}>
-                    {list.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={customListId || undefined} onValueChange={selectList}>
+            <SelectTrigger className="w-[180px] md:w-[220px]">
+              <SelectValue placeholder="Playlist" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableLists.map((list) => (
+                <SelectItem key={list.id} value={list.id}>
+                  {list.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
 
-      {/* Content Type Tabs */}
-      <div className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4">
+        {/* Navigation Tabs - Netflix Style */}
+        <div className="px-4 md:px-12 pb-4">
           <Tabs value={contentType} onValueChange={(v) => setContentType(v as any)} className="w-full">
-            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+            <TabsList className="bg-transparent border-b border-border h-auto p-0 rounded-none">
               <TabsTrigger 
                 value="live" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
               >
                 <Tv className="w-4 h-4 mr-2" />
                 TV ao Vivo
-                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
-                  {categorizedContent.live.reduce((sum, cat) => sum + cat.channels.length, 0)}
-                </span>
               </TabsTrigger>
               <TabsTrigger 
                 value="movies"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
               >
                 <Film className="w-4 h-4 mr-2" />
                 Filmes
-                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
-                  {categorizedContent.movies.reduce((sum, cat) => sum + cat.channels.length, 0)}
-                </span>
               </TabsTrigger>
               <TabsTrigger 
                 value="series"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
               >
                 <Clapperboard className="w-4 h-4 mr-2" />
                 Séries
-                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
-                  {categorizedContent.series.reduce((sum, cat) => sum + cat.channels.length, 0)}
-                </span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </div>
 
-      {/* Controls and Category Filter */}
-      <div className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4">
-          <IPTVControls
-            view={view}
-            onViewChange={setView}
-            showFavoritesOnly={showFavoritesOnly}
-            onToggleFavorites={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onNextChannel={nextChannel}
-            onPreviousChannel={previousChannel}
-            onToggleInfo={() => setShowInfo(!showInfo)}
-            showInfo={showInfo}
-          />
-          
-          {/* Category Filter */}
+      {/* Search and Filters */}
+      <div className="fixed top-[136px] left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="px-4 md:px-12 py-3 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
           {availableCategories.length > 0 && (
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-sm text-muted-foreground hidden sm:inline">Categoria:</span>
-              <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Todas as categorias" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as categorias</SelectItem>
-                  {availableCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {availableCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        {view === 'player' && currentChannel && (
-          <div className="h-full flex flex-col lg:flex-row">
-            {/* Video Player */}
-            <div className="flex-1 bg-black relative">
-              <VideoPlayer
-                url={getStreamUrl(currentChannel)}
-                title={currentChannel.name}
-                logo={currentChannel.tvg_logo || undefined}
-                className="h-full"
-              />
-
-              {/* Channel Info Overlay */}
-              {showInfo && (
-                <div className="absolute bottom-20 left-4 right-4 bg-background/95 backdrop-blur-sm border border-border rounded-lg p-4 animate-in slide-in-from-bottom-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {currentChannel.tvg_logo && (
-                          <img
-                            src={currentChannel.tvg_logo}
-                            alt={currentChannel.name}
-                            className="w-12 h-12 object-contain rounded"
-                          />
-                        )}
-                        <div>
-                          <h3 className="text-lg font-bold">{currentChannel.name}</h3>
-                          {currentChannel.category_name && (
-                            <p className="text-sm text-muted-foreground">
-                              {currentChannel.category_name}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Use as setas ↑↓ para mudar de canal • Pressione 'i' para info
-                      </p>
-                      <p className="text-xs text-orange-500 mt-2">
-                        ⚠️ Modo teste para administradores
-                      </p>
-                    </div>
-
-                    <Button
-                      variant={isFavorite(currentChannel.id) ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => toggleFavorite(currentChannel.id)}
-                    >
-                      <Heart
-                        className={isFavorite(currentChannel.id) ? 'fill-current' : ''}
-                      />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Channel List Sidebar */}
-            <div className="lg:w-96 border-l border-border bg-background overflow-y-auto">
-              <ChannelList
-                channels={allFilteredChannels}
-                categories={currentCategories.map(c => c.display_name)}
-                selectedChannel={currentChannel.id}
-                selectedCategory={selectedCategory}
-                onChannelSelect={changeChannel}
-                onCategorySelect={setSelectedCategory}
-                tvMode={false}
-              />
-            </div>
-          </div>
-        )}
-
-        {view === 'grid' && (
-          <div className="h-full overflow-y-auto">
-            <ChannelGrid
-              channels={allFilteredChannels}
-              onChannelSelect={(channel) => {
-                changeChannel(channel as any);
-                setView('player');
-              }}
-              isFavorite={isFavorite}
-              onToggleFavorite={toggleFavorite}
-            />
-          </div>
-        )}
-
-        {!currentChannel && view === 'player' && (
-          <div className="h-full flex items-center justify-center">
+      {/* Main Content - Netflix Style Carousels */}
+      <div className="pt-[200px] pb-12">
+        {currentCategories.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[400px] px-4">
             <Card className="p-8 max-w-md text-center">
               {contentType === 'live' && <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
               {contentType === 'movies' && <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
@@ -392,12 +286,84 @@ export default function AdminIPTVTest() {
                 {contentType === 'series' && 'Nenhuma série disponível'}
               </h2>
               <p className="text-muted-foreground">
-                Selecione outra playlist ou adicione conteúdo à lista atual.
+                Selecione outra playlist ou adicione conteúdo.
               </p>
             </Card>
           </div>
+        ) : (
+          currentCategories.map((category) => (
+            <ContentCarousel
+              key={category.id}
+              title={category.display_name}
+              itemCount={category.channels.length}
+            >
+              {category.channels.map((channel) => (
+                <ContentCard
+                  key={channel.id}
+                  id={channel.id}
+                  name={channel.name}
+                  logo={channel.tvg_logo || undefined}
+                  category={category.display_name}
+                  isFavorite={isFavorite(channel.id)}
+                  onPlay={() => handlePlay(channel)}
+                  onToggleFavorite={() => toggleFavorite(channel.id)}
+                />
+              ))}
+            </ContentCarousel>
+          ))
         )}
       </div>
+
+      {/* Video Player Dialog */}
+      <Dialog open={showPlayerDialog} onOpenChange={setShowPlayerDialog}>
+        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] h-full p-0 bg-black border-0">
+          <DialogTitle className="sr-only">
+            {playerChannel?.name || 'Player'}
+          </DialogTitle>
+          
+          {playerChannel && (
+            <div className="relative w-full h-full">
+              <VideoPlayer
+                url={getStreamUrl(playerChannel)}
+                title={playerChannel.name}
+                logo={playerChannel.tvg_logo || undefined}
+                className="w-full h-full"
+              />
+
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 bg-background/80 hover:bg-background/95 backdrop-blur-sm rounded-full"
+                onClick={() => {
+                  setShowPlayerDialog(false);
+                  setPlayerChannel(null);
+                }}
+              >
+                <X className="w-6 h-6" />
+              </Button>
+
+              {/* Info Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-6">
+                <h2 className="text-2xl font-bold mb-2">{playerChannel.name}</h2>
+                {playerChannel.category_name && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {playerChannel.category_name}
+                  </p>
+                )}
+                <Button
+                  variant={isFavorite(playerChannel.id) ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleFavorite(playerChannel.id)}
+                  className="gap-2"
+                >
+                  {isFavorite(playerChannel.id) ? '❤️ Favorito' : '🤍 Adicionar aos favoritos'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
