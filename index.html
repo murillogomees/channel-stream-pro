@@ -44,6 +44,11 @@
     
     <!-- Preload LCP image for faster rendering -->
     <link rel="preload" as="image" href="/src/assets/logo-white-sm.webp" fetchpriority="high" type="image/webp">
+    
+    <!-- Modulepreload for critical JavaScript -->
+    <link rel="modulepreload" href="/src/main.tsx">
+    <link rel="modulepreload" href="/src/App.tsx">
+    <link rel="modulepreload" href="/src/pages/Index.tsx">
 
     <!-- Schema.org JSON-LD -->
     <script type="application/ld+json">
@@ -109,18 +114,20 @@
     }
     </script>
 
-    <!-- Meta Pixel Code -->
-    <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '706630189163732');
-    fbq('track', 'PageView');
+    <!-- Meta Pixel Code - Deferred for performance -->
+    <script defer>
+    window.addEventListener('load', function() {
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '706630189163732');
+      fbq('track', 'PageView');
+    });
     </script>
     <!-- End Meta Pixel Code -->
   <meta property="og:title" content="IPTV LINK - Mais de 10.000 canais em Full HD e 4K | Teste Grátis">
