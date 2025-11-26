@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, Heart, Tv, List as ListIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, Heart, Tv, List as ListIcon, Film, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
 import { ChannelList } from '@/components/app/ChannelList';
@@ -9,6 +9,7 @@ import { IPTVControls } from '@/components/app/IPTVControls';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -37,11 +38,38 @@ export default function AdminIPTVTest() {
     isLoading: favoritesLoading,
   } = useFavoriteChannels();
 
-  const [view, setView] = useState<'player' | 'grid' | 'list'>('player');
+  const [contentType, setContentType] = useState<'live' | 'movies' | 'series'>('live');
+  const [view, setView] = useState<'player' | 'grid' | 'list'>('grid');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+
+  // Categorize content by type
+  const categorizedContent = useMemo(() => {
+    const live: typeof categories = [];
+    const movies: typeof categories = [];
+    const series: typeof categories = [];
+
+    categories.forEach(cat => {
+      const catName = cat.display_name.toLowerCase();
+      const catId = cat.name.toLowerCase();
+      
+      // Detect content type based on category name
+      if (catName.includes('filme') || catName.includes('movie') || 
+          catId.includes('filme') || catId.includes('movie') ||
+          catName.includes('vod') && !catName.includes('série') && !catName.includes('series')) {
+        movies.push(cat);
+      } else if (catName.includes('série') || catName.includes('series') || 
+                 catName.includes('novela') || catId.includes('serie')) {
+        series.push(cat);
+      } else {
+        live.push(cat);
+      }
+    });
+
+    return { live, movies, series };
+  }, [categories]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -71,18 +99,33 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [view, nextChannel, previousChannel]);
 
-  // Filter channels
-  const filteredCategories = categories.map(cat => ({
-    ...cat,
-    channels: cat.channels.filter(ch => {
-      const matchesSearch = ch.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = !selectedCategory || cat.id === selectedCategory;
-      const matchesFavorites = !showFavoritesOnly || isFavorite(ch.id);
-      return matchesSearch && matchesCategory && matchesFavorites;
-    })
-  })).filter(cat => cat.channels.length > 0);
+  // Filter channels based on content type
+  const getFilteredCategories = useCallback((cats: typeof categories) => {
+    return cats.map(cat => ({
+      ...cat,
+      channels: cat.channels.filter(ch => {
+        const matchesSearch = ch.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = !selectedCategory || cat.id === selectedCategory;
+        const matchesFavorites = !showFavoritesOnly || isFavorite(ch.id);
+        return matchesSearch && matchesCategory && matchesFavorites;
+      })
+    })).filter(cat => cat.channels.length > 0);
+  }, [searchQuery, selectedCategory, showFavoritesOnly, isFavorite]);
 
-  const allFilteredChannels = filteredCategories.flatMap(cat => cat.channels);
+  const currentCategories = useMemo(() => {
+    switch (contentType) {
+      case 'live':
+        return getFilteredCategories(categorizedContent.live);
+      case 'movies':
+        return getFilteredCategories(categorizedContent.movies);
+      case 'series':
+        return getFilteredCategories(categorizedContent.series);
+      default:
+        return [];
+    }
+  }, [contentType, categorizedContent, getFilteredCategories]);
+
+  const allFilteredChannels = currentCategories.flatMap(cat => cat.channels);
 
   // Build stream URL with proxy
   const getStreamUrl = useCallback((channel: typeof currentChannel) => {
@@ -157,6 +200,46 @@ export default function AdminIPTVTest() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+      </div>
+
+      {/* Content Type Tabs */}
+      <div className="bg-background border-b border-border">
+        <div className="max-w-7xl mx-auto px-4">
+          <Tabs value={contentType} onValueChange={(v) => setContentType(v as any)} className="w-full">
+            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+              <TabsTrigger 
+                value="live" 
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+              >
+                <Tv className="w-4 h-4 mr-2" />
+                TV ao Vivo
+                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
+                  {categorizedContent.live.reduce((sum, cat) => sum + cat.channels.length, 0)}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="movies"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+              >
+                <Film className="w-4 h-4 mr-2" />
+                Filmes
+                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
+                  {categorizedContent.movies.reduce((sum, cat) => sum + cat.channels.length, 0)}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="series"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+              >
+                <Clapperboard className="w-4 h-4 mr-2" />
+                Séries
+                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-medium">
+                  {categorizedContent.series.reduce((sum, cat) => sum + cat.channels.length, 0)}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
@@ -235,7 +318,7 @@ export default function AdminIPTVTest() {
             <div className="lg:w-96 border-l border-border bg-background overflow-y-auto">
               <ChannelList
                 channels={allFilteredChannels}
-                categories={filteredCategories.map(c => c.display_name)}
+                categories={currentCategories.map(c => c.display_name)}
                 selectedChannel={currentChannel.id}
                 selectedCategory={selectedCategory}
                 onChannelSelect={changeChannel}
@@ -263,10 +346,16 @@ export default function AdminIPTVTest() {
         {!currentChannel && view === 'player' && (
           <div className="h-full flex items-center justify-center">
             <Card className="p-8 max-w-md text-center">
-              <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Nenhum canal disponível</h2>
+              {contentType === 'live' && <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+              {contentType === 'movies' && <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+              {contentType === 'series' && <Clapperboard className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+              <h2 className="text-2xl font-bold mb-2">
+                {contentType === 'live' && 'Nenhum canal disponível'}
+                {contentType === 'movies' && 'Nenhum filme disponível'}
+                {contentType === 'series' && 'Nenhuma série disponível'}
+              </h2>
               <p className="text-muted-foreground">
-                Selecione outra playlist ou adicione canais à lista atual.
+                Selecione outra playlist ou adicione conteúdo à lista atual.
               </p>
             </Card>
           </div>
