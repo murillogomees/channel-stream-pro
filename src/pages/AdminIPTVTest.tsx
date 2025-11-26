@@ -212,28 +212,28 @@ export default function AdminIPTVTest() {
         </div>
 
         {/* Navigation Tabs - Netflix Style */}
-        <div className="px-4 md:px-12 pb-4">
+        <div className="px-4 md:px-12 pb-2">
           <Tabs value={contentType} onValueChange={(v) => setContentType(v as any)} className="w-full">
-            <TabsList className="bg-transparent border-b border-border h-auto p-0 rounded-none">
+            <TabsList className="bg-transparent border-b-2 border-border h-auto p-0 rounded-none gap-6">
               <TabsTrigger 
                 value="live" 
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
-                <Tv className="w-4 h-4 mr-2" />
+                <Tv className="w-5 h-5 mr-2" />
                 TV ao Vivo
               </TabsTrigger>
               <TabsTrigger 
                 value="movies"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
-                <Film className="w-4 h-4 mr-2" />
+                <Film className="w-5 h-5 mr-2" />
                 Filmes
               </TabsTrigger>
               <TabsTrigger 
                 value="series"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-2 px-4 transition-all"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-2 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
               >
-                <Clapperboard className="w-4 h-4 mr-2" />
+                <Clapperboard className="w-5 h-5 mr-2" />
                 Séries
               </TabsTrigger>
             </TabsList>
