@@ -72,23 +72,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
     setSession(currentSession);
-    setLoading(false); // Libera UI imediatamente
     
     if (currentSession?.user) {
-      // Buscar dados em background sem bloquear
-      fetchUserData(currentSession.user.id).then(userData => {
-        setUser(userData);
-        
-        // Registrar login de forma assíncrona
-        if (userData) {
-          authLoggingService.logLogin(
-            currentSession.user.id,
-            userData.email || currentSession.user.email || ''
-          ).catch(console.error);
-        }
-      });
+      // Buscar dados do usuário
+      const userData = await fetchUserData(currentSession.user.id);
+      setUser(userData);
+      setLoading(false);
+      
+      // Registrar login de forma assíncrona
+      if (userData) {
+        authLoggingService.logLogin(
+          currentSession.user.id,
+          userData.email || currentSession.user.email || ''
+        ).catch(console.error);
+      }
     } else {
       setUser(null);
+      setLoading(false);
     }
   }, [fetchUserData]);
 

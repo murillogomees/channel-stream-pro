@@ -28,7 +28,7 @@ export const ProtectedRoute = ({
   const { isAuthenticated, isAdmin, isSuperAdmin, isClient, loading, user } = useAuth();
   const location = useLocation();
 
-  if (loading || (isAuthenticated && !user)) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
