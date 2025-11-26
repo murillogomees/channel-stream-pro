@@ -48,50 +48,63 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Buscar cliente associado ao usuário
+    // Buscar perfil do usuário para verificar se é admin
     const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: cliente, error: clientError } = await supabaseService
-      .from('clientes')
-      .select('id, cliente_ativo, data_vencimento')
-      .eq('user_id', user.id)
+    const { data: profile } = await supabaseService
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .single();
 
-    if (clientError || !cliente) {
-      console.error('Cliente não encontrado:', clientError);
-      return new Response('Unauthorized - No client found', { 
-        status: 401,
-        headers: corsHeaders 
-      });
-    }
+    const isAdmin = profile?.role === 'admin';
 
-    // Verificar se o cliente está ativo e não vencido
-    const today = new Date();
-    const vencimento = cliente.data_vencimento ? new Date(cliente.data_vencimento) : null;
-    
-    if (!cliente.cliente_ativo || (vencimento && vencimento < today)) {
-      return new Response('Subscription expired', { 
-        status: 403,
-        headers: corsHeaders 
-      });
-    }
+    // Se não for admin, verificar cliente e assinatura
+    if (!isAdmin) {
+      const { data: cliente, error: clientError } = await supabaseService
+        .from('clientes')
+        .select('id, cliente_ativo, data_vencimento')
+        .eq('user_id', user.id)
+        .single();
 
-    // Verificar se o cliente tem acesso a esta lista
-    const { data: assignment } = await supabaseService
-      .from('client_m3u_custom_assignments')
-      .select('id')
-      .eq('cliente_id', cliente.id)
-      .eq('custom_list_id', listId)
-      .single();
+      if (clientError || !cliente) {
+        console.error('Cliente não encontrado:', clientError);
+        return new Response('Unauthorized - No client found', { 
+          status: 401,
+          headers: corsHeaders 
+        });
+      }
 
-    if (!assignment) {
-      return new Response('Forbidden - No access to this playlist', { 
-        status: 403,
-        headers: corsHeaders 
-      });
+      // Verificar se o cliente está ativo e não vencido
+      const today = new Date();
+      const vencimento = cliente.data_vencimento ? new Date(cliente.data_vencimento) : null;
+      
+      if (!cliente.cliente_ativo || (vencimento && vencimento < today)) {
+        return new Response('Subscription expired', { 
+          status: 403,
+          headers: corsHeaders 
+        });
+      }
+
+      // Verificar se o cliente tem acesso a esta lista
+      const { data: assignment } = await supabaseService
+        .from('client_m3u_custom_assignments')
+        .select('id')
+        .eq('cliente_id', cliente.id)
+        .eq('custom_list_id', listId)
+        .single();
+
+      if (!assignment) {
+        return new Response('Forbidden - No access to this playlist', { 
+          status: 403,
+          headers: corsHeaders 
+        });
+      }
+    } else {
+      console.log(`Admin access granted for user ${user.id}`);
     }
 
     // Decodificar a URL do stream
