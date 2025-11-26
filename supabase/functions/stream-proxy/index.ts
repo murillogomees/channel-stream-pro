@@ -54,13 +54,13 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: profile } = await supabaseService
-      .from('profiles')
+    const { data: userRoles } = await supabaseService
+      .from('user_roles')
       .select('role')
-      .eq('id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    const isAdmin = profile?.role === 'admin';
+    const roles = userRoles?.map(r => r.role) || [];
+    const isAdmin = roles.includes('admin') || roles.includes('super_admin');
 
     // Se não for admin, verificar cliente e assinatura
     if (!isAdmin) {
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     const decodedStreamUrl = decodeURIComponent(streamUrl);
 
     // Fazer proxy do stream
-    console.log(`Proxying stream for client ${cliente.id}: ${decodedStreamUrl}`);
+    console.log(`Proxying stream for user ${user.id}: ${decodedStreamUrl}`);
 
     const streamResponse = await fetch(decodedStreamUrl, {
       headers: {
