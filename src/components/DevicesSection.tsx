@@ -88,7 +88,7 @@ const DevicesSection = () => {
                     }
                   }}
                   role="button"
-                  aria-label={`${platform.name} - Baixar aplicativo IPTV`}
+                  aria-label={`${platform.name}: Baixar aplicativo IPTV para ${platform.name}`}
                   tabIndex={0}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && platform.downloadUrl) {
