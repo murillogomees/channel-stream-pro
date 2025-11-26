@@ -162,7 +162,7 @@ const MoviesSection = () => {
                 className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
                 onClick={() => setSelectedTrailer({ src: movie.trailer, title: movie.title })}
                 role="button"
-                aria-label={`${movie.title} - ${movie.year} - ${movie.rating} - ${movie.duration} - ${movie.genre} - Assistir trailer`}
+                aria-label={`${movie.title}, ${movie.year}, avaliação ${movie.rating}, ${movie.duration}, ${movie.genre}. Assistir trailer`}
                 tabIndex={0}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
@@ -236,7 +236,7 @@ const MoviesSection = () => {
                 key={index}
                 className="group bg-gradient-card border-2 border-border hover:border-primary/40 transition-smooth hover:scale-[1.02] hover:shadow-elevated cursor-pointer overflow-hidden h-full flex flex-col"
                 role="button"
-                aria-label={`${series.title} - ${series.year} - ${series.rating} - ${series.genre} - ${series.seasons} - ${series.episodes} - Ver informações`}
+                aria-label={`${series.title}, ${series.year}, avaliação ${series.rating}, ${series.genre}, ${series.seasons}, ${series.episodes}. Ver informações da série`}
                 tabIndex={0}
               >
                 <div className="relative flex-shrink-0">
