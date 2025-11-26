@@ -78,8 +78,26 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       onError?.(errorMsg);
     };
 
-    // Check if stream is HLS
-    const isHLS = url.includes('.m3u8') || url.includes('application/x-mpegURL') || url.includes('stream-proxy');
+    // Check if stream is HLS (considerando URL original dentro do stream-proxy)
+    const isHLS = (() => {
+      try {
+        const parsed = new URL(url);
+        const originalUrl = parsed.searchParams.get('url');
+        if (originalUrl) {
+          const decoded = decodeURIComponent(originalUrl);
+          return (
+            decoded.includes('.m3u8') ||
+            decoded.includes('application/x-mpegURL')
+          );
+        }
+      } catch {
+        // Se não conseguir parsear, cai no fallback abaixo
+      }
+      return (
+        url.includes('.m3u8') ||
+        url.includes('application/x-mpegURL')
+      );
+    })();
     console.log('[VideoPlayer] Is HLS:', isHLS, 'HLS supported:', Hls.isSupported());
 
     if (isHLS && Hls.isSupported()) {
