@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import Hls from 'hls.js';
 
 interface VideoPlayerProps {
   url: string;
@@ -27,6 +28,8 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     setHasError(false);
     setErrorMessage('');
 
+    let hls: Hls | null = null;
+
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
     const handleError = (e: Event) => {
@@ -35,7 +38,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       
       let errorMsg = 'Erro ao carregar o canal';
       
-      // Detectar erros específicos
       if (video.error) {
         switch (video.error.code) {
           case MediaError.MEDIA_ERR_NETWORK:
@@ -58,6 +60,65 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       onError?.(errorMsg);
     };
 
+    // Check if stream is HLS
+    const isHLS = url.includes('.m3u8') || url.includes('application/x-mpegURL');
+
+    if (isHLS && Hls.isSupported()) {
+      // Use HLS.js for HLS streams
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+      });
+
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsLoading(false);
+        video.play().catch(err => {
+          console.error('Autoplay prevented:', err);
+        });
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          setHasError(true);
+          setIsLoading(false);
+          
+          let errorMsg = 'Erro ao carregar stream HLS';
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              errorMsg = 'Erro de rede ao carregar stream';
+              hls?.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              errorMsg = 'Erro de mídia ao reproduzir';
+              hls?.recoverMediaError();
+              break;
+            default:
+              errorMsg = 'Erro fatal no player';
+              break;
+          }
+          
+          setErrorMessage(errorMsg);
+          toast.error(errorMsg);
+          onError?.(errorMsg);
+        }
+      });
+    } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS support (Safari)
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(err => {
+          console.error('Autoplay prevented:', err);
+        });
+      });
+    } else {
+      // Standard video source
+      video.src = url;
+    }
+
     video.addEventListener('loadstart', handleLoadStart);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('error', handleError);
@@ -66,6 +127,10 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('error', handleError);
+      
+      if (hls) {
+        hls.destroy();
+      }
     };
   }, [url, onError]);
 

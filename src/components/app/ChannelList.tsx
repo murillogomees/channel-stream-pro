@@ -3,16 +3,24 @@ import { Tv, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import type { Channel } from '@/utils/m3uParser';
+
+interface ChannelData {
+  id: string;
+  name: string;
+  logo?: string;
+  tvg_logo?: string | null;
+  category?: string;
+  category_name?: string;
+}
 
 interface ChannelListProps {
-  channels: Channel[];
+  channels: ChannelData[];
   categories: string[];
-  selectedChannel?: Channel;
-  selectedCategory: string;
-  onChannelSelect: (channel: Channel) => void;
-  onCategorySelect: (category: string) => void;
-  isTVMode?: boolean;
+  selectedChannel?: string | ChannelData;
+  selectedCategory?: string;
+  onChannelSelect: (channel: ChannelData) => void;
+  onCategorySelect: (category: string | null) => void;
+  tvMode?: boolean;
 }
 
 export function ChannelList({
@@ -22,9 +30,11 @@ export function ChannelList({
   selectedCategory,
   onChannelSelect,
   onCategorySelect,
-  isTVMode = false,
+  tvMode = false,
 }: ChannelListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const selectedId = typeof selectedChannel === 'string' ? selectedChannel : selectedChannel?.id;
 
   const filteredChannels = channels.filter(channel =>
     channel.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -50,10 +60,10 @@ export function ChannelList({
       <ScrollArea className="border-b">
         <div className="flex gap-2 p-4">
           <Badge
-            variant={selectedCategory === 'all' ? 'default' : 'outline'}
+            variant={!selectedCategory ? 'default' : 'outline'}
             className="cursor-pointer whitespace-nowrap"
-            onClick={() => onCategorySelect('all')}
-            data-focusable={isTVMode}
+            onClick={() => onCategorySelect(null)}
+            data-focusable={tvMode}
             data-focus-id="category-all"
           >
             Todos
@@ -64,7 +74,7 @@ export function ChannelList({
               variant={selectedCategory === category ? 'default' : 'outline'}
               className="cursor-pointer whitespace-nowrap"
               onClick={() => onCategorySelect(category)}
-              data-focusable={isTVMode}
+              data-focusable={tvMode}
               data-focus-id={`category-${category}`}
             >
               {category}
@@ -83,40 +93,45 @@ export function ChannelList({
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredChannels.map((channel) => (
-                <button
-                  key={channel.id}
-                  onClick={() => onChannelSelect(channel)}
-                  data-focusable={isTVMode}
-                  data-focus-id={`channel-${channel.id}`}
-                  className={`
-                    w-full flex items-center gap-3 p-3 rounded-lg text-left
-                    transition-colors hover:bg-accent
-                    ${selectedChannel?.id === channel.id ? 'bg-accent' : ''}
-                    ${isTVMode ? 'focus:ring-2 focus:ring-primary focus:outline-none' : ''}
-                  `}
-                >
-                  {channel.logo ? (
-                    <img
-                      src={channel.logo}
-                      alt={channel.name}
-                      className="w-10 h-10 object-contain rounded bg-muted"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                      <Tv className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{channel.name}</p>
-                    {channel.category && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {channel.category}
-                      </p>
+              {filteredChannels.map((channel) => {
+                const logo = channel.logo || channel.tvg_logo;
+                const categoryName = channel.category || channel.category_name;
+                
+                return (
+                  <button
+                    key={channel.id}
+                    onClick={() => onChannelSelect(channel)}
+                    data-focusable={tvMode}
+                    data-focus-id={`channel-${channel.id}`}
+                    className={`
+                      w-full flex items-center gap-3 p-3 rounded-lg text-left
+                      transition-colors hover:bg-accent
+                      ${selectedId === channel.id ? 'bg-accent' : ''}
+                      ${tvMode ? 'focus:ring-2 focus:ring-primary focus:outline-none' : ''}
+                    `}
+                  >
+                    {logo ? (
+                      <img
+                        src={logo}
+                        alt={channel.name}
+                        className="w-10 h-10 object-contain rounded bg-muted"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                        <Tv className="w-5 h-5 text-muted-foreground" />
+                      </div>
                     )}
-                  </div>
-                </button>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{channel.name}</p>
+                      {categoryName && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {categoryName}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

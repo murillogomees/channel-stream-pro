@@ -36,6 +36,10 @@ const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 
+// IPTV App pages
+const AppPlayer = lazy(() => import("./pages/AppPlayer"));
+const AppInstall = lazy(() => import("./pages/AppInstall"));
+
 const AutoNotificationProvider = () => {
   useAutoNotifications();
   return null;
@@ -55,8 +59,13 @@ const App = () => (
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/install" element={<AppInstall />} />
           
           <Route path="/conta" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
+          <Route path="/cliente/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
+          
+          {/* IPTV App Routes */}
+          <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           
           <Route path="/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<Navigate to="/dashboard" replace />} />
