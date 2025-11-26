@@ -95,6 +95,7 @@ const App = () => (
           <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-stats" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-custom-dashboard" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u/custom" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-usage-report" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/notificacoes" element={<Navigate to="/admin/notifications" replace />} />
           <Route path="/admin/notification-settings" element={<Navigate to="/admin/notifications" replace />} />
