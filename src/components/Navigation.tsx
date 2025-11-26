@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, User, Phone, MessageCircle, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import logoWhite from "@/assets/logo-white-nav.webp";
+import { OptimizedImage } from "@/components/OptimizedImage";
+import logoWhiteNav from "@/assets/logo-white-nav.webp";
+import logoWhiteSm from "@/assets/logo-white-sm.webp";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,13 +36,15 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <img
-              src={logoWhite}
+            <OptimizedImage
+              src={logoWhiteNav}
+              srcSet={`${logoWhiteSm} 400w, ${logoWhiteNav} 600w`}
+              sizes="(max-width: 768px) 100px, (max-width: 1024px) 120px, 150px"
               alt={`${settings.header.logo.text} - Logotipo da empresa de streaming IPTV premium`}
               className="h-8 md:h-9 lg:h-10 w-auto select-none"
-              width="200"
-              height="76"
-              loading="eager"
+              width={200}
+              height={76}
+              eager
               decoding="async"
               role="img"
               aria-label={`Ir para página inicial - ${settings.header.logo.text}`}

@@ -5,10 +5,12 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   alt: string;
   fallback?: string;
   eager?: boolean;
+  srcSet?: string;
+  sizes?: string;
 }
 
 /**
- * Componente de imagem otimizado com lazy loading e placeholder
+ * Componente de imagem otimizado com lazy loading, placeholder e suporte a srcset
  */
 export function OptimizedImage({ 
   src, 
@@ -16,6 +18,8 @@ export function OptimizedImage({
   fallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3C/svg%3E',
   eager = false,
   className,
+  srcSet,
+  sizes,
   ...props 
 }: OptimizedImageProps) {
   const [imageSrc, setImageSrc] = useState(eager ? src : fallback);
@@ -55,6 +59,8 @@ export function OptimizedImage({
     <img
       ref={imgRef}
       src={imageSrc}
+      srcSet={srcSet}
+      sizes={sizes}
       alt={alt}
       loading={eager ? 'eager' : 'lazy'}
       onLoad={() => setIsLoaded(true)}
