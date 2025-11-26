@@ -48,7 +48,9 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
             errorMsg = 'Erro ao decodificar o vídeo.';
             break;
           case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            errorMsg = 'Formato de vídeo não suportado.';
+            errorMsg = url.includes('stream-proxy')
+              ? 'Este tipo de stream não é suportado diretamente no navegador no modo de teste. Tente outro canal ou teste no app SmartOne.'
+              : 'Formato de vídeo não suportado.';
             break;
           case MediaError.MEDIA_ERR_ABORTED:
             errorMsg = 'Reprodução cancelada.';
