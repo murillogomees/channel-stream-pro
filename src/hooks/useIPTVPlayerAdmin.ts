@@ -34,9 +34,13 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [customListId, setCustomListId] = useState<string | null>(selectedListId || null);
   const [availableLists, setAvailableLists] = useState<M3UList[]>([]);
+  const [hasLoadedLists, setHasLoadedLists] = useState(false);
+  const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
 
   // Load available M3U lists for admin selection - using default playlist from m3u_lists
   const loadAvailableLists = useCallback(async () => {
+    if (hasLoadedLists) return;
+    
     try {
       const { data, error } = await supabase
         .from('m3u_lists')
@@ -48,6 +52,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
 
       if (error) throw error;
       setAvailableLists(data || []);
+      setHasLoadedLists(true);
       
       // Auto-select default list if found
       if (!selectedListId && data && data.length > 0) {
@@ -60,14 +65,17 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       console.error('[IPTV Admin] Error loading lists:', error);
       toast.error('Erro ao carregar lista M3U padrão');
       setIsLoading(false);
+      setHasLoadedLists(true);
     }
-  }, [selectedListId]);
+  }, [selectedListId, hasLoadedLists]);
 
   // Load playlist from default M3U list
   const loadPlaylist = useCallback(async (listId: string) => {
+    if (isLoadingPlaylist) return;
+    
     try {
       setIsLoading(true);
-      setCustomListId(listId);
+      setIsLoadingPlaylist(true);
 
       // Get the M3U file URL
       const { data: listData, error: listError } = await supabase
@@ -163,18 +171,19 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       toast.error(error.message || 'Erro ao carregar playlist');
     } finally {
       setIsLoading(false);
+      setIsLoadingPlaylist(false);
     }
-  }, []);
+  }, [isLoadingPlaylist]);
 
   useEffect(() => {
     loadAvailableLists();
-  }, [loadAvailableLists]);
+  }, []);
 
   useEffect(() => {
-    if (customListId) {
+    if (customListId && !isLoadingPlaylist) {
       loadPlaylist(customListId);
     }
-  }, [customListId, loadPlaylist]);
+  }, [customListId]);
 
   const changeChannel = useCallback((channel: Channel) => {
     setCurrentChannel(channel);
