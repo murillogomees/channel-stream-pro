@@ -49,10 +49,14 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       // Auto-select first list if none selected
       if (!selectedListId && data && data.length > 0) {
         setCustomListId(data[0].id);
+      } else if (!data || data.length === 0) {
+        // No playlists available - stop loading
+        setIsLoading(false);
       }
     } catch (error: any) {
       console.error('Error loading lists:', error);
       toast.error('Erro ao carregar listas M3U');
+      setIsLoading(false);
     }
   }, [selectedListId]);
 
