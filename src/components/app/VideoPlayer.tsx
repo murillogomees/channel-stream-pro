@@ -25,21 +25,36 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     const video = videoRef.current;
     if (!video) return;
 
+    console.log('[VideoPlayer] Loading URL:', url);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
 
     let hls: Hls | null = null;
 
-    const handleLoadStart = () => setIsLoading(true);
-    const handleCanPlay = () => setIsLoading(false);
+    const handleLoadStart = () => {
+      console.log('[VideoPlayer] Load started');
+      setIsLoading(true);
+    };
+    
+    const handleCanPlay = () => {
+      console.log('[VideoPlayer] Can play');
+      setIsLoading(false);
+    };
+    
     const handleError = (e: Event) => {
+      console.error('[VideoPlayer] Error event:', e);
       setIsLoading(false);
       setHasError(true);
       
       let errorMsg = 'Erro ao carregar o canal';
       
       if (video.error) {
+        console.error('[VideoPlayer] MediaError:', {
+          code: video.error.code,
+          message: video.error.message
+        });
+        
         switch (video.error.code) {
           case MediaError.MEDIA_ERR_NETWORK:
             errorMsg = 'Erro de conexão. Verifique sua internet.';
@@ -65,12 +80,14 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     // Check if stream is HLS
     const isHLS = url.includes('.m3u8') || url.includes('application/x-mpegURL') || url.includes('stream-proxy');
+    console.log('[VideoPlayer] Is HLS:', isHLS, 'HLS supported:', Hls.isSupported());
 
     if (isHLS && Hls.isSupported()) {
       // Get auth token for stream proxy (must be done before HLS setup)
       const initHLS = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || '';
+        console.log('[VideoPlayer] Initializing HLS with auth token:', !!token);
 
         // Use HLS.js with custom loader for auth headers
         hls = new Hls({
@@ -88,13 +105,15 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('[VideoPlayer] HLS manifest parsed successfully');
           setIsLoading(false);
           video.play().catch(err => {
-            console.error('Autoplay prevented:', err);
+            console.error('[VideoPlayer] Autoplay prevented:', err);
           });
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('[VideoPlayer] HLS error:', data);
           if (data.fatal) {
             setHasError(true);
             setIsLoading(false);
@@ -103,10 +122,12 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 errorMsg = 'Erro de rede ao carregar stream';
+                console.log('[VideoPlayer] Attempting to recover from network error');
                 hls?.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
                 errorMsg = 'Erro de mídia ao reproduzir';
+                console.log('[VideoPlayer] Attempting to recover from media error');
                 hls?.recoverMediaError();
                 break;
               default:
@@ -124,14 +145,16 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       initHLS();
     } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (Safari)
+      console.log('[VideoPlayer] Using native HLS support');
       video.src = url;
       video.addEventListener('loadedmetadata', () => {
         video.play().catch(err => {
-          console.error('Autoplay prevented:', err);
+          console.error('[VideoPlayer] Autoplay prevented:', err);
         });
       });
     } else {
       // Standard video source
+      console.log('[VideoPlayer] Using standard video source');
       video.src = url;
     }
 
@@ -145,6 +168,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       video.removeEventListener('error', handleError);
       
       if (hls) {
+        console.log('[VideoPlayer] Destroying HLS instance');
         hls.destroy();
       }
     };

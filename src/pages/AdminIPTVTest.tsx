@@ -21,6 +21,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 export default function AdminIPTVTest() {
@@ -163,12 +164,22 @@ export default function AdminIPTVTest() {
 
   // Build stream URL with proxy
   const getStreamUrl = useCallback((channel: any) => {
-    if (!channel || !customListId) return '';
+    if (!channel || !customListId) {
+      console.error('[AdminIPTVTest] Missing channel or customListId:', { channel: !!channel, customListId });
+      return '';
+    }
     
     const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
     const encodedUrl = encodeURIComponent(channel.stream_url);
+    const finalUrl = `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
     
-    return `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
+    console.log('[AdminIPTVTest] Building stream URL:', {
+      channelName: channel.name,
+      originalUrl: channel.stream_url,
+      proxyUrl: finalUrl
+    });
+    
+    return finalUrl;
   }, [customListId]);
 
   // Handle play
@@ -350,6 +361,9 @@ export default function AdminIPTVTest() {
           <DialogTitle className="sr-only">
             {playerChannel?.name || 'Player'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Reproduzindo canal {playerChannel?.name}
+          </DialogDescription>
           
           {playerChannel && (
             <div className="relative w-full h-full">
@@ -364,7 +378,7 @@ export default function AdminIPTVTest() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute top-4 right-4 bg-background/80 hover:bg-background/95 backdrop-blur-sm rounded-full"
+                className="absolute top-4 right-4 bg-background/80 hover:bg-background/95 backdrop-blur-sm rounded-full z-20"
                 onClick={() => {
                   setShowPlayerDialog(false);
                   setPlayerChannel(null);
@@ -374,7 +388,7 @@ export default function AdminIPTVTest() {
               </Button>
 
               {/* Info Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-6">
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-6 z-10">
                 <h2 className="text-2xl font-bold mb-2">{playerChannel.name}</h2>
                 {playerChannel.category_name && (
                   <p className="text-sm text-muted-foreground mb-4">
