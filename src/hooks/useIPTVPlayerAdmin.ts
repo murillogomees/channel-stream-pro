@@ -38,7 +38,6 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   // Load available M3U lists for admin selection - using default playlist from m3u_lists
   const loadAvailableLists = useCallback(async () => {
     try {
-      console.log('[IPTV Admin] Loading default M3U lists...');
       const { data, error } = await supabase
         .from('m3u_lists')
         .select('id, name, description, file_url')
@@ -47,21 +46,13 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         .order('name')
         .limit(1);
 
-      if (error) {
-        console.error('[IPTV Admin] Error fetching lists:', error);
-        throw error;
-      }
-      
-      console.log('[IPTV Admin] Loaded lists:', data);
+      if (error) throw error;
       setAvailableLists(data || []);
       
       // Auto-select default list if found
       if (!selectedListId && data && data.length > 0) {
-        console.log('[IPTV Admin] Auto-selecting list:', data[0].id);
         setCustomListId(data[0].id);
       } else if (!data || data.length === 0) {
-        console.warn('[IPTV Admin] No default playlist found');
-        // No default playlist available - stop loading
         setIsLoading(false);
         toast.error('Nenhuma playlist padrão encontrada');
       }
@@ -93,8 +84,8 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       
       console.log('[IPTV Admin] M3U URL:', listData.file_url);
 
-      // Fetch and parse M3U file using proxy to avoid CORS issues
-      console.log('[IPTV Admin] Fetching M3U file via proxy...');
+      // Fetch and parse M3U file using proxy (returns parsed channels)
+      console.log('[IPTV Admin] Fetching and parsing M3U via proxy...');
       const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
       const proxyResponse = await fetch(proxyUrl, {
         method: 'POST',
@@ -106,76 +97,48 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       });
 
       if (!proxyResponse.ok) {
-        const error = await proxyResponse.text();
-        console.error('[IPTV Admin] Proxy error:', error);
-        throw new Error(`Erro ao buscar M3U: ${error}`);
+        const errorData = await proxyResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
+        console.error('[IPTV Admin] Proxy error:', errorData);
+        throw new Error(errorData.error || 'Erro ao buscar M3U');
       }
 
-      const m3uContent = await proxyResponse.text();
-      console.log('[IPTV Admin] M3U content length:', m3uContent.length);
+      const { channels } = await proxyResponse.json();
       
-      // Parse M3U content
-      const lines = m3uContent.split('\n');
+      // Group channels by category
       const categoriesMap = new Map<string, Category>();
-      let currentChannelInfo: any = null;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+      for (const channel of channels) {
+        const categoryName = channel.category_name || 'Sem Categoria';
         
-        if (line.startsWith('#EXTINF:')) {
-          // Parse channel info
-          const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
-          const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
-          const groupTitleMatch = line.match(/group-title="([^"]*)"/);
-          const nameMatch = line.match(/,(.+)$/);
-          
-          currentChannelInfo = {
-            tvg_logo: tvgLogoMatch ? tvgLogoMatch[1] : null,
-            tvg_id: tvgIdMatch ? tvgIdMatch[1] : null,
-            group_title: groupTitleMatch ? groupTitleMatch[1] : 'Sem Categoria',
-            name: nameMatch ? nameMatch[1] : 'Canal',
-          };
-        } else if (line && !line.startsWith('#') && currentChannelInfo) {
-          // This is the stream URL
-          const categoryName = currentChannelInfo.group_title;
-          
-          if (!categoriesMap.has(categoryName)) {
-            categoriesMap.set(categoryName, {
-              id: `cat-${categoriesMap.size}`,
-              name: categoryName,
-              display_name: categoryName,
-              icon: null,
-              channels: []
-            });
-          }
-          
-          const category = categoriesMap.get(categoryName)!;
-          category.channels.push({
-            id: `ch-${category.channels.length}`,
-            name: currentChannelInfo.name,
-            stream_url: line,
-            tvg_logo: currentChannelInfo.tvg_logo,
-            tvg_id: currentChannelInfo.tvg_id,
-            category_id: category.id,
-            category_name: categoryName,
-            order_position: category.channels.length
+        if (!categoriesMap.has(categoryName)) {
+          categoriesMap.set(categoryName, {
+            id: `cat-${categoriesMap.size}`,
+            name: categoryName,
+            display_name: categoryName,
+            icon: null,
+            channels: []
           });
-          
-          currentChannelInfo = null;
         }
+        
+        const category = categoriesMap.get(categoryName)!;
+        category.channels.push({
+          id: channel.id,
+          name: channel.name,
+          stream_url: channel.stream_url,
+          tvg_logo: channel.tvg_logo,
+          tvg_id: null,
+          category_id: category.id,
+          category_name: categoryName,
+          order_position: category.channels.length
+        });
       }
 
       const categoriesArray = Array.from(categoriesMap.values());
-      console.log('[IPTV Admin] Parsed categories:', categoriesArray.length);
-      console.log('[IPTV Admin] Total channels:', categoriesArray.reduce((sum, cat) => sum + cat.channels.length, 0));
       setCategories(categoriesArray);
 
       // Set first channel as default
       if (categoriesArray.length > 0 && categoriesArray[0].channels.length > 0) {
-        console.log('[IPTV Admin] Setting first channel:', categoriesArray[0].channels[0].name);
         setCurrentChannel(categoriesArray[0].channels[0]);
-      } else {
-        console.warn('[IPTV Admin] No channels found in M3U');
       }
 
     } catch (error: any) {

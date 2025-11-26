@@ -5,6 +5,91 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface Channel {
+  id: string;
+  name: string;
+  tvg_logo: string | null;
+  stream_url: string;
+  category_name: string;
+}
+
+// Parse M3U content in chunks to avoid memory issues
+const parseM3UStream = async (response: Response): Promise<Channel[]> => {
+  const channels: Channel[] = [];
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  
+  if (!reader) throw new Error('No stream available');
+  
+  let buffer = '';
+  let currentChannel: Partial<Channel> | null = null;
+  let channelCount = 0;
+  
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      
+      // Keep last incomplete line in buffer
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (trimmedLine.startsWith('#EXTINF:')) {
+          currentChannel = {
+            id: `channel-${channelCount++}`,
+            name: '',
+            tvg_logo: null,
+            stream_url: '',
+            category_name: 'Outros'
+          };
+          
+          // Extract channel name (after last comma)
+          const nameMatch = trimmedLine.match(/,(.+)$/);
+          if (nameMatch) {
+            currentChannel.name = nameMatch[1].trim();
+          }
+          
+          // Extract tvg-logo
+          const logoMatch = trimmedLine.match(/tvg-logo="([^"]+)"/);
+          if (logoMatch) {
+            currentChannel.tvg_logo = logoMatch[1];
+          }
+          
+          // Extract group-title (category)
+          const categoryMatch = trimmedLine.match(/group-title="([^"]+)"/);
+          if (categoryMatch) {
+            currentChannel.category_name = categoryMatch[1];
+          }
+        } else if (currentChannel && trimmedLine && !trimmedLine.startsWith('#')) {
+          currentChannel.stream_url = trimmedLine;
+          
+          if (currentChannel.name && currentChannel.stream_url) {
+            channels.push(currentChannel as Channel);
+          }
+          
+          currentChannel = null;
+        }
+      }
+    }
+    
+    // Process any remaining buffer
+    if (buffer.trim() && currentChannel && currentChannel.name) {
+      currentChannel.stream_url = buffer.trim();
+      channels.push(currentChannel as Channel);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  
+  return channels;
+};
+
 // Timeout helper
 const fetchWithTimeout = async (url: string, timeoutMs = 25000) => {
   const controller = new AbortController();
@@ -49,25 +134,15 @@ serve(async (req) => {
       throw new Error(`Falha ao buscar M3U: ${response.status} ${response.statusText}`);
     }
 
-    // Limitar tamanho máximo para evitar memory issues (60MB)
-    const MAX_SIZE = 60 * 1024 * 1024;
-    const contentLength = response.headers.get('content-length');
+    console.log(`[FetchM3U] Parseando M3U em streaming...`);
     
-    if (contentLength && parseInt(contentLength) > MAX_SIZE) {
-      throw new Error('Arquivo M3U muito grande (máximo 60MB). Para arquivos maiores, cole o conteúdo diretamente.');
-    }
-
-    const content = await response.text();
+    // Parse M3U in streaming mode to avoid memory issues
+    const channels = await parseM3UStream(response);
     
-    // Verificação adicional de tamanho
-    if (content.length > MAX_SIZE) {
-      throw new Error('Arquivo M3U muito grande (máximo 60MB). Para arquivos maiores, cole o conteúdo diretamente.');
-    }
-    
-    console.log(`[FetchM3U] Conteúdo obtido com sucesso (${content.length} bytes)`);
+    console.log(`[FetchM3U] ${channels.length} canais parseados com sucesso`);
 
     return new Response(
-      JSON.stringify({ content }),
+      JSON.stringify({ channels }),
       { 
         status: 200, 
         headers: { 
