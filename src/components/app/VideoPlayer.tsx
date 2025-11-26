@@ -64,7 +64,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
             break;
           case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
             errorMsg = url.includes('stream-proxy')
-              ? 'Este tipo de stream não é suportado diretamente no navegador no modo de teste. Tente outro canal ou teste no app SmartOne.'
+              ? 'Canal ou formato não suportado nesta lista M3U no modo de teste. Verifique se a URL do canal está correta/ativa na playlist.'
               : 'Formato de vídeo não suportado.';
             break;
           case MediaError.MEDIA_ERR_ABORTED:
