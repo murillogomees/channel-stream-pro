@@ -59,16 +59,46 @@ export default function AdminIPTVTest() {
     categories.forEach(cat => {
       const catName = cat.display_name.toLowerCase();
       const catId = cat.name.toLowerCase();
+      const combinedText = `${catName} ${catId}`;
       
-      // Detect content type based on category name
-      if (catName.includes('filme') || catName.includes('movie') || 
-          catId.includes('filme') || catId.includes('movie') ||
-          catName.includes('vod') && !catName.includes('série') && !catName.includes('series')) {
-        movies.push(cat);
-      } else if (catName.includes('série') || catName.includes('series') || 
-                 catName.includes('novela') || catId.includes('serie')) {
+      // Keywords for movies
+      const movieKeywords = [
+        'filme', 'movie', 'cinema', 'vod filme', 'filmes',
+        'movies', 'film', 'peliculas', 'pelicula'
+      ];
+      
+      // Keywords for series
+      const seriesKeywords = [
+        'série', 'series', 'seriado', 'novela', 'temporada',
+        'season', 'episódio', 'episode', 'miniserie', 'sitcom',
+        'serie', 'séries', 'drama', 'dorama'
+      ];
+      
+      // Keywords for live TV
+      const liveKeywords = [
+        'ao vivo', 'live', 'tv', 'canal', 'channel', 'hd',
+        'sd', 'fhd', '4k', 'aberto', 'fechado', 'esporte',
+        'sport', 'notícia', 'news', 'infantil', 'kids',
+        'documentário', 'documentary', 'variedade', 'variety',
+        'religioso', 'religious', 'música', 'music'
+      ];
+      
+      // Check for movies
+      const isMovie = movieKeywords.some(keyword => combinedText.includes(keyword)) &&
+                      !seriesKeywords.some(keyword => combinedText.includes(keyword));
+      
+      // Check for series
+      const isSeries = seriesKeywords.some(keyword => combinedText.includes(keyword));
+      
+      // Check for live TV
+      const isLive = liveKeywords.some(keyword => combinedText.includes(keyword)) ||
+                     (!isMovie && !isSeries); // Default to live if not identified
+      
+      if (isSeries) {
         series.push(cat);
-      } else {
+      } else if (isMovie) {
+        movies.push(cat);
+      } else if (isLive) {
         live.push(cat);
       }
     });
