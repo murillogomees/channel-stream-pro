@@ -85,42 +85,41 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         hls.loadSource(url);
         hls.attachMedia(video);
 
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setIsLoading(false);
+          video.play().catch(err => {
+            console.error('Autoplay prevented:', err);
+          });
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            setHasError(true);
+            setIsLoading(false);
+            
+            let errorMsg = 'Erro ao carregar stream HLS';
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                errorMsg = 'Erro de rede ao carregar stream';
+                hls?.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                errorMsg = 'Erro de mídia ao reproduzir';
+                hls?.recoverMediaError();
+                break;
+              default:
+                errorMsg = 'Erro fatal no player';
+                break;
+            }
+            
+            setErrorMessage(errorMsg);
+            toast.error(errorMsg);
+            onError?.(errorMsg);
+          }
+        });
       };
 
       initHLS();
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsLoading(false);
-        video.play().catch(err => {
-          console.error('Autoplay prevented:', err);
-        });
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          setHasError(true);
-          setIsLoading(false);
-          
-          let errorMsg = 'Erro ao carregar stream HLS';
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              errorMsg = 'Erro de rede ao carregar stream';
-              hls?.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              errorMsg = 'Erro de mídia ao reproduzir';
-              hls?.recoverMediaError();
-              break;
-            default:
-              errorMsg = 'Erro fatal no player';
-              break;
-          }
-          
-          setErrorMessage(errorMsg);
-          toast.error(errorMsg);
-          onError?.(errorMsg);
-        }
-      });
     } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (Safari)
       video.src = url;
