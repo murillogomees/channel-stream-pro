@@ -93,10 +93,25 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       
       console.log('[IPTV Admin] M3U URL:', listData.file_url);
 
-      // Fetch and parse M3U file
-      console.log('[IPTV Admin] Fetching M3U file...');
-      const response = await fetch(listData.file_url);
-      const m3uContent = await response.text();
+      // Fetch and parse M3U file using proxy to avoid CORS issues
+      console.log('[IPTV Admin] Fetching M3U file via proxy...');
+      const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
+      const proxyResponse = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({ url: listData.file_url }),
+      });
+
+      if (!proxyResponse.ok) {
+        const error = await proxyResponse.text();
+        console.error('[IPTV Admin] Proxy error:', error);
+        throw new Error(`Erro ao buscar M3U: ${error}`);
+      }
+
+      const m3uContent = await proxyResponse.text();
       console.log('[IPTV Admin] M3U content length:', m3uContent.length);
       
       // Parse M3U content
