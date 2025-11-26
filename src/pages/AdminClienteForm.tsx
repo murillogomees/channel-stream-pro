@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
-import { UpdateNotificationHandler } from '@/services/notifications';
+import { UpdateNotificationHandler, EventNotificationHandler } from '@/services/notifications';
 import { smartoneService } from '@/services/smartoneService';
 import { supabase } from '@/integrations/supabase/client';
 import { activityLogService } from '@/services/activityLogService';
@@ -559,10 +559,8 @@ export default function AdminClienteForm() {
               situacao: clienteCompleto.situacao
             });
 
-            // Importar dinamicamente e enviar boas-vindas diretamente
-            console.log('Importando EventNotificationHandler...');
-            const { EventNotificationHandler } = await import('@/services/notifications');
-            console.log('EventNotificationHandler importado, criando instância...');
+            // Enviar boas-vindas diretamente
+            console.log('Criando instância do EventNotificationHandler...');
             
             const eventHandler = new EventNotificationHandler();
             console.log('EventHandler criado, chamando sendWelcomeToNewClient...');
