@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
-import logoWhite from "@/assets/logo-white-sm.webp";
+import { OptimizedImage } from "@/components/OptimizedImage";
+import logoWhiteSm from "@/assets/logo-white-sm.webp";
+import logoWhiteOpt from "@/assets/logo-white-opt.webp";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
 
@@ -20,13 +22,14 @@ const HeroSection = () => {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero px-4 sm:px-6 lg:px-8">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
-        <img
+        <OptimizedImage
           src={heroBg}
           alt="Plano de fundo com imagem de streaming de televisão premium em alta qualidade, mostrando uma experiência de entretenimento moderna e imersiva"
           className="w-full h-full object-cover opacity-20"
-          width="1920"
-          height="1080"
-          loading="eager"
+          width={1920}
+          height={1080}
+          sizes="100vw"
+          eager
           decoding="async"
           aria-hidden="true"
         />
@@ -38,15 +41,16 @@ const HeroSection = () => {
         <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
           {/* Logo as Main Title */}
           <div className="flex justify-center mb-4">
-            <img
-              src={logoWhite}
+            <OptimizedImage
+              src={logoWhiteSm}
+              srcSet={`${logoWhiteSm} 600w, ${logoWhiteOpt} 800w`}
+              sizes="(max-width: 640px) 96px, (max-width: 768px) 112px, (max-width: 1024px) 128px, (max-width: 1280px) 144px, 160px"
               alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
               className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain"
               style={{ maxWidth: '90vw' }}
-              width="600"
-              height="263"
-              loading="eager"
-              fetchPriority="high"
+              width={600}
+              height={263}
+              eager
               decoding="async"
               role="img"
               aria-label="IPTV LINK - Streaming Premium"

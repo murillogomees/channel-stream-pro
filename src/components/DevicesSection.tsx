@@ -1,12 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { OptimizedImage } from "@/components/OptimizedImage";
 import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
 import androidIconWebP from "@/assets/icons/android-device-sm.webp";
+import androidIconOptWebP from "@/assets/icons/android-device-opt.webp";
 import iosIconWebP from "@/assets/icons/ios-device-sm.webp";
+import iosIconOptWebP from "@/assets/icons/ios-device-opt.webp";
 import windowsIconWebP from "@/assets/icons/windows-device-sm.webp";
+import windowsIconOptWebP from "@/assets/icons/windows-device-opt.webp";
 import macIconWebP from "@/assets/icons/mac-device-sm.webp";
+import macIconOptWebP from "@/assets/icons/mac-device-opt.webp";
 import tabletIconWebP from "@/assets/icons/tablet-device-sm.webp";
+import tabletIconOptWebP from "@/assets/icons/tablet-device-opt.webp";
 import smarttvIconWebP from "@/assets/icons/smarttv-device-sm.webp";
+import smarttvIconOptWebP from "@/assets/icons/smarttv-device-opt.webp";
 
 const DevicesSection = () => {
   const devicesConfig = {
@@ -23,13 +30,13 @@ const DevicesSection = () => {
     ]
   };
 
-  const deviceImageMapWebP: Record<string, string> = {
-    android: androidIconWebP,
-    ios: iosIconWebP,
-    windows: windowsIconWebP,
-    mac: macIconWebP,
-    tablet: tabletIconWebP,
-    smarttv: smarttvIconWebP,
+  const deviceImageMapWebP: Record<string, { src: string; srcSet: string }> = {
+    android: { src: androidIconOptWebP, srcSet: `${androidIconOptWebP} 256w, ${androidIconWebP} 160w` },
+    ios: { src: iosIconOptWebP, srcSet: `${iosIconOptWebP} 256w, ${iosIconWebP} 160w` },
+    windows: { src: windowsIconOptWebP, srcSet: `${windowsIconOptWebP} 256w, ${windowsIconWebP} 160w` },
+    mac: { src: macIconOptWebP, srcSet: `${macIconOptWebP} 256w, ${macIconWebP} 160w` },
+    tablet: { src: tabletIconOptWebP, srcSet: `${tabletIconOptWebP} 256w, ${tabletIconWebP} 160w` },
+    smarttv: { src: smarttvIconOptWebP, srcSet: `${smarttvIconOptWebP} 256w, ${smarttvIconWebP} 160w` },
   };
 
   return (
@@ -50,12 +57,13 @@ const DevicesSection = () => {
 
         {/* Devices Image */}
         <div className="mb-10 sm:mb-12 lg:mb-16 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl">
-          <img
+          <OptimizedImage
             src={devicesImageWebP}
             alt="IPTV disponível em todos os dispositivos: smartphones Android e iOS, tablets, Smart TVs, computadores Windows e Mac, mostrando compatibilidade multiplataforma total"
             className="w-full h-auto object-cover"
-            width="1440"
-            height="810"
+            width={1440}
+            height={810}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1214px"
             loading="lazy"
             decoding="async"
             role="img"
@@ -68,7 +76,7 @@ const DevicesSection = () => {
           {devicesConfig.platforms
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
-              const deviceImageWebP = deviceImageMapWebP[platform.id];
+              const deviceImage = deviceImageMapWebP[platform.id];
               
               return (
                 <Card
@@ -89,12 +97,14 @@ const DevicesSection = () => {
                   }}
                 >
                   <div className="w-20 h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
-                    <img 
-                      src={deviceImageWebP} 
+                    <OptimizedImage 
+                      src={deviceImage.src}
+                      srcSet={deviceImage.srcSet}
+                      sizes="80px"
                       alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
                       className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                      width="160"
-                      height="160"
+                      width={160}
+                      height={160}
                       loading="lazy"
                       decoding="async"
                       aria-hidden="true"
