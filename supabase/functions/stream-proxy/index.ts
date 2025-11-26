@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     const decodedStreamUrl = decodeURIComponent(streamUrl);
 
     // Fazer proxy do stream
-    console.log(`Proxying stream for client ${clientId}: ${decodedStreamUrl}`);
+    console.log(`Proxying stream for client ${cliente.id}: ${decodedStreamUrl}`);
 
     const streamResponse = await fetch(decodedStreamUrl, {
       headers: {

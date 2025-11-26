@@ -172,8 +172,6 @@ serve(async (req) => {
 
     const { email, password, nome, telefone } = await req.json();
 
-    console.log('[Auth] Starting signup request');
-
     // Validate input
     if (!email || !password) {
       return new Response(
@@ -221,7 +219,7 @@ serve(async (req) => {
     });
 
     if (authError) {
-      console.error('[Auth] Error creating user:', authError);
+      console.error('[Auth] Error creating user:', authError.message);
       return new Response(
         JSON.stringify({ error: authError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -237,7 +235,7 @@ serve(async (req) => {
     });
 
     if (sessionError) {
-      console.error('[Auth] Error creating session:', sessionError);
+      console.error('[Auth] Error creating session:', sessionError.message);
       return new Response(
         JSON.stringify({ error: sessionError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
