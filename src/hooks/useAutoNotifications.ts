@@ -19,20 +19,13 @@ export function useAutoNotifications() {
 
     if (config.autoSendEnabled) {
       scheduler.start();
-      setIsRunning(config.autoSendEnabled);
+      setIsRunning(true);
     } else {
       scheduler.stop();
       setIsRunning(false);
     }
 
-    // Atualizar estado a cada minuto
-    const interval = setInterval(() => {
-      setLastRunState(scheduler.getLastRunState());
-      setIsRunning(config.autoSendEnabled);
-    }, 60000);
-
     return () => {
-      clearInterval(interval);
       if (schedulerRef.current) {
         schedulerRef.current.stop();
       }

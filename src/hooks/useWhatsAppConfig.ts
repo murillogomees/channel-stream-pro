@@ -20,13 +20,6 @@ export function useWhatsAppConfig() {
 
   useEffect(() => {
     loadConfig();
-    
-    // Atualizar configuração a cada 30 segundos
-    const interval = setInterval(() => {
-      loadConfig();
-    }, 30000);
-    
-    return () => clearInterval(interval);
   }, []);
 
   const loadConfig = async () => {

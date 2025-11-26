@@ -68,7 +68,7 @@ export function useNotificationLogs() {
     loadStats();
     loadLogs();
 
-    // Realtime subscription
+    // Realtime subscription (remove polling, apenas realtime)
     const channel = supabase
       .channel('notification_logs_changes')
       .on(
@@ -85,15 +85,8 @@ export function useNotificationLogs() {
       )
       .subscribe();
 
-    // Refresh a cada 30 segundos
-    const interval = setInterval(() => {
-      loadStats();
-      loadLogs();
-    }, 30000);
-
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(interval);
     };
   }, []);
 
