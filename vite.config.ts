@@ -74,13 +74,38 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-tabs',
             '@radix-ui/react-toast',
             '@radix-ui/react-tooltip',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-label',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-progress',
+            '@radix-ui/react-radio-group',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-switch',
           ],
           'supabase': ['@supabase/supabase-js'],
           'charts': ['recharts'],
-          'video': ['hls.js']
+          'video': ['hls.js'],
+          'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'date': ['date-fns'],
+          'animation': ['framer-motion'],
         },
       },
     },
     chunkSizeWarningLimit: 1000,
+    // Otimizar tamanho de assets
+    assetsInlineLimit: 4096, // Inline assets < 4kb como base64
+    cssCodeSplit: true, // Separar CSS por chunk
+    minify: 'terser', // Minificação agressiva em produção
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs em produção
+        drop_debugger: true,
+      },
+    },
   },
 }));

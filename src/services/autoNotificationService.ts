@@ -43,7 +43,8 @@ export class AutoNotificationScheduler {
       this.checkAndSend();
     }, CHECK_INTERVAL);
 
-    setTimeout(() => this.checkAndSend(), 5000);
+    // Não executa imediatamente no start para evitar overhead inicial
+    // A primeira verificação acontece após CHECK_INTERVAL
   }
 
   stop() {
