@@ -99,6 +99,19 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [view, nextChannel, previousChannel]);
 
+  // Get available categories for current content type
+  const availableCategories = useMemo(() => {
+    const cats = contentType === 'live' ? categorizedContent.live :
+                 contentType === 'movies' ? categorizedContent.movies :
+                 categorizedContent.series;
+    return cats.map(cat => ({ id: cat.id, name: cat.display_name }));
+  }, [contentType, categorizedContent]);
+
+  // Reset selected category when content type changes
+  useEffect(() => {
+    setSelectedCategory(null);
+  }, [contentType]);
+
   // Filter channels based on content type
   const getFilteredCategories = useCallback((cats: typeof categories) => {
     return cats.map(cat => ({
@@ -243,19 +256,43 @@ export default function AdminIPTVTest() {
         </div>
       </div>
 
-      {/* Controls */}
-      <IPTVControls
-        view={view}
-        onViewChange={setView}
-        showFavoritesOnly={showFavoritesOnly}
-        onToggleFavorites={() => setShowFavoritesOnly(!showFavoritesOnly)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onNextChannel={nextChannel}
-        onPreviousChannel={previousChannel}
-        onToggleInfo={() => setShowInfo(!showInfo)}
-        showInfo={showInfo}
-      />
+      {/* Controls and Category Filter */}
+      <div className="bg-background border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4">
+          <IPTVControls
+            view={view}
+            onViewChange={setView}
+            showFavoritesOnly={showFavoritesOnly}
+            onToggleFavorites={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onNextChannel={nextChannel}
+            onPreviousChannel={previousChannel}
+            onToggleInfo={() => setShowInfo(!showInfo)}
+            showInfo={showInfo}
+          />
+          
+          {/* Category Filter */}
+          {availableCategories.length > 0 && (
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-sm text-muted-foreground hidden sm:inline">Categoria:</span>
+              <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Todas as categorias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {availableCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
