@@ -113,10 +113,20 @@ Deno.serve(async (req) => {
     // Fazer proxy do stream
     console.log(`Proxying stream for user ${user.id}: ${decodedStreamUrl}`);
 
+    const upstreamHeaders = new Headers();
+    // Preservar alguns headers importantes do request original
+    const clientHeadersToForward = ['User-Agent', 'Range', 'Accept', 'Accept-Encoding', 'Accept-Language', 'Origin', 'Referer'];
+    clientHeadersToForward.forEach((h) => {
+      const value = req.headers.get(h.toLowerCase()) || req.headers.get(h);
+      if (value) upstreamHeaders.set(h, value);
+    });
+    // Garante um User-Agent "de navegador" se não vier do client
+    if (!upstreamHeaders.has('User-Agent')) {
+      upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    }
+
     const streamResponse = await fetch(decodedStreamUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
+      headers: upstreamHeaders,
     });
 
     if (!streamResponse.ok) {
