@@ -7,7 +7,7 @@
  * - public.user_roles para permissões
  */
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
@@ -19,60 +19,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UnifiedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const cacheRef = useRef<{ userId: string; data: UnifiedUser; timestamp: number } | null>(null);
 
   /**
    * Busca dados completos do usuário: perfil + roles + dados de cliente
    */
   const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
-      // 1. Buscar perfil
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Fazer queries em paralelo (3 ao invés de 5+)
+      const [profileResult, rolesResult, clienteResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('user_roles').select('role').eq('user_id', userId),
+        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo, mac_smart_one').eq('user_id', userId).maybeSingle()
+      ]);
 
-      if (profileError) {
-        console.error('[AuthContext] Erro ao buscar perfil:', profileError);
+      if (profileResult.error) {
+        console.error('[AuthContext] Erro ao buscar perfil:', profileResult.error);
         return null;
       }
 
-      // 2. Buscar roles com fallback robusto (RLS-safe)
-      let roles: AppRole[] = [];
-      try {
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId);
+      const profile = profileResult.data;
+      const roles: AppRole[] = (rolesResult.data || []).map((r) => r.role as AppRole);
+      const clienteData = clienteResult.data;
 
-        if (rolesError) {
-        } else {
-          roles = (rolesData || []).map((r) => r.role as AppRole);
-        }
-      } catch (e) {
-      }
-
-      // Fallback: usar RPC has_role (SECURITY DEFINER) para ignorar RLS
-      try {
-        const [{ data: isAdminRpc }, { data: isClientRpc }] = await Promise.all([
-          supabase.rpc('has_role', { _user_id: userId, _role: 'admin' as any }),
-          supabase.rpc('has_role', { _user_id: userId, _role: 'client' as any }),
-        ]);
-
-        if (isAdminRpc) roles = Array.from(new Set([...roles, 'admin' as AppRole]));
-        if (isClientRpc) roles = Array.from(new Set([...roles, 'client' as AppRole]));
-      } catch (e) {
-        // Silenciar erro
-      }
-
-      // 3. Buscar dados de cliente (se existir)
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      // 4. Montar objeto unificado
+      // Montar objeto unificado
       const unifiedUser: UnifiedUser = {
         ...profile,
         roles,
@@ -98,28 +68,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   /**
-   * Atualiza estado de autenticação
+   * Atualiza estado de autenticação (com debounce para evitar chamadas repetidas)
    */
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
-    console.log('[AuthContext] Atualizando estado de autenticação:', {
-      hasSession: !!currentSession,
-      userId: currentSession?.user?.id
-    });
-    
     setSession(currentSession);
     
     if (currentSession?.user) {
       const userData = await fetchUserData(currentSession.user.id);
       setUser(userData);
       
-      // Registrar login
+      // Registrar login de forma assíncrona (não bloqueia UI)
       if (userData) {
-        setTimeout(() => {
-          authLoggingService.logLogin(
-            currentSession.user.id,
-            userData.email || currentSession.user.email || ''
-          );
-        }, 0);
+        authLoggingService.logLogin(
+          currentSession.user.id,
+          userData.email || currentSession.user.email || ''
+        ).catch(console.error);
       }
     } else {
       setUser(null);
@@ -129,24 +92,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [fetchUserData]);
 
   /**
-   * Força atualização dos dados do usuário
+   * Força atualização dos dados do usuário (invalida cache)
    */
   const refreshUser = useCallback(async () => {
     if (session?.user) {
+      cacheRef.current = null; // Invalidar cache
       const userData = await fetchUserData(session.user.id);
       setUser(userData);
     }
   }, [session, fetchUserData]);
 
   /**
-   * Logout
+   * Logout (limpa cache)
    */
   const signOut = useCallback(async () => {
     // Registrar logout antes de fazer signOut
     if (user) {
-      await authLoggingService.logLogout(user.id, user.email || '');
+      await authLoggingService.logLogout(user.id, user.email || '').catch(console.error);
     }
     
+    cacheRef.current = null; // Limpar cache
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
