@@ -116,7 +116,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    const { url, limit = 5000, offset = 0 } = await req.json();
     
     if (!url) {
       return new Response(
@@ -125,7 +125,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[FetchM3U] Fazendo fetch da URL: ${url}`);
+    console.log(`[FetchM3U] Fazendo fetch da URL: ${url} (limit: ${limit}, offset: ${offset})`);
     
     // Fetch com timeout de 25 segundos
     const response = await fetchWithTimeout(url);
@@ -137,12 +137,24 @@ serve(async (req) => {
     console.log(`[FetchM3U] Parseando M3U em streaming...`);
     
     // Parse M3U in streaming mode to avoid memory issues
-    const channels = await parseM3UStream(response);
+    const allChannels = await parseM3UStream(response);
     
-    console.log(`[FetchM3U] ${channels.length} canais parseados com sucesso`);
+    console.log(`[FetchM3U] ${allChannels.length} canais parseados no total`);
+
+    // Aplicar paginação para evitar exceder limite de memória
+    const paginatedChannels = allChannels.slice(offset, offset + limit);
+    const hasMore = (offset + limit) < allChannels.length;
+
+    console.log(`[FetchM3U] Retornando ${paginatedChannels.length} canais (${offset} a ${offset + paginatedChannels.length})`);
 
     return new Response(
-      JSON.stringify({ channels }),
+      JSON.stringify({ 
+        channels: paginatedChannels,
+        total: allChannels.length,
+        offset,
+        limit,
+        hasMore
+      }),
       { 
         status: 200, 
         headers: { 
