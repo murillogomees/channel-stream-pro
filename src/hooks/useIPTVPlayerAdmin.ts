@@ -38,6 +38,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   // Load available M3U lists for admin selection - using default playlist from m3u_lists
   const loadAvailableLists = useCallback(async () => {
     try {
+      console.log('[IPTV Admin] Loading default M3U lists...');
       const { data, error } = await supabase
         .from('m3u_lists')
         .select('id, name, description, file_url')
@@ -46,19 +47,26 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         .order('name')
         .limit(1);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[IPTV Admin] Error fetching lists:', error);
+        throw error;
+      }
+      
+      console.log('[IPTV Admin] Loaded lists:', data);
       setAvailableLists(data || []);
       
       // Auto-select default list if found
       if (!selectedListId && data && data.length > 0) {
+        console.log('[IPTV Admin] Auto-selecting list:', data[0].id);
         setCustomListId(data[0].id);
       } else if (!data || data.length === 0) {
+        console.warn('[IPTV Admin] No default playlist found');
         // No default playlist available - stop loading
         setIsLoading(false);
         toast.error('Nenhuma playlist padrão encontrada');
       }
     } catch (error: any) {
-      console.error('Error loading lists:', error);
+      console.error('[IPTV Admin] Error loading lists:', error);
       toast.error('Erro ao carregar lista M3U padrão');
       setIsLoading(false);
     }
@@ -67,6 +75,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   // Load playlist from default M3U list
   const loadPlaylist = useCallback(async (listId: string) => {
     try {
+      console.log('[IPTV Admin] Loading playlist for list:', listId);
       setIsLoading(true);
       setCustomListId(listId);
 
@@ -77,11 +86,18 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         .eq('id', listId)
         .single();
 
-      if (listError) throw listError;
+      if (listError) {
+        console.error('[IPTV Admin] Error fetching list data:', listError);
+        throw listError;
+      }
+      
+      console.log('[IPTV Admin] M3U URL:', listData.file_url);
 
       // Fetch and parse M3U file
+      console.log('[IPTV Admin] Fetching M3U file...');
       const response = await fetch(listData.file_url);
       const m3uContent = await response.text();
+      console.log('[IPTV Admin] M3U content length:', m3uContent.length);
       
       // Parse M3U content
       const lines = m3uContent.split('\n');
@@ -135,15 +151,20 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       }
 
       const categoriesArray = Array.from(categoriesMap.values());
+      console.log('[IPTV Admin] Parsed categories:', categoriesArray.length);
+      console.log('[IPTV Admin] Total channels:', categoriesArray.reduce((sum, cat) => sum + cat.channels.length, 0));
       setCategories(categoriesArray);
 
       // Set first channel as default
       if (categoriesArray.length > 0 && categoriesArray[0].channels.length > 0) {
+        console.log('[IPTV Admin] Setting first channel:', categoriesArray[0].channels[0].name);
         setCurrentChannel(categoriesArray[0].channels[0]);
+      } else {
+        console.warn('[IPTV Admin] No channels found in M3U');
       }
 
     } catch (error: any) {
-      console.error('Error loading playlist:', error);
+      console.error('[IPTV Admin] Error loading playlist:', error);
       toast.error('Erro ao carregar playlist padrão');
     } finally {
       setIsLoading(false);
