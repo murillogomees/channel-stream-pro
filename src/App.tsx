@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -41,16 +42,17 @@ const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 
 const App = () => (
   <ThemeProvider>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-      <Suspense fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      }>
-        <Routes>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+        <Suspense fallback={
+          <div className="min-h-screen bg-background flex items-center justify-center">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        }>
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
@@ -132,10 +134,11 @@ const App = () => (
           <Route path="/403" element={<Forbidden />} />
           
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
-  </TooltipProvider>
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </TooltipProvider>
+    </AuthProvider>
   </ThemeProvider>
 );
 

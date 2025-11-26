@@ -68,27 +68,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   /**
-   * Atualiza estado de autenticação (com debounce para evitar chamadas repetidas)
+   * Atualiza estado de autenticação (otimizado para não bloquear)
    */
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
     setSession(currentSession);
+    setLoading(false); // Libera UI imediatamente
     
     if (currentSession?.user) {
-      const userData = await fetchUserData(currentSession.user.id);
-      setUser(userData);
-      
-      // Registrar login de forma assíncrona (não bloqueia UI)
-      if (userData) {
-        authLoggingService.logLogin(
-          currentSession.user.id,
-          userData.email || currentSession.user.email || ''
-        ).catch(console.error);
-      }
+      // Buscar dados em background sem bloquear
+      fetchUserData(currentSession.user.id).then(userData => {
+        setUser(userData);
+        
+        // Registrar login de forma assíncrona
+        if (userData) {
+          authLoggingService.logLogin(
+            currentSession.user.id,
+            userData.email || currentSession.user.email || ''
+          ).catch(console.error);
+        }
+      });
     } else {
       setUser(null);
     }
-    
-    setLoading(false);
   }, [fetchUserData]);
 
   /**
