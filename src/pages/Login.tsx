@@ -120,14 +120,6 @@ export default function Login() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
