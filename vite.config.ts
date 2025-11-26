@@ -88,34 +88,44 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slider',
-            '@radix-ui/react-switch',
-          ],
-          'supabase': ['@supabase/supabase-js'],
-          'charts': ['recharts'],
-          'video': ['hls.js'],
-          'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          'date': ['date-fns'],
-          'animation': ['framer-motion'],
+        manualChunks(id) {
+          // Separar bibliotecas principais em chunks dedicados
+          if (id.includes('node_modules')) {
+            // React ecosystem
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            // Radix UI components
+            if (id.includes('@radix-ui')) {
+              return 'ui-vendor';
+            }
+            // Supabase
+            if (id.includes('@supabase')) {
+              return 'supabase';
+            }
+            // Recharts - Carregado apenas quando necessário (páginas admin)
+            if (id.includes('recharts')) {
+              return 'charts';
+            }
+            // HLS.js para vídeo
+            if (id.includes('hls.js')) {
+              return 'video';
+            }
+            // Formulários
+            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+              return 'forms';
+            }
+            // Datas
+            if (id.includes('date-fns')) {
+              return 'date';
+            }
+            // Animações
+            if (id.includes('framer-motion')) {
+              return 'animation';
+            }
+            // Outras bibliotecas node_modules vão para vendor comum
+            return 'vendor';
+          }
         },
       },
     },
@@ -128,7 +138,14 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true, // Remove console.logs em produção
         drop_debugger: true,
+        pure_funcs: ['console.log'], // Remove chamadas específicas
+      },
+      mangle: {
+        safari10: true, // Compatibilidade com Safari 10+
       },
     },
+    // Otimizações adicionais para reduzir JavaScript não usado
+    reportCompressedSize: false, // Não reportar tamanho comprimido (mais rápido)
+    sourcemap: false, // Sem sourcemaps em produção (menor)
   },
 }));
