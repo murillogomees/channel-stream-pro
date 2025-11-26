@@ -3,10 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { M3UImportNotifications } from "@/components/admin/M3UImportNotifications";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -41,20 +39,17 @@ const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 
-const AutoNotificationProvider = () => {
-  useAutoNotifications();
-  return null;
-};
-
 const App = () => (
   <ThemeProvider>
     <TooltipProvider>
-      <AutoNotificationProvider />
-      <M3UImportNotifications />
       <Toaster />
       <Sonner />
       <BrowserRouter>
-      <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <Suspense fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      }>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/tutorial" element={<TutorialSmartOne />} />
