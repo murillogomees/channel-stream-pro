@@ -7,7 +7,7 @@ const Footer = () => {
         <Separator className="mb-4 sm:mb-6" />
         <div className="text-center">
           <p className="text-muted-foreground text-xs sm:text-sm px-2">
-            © 2025 <span className="font-semibold text-primary">IPTV Link</span>. Todos os direitos reservados.
+            © 2025 <span className="font-semibold text-foreground">IPTV Link</span>. Todos os direitos reservados.
           </p>
         </div>
       </div>
