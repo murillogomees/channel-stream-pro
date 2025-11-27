@@ -357,6 +357,10 @@
     box-shadow: var(--shadow-glow);
   }
 
+  .shadow-glow-lg {
+    box-shadow: 0 0 60px hsl(var(--primary) / 0.5);
+  }
+
   .shadow-accent-glow {
     box-shadow: var(--shadow-accent-glow);
   }
