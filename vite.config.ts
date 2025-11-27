@@ -93,42 +93,34 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Separar bibliotecas principais em chunks dedicados
           if (id.includes('node_modules')) {
-            // React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
+            // React + UI libs que dependem de React Context devem ficar juntos
+            if (
+              id.includes('react') || 
+              id.includes('react-dom') || 
+              id.includes('react-router') ||
+              id.includes('@radix-ui') ||
+              id.includes('vaul') ||
+              id.includes('cmdk')
+            ) {
+              return 'vendor';
             }
-            // Radix UI components
-            if (id.includes('@radix-ui')) {
-              return 'ui-vendor';
-            }
-            // Supabase
+            // Supabase separado (grande e independente)
             if (id.includes('@supabase')) {
               return 'supabase';
             }
-            // Recharts - Carregado apenas quando necessário (páginas admin)
-            if (id.includes('recharts')) {
+            // Recharts separado (carregado apenas em admin)
+            if (id.includes('recharts') || id.includes('d3')) {
               return 'charts';
             }
-            // HLS.js para vídeo
+            // HLS.js separado (carregado apenas no player)
             if (id.includes('hls.js')) {
               return 'video';
             }
-            // Formulários
-            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-              return 'forms';
-            }
-            // Datas
-            if (id.includes('date-fns')) {
-              return 'date';
-            }
-            // Animações
+            // Framer motion separado (animações)
             if (id.includes('framer-motion')) {
               return 'animation';
             }
-            // Outras bibliotecas node_modules vão para vendor comum
-            return 'vendor';
           }
         },
       },
