@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
@@ -64,7 +63,6 @@ const situacaoColors: Record<string, string> = {
 export default function AdminClientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading } = useAuth();
   const { clientes, deleteCliente, loading: loadingClientes } = useClientesDb();
   const { config } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
@@ -172,17 +170,12 @@ export default function AdminClientes() {
     fetchM3ULists();
   }, [clientes]);
 
-  if (loading || loadingClientes) {
+  if (loadingClientes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
       </div>
     );
-  }
-
-  if (!isAdmin) {
-    navigate('/auth');
-    return null;
   }
 
   const handleDeleteClick = (id: string) => {

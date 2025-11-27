@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff, Wifi } from 'lucide-react';
+import { Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff, Wifi } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { playlistHealthService, PlaylistHealthStats, PlaylistHealthCheck } from '@/services/playlistHealthService';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +17,7 @@ import {
 } from '@/components/ui/select';
 
 export default function AdminPlaylistHealth() {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading: authLoading, user } = useAuth();
   
   const [stats, setStats] = useState<PlaylistHealthStats | null>(null);
   const [allChecks, setAllChecks] = useState<PlaylistHealthCheck[]>([]);
@@ -30,17 +26,6 @@ export default function AdminPlaylistHealth() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    
-    // Redirecionar se não é admin e roles já carregaram
-    if (!authLoading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-      return;
-    }
-
-    // Só carregar dados se é admin confirmado
-    if (!isAdmin) return;
-
     loadStats();
     
     // Real-time subscription for playlist health checks
@@ -69,7 +54,7 @@ export default function AdminPlaylistHealth() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [authLoading, isAdmin, navigate, user]);
+  }, []);
 
   const loadStats = async () => {
     setIsLoading(true);
@@ -176,9 +161,9 @@ export default function AdminPlaylistHealth() {
     }
   };
 
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center">
           <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Carregando...</p>
@@ -190,34 +175,24 @@ export default function AdminPlaylistHealth() {
   const healthPercentage = stats ? (stats.active / stats.total) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate('/admin/dashboard')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Saúde das Playlists</h1>
-              <p className="text-muted-foreground">
-                Monitoramento de playlists M3U do SmartOne
-              </p>
-            </div>
-          </div>
-          
-          <Button onClick={handleRunHealthCheck} disabled={isRunning}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-            {isRunning ? 'Verificando...' : 'Executar Verificação'}
-          </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Saúde das Playlists</h2>
+          <p className="text-muted-foreground">
+            Monitoramento de playlists M3U do SmartOne
+          </p>
         </div>
+          
+        <Button onClick={handleRunHealthCheck} disabled={isRunning}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
+          {isRunning ? 'Verificando...' : 'Executar Verificação'}
+        </Button>
+      </div>
 
-        {/* Estatísticas Gerais */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+      {/* Estatísticas Gerais */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -444,7 +419,6 @@ export default function AdminPlaylistHealth() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

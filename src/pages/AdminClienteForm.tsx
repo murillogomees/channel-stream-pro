@@ -4,7 +4,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
@@ -96,7 +95,6 @@ export default function AdminClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading } = useAuth();
   const { clientes, loading: loadingClientes, addCliente, updateCliente } = useClientesDb();
   const { addLog } = useNotificationLogs();
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
@@ -269,17 +267,12 @@ export default function AdminClienteForm() {
     }
   }, [watch('dataContratacao'), watch('situacao'), watch('plano'), setValue]);
 
-  if (loading) {
+  if (loadingClientes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
       </div>
     );
-  }
-
-  if (!isAdmin) {
-    navigate('/auth');
-    return null;
   }
 
   const onSubmit = async (data: ClienteFormData) => {

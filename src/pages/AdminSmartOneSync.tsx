@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { smartoneService } from "@/services/smartoneService";
@@ -11,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity, Wifi, Copy } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ShieldAlert, Activity, Wifi, Copy } from "lucide-react";
 
 interface ClienteComPerfil {
   id: string;
@@ -27,8 +26,7 @@ interface ClienteComPerfil {
 }
 
 const AdminSmartOneSync = () => {
-  const { isAdmin, loading: authLoading, user } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteComPerfil[]>([]);
   const [smartonePlaylists, setSmartOnePlaylists] = useState<any[]>([]);
@@ -50,11 +48,36 @@ const AdminSmartOneSync = () => {
   });
 
   useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    if (!authLoading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-    }
-  }, [isAdmin, authLoading, navigate, user]);
+    loadClientes();
+    loadSmartOnePlaylists();
+    
+    // Real-time subscription for cliente changes
+    const channel = supabase
+      .channel('clientes-sync-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'clientes',
+          filter: 'mac_smart_one=not.is.null'
+        },
+        (payload) => {
+          console.log('🔄 Real-time update received:', payload);
+          loadClientes();
+        }
+      )
+      .subscribe();
+
+    const interval = setInterval(() => {
+      loadClientes();
+    }, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, []);
 
   const loadClientes = async () => {
     try {
@@ -204,8 +227,7 @@ const AdminSmartOneSync = () => {
         supabase.removeChannel(channel);
         clearInterval(interval);
       };
-    }
-  }, [isAdmin]);
+  }, []);
 
   const handleSync = async (cliente: ClienteComPerfil) => {
     try {
@@ -328,29 +350,19 @@ URL da Playlist: ${defaultM3U.file_url}
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-          </div>
-          <Button 
-            variant="outline"
-            onClick={() => navigate('/admin/smartone-test')}
-          >
-            <Activity className="h-4 w-4 mr-2" />
-            Teste de Conectividade
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Sincronização SmartOne</h2>
+          <p className="text-muted-foreground">Gerencie sincronização de playlists</p>
         </div>
+      </div>
 
-        <div className="grid gap-6">
-          {/* Tabela de Playlists do SmartOne */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+      <div className="grid gap-6">
+        {/* Tabela de Playlists do SmartOne */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Playlists Cadastradas no SmartOne</CardTitle>
                   <CardDescription>

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +13,6 @@ import { ptBR } from 'date-fns/locale';
 
 export default function AdminRoleAudit() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,12 +20,8 @@ export default function AdminRoleAudit() {
   const [actionFilter, setActionFilter] = useState<string>('all');
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/admin/dashboard');
-      return;
-    }
     loadAuditLogs();
-  }, [isAdmin, navigate]);
+  }, []);
 
   const loadAuditLogs = async () => {
     setLoading(true);
