@@ -36,6 +36,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   const [availableLists, setAvailableLists] = useState<M3UList[]>([]);
   const [hasLoadedLists, setHasLoadedLists] = useState(false);
   const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<string>('');
 
   // Load available M3U lists for admin selection - using default playlist from m3u_lists
   const loadAvailableLists = useCallback(async () => {
@@ -69,13 +70,14 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     }
   }, [selectedListId, hasLoadedLists]);
 
-  // Load playlist from default M3U list
+  // Load playlist from default M3U list - now loads ALL channels
   const loadPlaylist = useCallback(async (listId: string) => {
     if (isLoadingPlaylist) return;
     
     try {
       setIsLoading(true);
       setIsLoadingPlaylist(true);
+      setLoadingProgress('Buscando playlist...');
 
       // Get the M3U file URL
       const { data: listData, error: listError } = await supabase
@@ -88,13 +90,16 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         throw listError;
       }
 
-      // Fetch and parse M3U file using proxy with timeout
+      // Fetch and parse M3U file using proxy - NO LIMIT to get all channels
       const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      // Increased timeout to 60 seconds for large playlists
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       
       try {
+        setLoadingProgress('Baixando e processando canais...');
+        
         const proxyResponse = await fetch(proxyUrl, {
           method: 'POST',
           headers: {
@@ -102,9 +107,8 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
             'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
           body: JSON.stringify({ 
-            url: listData.file_url,
-            limit: 5000,
-            offset: 0
+            url: listData.file_url
+            // No limit - fetch all channels
           }),
           signal: controller.signal
         });
@@ -118,9 +122,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
 
         const { channels, total } = await proxyResponse.json();
         
-        if (total && total > 5000) {
-          toast.info(`Carregados primeiros 5.000 de ${total.toLocaleString()} canais`);
-        }
+        setLoadingProgress(`Organizando ${total.toLocaleString()} canais...`);
         
         // Group channels by category
         const categoriesMap = new Map<string, Category>();
@@ -153,6 +155,12 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
 
         const categoriesArray = Array.from(categoriesMap.values());
         setCategories(categoriesArray);
+        
+        // Log totals for debugging
+        const totalChannels = categoriesArray.reduce((acc, cat) => acc + cat.channels.length, 0);
+        console.log(`[IPTV Admin] Loaded ${totalChannels} channels in ${categoriesArray.length} categories`);
+        
+        toast.success(`${total.toLocaleString()} canais carregados`);
 
         // Set first channel as default
         if (categoriesArray.length > 0 && categoriesArray[0].channels.length > 0) {
@@ -161,7 +169,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       } catch (error: any) {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
-          throw new Error('Tempo limite excedido (35s)');
+          throw new Error('Tempo limite excedido (60s). A playlist é muito grande.');
         }
         throw error;
       }
@@ -172,6 +180,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     } finally {
       setIsLoading(false);
       setIsLoadingPlaylist(false);
+      setLoadingProgress('');
     }
   }, [isLoadingPlaylist]);
 
@@ -215,6 +224,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     categories,
     currentChannel,
     isLoading,
+    loadingProgress,
     customListId,
     availableLists,
     changeChannel,

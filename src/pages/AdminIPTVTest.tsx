@@ -30,6 +30,7 @@ export default function AdminIPTVTest() {
     categories,
     currentChannel,
     isLoading: playerLoading,
+    loadingProgress,
     customListId,
     availableLists,
     changeChannel,
@@ -199,7 +200,12 @@ export default function AdminIPTVTest() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-lg text-muted-foreground">Carregando playlist...</p>
+          <p className="text-lg text-muted-foreground">
+            {loadingProgress || 'Carregando playlist...'}
+          </p>
+          <p className="text-sm text-muted-foreground/70 mt-2">
+            Playlists grandes podem levar até 60 segundos
+          </p>
         </div>
       </div>
     );
