@@ -1,5 +1,5 @@
 // Admin Client Form - Client registration and editing
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -97,8 +96,9 @@ export default function AdminClienteForm() {
   const { toast } = useToast();
   const { clientes, loading: loadingClientes, addCliente, updateCliente } = useClientesDb();
   const { addLog } = useNotificationLogs();
-  const [enviarWhatsApp, setEnviarWhatsApp] = useState(true);
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id); // true para novo cliente, false para edição
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
+  const isInitialLoad = useRef(true);
   const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
@@ -266,6 +266,42 @@ export default function AdminClienteForm() {
       }
     }
   }, [watch('dataContratacao'), watch('situacao'), watch('plano'), setValue]);
+
+  // Detectar mudanças importantes e ativar notificação WhatsApp automaticamente
+  useEffect(() => {
+    // Só aplicar lógica para edição (quando há clienteOriginal)
+    if (!clienteOriginal || isInitialLoad.current) {
+      return;
+    }
+
+    const situacaoAtual = watch('situacao');
+    const planoAtual = watch('plano');
+    const dataVencimentoAtual = watch('dataVencimento');
+
+    // Verificar se houve mudanças relevantes
+    const mudouSituacao = situacaoAtual !== clienteOriginal.situacao;
+    const mudouPlano = planoAtual !== clienteOriginal.plano;
+    const mudouVencimento = dataVencimentoAtual !== clienteOriginal.dataVencimento;
+    
+    // Ativação de assinatura (saiu de Testando)
+    const ativouAssinatura = clienteOriginal.situacao === 'Testando' && situacaoAtual === 'Ativo';
+
+    // Habilitar notificação automaticamente se houver mudanças relevantes
+    if (mudouSituacao || mudouPlano || mudouVencimento || ativouAssinatura) {
+      setEnviarWhatsApp(true);
+    }
+  }, [watch('situacao'), watch('plano'), watch('dataVencimento'), clienteOriginal]);
+
+  // Marcar que a carga inicial terminou após o cliente ser carregado
+  useEffect(() => {
+    if (clienteOriginal && isInitialLoad.current) {
+      // Usar setTimeout para garantir que os valores foram setados
+      const timer = setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [clienteOriginal]);
 
   if (loadingClientes) {
     return (
@@ -451,6 +487,8 @@ export default function AdminClienteForm() {
             mac_smart_one: clienteData.macSmartOne || null,
             cliente_ativo: clienteData.clienteAtivo,
             smartone_status: 'nao_enviado',
+            origem_cadastro: clienteData.origemCadastro || null,
+            dispositivo_contratado: clienteData.dispositivoContratado || null,
             data_cadastro: new Date().toISOString(),
             data_ultima_edicao: new Date().toISOString()
           })
@@ -873,8 +911,8 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="macSmartOne">MAC SmartOne</Label>
-                  <Input id="macSmartOne" {...register('macSmartOne')} />
+                  <Label htmlFor="macSmartOne">MAC SmartOne <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
+                  <Input id="macSmartOne" placeholder="XX:XX:XX:XX:XX:XX" {...register('macSmartOne')} />
                 </div>
 
                 {/* Validação SmartOne em tempo real */}
@@ -890,7 +928,7 @@ export default function AdminClienteForm() {
 
               <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">
                 <div className="space-y-2">
-                  <Label className="text-base font-semibold">Listas M3U</Label>
+                  <Label className="text-base font-semibold">Listas M3U <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
                   <p className="text-sm text-muted-foreground">
                     Selecione uma ou mais listas M3U que serão atribuídas a este cliente
                   </p>
@@ -931,21 +969,34 @@ export default function AdminClienteForm() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg border border-border">
-                <Checkbox
+              <div className="flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200"
+                style={{
+                  backgroundColor: enviarWhatsApp ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--muted) / 0.3)',
+                  borderColor: enviarWhatsApp ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--border))'
+                }}
+              >
+                <Switch
                   id="enviarWhatsApp"
                   checked={enviarWhatsApp}
-                  onCheckedChange={(checked) => setEnviarWhatsApp(checked as boolean)}
+                  onCheckedChange={setEnviarWhatsApp}
                 />
-                <Label 
-                  htmlFor="enviarWhatsApp" 
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {id 
-                    ? 'Enviar mensagem de atualização ao cliente via WhatsApp'
-                    : 'Enviar mensagem de boas-vindas ao cliente via WhatsApp'
-                  }
-                </Label>
+                <div className="flex-1">
+                  <Label 
+                    htmlFor="enviarWhatsApp" 
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    {id 
+                      ? 'Enviar mensagem de atualização ao cliente via WhatsApp'
+                      : 'Enviar mensagem de boas-vindas ao cliente via WhatsApp'
+                    }
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {enviarWhatsApp 
+                      ? '✓ Notificação será enviada ao salvar'
+                      : 'Nenhuma notificação será enviada'
+                    }
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end">
