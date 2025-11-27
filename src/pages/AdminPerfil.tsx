@@ -13,19 +13,12 @@ import { ThemeSelector } from "@/components/admin/ThemeSelector";
 const AdminPerfil = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, isAdmin, loading, signOut: logout } = useAuth();
+  const { user, signOut: logout } = useAuth();
   
   const [email, setEmail] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    if (!loading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-    }
-  }, [isAdmin, loading, navigate, user]);
 
   useEffect(() => {
     if (user) {
@@ -126,20 +119,8 @@ const AdminPerfil = () => {
       title: "Logout realizado",
       description: "Você foi desconectado com sucesso.",
     });
-    navigate('/auth');
+    navigate('/login');
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background">
