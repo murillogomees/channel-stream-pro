@@ -7,7 +7,10 @@ import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
   Users, Bell, Shield, BarChart3, Settings, 
   LogOut, User, Package, Clock, AlertTriangle,
-  Plug, UserCog, ArrowLeft
+  Plug, UserCog, ArrowLeft, Tv, Play, Download,
+  FileText, History, MessageSquare, Send, Cog,
+  ListVideo, Hammer, Database, UserPlus, BookOpen,
+  Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -54,22 +57,38 @@ interface NavCardProps {
   icon: React.ReactNode;
   path: string;
   badge?: string;
+  isNew?: boolean;
+  isHighlighted?: boolean;
 }
 
-const NavCard = ({ title, description, icon, path, badge }: NavCardProps) => {
+const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }: NavCardProps) => {
   const navigate = useNavigate();
 
   return (
     <Card 
-      className="hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in hover:border-primary/50" 
+      className={`hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in hover:border-primary/50 relative overflow-hidden ${
+        isHighlighted ? 'ring-2 ring-primary/50 bg-primary/5' : ''
+      }`}
       onClick={() => navigate(path)}
     >
+      {isNew && (
+        <div className="absolute top-0 right-0">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            NOVO
+          </div>
+        </div>
+      )}
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 group-hover:scale-110">
+          <div className={`p-2 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+            isHighlighted 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'
+          }`}>
             {icon}
           </div>
-          {badge && (
+          {badge && !isNew && (
             <Badge variant="secondary" className="animate-fade-in">{badge}</Badge>
           )}
         </div>
@@ -182,13 +201,51 @@ const AdminDashboard = () => {
 
         <Separator className="my-8" />
 
+        {/* IPTV Player - DESTACADO */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/70 text-primary-foreground px-3 py-1 rounded-full">
+              <Tv className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">IPTV Player</h2>
+              <Badge className="bg-white/20 text-white hover:bg-white/30">Novo</Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <NavCard
+              title="Player IPTV"
+              description="Assista canais ao vivo, filmes e séries"
+              icon={<Play className="h-5 w-5" />}
+              path="/app/player"
+              isNew
+              isHighlighted
+            />
+            <NavCard
+              title="Teste de IPTV"
+              description="Teste streams e debug de canais"
+              icon={<Tv className="h-5 w-5" />}
+              path="/admin/iptv-test"
+              isNew
+              isHighlighted
+            />
+            <NavCard
+              title="Instalação do App"
+              description="Guia de instalação para dispositivos"
+              icon={<Download className="h-5 w-5" />}
+              path="/install"
+              isNew
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
         {/* Gestão de Clientes */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Gestão de Clientes</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Lista de Clientes"
               description="Visualize e gerencie todos os clientes"
@@ -204,9 +261,21 @@ const AdminDashboard = () => {
             <NavCard
               title="Gestão M3U"
               description="Gerencie playlists, canais e VOD"
-              icon={<Package className="h-5 w-5" />}
+              icon={<ListVideo className="h-5 w-5" />}
               path="/admin/m3u"
               badge="Consolidado"
+            />
+            <NavCard
+              title="M3U Builder"
+              description="Construtor personalizado de listas M3U"
+              icon={<Hammer className="h-5 w-5" />}
+              path="/admin/m3u-builder"
+            />
+            <NavCard
+              title="Histórico de Importação"
+              description="Veja o histórico de importações M3U"
+              icon={<History className="h-5 w-5" />}
+              path="/admin/m3u-import-history"
             />
           </div>
         </section>
@@ -219,13 +288,25 @@ const AdminDashboard = () => {
             <Bell className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Sistema de Notificações</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
-              title="Notificações"
-              description="Histórico, templates, automáticas e configurações"
+              title="Centro de Notificações"
+              description="Histórico, templates e automáticas"
               icon={<Bell className="h-5 w-5" />}
               path="/admin/notifications"
               badge="Consolidado"
+            />
+            <NavCard
+              title="Fila de Notificações"
+              description="Gerencie a fila de envios pendentes"
+              icon={<Send className="h-5 w-5" />}
+              path="/admin/notification-queue"
+            />
+            <NavCard
+              title="Config WhatsApp"
+              description="Configure a integração com WhatsApp"
+              icon={<MessageSquare className="h-5 w-5" />}
+              path="/admin/whatsapp-config"
             />
           </div>
         </section>
@@ -238,7 +319,7 @@ const AdminDashboard = () => {
             <Shield className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Segurança & Monitoramento</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Centro de Segurança"
               description="Alertas, monitoramento, IP blocking e 2FA"
@@ -257,7 +338,7 @@ const AdminDashboard = () => {
             <BarChart3 className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Analytics & Conversão</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Analytics Hub"
               description="Métricas gerais, conversão e cupons"
@@ -276,11 +357,11 @@ const AdminDashboard = () => {
             <Settings className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Sistema & Configurações</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Configurações do Sistema"
-              description="Saúde, playlist, backup, customização e variáveis"
-              icon={<Settings className="h-5 w-5" />}
+              description="Saúde, playlist, backup e customização"
+              icon={<Cog className="h-5 w-5" />}
               path="/admin/system"
               badge="Consolidado"
             />
@@ -295,7 +376,7 @@ const AdminDashboard = () => {
             <Plug className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Integrações Externas</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="SmartOne IPTV"
               description="Sincronização e testes de conectividade"
@@ -314,13 +395,50 @@ const AdminDashboard = () => {
             <UserCog className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Usuários & Permissões</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Gestão de Usuários"
               description="Roles, auditoria, leaderboard e agenda"
               icon={<UserCog className="h-5 w-5" />}
               path="/admin/users"
               badge="Consolidado"
+            />
+            <NavCard
+              title="Criar Usuário Admin"
+              description="Crie novos usuários administradores"
+              icon={<UserPlus className="h-5 w-5" />}
+              path="/admin/create-user"
+              badge="Super Admin"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Outras Páginas */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Outras Páginas</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              title="Meu Perfil"
+              description="Gerencie suas informações pessoais"
+              icon={<User className="h-5 w-5" />}
+              path="/admin/perfil"
+            />
+            <NavCard
+              title="Tutorial SmartOne"
+              description="Guia de configuração do SmartOne"
+              icon={<BookOpen className="h-5 w-5" />}
+              path="/tutorial"
+            />
+            <NavCard
+              title="Página Inicial"
+              description="Landing page do sistema"
+              icon={<Database className="h-5 w-5" />}
+              path="/"
             />
           </div>
         </section>
