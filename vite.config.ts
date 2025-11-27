@@ -16,7 +16,6 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'logo.png', 'logo.webp'],
-      // Force cache invalidation with version
       devOptions: {
         enabled: false
       },
@@ -41,7 +40,7 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,webp,svg,jpg,jpeg}'],
-        maximumFileSizeToCacheInBytes: 5000000, // 5MB
+        maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
@@ -50,13 +49,13 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-api',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+                maxAgeSeconds: 60 * 60 * 24
               }
             }
           },
           {
             urlPattern: /\.m3u8$/,
-            handler: 'NetworkOnly' // Never cache video streams
+            handler: 'NetworkOnly'
           },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
@@ -65,7 +64,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365
               }
             }
           },
@@ -76,7 +75,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'static-resources',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 30
               }
             }
           }
@@ -89,59 +88,40 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Garante que React seja pré-bundled corretamente
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // React + UI libs que dependem de React Context devem ficar juntos
-            if (
-              id.includes('react') || 
-              id.includes('react-dom') || 
-              id.includes('react-router') ||
-              id.includes('@radix-ui') ||
-              id.includes('vaul') ||
-              id.includes('cmdk')
-            ) {
-              return 'vendor';
-            }
-            // Supabase separado (grande e independente)
-            if (id.includes('@supabase')) {
-              return 'supabase';
-            }
-            // Recharts separado (carregado apenas em admin)
-            if (id.includes('recharts') || id.includes('d3')) {
-              return 'charts';
-            }
-            // HLS.js separado (carregado apenas no player)
-            if (id.includes('hls.js')) {
-              return 'video';
-            }
-            // Framer motion separado (animações)
-            if (id.includes('framer-motion')) {
-              return 'animation';
-            }
-          }
+        // Usar sintaxe de objeto para garantir ordem de carregamento
+        manualChunks: {
+          // React e todas as deps que usam React Context juntos
+          'vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            'react/jsx-runtime'
+          ],
         },
       },
     },
     chunkSizeWarningLimit: 1000,
-    // Otimizar tamanho de assets
-    assetsInlineLimit: 4096, // Inline assets < 4kb como base64
-    cssCodeSplit: true, // Separar CSS por chunk
-    minify: 'terser', // Minificação agressiva em produção
+    assetsInlineLimit: 4096,
+    cssCodeSplit: true,
+    minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Remove console.logs em produção
+        drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log'], // Remove chamadas específicas
+        pure_funcs: ['console.log'],
       },
       mangle: {
-        safari10: true, // Compatibilidade com Safari 10+
+        safari10: true,
       },
     },
-    // Otimizações adicionais para reduzir JavaScript não usado
-    reportCompressedSize: false, // Não reportar tamanho comprimido (mais rápido)
-    sourcemap: false, // Sem sourcemaps em produção (menor)
+    reportCompressedSize: false,
+    sourcemap: false,
   },
 }));
