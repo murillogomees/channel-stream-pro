@@ -68,29 +68,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   /**
-   * Atualiza estado de autenticação (otimizado para não bloquear)
+   * Atualiza estado de autenticação (otimizado - libera loading ANTES de buscar dados extras)
    */
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
     setSession(currentSession);
     
     if (currentSession?.user) {
+      // CRÍTICO: Liberar loading IMEDIATAMENTE com dados básicos do session
+      // Isso evita tela branca enquanto busca dados do perfil
+      const basicUser: UnifiedUser = {
+        id: currentSession.user.id,
+        nome: currentSession.user.user_metadata?.nome || currentSession.user.email?.split('@')[0] || 'Usuário',
+        email: currentSession.user.email || '',
+        roles: [],
+        isAdmin: false,
+        isSuperAdmin: false,
+        isClient: false,
+        created_at: currentSession.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      setUser(basicUser);
+      setLoading(false); // LIBERA A UI IMEDIATAMENTE
+      
+      // Buscar dados completos em background (não bloqueia a UI)
       try {
-        // Buscar dados do usuário
         const userData = await fetchUserData(currentSession.user.id);
-        setUser(userData);
-        
-        // Registrar login de forma assíncrona
         if (userData) {
+          setUser(userData);
+          
+          // Registrar login de forma assíncrona (fire and forget)
           authLoggingService.logLogin(
             currentSession.user.id,
             userData.email || currentSession.user.email || ''
-          ).catch(console.error);
+          ).catch(() => {}); // Silenciar erros de log
         }
       } catch (error) {
-        console.error('[AuthContext] Erro ao buscar dados do usuário:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
+        console.error('[AuthContext] Erro ao buscar dados extras:', error);
+        // Mantém o basicUser - não limpa o usuário
       }
     } else {
       setUser(null);
