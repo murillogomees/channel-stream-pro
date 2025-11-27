@@ -60,6 +60,24 @@ const situacaoColors: Record<string, string> = {
   Lead: 'bg-purple-500',
 };
 
+// Labels amigáveis para dispositivos
+const dispositivoLabels: Record<string, string> = {
+  smart_tv: 'Smart TV',
+  roku_tv: 'Roku TV',
+  fire_stick: 'Fire Stick',
+  android_tv: 'Android TV',
+  celular_android: 'Celular Android',
+  celular_ios: 'Celular iOS (iPhone)',
+  computador: 'Computador',
+  mac: 'Mac',
+  tablet_android: 'Tablet Android',
+  tablet_ios: 'Tablet iOS (iPad)',
+  chromecast: 'Chromecast',
+  apple_tv: 'Apple TV',
+  xbox: 'Xbox',
+  playstation: 'PlayStation',
+};
+
 export default function AdminClientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -532,7 +550,7 @@ export default function AdminClientes() {
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
                       <TableCell className="hidden md:table-cell">{cliente.macSmartOne || 'N/A'}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{cliente.dispositivoContratado || 'N/A'}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{cliente.dispositivoContratado ? dispositivoLabels[cliente.dispositivoContratado] || cliente.dispositivoContratado : 'N/A'}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <Badge className={situacaoColors[cliente.situacao]}>
                           {cliente.situacao}
