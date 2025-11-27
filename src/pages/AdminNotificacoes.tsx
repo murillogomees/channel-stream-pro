@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { useClientesDb } from '@/hooks/useClientesDb';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
@@ -42,7 +41,6 @@ import { getWhatsAppService } from '@/services/whatsapp';
 export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading, user } = useAuth();
   const { clientes } = useClientesDb();
   const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
@@ -71,13 +69,6 @@ export default function AdminNotificacoes() {
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
 
   const nextRunTime = getNextRunTime();
-
-  useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    if (!loading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-    }
-  }, [isAdmin, loading, navigate, user]);
 
   // Validar número de teste quando mudar
   useEffect(() => {
@@ -175,18 +166,10 @@ export default function AdminNotificacoes() {
     }
   };
 
-  if (loading || configLoading) {
+  if (configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
-
-  if (loading || !isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
   }

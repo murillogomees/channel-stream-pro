@@ -36,7 +36,7 @@ interface AuditLog {
 }
 
 const AdminUserRoles = () => {
-  const { isAdmin, loading: authLoading, user: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -50,20 +50,6 @@ const AdminUserRoles = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [bulkRole, setBulkRole] = useState<string>("admin");
   const [bulkAction, setBulkAction] = useState<"add" | "remove">("add");
-
-  useEffect(() => {
-    // Aguardar roles carregarem (user existe mas roles vazio = ainda carregando)
-    const rolesStillLoading = currentUser && currentUser.roles?.length === 0;
-    
-    if (!authLoading && !rolesStillLoading && !isAdmin) {
-      toast({
-        title: "Acesso negado",
-        description: "Você não tem permissão para acessar esta página.",
-        variant: "destructive",
-      });
-      navigate('/admin/dashboard');
-    }
-  }, [isAdmin, authLoading, navigate, toast, currentUser]);
 
   const loadUsers = async () => {
     try {
@@ -136,11 +122,9 @@ const AdminUserRoles = () => {
   };
 
   useEffect(() => {
-    if (isAdmin) {
-      loadUsers();
-      loadAuditLogs();
-    }
-  }, [isAdmin]);
+    loadUsers();
+    loadAuditLogs();
+  }, []);
 
   const logAuditAction = async (userId: string, action: 'added' | 'removed', role: string) => {
     try {

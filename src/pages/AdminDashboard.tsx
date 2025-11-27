@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
@@ -84,25 +83,9 @@ const NavCard = ({ title, description, icon, path, badge }: NavCardProps) => {
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAdmin, loading, signOut: logout, user } = useAuth();
+  const { signOut: logout, user } = useAuth();
   const { getStats, loading: statsLoading } = useClientesDb();
   const stats = getStats();
-
-  // Nota: A verificação de permissão é feita pelo ProtectedRoute
-  // Este useEffect só mostra mensagem se as roles já carregaram e não é admin
-  useEffect(() => {
-    // Aguardar roles carregarem (user existe mas roles vazio = ainda carregando)
-    const rolesStillLoading = user && user.roles?.length === 0;
-    
-    if (!loading && !rolesStillLoading && !isAdmin) {
-      toast({
-        title: "Acesso negado",
-        description: "Você não tem permissão de administrador.",
-        variant: "destructive",
-      });
-      navigate('/login');
-    }
-  }, [isAdmin, loading, navigate, toast, user]);
 
   const handleLogout = async () => {
     await logout();
@@ -112,21 +95,6 @@ const AdminDashboard = () => {
     });
     navigate('/login');
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-muted-foreground">Carregando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background">
