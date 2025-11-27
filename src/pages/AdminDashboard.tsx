@@ -88,8 +88,13 @@ const AdminDashboard = () => {
   const { getStats, loading: statsLoading } = useClientesDb();
   const stats = getStats();
 
+  // Nota: A verificação de permissão é feita pelo ProtectedRoute
+  // Este useEffect só mostra mensagem se as roles já carregaram e não é admin
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    // Aguardar roles carregarem (user existe mas roles vazio = ainda carregando)
+    const rolesStillLoading = user && user.roles?.length === 0;
+    
+    if (!loading && !rolesStillLoading && !isAdmin) {
       toast({
         title: "Acesso negado",
         description: "Você não tem permissão de administrador.",
@@ -97,7 +102,7 @@ const AdminDashboard = () => {
       });
       navigate('/login');
     }
-  }, [isAdmin, loading, navigate, toast]);
+  }, [isAdmin, loading, navigate, toast, user]);
 
   const handleLogout = async () => {
     await logout();

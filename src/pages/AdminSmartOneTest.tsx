@@ -33,7 +33,7 @@ interface TestResult {
 }
 
 const AdminSmartOneTest = () => {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -50,7 +50,9 @@ const AdminSmartOneTest = () => {
     m3uUrl: ''
   });
 
-  if (!authLoading && !isAdmin) {
+  // Aguardar roles carregarem antes de verificar permissão
+  const rolesStillLoading = user && user.roles?.length === 0;
+  if (!authLoading && !rolesStillLoading && !isAdmin) {
     navigate('/auth');
     return null;
   }

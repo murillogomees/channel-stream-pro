@@ -37,7 +37,7 @@ const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accen
 
 export default function AdminM3UListStats() {
   const navigate = useNavigate();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   const [period, setPeriod] = useState('7');
   const [isLoading, setIsLoading] = useState(true);
   const [topViewed, setTopViewed] = useState<ListStats[]>([]);
@@ -46,10 +46,11 @@ export default function AdminM3UListStats() {
   const [activityByType, setActivityByType] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    if (!authLoading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [isAdmin, authLoading, navigate, user]);
 
   useEffect(() => {
     if (isAdmin) {
