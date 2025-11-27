@@ -124,7 +124,7 @@ export default function AdminClienteForm() {
     resolver: zodResolver(clienteSchema),
     defaultValues: {
       valorPago: 0,
-      clienteAtivo: false,
+      clienteAtivo: !id, // true para novo cliente, false para edição
     },
   });
 
