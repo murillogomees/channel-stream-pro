@@ -76,21 +76,28 @@ export class DueDateNotificationHandler {
 
       console.log(`✅ Notificação de vencimento enviada para ${cliente.nome} (${daysBeforeDue} dias)`);
 
-      // Enviar alerta ao administrador se for vencimento (dia 0 ou depois)
-      if (daysBeforeDue <= 0) {
-        await this.sendAdminAlert(cliente, daysBeforeDue, addLog);
-      }
+      // SEMPRE enviar resumo ao admin quando uma notificação for enviada ao cliente
+      await this.sendAdminSummary(cliente, daysBeforeDue, template.name, true, addLog);
 
       return true;
     } catch (error) {
       console.error(`❌ Erro ao enviar notificação de vencimento para ${cliente.nome}:`, error);
+      
+      // Notificar admin sobre a falha também
+      await this.sendAdminSummary(cliente, daysBeforeDue, template?.name || 'Template não encontrado', false, addLog);
+      
       return false;
     }
   }
 
-  private async sendAdminAlert(
+  /**
+   * Envia resumo ao administrador sobre a notificação enviada ao cliente
+   */
+  private async sendAdminSummary(
     cliente: Cliente,
     daysBeforeDue: number,
+    templateName: string,
+    success: boolean,
     addLog: (log: NotificationLog) => void
   ): Promise<void> {
     try {
@@ -106,32 +113,57 @@ export class DueDateNotificationHandler {
         return;
       }
 
-      // Criar mensagem de alerta para admin
-      const statusMsg = daysBeforeDue === 0 
-        ? 'venceu hoje' 
-        : `venceu há ${Math.abs(daysBeforeDue)} dias`;
+      // Criar mensagem de resumo para admin
+      const statusIcon = success ? '✅' : '❌';
+      const statusEnvio = success ? 'Enviada com sucesso' : 'Falha no envio';
+      
+      let statusVencimento: string;
+      let emoji: string;
+      
+      if (daysBeforeDue > 0) {
+        emoji = '⏰';
+        statusVencimento = `Vence em ${daysBeforeDue} dia${daysBeforeDue > 1 ? 's' : ''}`;
+      } else if (daysBeforeDue === 0) {
+        emoji = '🚨';
+        statusVencimento = 'Vence HOJE';
+      } else {
+        emoji = '🔴';
+        statusVencimento = `Vencido há ${Math.abs(daysBeforeDue)} dia${Math.abs(daysBeforeDue) > 1 ? 's' : ''}`;
+      }
 
-      const adminMessage = `🚨 *ALERTA DE VENCIMENTO*\n\n` +
-        `Cliente: *${cliente.nome}*\n` +
-        `Telefone: ${cliente.telefone}\n` +
-        `Plano: ${cliente.plano || 'Não definido'}\n` +
-        `Status: Assinatura ${statusMsg}\n` +
-        `Data de vencimento: ${cliente.dataVencimento ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR') : 'Não definida'}\n\n` +
-        `⚠️ Ação necessária: Entre em contato com o cliente.`;
+      const timestamp = new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const adminMessage = `${emoji} *RESUMO DE NOTIFICAÇÃO*\n\n` +
+        `${statusIcon} *Status do Envio:* ${statusEnvio}\n\n` +
+        `👤 *Cliente:* ${cliente.nome}\n` +
+        `📱 *Telefone:* ${cliente.telefone}\n` +
+        `📋 *Plano:* ${cliente.plano || 'Não definido'}\n` +
+        `💰 *Valor:* R$ ${cliente.valorPago?.toFixed(2) || '0.00'}\n` +
+        `📅 *Vencimento:* ${cliente.dataVencimento ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR') : 'Não definida'}\n` +
+        `⚡ *Situação:* ${statusVencimento}\n\n` +
+        `📨 *Template usado:* ${templateName}\n` +
+        `🕐 *Horário:* ${timestamp}\n\n` +
+        `${daysBeforeDue <= 0 ? '⚠️ *Ação necessária:* Entre em contato com o cliente.' : '✨ Cliente notificado preventivamente.'}`;
 
       // Enviar para cada administrador configurado
       for (const adminPhone of adminPhones) {
         try {
           const adminCliente: Cliente = {
             ...cliente,
-            id: `admin-alert-${cliente.id}`,
+            id: `admin-summary-${cliente.id}`,
             nome: 'Administrador',
             telefone: adminPhone,
           };
 
           const adminTemplate = {
-            id: 'admin-expiration-alert',
-            name: 'Alerta Admin - Vencimento',
+            id: 'admin-notification-summary',
+            name: 'Resumo Notificação Admin',
             message: adminMessage,
             variables: [],
             type: 'local' as const,
@@ -145,13 +177,13 @@ export class DueDateNotificationHandler {
             addLog,
           });
 
-          console.log(`✅ Alerta de vencimento enviado ao admin: ${adminPhone}`);
+          console.log(`✅ Resumo de notificação enviado ao admin: ${adminPhone}`);
         } catch (error) {
-          console.error(`❌ Erro ao enviar alerta ao admin ${adminPhone}:`, error);
+          console.error(`❌ Erro ao enviar resumo ao admin ${adminPhone}:`, error);
         }
       }
     } catch (error) {
-      console.error('❌ Erro ao processar alertas de administrador:', error);
+      console.error('❌ Erro ao processar resumos de administrador:', error);
     }
   }
 }
