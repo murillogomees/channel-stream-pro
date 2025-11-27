@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, X, Search, Tv, Film, Clapperboard } from 'lucide-react';
+import { Loader2, ArrowLeft, X, Search, Tv, Film, Clapperboard, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
 import { ContentCarousel } from '@/components/app/ContentCarousel';
@@ -8,7 +8,6 @@ import { ContentCard } from '@/components/app/ContentCard';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -23,6 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 export default function AdminIPTVTest() {
   const navigate = useNavigate();
@@ -188,6 +188,12 @@ export default function AdminIPTVTest() {
     setShowPlayerDialog(true);
   };
 
+  const contentTypes = [
+    { id: 'live', label: 'TV ao Vivo', icon: Tv, count: categorizedContent.live.reduce((acc, cat) => acc + cat.channels.length, 0) },
+    { id: 'movies', label: 'Filmes', icon: Film, count: categorizedContent.movies.reduce((acc, cat) => acc + cat.channels.length, 0) },
+    { id: 'series', label: 'Séries', icon: Clapperboard, count: categorizedContent.series.reduce((acc, cat) => acc + cat.channels.length, 0) },
+  ] as const;
+
   if (playerLoading || favoritesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -218,28 +224,27 @@ export default function AdminIPTVTest() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Netflix Style */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-sm">
-        <div className="flex items-center justify-between px-6 md:px-16 py-4">
-          <div className="flex items-center gap-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/admin/dashboard')}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+        {/* Top Bar - Logo, Playlist, Search, Category */}
+        <div className="flex items-center gap-4 px-4 md:px-8 py-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/admin/dashboard')}
+            className="shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
 
-            <div className="flex items-center gap-2">
-              <Tv className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-bold hidden sm:block">IPTV Player</h1>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Tv className="w-6 h-6 text-primary" />
+            <span className="text-lg font-bold hidden sm:block">IPTV</span>
           </div>
 
           {/* Playlist Selector */}
           <Select value={customListId || undefined} onValueChange={selectList}>
-            <SelectTrigger className="w-[180px] md:w-[220px]">
+            <SelectTrigger className="w-[140px] md:w-[180px] shrink-0">
               <SelectValue placeholder="Playlist" />
             </SelectTrigger>
             <SelectContent>
@@ -250,58 +255,26 @@ export default function AdminIPTVTest() {
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Navigation Tabs - Netflix Style Full Width */}
-        <div className="w-full">
-          <Tabs value={contentType} onValueChange={(v) => setContentType(v as any)} className="w-full">
-            <TabsList className="w-full bg-transparent border-b-2 border-border h-auto p-0 rounded-none gap-8 justify-start px-6 md:px-16">
-              <TabsTrigger 
-                value="live" 
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
-              >
-                <Tv className="w-5 h-5 mr-2" />
-                TV ao Vivo
-              </TabsTrigger>
-              <TabsTrigger 
-                value="movies"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
-              >
-                <Film className="w-5 h-5 mr-2" />
-                Filmes
-              </TabsTrigger>
-              <TabsTrigger 
-                value="series"
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-4 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-bold rounded-none pb-3 px-0 transition-all text-muted-foreground text-base md:text-lg hover:text-foreground border-b-4 border-transparent -mb-[2px]"
-              >
-                <Clapperboard className="w-5 h-5 mr-2" />
-                Séries
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="fixed top-[136px] left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="px-6 md:px-16 py-4 flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background/50 border-muted-foreground/20"
+              className="pl-10 h-9"
             />
           </div>
 
+          {/* Category Selector */}
           {availableCategories.length > 0 && (
             <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
-              <SelectTrigger className="w-[200px] bg-background/50 border-muted-foreground/20">
+              <SelectTrigger className="w-[160px] md:w-[200px] hidden md:flex">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todas categorias</SelectItem>
                 {availableCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
@@ -310,11 +283,75 @@ export default function AdminIPTVTest() {
               </SelectContent>
             </Select>
           )}
+
+          {/* Favorites Toggle */}
+          <Button
+            variant={showFavoritesOnly ? 'default' : 'ghost'}
+            size="icon"
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            className="shrink-0 hidden sm:flex"
+          >
+            <Heart className={cn("w-5 h-5", showFavoritesOnly && "fill-current")} />
+          </Button>
         </div>
+
+        {/* Content Type Tabs - Prominent and Clear */}
+        <div className="px-4 md:px-8 pb-2">
+          <div className="flex items-center gap-2">
+            {contentTypes.map((type) => {
+              const Icon = type.icon;
+              const isActive = contentType === type.id;
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => setContentType(type.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all",
+                    "border-2",
+                    isActive 
+                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25" 
+                      : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="hidden sm:inline">{type.label}</span>
+                  <span className="sm:hidden">{type.id === 'live' ? 'TV' : type.id === 'movies' ? 'Filmes' : 'Séries'}</span>
+                  {type.count > 0 && (
+                    <span className={cn(
+                      "text-xs px-1.5 py-0.5 rounded-full",
+                      isActive ? "bg-primary-foreground/20" : "bg-muted-foreground/20"
+                    )}>
+                      {type.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Category Selector */}
+        {availableCategories.length > 0 && (
+          <div className="px-4 pb-3 md:hidden">
+            <Select value={selectedCategory || 'all'} onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas categorias</SelectItem>
+                {availableCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {/* Main Content - Netflix Style Carousels */}
-      <div className="pt-[200px] pb-12">
+      {/* Main Content */}
+      <div className="pt-[140px] md:pt-[120px] pb-12">
         {currentCategories.length === 0 ? (
           <div className="flex items-center justify-center min-h-[400px] px-4">
             <Card className="p-8 max-w-md text-center">
