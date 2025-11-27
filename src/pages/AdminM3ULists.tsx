@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
 import { PageHeader } from '@/components/admin/PageHeader';
@@ -42,8 +41,7 @@ const PLAN_TYPES = [
 ];
 
 export default function AdminM3ULists() {
-  const navigate = useNavigate();
-  const { isAdmin, loading: authLoading, user } = useAuth();
+  const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useM3UListFavorites();
   
   const [lists, setLists] = useState<M3UList[]>([]);
@@ -61,23 +59,15 @@ export default function AdminM3ULists() {
   const [selectedListName, setSelectedListName] = useState<string>('');
 
   useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    if (!authLoading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-    }
-  }, [isAdmin, authLoading, navigate, user]);
+    loadLists();
 
-  useEffect(() => {
-    if (isAdmin) {
-      loadLists();
-
-      // Subscrição em tempo real para mudanças nas atribuições
-      const channel = supabase
-        .channel('client_m3u_lists_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
+    // Subscrição em tempo real para mudanças nas atribuições
+    const channel = supabase
+      .channel('client_m3u_lists_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
             schema: 'public',
             table: 'client_m3u_lists'
           },
@@ -90,8 +80,7 @@ export default function AdminM3ULists() {
       return () => {
         supabase.removeChannel(channel);
       };
-    }
-  }, [isAdmin]);
+  }, []);
 
   const loadLists = async () => {
     try {
@@ -269,21 +258,10 @@ export default function AdminM3ULists() {
     setClientManagerOpen(true);
   };
 
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Aguardar roles carregarem (user existe mas roles vazio = ainda carregando)
-  const rolesStillLoading = user && user.roles?.length === 0;
-  
-  if (!isAdmin && !rolesStillLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Acesso negado</p>
       </div>
     );
   }

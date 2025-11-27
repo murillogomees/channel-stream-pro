@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,16 +13,11 @@ import { ptBR } from 'date-fns/locale';
 
 export default function AdminSuspiciousLogins() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [recentAttempts, setRecentAttempts] = useState<any[]>([]);
   const [blockedAttempts, setBlockedAttempts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/admin/dashboard');
-      return;
-    }
     loadData();
     
     // Real-time updates via Supabase
@@ -52,7 +46,7 @@ export default function AdminSuspiciousLogins() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [isAdmin, navigate]);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);

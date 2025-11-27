@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  ArrowLeft, 
   RefreshCw, 
   CheckCircle2, 
   XCircle, 
@@ -33,8 +30,6 @@ interface TestResult {
 }
 
 const AdminSmartOneTest = () => {
-  const { isAdmin, loading: authLoading, user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   
   const [testing, setTesting] = useState(false);
@@ -49,13 +44,6 @@ const AdminSmartOneTest = () => {
     mac: '',
     m3uUrl: ''
   });
-
-  // Aguardar roles carregarem antes de verificar permissão
-  const rolesStillLoading = user && user.roles?.length === 0;
-  if (!authLoading && !rolesStillLoading && !isAdmin) {
-    navigate('/auth');
-    return null;
-  }
 
   const runConnectivityTest = async () => {
     setTesting(true);
@@ -367,22 +355,13 @@ const AdminSmartOneTest = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/admin/dashboard')}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Teste de Conectividade SmartOne</h1>
-              <p className="text-muted-foreground">
-                Valide credenciais e disponibilidade da API SmartOne
-              </p>
-            </div>
+          <div>
+            <h2 className="text-2xl font-bold">Teste de Conectividade SmartOne</h2>
+            <p className="text-muted-foreground">
+              Valide credenciais e disponibilidade da API SmartOne
+            </p>
           </div>
         </div>
 

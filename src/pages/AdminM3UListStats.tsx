@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Eye, Edit, Download, TrendingUp, Clock, ArrowLeft } from 'lucide-react';
+import { Eye, Edit, Download, TrendingUp, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   BarChart,
@@ -36,8 +34,6 @@ interface ListStats {
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 export default function AdminM3UListStats() {
-  const navigate = useNavigate();
-  const { isAdmin, loading: authLoading, user } = useAuth();
   const [period, setPeriod] = useState('7');
   const [isLoading, setIsLoading] = useState(true);
   const [topViewed, setTopViewed] = useState<ListStats[]>([]);
@@ -46,17 +42,8 @@ export default function AdminM3UListStats() {
   const [activityByType, setActivityByType] = useState<any[]>([]);
 
   useEffect(() => {
-    const rolesStillLoading = user && user.roles?.length === 0;
-    if (!authLoading && !rolesStillLoading && !isAdmin) {
-      navigate('/auth');
-    }
-  }, [isAdmin, authLoading, navigate, user]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadStats();
-    }
-  }, [isAdmin, period]);
+    loadStats();
+  }, [period]);
 
   const loadStats = async () => {
     try {
@@ -156,19 +143,19 @@ export default function AdminM3UListStats() {
     }
   };
 
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Estatísticas de Listas M3U</h1>
+          <h2 className="text-2xl font-bold">Estatísticas de Listas M3U</h2>
           <p className="text-muted-foreground">
             Análise de uso e acesso às listas M3U
           </p>
@@ -185,10 +172,6 @@ export default function AdminM3UListStats() {
               <SelectItem value="365">Último ano</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => navigate('/admin/m3u-lists')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
         </div>
       </div>
 
