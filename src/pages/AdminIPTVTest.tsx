@@ -351,45 +351,49 @@ export default function AdminIPTVTest() {
       </div>
 
       {/* Main Content */}
-      <div className="pt-[140px] md:pt-[120px] pb-12">
-        {currentCategories.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[400px] px-4">
-            <Card className="p-8 max-w-md text-center">
-              {contentType === 'live' && <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-              {contentType === 'movies' && <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-              {contentType === 'series' && <Clapperboard className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-              <h2 className="text-2xl font-bold mb-2">
-                {contentType === 'live' && 'Nenhum canal disponível'}
-                {contentType === 'movies' && 'Nenhum filme disponível'}
-                {contentType === 'series' && 'Nenhuma série disponível'}
-              </h2>
-              <p className="text-muted-foreground">
-                Selecione outra playlist ou adicione conteúdo.
-              </p>
-            </Card>
-          </div>
-        ) : (
-          currentCategories.map((category) => (
-            <ContentCarousel
-              key={category.id}
-              title={category.display_name}
-              itemCount={category.channels.length}
-            >
-              {category.channels.map((channel) => (
-                <ContentCard
-                  key={channel.id}
-                  id={channel.id}
-                  name={channel.name}
-                  logo={channel.tvg_logo || undefined}
-                  category={category.display_name}
-                  isFavorite={isFavorite(channel.id)}
-                  onPlay={() => handlePlay(channel)}
-                  onToggleFavorite={() => toggleFavorite(channel.id)}
-                />
+      <div className="pt-[160px] md:pt-[140px] pb-16">
+        <div className="max-w-[1800px] mx-auto">
+          {currentCategories.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[400px] px-4">
+              <Card className="p-8 max-w-md text-center">
+                {contentType === 'live' && <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+                {contentType === 'movies' && <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+                {contentType === 'series' && <Clapperboard className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
+                <h2 className="text-2xl font-bold mb-2">
+                  {contentType === 'live' && 'Nenhum canal disponível'}
+                  {contentType === 'movies' && 'Nenhum filme disponível'}
+                  {contentType === 'series' && 'Nenhuma série disponível'}
+                </h2>
+                <p className="text-muted-foreground">
+                  Selecione outra playlist ou adicione conteúdo.
+                </p>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-8 md:space-y-10">
+              {currentCategories.map((category) => (
+                <ContentCarousel
+                  key={category.id}
+                  title={category.display_name}
+                  itemCount={category.channels.length}
+                >
+                  {category.channels.map((channel) => (
+                    <ContentCard
+                      key={channel.id}
+                      id={channel.id}
+                      name={channel.name}
+                      logo={channel.tvg_logo || undefined}
+                      category={category.display_name}
+                      isFavorite={isFavorite(channel.id)}
+                      onPlay={() => handlePlay(channel)}
+                      onToggleFavorite={() => toggleFavorite(channel.id)}
+                    />
+                  ))}
+                </ContentCarousel>
               ))}
-            </ContentCarousel>
-          ))
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Video Player Dialog */}
