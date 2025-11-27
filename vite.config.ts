@@ -39,6 +39,10 @@ export default defineConfig(({ mode }) => ({
         screenshots: []
       },
       workbox: {
+        // Forçar atualização do cache
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,webp,svg,jpg,jpeg}'],
         maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
@@ -67,17 +71,6 @@ export default defineConfig(({ mode }) => ({
                 maxAgeSeconds: 60 * 60 * 24 * 365
               }
             }
-          },
-          {
-            urlPattern: /\.(?:js|css)$/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'static-resources',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30
-              }
-            }
           }
         ]
       }
@@ -88,26 +81,9 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Garante que React seja pré-bundled corretamente
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'],
-  },
   build: {
-    rollupOptions: {
-      output: {
-        // Usar sintaxe de objeto para garantir ordem de carregamento
-        manualChunks: {
-          // React e todas as deps que usam React Context juntos
-          'vendor': [
-            'react',
-            'react-dom',
-            'react-router-dom',
-            'react/jsx-runtime'
-          ],
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000,
+    // Sem manualChunks - deixar Vite gerenciar automaticamente
+    chunkSizeWarningLimit: 1500,
     assetsInlineLimit: 4096,
     cssCodeSplit: true,
     minify: 'terser',
@@ -115,7 +91,6 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log'],
       },
       mangle: {
         safari10: true,
