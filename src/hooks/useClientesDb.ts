@@ -65,6 +65,7 @@ export function useClientesDb() {
         mac_smart_one: clienteData.macSmartOne || null,
         cliente_ativo: clienteData.clienteAtivo,
         origem_cadastro: clienteData.origemCadastro || null,
+        dispositivo_contratado: clienteData.dispositivoContratado || null,
         data_ultima_edicao: new Date().toISOString(),
       })
       .eq('id', id)
