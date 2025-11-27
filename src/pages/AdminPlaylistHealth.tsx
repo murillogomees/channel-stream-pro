@@ -21,7 +21,7 @@ import {
 export default function AdminPlaylistHealth() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   
   const [stats, setStats] = useState<PlaylistHealthStats | null>(null);
   const [allChecks, setAllChecks] = useState<PlaylistHealthCheck[]>([]);
@@ -30,10 +30,16 @@ export default function AdminPlaylistHealth() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    
+    // Redirecionar se não é admin e roles já carregaram
+    if (!authLoading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
       return;
     }
+
+    // Só carregar dados se é admin confirmado
+    if (!isAdmin) return;
 
     loadStats();
     
@@ -63,7 +69,7 @@ export default function AdminPlaylistHealth() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [authLoading, isAdmin, navigate]);
+  }, [authLoading, isAdmin, navigate, user]);
 
   const loadStats = async () => {
     setIsLoading(true);

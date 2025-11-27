@@ -21,10 +21,11 @@ const AdminPerfil = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    if (!loading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, loading, navigate, user]);
 
   useEffect(() => {
     if (user) {

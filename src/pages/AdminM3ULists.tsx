@@ -43,7 +43,7 @@ const PLAN_TYPES = [
 
 export default function AdminM3ULists() {
   const navigate = useNavigate();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   const { isFavorite, toggleFavorite } = useM3UListFavorites();
   
   const [lists, setLists] = useState<M3UList[]>([]);
@@ -61,10 +61,11 @@ export default function AdminM3ULists() {
   const [selectedListName, setSelectedListName] = useState<string>('');
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    if (!authLoading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [isAdmin, authLoading, navigate, user]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -276,7 +277,10 @@ export default function AdminM3ULists() {
     );
   }
 
-  if (!isAdmin) {
+  // Aguardar roles carregarem (user existe mas roles vazio = ainda carregando)
+  const rolesStillLoading = user && user.roles?.length === 0;
+  
+  if (!isAdmin && !rolesStillLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Acesso negado</p>

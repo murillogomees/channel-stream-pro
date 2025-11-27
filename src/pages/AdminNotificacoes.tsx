@@ -42,7 +42,7 @@ import { getWhatsAppService } from '@/services/whatsapp';
 export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, user } = useAuth();
   const { clientes } = useClientesDb();
   const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
@@ -73,10 +73,11 @@ export default function AdminNotificacoes() {
   const nextRunTime = getNextRunTime();
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    if (!loading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, loading, navigate, user]);
 
   // Validar número de teste quando mudar
   useEffect(() => {

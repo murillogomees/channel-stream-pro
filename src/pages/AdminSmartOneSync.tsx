@@ -27,7 +27,7 @@ interface ClienteComPerfil {
 }
 
 const AdminSmartOneSync = () => {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteComPerfil[]>([]);
@@ -50,10 +50,11 @@ const AdminSmartOneSync = () => {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    const rolesStillLoading = user && user.roles?.length === 0;
+    if (!authLoading && !rolesStillLoading && !isAdmin) {
       navigate('/auth');
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [isAdmin, authLoading, navigate, user]);
 
   const loadClientes = async () => {
     try {
