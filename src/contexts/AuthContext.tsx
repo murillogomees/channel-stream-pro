@@ -74,17 +74,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setSession(currentSession);
     
     if (currentSession?.user) {
-      // Buscar dados do usuário
-      const userData = await fetchUserData(currentSession.user.id);
-      setUser(userData);
-      setLoading(false);
-      
-      // Registrar login de forma assíncrona
-      if (userData) {
-        authLoggingService.logLogin(
-          currentSession.user.id,
-          userData.email || currentSession.user.email || ''
-        ).catch(console.error);
+      try {
+        // Buscar dados do usuário
+        const userData = await fetchUserData(currentSession.user.id);
+        setUser(userData);
+        
+        // Registrar login de forma assíncrona
+        if (userData) {
+          authLoggingService.logLogin(
+            currentSession.user.id,
+            userData.email || currentSession.user.email || ''
+          ).catch(console.error);
+        }
+      } catch (error) {
+        console.error('[AuthContext] Erro ao buscar dados do usuário:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
     } else {
       setUser(null);
@@ -119,6 +125,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
+    // Timeout de segurança para evitar loading infinito
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('[AuthContext] Safety timeout triggered - forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000);
+
     // Configurar listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
@@ -130,11 +144,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // Verificar sessão inicial
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      updateAuthState(currentSession);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        updateAuthState(currentSession);
+      })
+      .catch((error) => {
+        console.error('[AuthContext] Erro ao obter sessão:', error);
+        setLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, [updateAuthState]);
 
   const value: AuthContextType = {
