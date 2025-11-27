@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'logo.png', 'logo.webp'],
+      // Force cache invalidation with version
+      devOptions: {
+        enabled: false
+      },
       manifest: {
         name: 'IPTV Player',
         short_name: 'IPTV',
