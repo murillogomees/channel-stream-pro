@@ -90,8 +90,8 @@ const parseM3UStream = async (response: Response): Promise<Channel[]> => {
   return channels;
 };
 
-// Timeout helper
-const fetchWithTimeout = async (url: string, timeoutMs = 25000) => {
+// Timeout helper - increased to 55 seconds for large files
+const fetchWithTimeout = async (url: string, timeoutMs = 55000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
@@ -116,7 +116,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, limit = 5000, offset = 0 } = await req.json();
+    const { url, limit, offset = 0 } = await req.json();
     
     if (!url) {
       return new Response(
@@ -125,9 +125,9 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[FetchM3U] Fazendo fetch da URL: ${url} (limit: ${limit}, offset: ${offset})`);
+    console.log(`[FetchM3U] Fazendo fetch da URL: ${url} (limit: ${limit || 'all'}, offset: ${offset})`);
     
-    // Fetch com timeout de 25 segundos
+    // Fetch com timeout de 55 segundos para listas grandes
     const response = await fetchWithTimeout(url);
 
     if (!response.ok) {
@@ -141,18 +141,24 @@ serve(async (req) => {
     
     console.log(`[FetchM3U] ${allChannels.length} canais parseados no total`);
 
-    // Aplicar paginação para evitar exceder limite de memória
-    const paginatedChannels = allChannels.slice(offset, offset + limit);
-    const hasMore = (offset + limit) < allChannels.length;
-
-    console.log(`[FetchM3U] Retornando ${paginatedChannels.length} canais (${offset} a ${offset + paginatedChannels.length})`);
+    // Se limit for especificado, aplicar paginação
+    let resultChannels = allChannels;
+    let hasMore = false;
+    
+    if (limit && limit > 0) {
+      resultChannels = allChannels.slice(offset, offset + limit);
+      hasMore = (offset + limit) < allChannels.length;
+      console.log(`[FetchM3U] Retornando ${resultChannels.length} canais (${offset} a ${offset + resultChannels.length})`);
+    } else {
+      console.log(`[FetchM3U] Retornando todos os ${allChannels.length} canais`);
+    }
 
     return new Response(
       JSON.stringify({ 
-        channels: paginatedChannels,
+        channels: resultChannels,
         total: allChannels.length,
         offset,
-        limit,
+        limit: limit || allChannels.length,
         hasMore
       }),
       { 
@@ -167,7 +173,7 @@ serve(async (req) => {
     console.error('[FetchM3U] Erro:', error);
     
     const errorMessage = error.name === 'AbortError' 
-      ? 'Timeout ao buscar URL M3U (máximo 25 segundos)'
+      ? 'Timeout ao buscar URL M3U (máximo 55 segundos)'
       : error.message || 'Erro ao buscar URL M3U';
     
     return new Response(
