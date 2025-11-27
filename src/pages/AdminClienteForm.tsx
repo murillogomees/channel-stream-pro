@@ -230,7 +230,7 @@ export default function AdminClienteForm() {
     validateSmartOneFields();
   }, [watch('macSmartOne'), watch('nome')]);
 
-  // Cálculo automático de data de vencimento
+  // Cálculo automático de data de vencimento e pagamento
   useEffect(() => {
     const dataContratacao = watch('dataContratacao');
     const situacao = watch('situacao');
@@ -241,8 +241,11 @@ export default function AdminClienteForm() {
       let dataVencimento: Date;
 
       if (situacao === 'Testando') {
-        // 14 dias após data de contratação
-        dataVencimento = addDays(dataContrato, 14);
+        // 15 dias após data de contratação para modo teste
+        dataVencimento = addDays(dataContrato, 15);
+        setValue('dataVencimento', format(dataVencimento, 'yyyy-MM-dd'));
+        // Data de pagamento igual à data de contratação para modo teste
+        setValue('dataUltimoPagamento', dataContratacao);
       } else if (situacao === 'Ativo' && plano) {
         // Calcular baseado no plano
         switch (plano) {
@@ -261,11 +264,8 @@ export default function AdminClienteForm() {
           default:
             dataVencimento = addMonths(dataContrato, 1);
         }
-      } else {
-        return; // Não calcular para outras situações
+        setValue('dataVencimento', format(dataVencimento, 'yyyy-MM-dd'));
       }
-
-      setValue('dataVencimento', format(dataVencimento, 'yyyy-MM-dd'));
     }
   }, [watch('dataContratacao'), watch('situacao'), watch('plano'), setValue]);
 
