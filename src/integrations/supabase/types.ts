@@ -1716,6 +1716,291 @@ export type Database = {
         }
         Relationships: []
       }
+      m3u_sync_entries: {
+        Row: {
+          created_at: string | null
+          duration: number | null
+          entry_hash: string
+          group_title: string | null
+          id: string
+          is_valid: boolean | null
+          metadata: Json | null
+          raw_extinf: string | null
+          source_id: string
+          stream_url: string
+          title: string
+          tvg_id: string | null
+          tvg_language: string | null
+          tvg_logo: string | null
+          tvg_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration?: number | null
+          entry_hash: string
+          group_title?: string | null
+          id?: string
+          is_valid?: boolean | null
+          metadata?: Json | null
+          raw_extinf?: string | null
+          source_id: string
+          stream_url: string
+          title: string
+          tvg_id?: string | null
+          tvg_language?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration?: number | null
+          entry_hash?: string
+          group_title?: string | null
+          id?: string
+          is_valid?: boolean | null
+          metadata?: Json | null
+          raw_extinf?: string | null
+          source_id?: string
+          stream_url?: string
+          title?: string
+          tvg_id?: string | null
+          tvg_language?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_sync_entries_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_sync_errors: {
+        Row: {
+          created_at: string | null
+          error_details: Json | null
+          error_message: string
+          error_type: string
+          id: string
+          job_id: string | null
+          source_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_details?: Json | null
+          error_message: string
+          error_type: string
+          id?: string
+          job_id?: string | null
+          source_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_details?: Json | null
+          error_message?: string
+          error_type?: string
+          id?: string
+          job_id?: string | null
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_sync_errors_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "m3u_sync_errors_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_sync_files: {
+        Row: {
+          checksum: string | null
+          content_type: string | null
+          expires_at: string | null
+          file_size_bytes: number | null
+          file_type: string
+          generated_at: string | null
+          id: string
+          metadata: Json | null
+          source_id: string
+          storage_path: string
+        }
+        Insert: {
+          checksum?: string | null
+          content_type?: string | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
+          file_type: string
+          generated_at?: string | null
+          id?: string
+          metadata?: Json | null
+          source_id: string
+          storage_path: string
+        }
+        Update: {
+          checksum?: string | null
+          content_type?: string | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
+          file_type?: string
+          generated_at?: string | null
+          id?: string
+          metadata?: Json | null
+          source_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_sync_files_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_sync_jobs: {
+        Row: {
+          completed_at: string | null
+          duration_ms: number | null
+          entries_count: number | null
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          invalid_entries_count: number | null
+          metadata: Json | null
+          new_entries: number | null
+          removed_entries: number | null
+          source_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["m3u_sync_status"] | null
+          triggered_by: string | null
+          updated_entries: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          duration_ms?: number | null
+          entries_count?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_entries_count?: number | null
+          metadata?: Json | null
+          new_entries?: number | null
+          removed_entries?: number | null
+          source_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["m3u_sync_status"] | null
+          triggered_by?: string | null
+          updated_entries?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          duration_ms?: number | null
+          entries_count?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_entries_count?: number | null
+          metadata?: Json | null
+          new_entries?: number | null
+          removed_entries?: number | null
+          source_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["m3u_sync_status"] | null
+          triggered_by?: string | null
+          updated_entries?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_sync_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_sync_sources: {
+        Row: {
+          checksum: string | null
+          created_at: string | null
+          created_by: string | null
+          enabled: boolean | null
+          entries_count: number | null
+          file_size_bytes: number | null
+          id: string
+          invalid_entries_count: number | null
+          key: string
+          last_error: string | null
+          last_sync_at: string | null
+          last_sync_status:
+            | Database["public"]["Enums"]["m3u_sync_status"]
+            | null
+          metadata: Json | null
+          name: string
+          source_url: string
+          sync_interval_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          enabled?: boolean | null
+          entries_count?: number | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_entries_count?: number | null
+          key: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?:
+            | Database["public"]["Enums"]["m3u_sync_status"]
+            | null
+          metadata?: Json | null
+          name: string
+          source_url: string
+          sync_interval_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          enabled?: boolean | null
+          entries_count?: number | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_entries_count?: number | null
+          key?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?:
+            | Database["public"]["Enums"]["m3u_sync_status"]
+            | null
+          metadata?: Json | null
+          name?: string
+          source_url?: string
+          sync_interval_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       m3u_view_history: {
         Row: {
           admin_id: string
@@ -3458,6 +3743,7 @@ export type Database = {
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_import_cache: { Args: never; Returns: undefined }
+      cleanup_old_m3u_sync_data: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
@@ -3582,6 +3868,17 @@ export type Database = {
         Args: { cliente_plano: string; cliente_situacao: string }
         Returns: string
       }
+      get_m3u_sync_stats: {
+        Args: never
+        Returns: {
+          active_sources: number
+          failed_syncs_24h: number
+          last_sync: string
+          successful_syncs_24h: number
+          total_entries: number
+          total_sources: number
+        }[]
+      }
       get_notification_retry_stats: { Args: never; Returns: Json }
       get_security_analytics: {
         Args: { _days?: number }
@@ -3646,6 +3943,22 @@ export type Database = {
         Returns: undefined
       }
       save_monthly_leaderboard: { Args: never; Returns: undefined }
+      search_m3u_entries: {
+        Args: {
+          limit_count?: number
+          search_query: string
+          source_key?: string
+        }
+        Returns: {
+          group_title: string
+          id: string
+          score: number
+          source_name: string
+          stream_url: string
+          title: string
+          tvg_logo: string
+        }[]
+      }
       update_watch_progress: {
         Args: {
           p_content_category: string
@@ -3699,6 +4012,12 @@ export type Database = {
         | "apple_tv"
         | "xbox"
         | "playstation"
+      m3u_sync_status:
+        | "pending"
+        | "running"
+        | "completed"
+        | "failed"
+        | "partial"
       origem_cadastro:
         | "Google Ads"
         | "Facebook"
@@ -3855,6 +4174,7 @@ export const Constants = {
         "xbox",
         "playstation",
       ],
+      m3u_sync_status: ["pending", "running", "completed", "failed", "partial"],
       origem_cadastro: [
         "Google Ads",
         "Facebook",
