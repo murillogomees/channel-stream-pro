@@ -27,7 +27,7 @@ import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
 import { useContinueWatching, useTrending } from '@/features/player/hooks';
-import { ContinueWatchingRow, Top10Row } from '@/features/player/components';
+import { ContinueWatchingRow, Top10Row, LiveTVView } from '@/features/player/components';
 import { 
   favoritesService as playerFavoritesService, 
   watchProgressService,
@@ -339,7 +339,6 @@ export default function AppPlayer() {
     );
   }
 
-  const showSidebar = activeTab !== 'home' && activeTab !== 'favorites';
   const tabTitle = {
     home: 'Início',
     live: 'TV ao Vivo',
@@ -544,8 +543,24 @@ export default function AppPlayer() {
             </div>
           )}
 
-          {/* Category Views (Live, Movies, Series) */}
-          {showSidebar && (
+          {/* Live TV View - Special layout with EPG, zapping, PIP */}
+          {activeTab === 'live' && (
+            <div className="p-4 lg:p-6 pb-20">
+              <LiveTVView
+                channels={categorizedContent.live.flatMap(cat => 
+                  cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
+                )}
+                currentChannel={currentChannel}
+                onChannelChange={changeChannel}
+                onPlay={handlePlay}
+                isFavorite={isFavorite}
+                onToggleFavorite={toggleFavorite}
+              />
+            </div>
+          )}
+
+          {/* Category Views (Movies, Series) */}
+          {(activeTab === 'movies' || activeTab === 'series') && (
             <div className="flex min-h-[calc(100vh-4rem)]">
               {/* Category Sidebar */}
               <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border py-4 lg:py-6 px-4">
