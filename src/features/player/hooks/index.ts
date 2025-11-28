@@ -12,3 +12,6 @@ export { useWatchProgress } from './useWatchProgress';
 export { useEPG, useChannelEPG } from './useEPG';
 export { useChannelZapping } from './useChannelZapping';
 export { usePictureInPicture } from './usePictureInPicture';
+
+// Movie hooks
+export { useMovieMetadata } from './useMovieMetadata';
