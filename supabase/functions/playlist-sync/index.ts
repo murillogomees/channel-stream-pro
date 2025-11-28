@@ -507,14 +507,49 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Try to acquire lock
-      const lockId = `sync-${Date.now()}`;
-      const { data: lockAcquired } = await supabase.rpc('acquire_playlist_sync_lock', {
+      // First, ensure playlist source exists (required for lock FK)
+      console.log(`[playlist-sync] Upserting playlist source for ${body.key}`);
+      const { error: upsertError } = await supabase.from('playlist_sources').upsert({
+        key: body.key,
+        name: body.key,
+        source_url: body.url,
+        owner_id: body.ownerId || null,
+        sync_enabled: true,
+      }, { onConflict: 'key' });
+      
+      if (upsertError) {
+        console.error(`[playlist-sync] Upsert error: ${upsertError.message}`);
+        return new Response(JSON.stringify({
+          error: `Failed to create playlist source: ${upsertError.message}`,
+        }), {
+          status: 500,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Now try to acquire lock
+      const lockId = `sync-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      console.log(`[playlist-sync] Attempting lock for ${body.key} with lockId ${lockId}`);
+      
+      const { data: lockAcquired, error: lockError } = await supabase.rpc('acquire_playlist_sync_lock', {
         p_key: body.key,
         p_locked_by: lockId,
       });
       
-      if (!lockAcquired) {
+      console.log(`[playlist-sync] Lock result: ${lockAcquired}, error: ${lockError?.message}`);
+      
+      if (lockError) {
+        console.error(`[playlist-sync] Lock error: ${lockError.message}`);
+        return new Response(JSON.stringify({
+          error: `Lock error: ${lockError.message}`,
+          status: 'error',
+        }), {
+          status: 500,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (lockAcquired === false) {
         return new Response(JSON.stringify({
           error: 'Sync already in progress',
           status: 'locked',
@@ -525,37 +560,36 @@ Deno.serve(async (req) => {
       }
       
       try {
-        // Ensure playlist source exists
-        await supabase.from('playlist_sources').upsert({
-          key: body.key,
-          name: body.key,
-          source_url: body.url,
-          owner_id: body.ownerId || null,
-        }, { onConflict: 'key' });
-        
         // Create job
-        const { data: job } = await supabase.from('playlist_sync_jobs').insert({
+        console.log(`[playlist-sync] Creating sync job for ${body.key}`);
+        const { data: job, error: jobError } = await supabase.from('playlist_sync_jobs').insert({
           playlist_key: body.key,
           status: 'queued',
           triggered_by: 'api',
           force_sync: body.force || false,
         }).select().single();
         
-        // Run sync (using waitUntil for background processing)
-        const syncPromise = syncPlaylist(supabase, body, job.id)
+        if (jobError) {
+          throw new Error(`Failed to create job: ${jobError.message}`);
+        }
+        
+        console.log(`[playlist-sync] Job created: ${job.id}, starting sync...`);
+        
+        // Return immediately and run sync in background
+        // Supabase Edge Functions don't have waitUntil, so we run async
+        syncPlaylist(supabase, body, job.id)
+          .then(() => {
+            console.log(`[playlist-sync] Sync completed for ${body.key}`);
+          })
+          .catch((err) => {
+            console.error(`[playlist-sync] Sync failed for ${body.key}: ${err.message}`);
+          })
           .finally(() => {
             supabase.rpc('release_playlist_sync_lock', {
               p_key: body.key,
               p_locked_by: lockId,
             });
           });
-        
-        // @ts-ignore - Deno Edge Runtime
-        if (typeof EdgeRuntime !== 'undefined') {
-          EdgeRuntime.waitUntil(syncPromise);
-        } else {
-          await syncPromise;
-        }
         
         return new Response(JSON.stringify({
           jobId: job.id,
@@ -568,6 +602,7 @@ Deno.serve(async (req) => {
         
       } catch (error) {
         // Release lock on error
+        console.error(`[playlist-sync] Error in sync setup: ${error instanceof Error ? error.message : error}`);
         await supabase.rpc('release_playlist_sync_lock', {
           p_key: body.key,
           p_locked_by: lockId,
