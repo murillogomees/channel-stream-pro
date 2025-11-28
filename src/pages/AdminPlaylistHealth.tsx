@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff, Wifi } from 'lucide-react';
+import { Activity, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock, Bell, BellOff, Wifi, ExternalLink, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { playlistHealthService, PlaylistHealthStats, PlaylistHealthCheck } from '@/services/playlistHealthService';
+import { playlistHealthService, PlaylistHealthStats, M3UListWithHealth } from '@/services/playlistHealthService';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Progress } from '@/components/ui/progress';
 import {
   Select,
@@ -15,18 +14,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function AdminPlaylistHealth() {
   const { toast } = useToast();
   
   const [stats, setStats] = useState<PlaylistHealthStats | null>(null);
-  const [allChecks, setAllChecks] = useState<PlaylistHealthCheck[]>([]);
+  const [listsWithHealth, setListsWithHealth] = useState<M3UListWithHealth[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [lastResults, setLastResults] = useState<any[] | null>(null);
 
   useEffect(() => {
-    loadStats();
+    loadData();
     
     // Real-time subscription for playlist health checks
     const channel = supabase
@@ -38,36 +45,29 @@ export default function AdminPlaylistHealth() {
           schema: 'public',
           table: 'playlist_health_checks'
         },
-        (payload) => {
-          console.log('🔄 Real-time playlist health update:', payload);
-          loadStats();
+        () => {
+          console.log('🔄 Real-time playlist health update');
+          loadData();
         }
       )
       .subscribe();
 
-    // Periodic refresh every 60 seconds
-    const interval = setInterval(() => {
-      loadStats();
-    }, 60000);
-
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(interval);
     };
   }, []);
 
-  const loadStats = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const [statsData, checksData] = await Promise.all([
+      const [statsData, listsData] = await Promise.all([
         playlistHealthService.getHealthStats(),
-        playlistHealthService.getAllHealthChecks(),
+        playlistHealthService.getM3UListsWithHealth(),
       ]);
       setStats(statsData);
-      setAllChecks(checksData);
-      setLastUpdate(new Date());
+      setListsWithHealth(listsData);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error('Erro ao carregar dados:', error);
       toast({
         title: 'Erro ao carregar dados',
         description: 'Não foi possível carregar as estatísticas.',
@@ -75,6 +75,43 @@ export default function AdminPlaylistHealth() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRunHealthCheck = async () => {
+    setIsRunning(true);
+    setLastResults(null);
+    
+    try {
+      const result = await playlistHealthService.runHealthCheck();
+      
+      if (result.success) {
+        toast({
+          title: 'Verificação concluída',
+          description: result.message,
+        });
+        
+        if (result.results) {
+          setLastResults(result.results);
+        }
+        
+        // Recarregar dados
+        await loadData();
+      } else {
+        toast({
+          title: 'Erro na verificação',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao executar verificação',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -87,7 +124,7 @@ export default function AdminPlaylistHealth() {
           title: 'Alertas pausados',
           description: result.message,
         });
-        await loadStats();
+        await loadData();
       } else {
         toast({
           title: 'Erro',
@@ -113,7 +150,7 @@ export default function AdminPlaylistHealth() {
           title: 'Alertas reativados',
           description: result.message,
         });
-        await loadStats();
+        await loadData();
       } else {
         toast({
           title: 'Erro',
@@ -130,34 +167,29 @@ export default function AdminPlaylistHealth() {
     }
   };
 
-  const handleRunHealthCheck = async () => {
-    setIsRunning(true);
-    try {
-      const result = await playlistHealthService.runHealthCheck();
-      
-      if (result.success) {
-        toast({
-          title: 'Verificação concluída',
-          description: result.message,
-        });
-        
-        // Recarregar estatísticas
-        await loadStats();
-      } else {
-        toast({
-          title: 'Erro na verificação',
-          description: result.message,
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao executar verificação',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRunning(false);
+  const getStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'inactive':
+        return <XCircle className="h-5 w-5 text-orange-500" />;
+      case 'error':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
+      default:
+        return <Clock className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Ativa</Badge>;
+      case 'inactive':
+        return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Inativa</Badge>;
+      case 'error':
+        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Erro</Badge>;
+      default:
+        return <Badge variant="secondary">Não verificada</Badge>;
     }
   };
 
@@ -172,20 +204,20 @@ export default function AdminPlaylistHealth() {
     );
   }
 
-  const healthPercentage = stats ? (stats.active / stats.total) * 100 : 0;
+  const healthPercentage = stats && stats.total > 0 ? (stats.active / stats.total) * 100 : 0;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Saúde das Playlists</h2>
+          <h2 className="text-2xl font-bold">Saúde das Listas M3U</h2>
           <p className="text-muted-foreground">
-            Monitoramento de playlists M3U do SmartOne
+            Monitoramento e verificação das listas M3U do sistema
           </p>
         </div>
           
-        <Button onClick={handleRunHealthCheck} disabled={isRunning}>
+        <Button onClick={handleRunHealthCheck} disabled={isRunning} size="lg">
           <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
           {isRunning ? 'Verificando...' : 'Executar Verificação'}
         </Button>
@@ -193,232 +225,276 @@ export default function AdminPlaylistHealth() {
 
       {/* Estatísticas Gerais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.total || 0}</div>
-              <p className="text-xs text-muted-foreground">Playlists monitoradas</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ativas</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats?.total ? Math.round((stats.active / stats.total) * 100) : 0}% do total
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inativas</CardTitle>
-              <XCircle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats?.inactive || 0}</div>
-              <p className="text-xs text-muted-foreground">Verificar urgente</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Com Erro</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats?.error || 0}</div>
-              <p className="text-xs text-muted-foreground">Requerem atenção</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Saúde Geral */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Saúde Geral do Sistema</CardTitle>
-            <CardDescription>
-              Percentual de playlists funcionando corretamente
-            </CardDescription>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Listas</CardTitle>
+            <List className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Status Geral</span>
-                <Badge variant={healthPercentage >= 90 ? 'default' : healthPercentage >= 70 ? 'secondary' : 'destructive'}>
-                  {healthPercentage.toFixed(1)}%
-                </Badge>
-              </div>
-              <Progress value={healthPercentage} className="h-2" />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Tempo Médio de Resposta</span>
-                </div>
-                <p className="text-2xl font-bold">{stats?.avgResponseTime || 0}ms</p>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Última Verificação</span>
-                </div>
-                <p className="text-sm">
-                  {stats?.lastCheck
-                    ? new Date(stats.lastCheck).toLocaleString('pt-BR')
-                    : 'Nunca executada'}
-                </p>
-              </div>
-            </div>
+          <CardContent>
+            <div className="text-2xl font-bold">{listsWithHealth.length}</div>
+            <p className="text-xs text-muted-foreground">Listas M3U cadastradas</p>
           </CardContent>
         </Card>
 
-        {/* Lista de Playlists com Gerenciamento de Snooze */}
-        <Card className="mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ativas</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.total ? Math.round((stats.active / stats.total) * 100) : 0}% do total verificado
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inativas</CardTitle>
+            <XCircle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats?.inactive || 0}</div>
+            <p className="text-xs text-muted-foreground">Verificar urgente</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Com Erro</CardTitle>
+            <AlertCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats?.error || 0}</div>
+            <p className="text-xs text-muted-foreground">Requerem atenção</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Saúde Geral */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Saúde Geral do Sistema</CardTitle>
+          <CardDescription>
+            Percentual de listas M3U funcionando corretamente
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Status Geral</span>
+              <Badge variant={healthPercentage >= 90 ? 'default' : healthPercentage >= 70 ? 'secondary' : 'destructive'}>
+                {healthPercentage.toFixed(1)}%
+              </Badge>
+            </div>
+            <Progress value={healthPercentage} className="h-2" />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Tempo Médio de Resposta</span>
+              </div>
+              <p className="text-2xl font-bold">{stats?.avgResponseTime || 0}ms</p>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Última Verificação</span>
+              </div>
+              <p className="text-sm">
+                {stats?.lastCheck
+                  ? new Date(stats.lastCheck).toLocaleString('pt-BR')
+                  : 'Nunca executada'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resultados da Última Verificação */}
+      {lastResults && lastResults.length > 0 && (
+        <Card>
           <CardHeader>
-            <CardTitle>Gerenciar Alertas das Playlists</CardTitle>
+            <CardTitle>Resultados da Verificação</CardTitle>
             <CardDescription>
-              Pausar ou reativar alertas para playlists específicas
+              Detalhes da última verificação executada
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {allChecks.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhuma playlist encontrada
-                </p>
-              ) : (
-                allChecks.map((check) => {
-                  const isSnoozed = check.snoozed_until && new Date(check.snoozed_until) > new Date();
-                  const statusIcon = check.status === 'active' ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : check.status === 'inactive' ? (
-                    <XCircle className="h-5 w-5 text-orange-500" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                  );
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lista</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Tempo</TableHead>
+                  <TableHead>Canais</TableHead>
+                  <TableHead>Erro</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lastResults.map((result, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{result.name}</TableCell>
+                    <TableCell>{getStatusBadge(result.status)}</TableCell>
+                    <TableCell>{result.responseTime}ms</TableCell>
+                    <TableCell>{result.channels ?? '-'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {result.error || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
-                  return (
-                    <div key={check.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          {statusIcon}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium">{check.playlist_id}</p>
-                              {isSnoozed && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <BellOff className="h-3 w-3 mr-1" />
-                                  Pausado
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">{check.m3u_url}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Última verificação: {new Date(check.last_checked_at).toLocaleString('pt-BR')}
-                            </p>
-                            {isSnoozed && check.snoozed_until && (
-                              <p className="text-xs text-orange-600 mt-1">
-                                Alertas pausados até: {new Date(check.snoozed_until).toLocaleString('pt-BR')}
-                              </p>
+      {/* Lista de Playlists M3U */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Listas M3U Cadastradas</CardTitle>
+          <CardDescription>
+            Status de saúde de cada lista M3U do sistema
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {listsWithHealth.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma lista M3U cadastrada
+              </p>
+            ) : (
+              listsWithHealth.map((list) => {
+                const isSnoozed = list.lastCheck?.snoozed_until && 
+                  new Date(list.lastCheck.snoozed_until) > new Date();
+
+                return (
+                  <div key={list.id} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        {getStatusIcon(list.lastCheck?.status)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-medium">{list.name}</p>
+                            {getStatusBadge(list.lastCheck?.status)}
+                            {isSnoozed && (
+                              <Badge variant="secondary" className="text-xs">
+                                <BellOff className="h-3 w-3 mr-1" />
+                                Pausado
+                              </Badge>
                             )}
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {isSnoozed ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUnsnooze(check.playlist_id)}
-                            >
-                              <Bell className="h-4 w-4 mr-1" />
-                              Reativar Alertas
-                            </Button>
-                          ) : (
-                            <Select onValueChange={(value) => handleSnooze(check.playlist_id, parseInt(value))}>
-                              <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Pausar alertas" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">Por 1 hora</SelectItem>
-                                <SelectItem value="4">Por 4 horas</SelectItem>
-                                <SelectItem value="12">Por 12 horas</SelectItem>
-                                <SelectItem value="24">Por 24 horas</SelectItem>
-                                <SelectItem value="72">Por 3 dias</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <p className="text-sm text-muted-foreground truncate max-w-md">
+                            {list.file_url}
+                          </p>
+                          {list.lastCheck && (
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span>
+                                Última verificação: {new Date(list.lastCheck.last_checked_at).toLocaleString('pt-BR')}
+                              </span>
+                              {list.lastCheck.response_time_ms && (
+                                <span>{list.lastCheck.response_time_ms}ms</span>
+                              )}
+                              {list.lastCheck.error_message && (
+                                <span className="text-red-500">{list.lastCheck.error_message}</span>
+                              )}
+                            </div>
+                          )}
+                          {isSnoozed && list.lastCheck?.snoozed_until && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              Alertas pausados até: {new Date(list.lastCheck.snoozed_until).toLocaleString('pt-BR')}
+                            </p>
                           )}
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(list.file_url, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                        
+                        {isSnoozed ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnsnooze(list.id)}
+                          >
+                            <Bell className="h-4 w-4 mr-1" />
+                            Reativar
+                          </Button>
+                        ) : (
+                          <Select onValueChange={(value) => handleSnooze(list.id, parseInt(value))}>
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue placeholder="Pausar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 hora</SelectItem>
+                              <SelectItem value="4">4 horas</SelectItem>
+                              <SelectItem value="12">12 horas</SelectItem>
+                              <SelectItem value="24">24 horas</SelectItem>
+                              <SelectItem value="72">3 dias</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Informações */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sobre o Monitoramento</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-medium mb-2">Como Funciona</h3>
-              <p className="text-sm text-muted-foreground">
-                O sistema verifica periodicamente se as URLs das playlists M3U estão respondendo corretamente.
-                Cada verificação registra o tempo de resposta e o status HTTP retornado.
-              </p>
-            </div>
+      {/* Informações */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sobre o Monitoramento</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h3 className="font-medium mb-2">Como Funciona</h3>
+            <p className="text-sm text-muted-foreground">
+              O sistema verifica se as URLs das listas M3U estão respondendo corretamente,
+              conta o número de canais disponíveis e registra o tempo de resposta.
+            </p>
+          </div>
 
-            <div>
-              <h3 className="font-medium mb-2">Status das Playlists</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span><strong>Ativa:</strong> Playlist respondendo corretamente (HTTP 200)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-orange-500" />
-                  <span><strong>Inativa:</strong> URL acessível mas retornou erro HTTP</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <span><strong>Erro:</strong> Não foi possível acessar a URL (timeout, rede, etc)</span>
-                </li>
-              </ul>
-            </div>
+          <div>
+            <h3 className="font-medium mb-2">Status das Listas</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span><strong>Ativa:</strong> Lista respondendo corretamente (HTTP 200)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-orange-500" />
+                <span><strong>Inativa:</strong> URL acessível mas retornou erro HTTP</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <span><strong>Erro:</strong> Não foi possível acessar a URL (timeout, rede, etc)</span>
+              </li>
+            </ul>
+          </div>
 
-            <div>
-              <h3 className="font-medium mb-2">Gerenciamento de Alertas</h3>
-              <p className="text-sm text-muted-foreground">
-                Você pode pausar alertas de playlists específicas por um período determinado. Durante o snooze,
-                o sistema continuará monitorando as playlists, mas não enviará notificações. Os alertas são
-                reativados automaticamente após o período escolhido.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-2">Verificação Automática</h3>
-              <p className="text-sm text-muted-foreground">
-                O sistema executa verificações automáticas a cada hora. Você também pode executar
-                verificações manuais clicando no botão "Executar Verificação" acima.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+          <div>
+            <h3 className="font-medium mb-2">Verificação Manual</h3>
+            <p className="text-sm text-muted-foreground">
+              Clique no botão "Executar Verificação" para verificar todas as listas M3U imediatamente.
+              Os resultados serão exibidos na tabela acima.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
