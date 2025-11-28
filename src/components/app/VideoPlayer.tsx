@@ -10,11 +10,9 @@ interface VideoPlayerProps {
   logo?: string;
   onError?: (error: string) => void;
   className?: string;
-  /** Skip proxy and use direct URL (for admins/testing) */
-  directAccess?: boolean;
 }
 
-export function VideoPlayer({ url, title, logo, onError, className = '', directAccess = false }: VideoPlayerProps) {
+export function VideoPlayer({ url, title, logo, onError, className = '' }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,7 +116,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '', directA
     const video = videoRef.current;
     if (!video || !url) return;
 
-    console.log('[VideoPlayer] Initializing with URL:', url, 'directAccess:', directAccess);
+    console.log('[VideoPlayer] Initializing with URL:', url);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -134,40 +132,46 @@ export function VideoPlayer({ url, title, logo, onError, className = '', directA
         setErrorMessage('Tempo limite excedido. Stream pode estar indisponível.');
         setIsLoading(false);
       }
-    }, 15000); // 15 second timeout
+    }, 30000); // 30 second timeout (increased for proxy + stream loading)
 
     const streamType = getStreamType(url);
     console.log('[VideoPlayer] Stream type:', streamType, 'HLS.js supported:', Hls.isSupported());
 
-    // Get auth token only if not direct access
+    // Get auth token for proxy authentication
     let token = '';
-    if (!directAccess) {
-      const { data: { session } } = await supabase.auth.getSession();
-      token = session?.access_token || '';
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token || '';
 
     if (streamType === 'hls') {
       if (Hls.isSupported()) {
-        // Use HLS.js with optimized settings for fast start
+        // Use HLS.js with optimized settings for IPTV streams via proxy
         const hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: true, // Enable low latency mode for faster start
-          backBufferLength: 30, // Reduced from 90
-          maxBufferLength: 10, // Reduced from 30 - start playing faster
-          maxMaxBufferLength: 30, // Reduced from 60
-          maxBufferSize: 30 * 1000 * 1000, // 30MB max buffer
-          maxBufferHole: 0.5, // Allow small gaps
-          startLevel: 0, // Start with lowest quality for fast start, then auto-switch
-          abrEwmaDefaultEstimate: 500000, // 500kbps initial estimate
+          lowLatencyMode: false, // Disable for better compatibility with various streams
+          backBufferLength: 30,
+          maxBufferLength: 30, // Enough buffer for smooth playback
+          maxMaxBufferLength: 60,
+          maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer
+          maxBufferHole: 0.5,
+          startLevel: -1, // Auto quality selection
+          abrEwmaDefaultEstimate: 1000000, // 1Mbps initial estimate
           abrBandWidthFactor: 0.95,
           abrBandWidthUpFactor: 0.7,
           capLevelToPlayerSize: true,
           debug: false,
-          fragLoadingTimeOut: 10000, // 10 second fragment timeout
-          manifestLoadingTimeOut: 8000, // 8 second manifest timeout
-          levelLoadingTimeOut: 8000,
+          // Increased timeouts for proxy + external stream
+          fragLoadingTimeOut: 20000, // 20 second fragment timeout
+          manifestLoadingTimeOut: 15000, // 15 second manifest timeout
+          levelLoadingTimeOut: 15000,
+          fragLoadingMaxRetry: 4,
+          manifestLoadingMaxRetry: 3,
+          levelLoadingMaxRetry: 3,
+          fragLoadingRetryDelay: 1000,
+          manifestLoadingRetryDelay: 1000,
+          levelLoadingRetryDelay: 1000,
           xhrSetup: (xhr, xhrUrl) => {
-            if (token && !directAccess) {
+            // Always add auth header when going through proxy
+            if (token) {
               xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
           },
@@ -195,12 +199,14 @@ export function VideoPlayer({ url, title, logo, onError, className = '', directA
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 console.log('[VideoPlayer] Network error, trying to recover...');
-                if (retryCount < 3) {
-                  hls.startLoad();
-                  setRetryCount(prev => prev + 1);
+                if (retryCount < 5) { // Increased retries for external streams
+                  setTimeout(() => {
+                    hls.startLoad();
+                    setRetryCount(prev => prev + 1);
+                  }, 1000 * (retryCount + 1)); // Exponential backoff
                 } else {
                   setHasError(true);
-                  setErrorMessage('Erro de rede. Verifique sua conexão.');
+                  setErrorMessage('Erro de rede. Verifique sua conexão ou tente outro canal.');
                   setIsLoading(false);
                 }
                 break;
@@ -209,10 +215,16 @@ export function VideoPlayer({ url, title, logo, onError, className = '', directA
                 hls.recoverMediaError();
                 break;
               default:
-                setHasError(true);
-                setErrorMessage('Formato não suportado ou canal indisponível.');
-                setIsLoading(false);
-                onError?.('Formato não suportado');
+                // Try one more thing: swap audio codec
+                if (data.details === 'bufferStalledError') {
+                  console.log('[VideoPlayer] Buffer stalled, trying to recover...');
+                  hls.recoverMediaError();
+                } else {
+                  setHasError(true);
+                  setErrorMessage('Canal indisponível. Tente novamente mais tarde.');
+                  setIsLoading(false);
+                  onError?.('Canal indisponível');
+                }
                 break;
             }
           }
