@@ -27,10 +27,12 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#0A0A0A",
         background_color: "#0A0A0A",
         display: "standalone",
-        orientation: "portrait",
+        orientation: "any",
+        display_override: ["standalone", "fullscreen"],
         start_url: "/app",
         scope: "/app",
         categories: ["entertainment", "video"],
+        prefer_related_applications: false,
         icons: [
           {
             src: "pwa-icon.png",
