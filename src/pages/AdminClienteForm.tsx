@@ -24,8 +24,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { M3UListSelector } from '@/components/admin/M3UListSelector';
 import { M3UListPreview } from '@/components/admin/M3UListPreview';
-import { SmartOneValidationAlert } from '@/components/admin/SmartOneValidationAlert';
-import { SmartOneDataDialog } from '@/components/admin/SmartOneDataDialog';
 
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -98,20 +96,9 @@ export default function AdminClienteForm() {
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id); // true para novo cliente, false para edição
   const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
   const isInitialLoad = useRef(true);
-  const [isSyncingSmartone, setIsSyncingSmartone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
   const [allM3ULists, setAllM3ULists] = useState<any[]>([]);
-  const [smartoneValidation, setSmartoneValidation] = useState<{
-    errors: string[];
-    warnings: string[];
-  }>({ errors: [], warnings: [] });
-  const [showSmartOneData, setShowSmartOneData] = useState(false);
-  const [savedClientData, setSavedClientData] = useState<{
-    nome: string;
-    macSmartOne: string;
-    m3uLists: Array<{ name: string; file_url: string }>;
-  } | null>(null);
 
   const {
     register,
@@ -198,32 +185,6 @@ export default function AdminClienteForm() {
 
     loadCliente();
   }, [id, setValue, toast]);
-
-  // Validação de MAC em tempo real (simplificada, sem SmartOne API)
-  useEffect(() => {
-    const validateMacFields = () => {
-      const macSmartOne = watch('macSmartOne');
-
-      // Se MAC não está preenchido, não validar
-      if (!macSmartOne) {
-        setSmartoneValidation({ errors: [], warnings: [] });
-        return;
-      }
-
-      // Validação local do formato MAC
-      const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-      const errors: string[] = [];
-      const warnings: string[] = [];
-
-      if (!macRegex.test(macSmartOne)) {
-        errors.push('Formato de MAC inválido. Use XX:XX:XX:XX:XX:XX');
-      }
-
-      setSmartoneValidation({ errors, warnings });
-    };
-
-    validateMacFields();
-  }, [watch('macSmartOne')]);
 
   // Cálculo automático de data de vencimento e pagamento
   useEffect(() => {
@@ -444,24 +405,6 @@ export default function AdminClienteForm() {
           });
         }
       }
-
-      // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
-      if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
-        const selectedM3UData = allM3ULists.filter(list => 
-          selectedM3ULists.includes(list.id)
-        );
-        
-        setSavedClientData({
-          nome: clienteData.nome,
-          macSmartOne: clienteData.macSmartOne,
-          m3uLists: selectedM3UData.map(list => ({
-            name: list.name,
-            file_url: list.file_url,
-          })),
-        });
-        setShowSmartOneData(true);
-        return; // Não navega automaticamente - aguarda confirmação do modal
-      }
     } else {
       // Insert new client directly into Supabase
       try {
@@ -665,24 +608,6 @@ export default function AdminClienteForm() {
             });
           }
         }
-
-        // Se tem MAC e M3U lists, mostrar diálogo com dados para SmartOne
-        if (clienteData.macSmartOne && selectedM3ULists.length > 0) {
-          const selectedM3UData = allM3ULists.filter(list => 
-            selectedM3ULists.includes(list.id)
-          );
-          
-          setSavedClientData({
-            nome: clienteData.nome,
-            macSmartOne: clienteData.macSmartOne,
-            m3uLists: selectedM3UData.map(list => ({
-              name: list.name,
-              file_url: list.file_url,
-            })),
-          });
-          setShowSmartOneData(true);
-          return; // Não navega automaticamente - aguarda confirmação do modal
-        }
       } catch (error) {
         console.error('Error creating client:', error);
         toast({
@@ -695,10 +620,7 @@ export default function AdminClienteForm() {
       }
     }
     
-    // Só navega se não for mostrar o diálogo do SmartOne
-    if (!savedClientData) {
-      navigate('/admin/clientes');
-    }
+    navigate('/admin/clientes');
     } catch (error) {
       console.error('Erro no submit:', error);
       toast({
@@ -908,19 +830,9 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="macSmartOne">MAC SmartOne <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
+                  <Label htmlFor="macSmartOne">MAC Address <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
                   <Input id="macSmartOne" placeholder="XX:XX:XX:XX:XX:XX" {...register('macSmartOne')} />
                 </div>
-
-                {/* Validação SmartOne em tempo real */}
-                {watch('macSmartOne') && (
-                  <div className="col-span-2">
-                    <SmartOneValidationAlert 
-                      errors={smartoneValidation.errors}
-                      warnings={smartoneValidation.warnings}
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">
@@ -1005,27 +917,13 @@ export default function AdminClienteForm() {
                 >
                   Cancelar
                 </Button>
-          <Button type="submit" disabled={isSubmitting || isSyncingSmartone} className="w-full sm:w-auto">
-            {isSubmitting ? 'Salvando...' : isSyncingSmartone ? 'Sincronizando...' : id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+          <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+            {isSubmitting ? 'Salvando...' : id ? 'Salvar Alterações' : 'Cadastrar Cliente'}
           </Button>
               </div>
             </CardContent>
           </Card>
         </form>
-
-        {/* Diálogo com dados para SmartOne */}
-        {savedClientData && (
-          <SmartOneDataDialog
-            open={showSmartOneData}
-            onOpenChange={(open) => {
-              setShowSmartOneData(open);
-              if (!open) {
-                navigate('/admin/clientes');
-              }
-            }}
-            clientData={savedClientData}
-          />
-        )}
       </div>
     </div>
   );

@@ -121,13 +121,9 @@ const App = () => (
           <Route path="/admin/variables" element={<Navigate to="/admin/system" replace />} />
           <Route path="/admin/status-history" element={<Navigate to="/admin/system" replace />} />
           <Route path="/admin/custom-status-badges" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/smartone-sync" element={<Navigate to="/admin/integrations" replace />} />
-          <Route path="/admin/smartone-test" element={<Navigate to="/admin/integrations" replace />} />
           <Route path="/admin/user-roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/role-audit" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/permission-test" element={<Navigate to="/admin/users" replace />} />
-          <Route path="/admin/leaderboard" element={<Navigate to="/admin/users" replace />} />
-          <Route path="/admin/schedule-config" element={<Navigate to="/admin/users" replace />} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
