@@ -238,9 +238,16 @@ export default function UniversalPlayer({
   // ===========================================================================
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !url) return;
+    if (!video || !url) {
+      console.warn('[Player] Missing video element or URL');
+      return;
+    }
 
-    console.log('[Player] Initializing with URL:', url.substring(0, 80) + '...');
+    console.log('[Player] ==========================================');
+    console.log('[Player] Initializing playback');
+    console.log('[Player] URL:', url);
+    console.log('[Player] HLS.js supported:', Hls.isSupported());
+    console.log('[Player] Native HLS:', video.canPlayType('application/vnd.apple.mpegurl'));
     
     // Reset state
     setIsLoading(true);
@@ -257,8 +264,8 @@ export default function UniversalPlayer({
     // ==== NATIVE HLS (Safari, iOS, Smart TVs) ====
     const supportsNativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
     
-    if (supportsNativeHls) {
-      console.log('[Player] Using native HLS');
+    if (supportsNativeHls && !Hls.isSupported()) {
+      console.log('[Player] Using native HLS (Safari/iOS/TV)');
       
       video.src = url;
       
@@ -293,21 +300,38 @@ export default function UniversalPlayer({
 
     // ==== HLS.JS (Chrome, Firefox, Edge, Android) ====
     if (!Hls.isSupported()) {
-      console.error('[Player] HLS not supported');
+      // Fallback to native if HLS.js not supported but native is
+      if (supportsNativeHls) {
+        console.log('[Player] Falling back to native HLS');
+        video.src = url;
+        video.load();
+        if (autoplay) video.play().catch(console.warn);
+        return;
+      }
+      
+      console.error('[Player] HLS not supported on this browser');
       setIsLoading(false);
       setHasError(true);
       setErrorMessage('Navegador não suporta HLS');
       return;
     }
 
-    console.log('[Player] Using hls.js');
+    console.log('[Player] Using hls.js engine');
     
-    const hls = new Hls(HLS_CONFIG);
+    const hls = new Hls({
+      ...HLS_CONFIG,
+      debug: false,
+      xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+        console.log('[Player] Loading:', url.substring(0, 60) + '...');
+      },
+    });
     hlsRef.current = hls;
 
     // Load source
     hls.loadSource(url);
     hls.attachMedia(video);
+    
+    console.log('[Player] HLS source attached');
 
     // Manifest parsed = ready to play
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
