@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, startTransition, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Tv, ArrowLeft, Search, Settings, RefreshCw, Database } from 'lucide-react';
+import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
@@ -434,9 +435,17 @@ export default function AppPlayer() {
             )}
             
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold truncate">
-                {isBackendSearchActive ? 'Busca' : tabTitle}
-              </h1>
+              {activeTab === 'home' && !isBackendSearchActive ? (
+                <img 
+                  src={logoWhite} 
+                  alt="IPTVLink" 
+                  className="h-6 sm:h-7 w-auto object-contain"
+                />
+              ) : (
+                <h1 className="text-base sm:text-lg font-semibold truncate">
+                  {isBackendSearchActive ? 'Busca' : tabTitle}
+                </h1>
+              )}
               {/* Content count */}
               <span className="hidden sm:inline text-sm text-muted-foreground flex-shrink-0">
                 {isBackendSearchActive && (
