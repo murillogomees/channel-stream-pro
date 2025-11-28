@@ -38,11 +38,21 @@ import {
 } from '@/features/player/services';
 import type { WatchProgress, TrendingItem, ContentType } from '@/features/player/types';
 
+// Separate component for Client content
+function ClientPlayerContent() {
+  return useIPTVPlayerClient();
+}
+
+// Separate component for Admin content  
+function AdminPlayerContent() {
+  return useIPTVPlayerAdmin(undefined, true);
+}
+
 export default function AppPlayer() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   
-  // Use different hooks based on role - admin hook only enabled for admins
+  // FIXED: Use hooks unconditionally, but control which one is active
   const clientPlayer = useIPTVPlayerClient();
   const adminPlayer = useIPTVPlayerAdmin(undefined, isAdmin);
   
@@ -483,281 +493,184 @@ export default function AppPlayer() {
                 {!isBackendSearchActive && activeTab === 'live' && `${counts.live.toLocaleString()} canais`}
                 {!isBackendSearchActive && activeTab === 'movies' && `${counts.movies.toLocaleString()} filmes`}
                 {!isBackendSearchActive && activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
-                {!isBackendSearchActive && activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
+                {!isBackendSearchActive && activeTab === 'favorites' && `${filteredChannels.length} favoritos`}
               </span>
-              {/* Cache indicator */}
-              {isCached && !isLoadingMore && !isBackendSearchActive && (
-                <div className="hidden sm:flex items-center gap-1 text-xs text-green-500 flex-shrink-0">
-                  <Database className="w-3 h-3" />
-                  <span>Cache</span>
-                </div>
-              )}
-              {/* Background loading indicator */}
-              {isLoadingMore && (
-                <div className="hidden sm:flex items-center gap-2 text-xs text-primary animate-pulse flex-shrink-0">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>{loadingProgress}</span>
-                </div>
-              )}
             </div>
           </div>
-
+          
+          {/* Search bar */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Refresh button */}
-            {!isAdmin && clearCacheAndReload && (
+            {/* Admin list selector */}
+            {isAdmin && availableLists.length > 0 && (
+              <Select
+                value={assignedPlaylist?.id || ''}
+                onValueChange={(value) => selectList?.(value)}
+              >
+                <SelectTrigger className="w-[140px] sm:w-[180px]">
+                  <SelectValue placeholder="Selecionar lista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLists.map((list: any) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* Cache indicator and refresh for clients */}
+            {!isAdmin && isCached && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={clearCacheAndReload}
-                className="h-9 w-9"
                 title="Atualizar playlist"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            )}
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-[140px] sm:w-[200px] lg:w-[280px] pl-9 h-9 text-sm"
-              />
-              {isSearching && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary" />
-              )}
-            </div>
-
-            {/* Sort select for movies */}
-            {activeTab === 'movies' && (
-              <Select value={movieSortBy} onValueChange={(v) => setMovieSortBy(v as MovieSortOption)}>
-                <SelectTrigger className="w-[90px] sm:w-[100px] h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">A-Z</SelectItem>
-                  <SelectItem value="rating">Avaliação</SelectItem>
-                  <SelectItem value="year">Ano</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Sort select for series */}
-            {activeTab === 'series' && (
-              <Select value={seriesSortBy} onValueChange={(v) => setSeriesSortBy(v as SeriesSortOption)}>
-                <SelectTrigger className="w-[90px] sm:w-[100px] h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">A-Z</SelectItem>
-                  <SelectItem value="rating">Avaliação</SelectItem>
-                  <SelectItem value="year">Ano</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Admin playlist selector */}
-            {isAdmin && availableLists.length > 0 && (
-              <select
-                value={assignedPlaylist?.id || ""}
-                onChange={(e) => selectList?.(e.target.value)}
-                className="hidden sm:block px-3 py-1.5 rounded-lg bg-background/50 border border-border text-xs text-foreground"
-              >
-                {availableLists.map((list: any) => (
-                  <option key={list.id} value={list.id}>
-                    {list.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Client playlist name badge */}
-            {!isAdmin && assignedPlaylist && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
-                <Tv className="w-3 h-3" />
-                <span className="truncate max-w-[120px]">{assignedPlaylist.name}</span>
-              </div>
-            )}
-
-            {/* Settings button - only for admins */}
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/dashboard')}
                 className="flex-shrink-0"
               >
-                <Settings className="w-5 h-5" />
+                <Database className="w-4 h-4" />
               </Button>
             )}
+            
+            {/* Loading more indicator */}
+            {isLoadingMore && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span className="hidden sm:inline">{loadedChannels.toLocaleString()}/{totalChannels.toLocaleString()}</span>
+              </div>
+            )}
+            
+            <div className="relative w-40 sm:w-48 md:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 h-9 sm:h-10"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
           </div>
         </header>
 
         {/* Content */}
-        <div className="pt-14 sm:pt-16 pb-24 md:pb-4">
-          {/* Home View */}
-          {activeTab === 'home' && (
-            <>
-              {/* Show search results if searching */}
-              {isBackendSearchActive ? (
-                <div className="px-3 py-4 sm:p-6 lg:p-8">
-                  <h2 className="text-xl font-semibold mb-4">
-                    {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
-                  </h2>
-                  {isSearching ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : filteredChannels.length > 0 ? (
-                    <TVContentGrid
-                      channels={filteredChannels}
-                      isFavorite={isFavorite}
-                      onPlay={handlePlay}
-                      onToggleFavorite={toggleFavorite}
-                    />
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground">Nenhum resultado encontrado</p>
-                      <p className="text-sm text-muted-foreground/70 mt-1">
-                        Tente buscar por outro termo
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {featuredItems.length > 0 && (
-                    <TVHeroSection
-                      items={featuredItems}
-                      onPlay={(item) => {
-                        const channel = allChannels.find(ch => ch.id === item.id);
-                        if (channel) handlePlay(channel);
-                      }}
-                      onToggleFavorite={toggleFavorite}
-                      isFavorite={isFavorite}
-                    />
-                  )}
-                  
-                  <div className="pb-16 space-y-2">
-                    {/* Continue Watching - Smart Feature */}
-                    <ContinueWatchingRow
-                      items={continueWatchingItems}
-                      onPlay={(item: WatchProgress) => {
-                        // Try to find channel in playlist or just navigate with the data
-                        const channel = allChannels.find(ch => ch.id === item.content_id);
-                        if (channel) {
-                          handlePlay(channel);
-                        } else {
-                          // Navigate with resume position
-                          setPlayerChannel({
-                            id: item.content_id,
-                            name: item.content_name,
-                            tvg_logo: item.content_logo,
-                            category_name: item.content_category,
-                            stream_url: '', // Will need to be resolved
-                          });
-                          setShowPlayerDialog(true);
-                        }
-                      }}
-                      onRemove={async (contentId: string) => {
-                        await removeContinueWatchingItem(contentId);
-                      }}
-                      isLoading={loadingContinueWatching}
-                    />
-
-                    {/* Top 10 - Smart Feature */}
-                    <Top10Row
-                      items={trendingItems}
-                      title="Top 10 da Semana"
-                      onPlay={(item: TrendingItem) => {
-                        const channel = allChannels.find(ch => ch.id === item.content_id);
-                        if (channel) {
-                          handlePlay(channel);
-                        }
-                      }}
-                      onInfo={(item: TrendingItem) => {
-                        // For now, just play the content
-                        const channel = allChannels.find(ch => ch.id === item.content_id);
-                        if (channel) {
-                          handlePlay(channel);
-                        }
-                      }}
-                      isLoading={loadingTrending}
-                    />
-
-                    {/* Existing category content rows */}
-                    {homeContent.map((category) => (
-                      <TVContentRow
-                        key={category.id}
-                        title={category.display_name}
-                        itemCount={category.channels.length}
-                      >
-                        {category.channels.map((channel) => (
-                          <TVContentCard
-                            key={channel.id}
-                            id={channel.id}
-                            name={channel.name}
-                            logo={channel.tvg_logo || undefined}
-                            category={category.display_name}
-                            isFavorite={isFavorite(channel.id)}
-                            onPlay={() => handlePlay(channel)}
-                            onToggleFavorite={() => toggleFavorite(channel.id)}
-                          />
-                        ))}
-                      </TVContentRow>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
+        <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
+          {/* Category filter for live/movies/series */}
+          {(activeTab === 'live' || activeTab === 'movies' || activeTab === 'series') && currentTabCategories.length > 0 && (
+            <TVCategoryFilter
+              categories={currentTabCategories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
           )}
 
-          {/* Favorites View */}
-          {activeTab === 'favorites' && (
-            <div className="pb-16">
-              <TVContentGrid
-                channels={filteredChannels}
-                isFavorite={isFavorite}
-                onPlay={handlePlay}
-                onToggleFavorite={toggleFavorite}
-                emptyMessage="Adicione canais aos favoritos para vê-los aqui"
-              />
+          {/* Content based on active tab */}
+          {activeTab === 'home' && (
+            <div className="space-y-6 px-4 lg:px-6 py-4">
+              {/* Hero Section */}
+              {featuredItems.length > 0 && !isBackendSearchActive && (
+                <TVHeroSection
+                  items={featuredItems}
+                  onPlay={handlePlay}
+                />
+              )}
+
+              {/* Continue Watching */}
+              {!isBackendSearchActive && continueWatchingItems.length > 0 && (
+                <ContinueWatchingRow
+                  items={continueWatchingItems}
+                  onPlay={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }}
+                  onRemove={removeContinueWatchingItem}
+                />
+              )}
+
+              {/* Top 10 */}
+              {!isBackendSearchActive && trendingItems.length > 0 && (
+                <Top10Row
+                  items={trendingItems}
+                  onPlay={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }}
+                />
+              )}
+
+              {/* Search results */}
+              {isBackendSearchActive && filteredChannels.length > 0 && (
+                <TVContentGrid
+                  channels={filteredChannels}
+                  onPlay={handlePlay}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={toggleFavorite}
+                />
+              )}
+
+              {/* Home sections */}
+              {!isBackendSearchActive && homeContent.map((section, index) => (
+                <TVContentRow
+                  key={section.id}
+                  title={section.display_name}
+                  channels={section.channels}
+                  onPlay={handlePlay}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
             </div>
           )}
 
-          {/* Live TV View - Special layout with EPG, zapping, PIP */}
           {activeTab === 'live' && (
-            <div className="px-3 py-2 sm:p-4 lg:p-6 pb-20">
-              {isBackendSearchActive ? (
-                <>
-                  <h2 className="text-xl font-semibold mb-4">
-                    {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
-                  </h2>
-                  {isSearching ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : filteredChannels.length > 0 ? (
-                    <TVContentGrid
-                      channels={filteredChannels}
-                      isFavorite={isFavorite}
-                      onPlay={handlePlay}
-                      onToggleFavorite={toggleFavorite}
-                    />
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground">Nenhum resultado encontrado</p>
-                    </div>
-                  )}
-                </>
+            <LiveTVView
+              categories={categorizedContent.live}
+              selectedCategory={selectedCategory}
+              onPlay={handlePlay}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+            />
+          )}
+
+          {activeTab === 'movies' && (
+            <MoviesView
+              categories={categorizedContent.movies}
+              selectedCategory={selectedCategory}
+              onPlay={handlePlay}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              sortBy={movieSortBy}
+              onSortChange={setMovieSortBy}
+            />
+          )}
+
+          {activeTab === 'series' && (
+            <SeriesView
+              categories={categorizedContent.series}
+              selectedCategory={selectedCategory}
+              onPlay={handlePlay}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              sortBy={seriesSortBy}
+              onSortChange={setSeriesSortBy}
+            />
+          )}
+
+          {activeTab === 'favorites' && (
+            <div className="px-4 lg:px-6 py-4">
+              {filteredChannels.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <Tv className="w-16 h-16 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Nenhum favorito</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    Adicione canais aos favoritos clicando no ícone de coração para encontrá-los rapidamente aqui.
+                  </p>
+                </div>
               ) : (
-                <LiveTVView
-                  channels={categorizedContent.live.flatMap(cat => 
-                    cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
-                  )}
-                  currentChannel={currentChannel}
-                  onChannelChange={changeChannel}
+                <TVContentGrid
+                  channels={filteredChannels}
                   onPlay={handlePlay}
                   isFavorite={isFavorite}
                   onToggleFavorite={toggleFavorite}
@@ -765,245 +678,56 @@ export default function AppPlayer() {
               )}
             </div>
           )}
-
-          {/* Movies View - Enhanced with TMDB integration */}
-          {activeTab === 'movies' && (
-            isBackendSearchActive ? (
-              <div className="px-3 py-4 sm:p-6 lg:p-8">
-                <h2 className="text-xl font-semibold mb-4">
-                  {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
-                </h2>
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                ) : filteredChannels.length > 0 ? (
-                  <TVContentGrid
-                    channels={filteredChannels}
-                    isFavorite={isFavorite}
-                    onPlay={handlePlay}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">Nenhum resultado encontrado</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <MoviesView
-                categories={categorizedContent.movies}
-                onPlay={handlePlay}
-                isFavorite={isFavorite}
-                onToggleFavorite={toggleFavorite}
-                searchQuery={searchQuery}
-                sortBy={movieSortBy}
-              />
-            )
-          )}
-
-          {/* Series View - Enhanced with TMDB integration */}
-          {activeTab === 'series' && (
-            isBackendSearchActive ? (
-              <div className="px-3 py-4 sm:p-6 lg:p-8">
-                <h2 className="text-xl font-semibold mb-4">
-                  {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
-                </h2>
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                ) : filteredChannels.length > 0 ? (
-                  <TVContentGrid
-                    channels={filteredChannels}
-                    isFavorite={isFavorite}
-                    onPlay={handlePlay}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">Nenhum resultado encontrado</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <SeriesView
-                categories={categorizedContent.series}
-                onPlay={handlePlay}
-                isFavorite={isFavorite}
-                onToggleFavorite={toggleFavorite}
-                searchQuery={searchQuery}
-                sortBy={seriesSortBy}
-              />
-            )
-          )}
         </div>
       </main>
 
-      {/* YouTube Style Player with Progress Tracking */}
+      {/* Player Dialog */}
       {showPlayerDialog && playerChannel && (
-        <PlayerWithProgressTracking
-          channel={playerChannel}
-          getStreamUrl={getStreamUrl}
-          isFavorite={isFavorite}
-          toggleFavorite={toggleFavorite}
+        <YouTubeStylePlayer
+          url={getStreamUrl(playerChannel)}
+          title={playerChannel.name}
+          logo={playerChannel.tvg_logo}
+          category={playerChannel.category_name || 'Geral'}
+          autoplay
           onBack={() => {
             setShowPlayerDialog(false);
             setPlayerChannel(null);
+            // Refresh continue watching when player closes
+            refreshContinueWatching();
           }}
-          onError={(error) => {
-            console.error('[IPTV] Player error:', error);
+          onError={(err) => console.error('Player error:', err)}
+          isFavorite={isFavorite(playerChannel.id)}
+          onToggleFavorite={() => toggleFavorite(playerChannel.id)}
+          onTimeUpdate={(time, dur) => {
+            // Track watch progress
+            if (time > 10 && dur > 0) {
+              watchProgressService.updateProgress({
+                profile_id: '', // Will be set by service
+                content_id: playerChannel.id,
+                content_type: streamService.needsProxy(playerChannel.stream_url) ? 'live' : 'vod',
+                content_name: playerChannel.name,
+                content_logo: playerChannel.tvg_logo,
+                content_category: playerChannel.category_name,
+                progress_seconds: Math.floor(time),
+                duration_seconds: Math.floor(dur),
+              }).catch(console.warn);
+            }
           }}
-          refreshContinueWatching={refreshContinueWatching}
+          onPlaybackStart={() => {
+            // Track view start
+            analyticsService.trackEvent({
+              event_type: 'view_start',
+              content_id: playerChannel.id,
+              content_type: 'channel',
+              content_name: playerChannel.name,
+              metadata: {
+                category: playerChannel.category_name,
+                has_logo: !!playerChannel.tvg_logo,
+              },
+            }).catch(console.warn);
+          }}
         />
       )}
     </div>
-  );
-}
-
-/**
- * Player wrapper with progress tracking
- */
-function PlayerWithProgressTracking({
-  channel,
-  getStreamUrl,
-  isFavorite,
-  toggleFavorite,
-  onBack,
-  onError,
-  refreshContinueWatching,
-}: {
-  channel: any;
-  getStreamUrl: (channel: any) => string;
-  isFavorite: (id: string) => boolean;
-  toggleFavorite: (id: string) => void;
-  onBack: () => void;
-  onError: (error: any) => void;
-  refreshContinueWatching: () => void;
-}) {
-  const lastSaveTimeRef = useRef<number>(0);
-  const currentProgressRef = useRef<number>(0);
-  const totalDurationRef = useRef<number>(0);
-  const hasStartedRef = useRef<boolean>(false);
-  
-  // Determine content type from channel data
-  const getContentType = (): ContentType => {
-    const catName = (channel.category_name || '').toLowerCase();
-    if (catName.includes('filme') || catName.includes('movie')) return 'movie';
-    if (catName.includes('série') || catName.includes('series')) return 'series';
-    return 'live';
-  };
-  
-  const contentType = getContentType();
-  
-  // Handle time updates - save progress every 30 seconds
-  const handleTimeUpdate = useCallback(async (currentTime: number, duration: number) => {
-    currentProgressRef.current = currentTime;
-    totalDurationRef.current = duration;
-    
-    const now = Date.now();
-    // Only save every 30 seconds
-    if (now - lastSaveTimeRef.current < 30000) return;
-    
-    lastSaveTimeRef.current = now;
-    
-    // Only save progress for VOD content (not live)
-    if (contentType === 'live') return;
-    
-    try {
-      await watchProgressService.updateProgress(
-        channel.id,
-        contentType,
-        channel.name,
-        currentTime,
-        duration,
-        {
-          contentLogo: channel.tvg_logo,
-          contentCategory: channel.category_name,
-        }
-      );
-      console.log(`[Progress] Saved: ${Math.round(currentTime)}s / ${Math.round(duration)}s`);
-    } catch (error) {
-      console.error('[Progress] Error saving:', error);
-    }
-  }, [channel, contentType]);
-  
-  // Handle playback start
-  const handlePlaybackStart = useCallback(async () => {
-    if (hasStartedRef.current) return;
-    hasStartedRef.current = true;
-    
-    try {
-      await analyticsService.trackPlay(channel.id, contentType, {
-        category: channel.category_name,
-      });
-      console.log(`[Analytics] Playback started: ${channel.name}`);
-    } catch (error) {
-      console.error('[Analytics] Error tracking play:', error);
-    }
-  }, [channel, contentType]);
-  
-  // Handle playback complete
-  const handlePlaybackComplete = useCallback(async () => {
-    if (contentType === 'live') return;
-    
-    try {
-      await watchProgressService.markCompleted(channel.id);
-      await watchProgressService.addToHistory(
-        channel.id,
-        contentType,
-        channel.name,
-        totalDurationRef.current,
-        {
-          contentLogo: channel.tvg_logo,
-          contentCategory: channel.category_name,
-        }
-      );
-      console.log(`[Progress] Completed: ${channel.name}`);
-    } catch (error) {
-      console.error('[Progress] Error marking complete:', error);
-    }
-  }, [channel, contentType]);
-  
-  // Save progress when closing player
-  const handleBack = useCallback(async () => {
-    if (contentType !== 'live' && currentProgressRef.current > 0) {
-      try {
-        await watchProgressService.updateProgress(
-          channel.id,
-          contentType,
-          channel.name,
-          currentProgressRef.current,
-          totalDurationRef.current,
-          {
-            contentLogo: channel.tvg_logo,
-            contentCategory: channel.category_name,
-          }
-        );
-        console.log(`[Progress] Final save: ${Math.round(currentProgressRef.current)}s`);
-        // Refresh continue watching list
-        refreshContinueWatching();
-      } catch (error) {
-        console.error('[Progress] Error final save:', error);
-      }
-    }
-    onBack();
-  }, [channel, contentType, onBack, refreshContinueWatching]);
-  
-  return (
-    <YouTubeStylePlayer
-      url={getStreamUrl(channel)}
-      title={channel.name}
-      logo={channel.tvg_logo || undefined}
-      category={channel.category_name || 'Geral'}
-      autoplay
-      isFavorite={isFavorite(channel.id)}
-      onToggleFavorite={() => toggleFavorite(channel.id)}
-      onBack={handleBack}
-      onError={onError}
-      onTimeUpdate={handleTimeUpdate}
-      onPlaybackStart={handlePlaybackStart}
-      onPlaybackComplete={handlePlaybackComplete}
-    />
   );
 }
