@@ -15,7 +15,6 @@ export interface SystemHealthStatus {
     websocket: ServiceHealth;
     supabase: ServiceHealth;
     whatsapp: ServiceHealth;
-    smartone: ServiceHealth;
   };
   lastUpdate: number;
 }
@@ -46,13 +45,7 @@ class SystemHealthService {
           lastCheck: 0,
         },
         whatsapp: {
-          name: 'WhatsApp API',
-          status: 'unknown',
-          latency: null,
-          lastCheck: 0,
-        },
-        smartone: {
-          name: 'SmartOne IPTV',
+          name: 'WhatsApp API (BotBot)',
           status: 'unknown',
           latency: null,
           lastCheck: 0,
@@ -93,7 +86,6 @@ class SystemHealthService {
       this.checkSupabase(),
       this.checkWebSocket(),
       this.checkWhatsApp(),
-      this.checkSmartOne(),
     ]);
     
     this.updateOverallStatus();
@@ -207,85 +199,6 @@ class SystemHealthService {
       latency: null,
       lastCheck: Date.now(),
     };
-  }
-
-  private async checkSmartOne(): Promise<void> {
-    const startTime = Date.now();
-    
-    try {
-      // Get SmartOne config from localStorage (same as smartoneService)
-      const configStr = localStorage.getItem('smartone_config');
-      
-      if (!configStr) {
-        this.healthStatus.services.smartone = {
-          name: 'SmartOne IPTV',
-          status: 'unknown',
-          latency: null,
-          lastCheck: Date.now(),
-          error: 'Integração não configurada',
-        };
-        return;
-      }
-
-      const config = JSON.parse(configStr);
-      
-      if (!config.enabled) {
-        this.healthStatus.services.smartone = {
-          name: 'SmartOne IPTV',
-          status: 'unknown',
-          latency: null,
-          lastCheck: Date.now(),
-          error: 'Integração desabilitada',
-        };
-        return;
-      }
-
-      if (!config.keyApi) {
-        this.healthStatus.services.smartone = {
-          name: 'SmartOne IPTV',
-          status: 'unknown',
-          latency: null,
-          lastCheck: Date.now(),
-          error: 'API Key não configurada',
-        };
-        return;
-      }
-
-      const baseUrl = config.baseUrl || 'https://api.smartone.tv';
-      const response = await fetch(`${baseUrl}/health`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${config.keyApi}`,
-        },
-      });
-
-      const latency = Date.now() - startTime;
-
-      if (!response.ok) {
-        this.healthStatus.services.smartone = {
-          name: 'SmartOne IPTV',
-          status: 'down',
-          latency,
-          lastCheck: Date.now(),
-          error: `HTTP ${response.status}`,
-        };
-      } else {
-        this.healthStatus.services.smartone = {
-          name: 'SmartOne IPTV',
-          status: latency > 3000 ? 'degraded' : 'operational',
-          latency,
-          lastCheck: Date.now(),
-        };
-      }
-    } catch (error) {
-      this.healthStatus.services.smartone = {
-        name: 'SmartOne IPTV',
-        status: 'down',
-        latency: null,
-        lastCheck: Date.now(),
-        error: error instanceof Error ? error.message : 'Erro de conexão',
-      };
-    }
   }
 
   updateWebSocketHealth(health: ServiceHealth) {

@@ -149,9 +149,9 @@ class MetricsPersistenceService {
         whatsapp_status: health.services.whatsapp.status,
         whatsapp_latency: health.services.whatsapp.latency,
         whatsapp_error: health.services.whatsapp.error || null,
-        smartone_status: health.services.smartone.status,
-        smartone_latency: health.services.smartone.latency,
-        smartone_error: health.services.smartone.error || null,
+        smartone_status: null,
+        smartone_latency: null,
+        smartone_error: null,
       };
 
       const { error } = await supabase
