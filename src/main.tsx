@@ -2,9 +2,13 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
+import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
 
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
+
+// Register Service Worker
+registerServiceWorker();
 
 // Suprimir erros de WebSocket do Realtime para evitar impacto no Lighthouse/SEO
 const originalConsoleError = console.error;
@@ -44,23 +48,20 @@ createRoot(document.getElementById("root")!).render(
   <App />
 );
 
-// Register service worker for PWA - only in production, defer to idle
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  // Usar requestIdleCallback para não bloquear render
-  const registerSW = () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        // Check for updates periodically
-        setInterval(() => registration.update(), 60 * 60 * 1000);
-      })
-      .catch(() => {
-        // Silent fail - SW not critical
-      });
-  };
-  
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(registerSW, { timeout: 5000 });
-  } else {
-    setTimeout(registerSW, 3000);
-  }
+// Screen Orientation API - lock landscape when player goes fullscreen
+if ('screen' in window && 'orientation' in screen) {
+  document.addEventListener('fullscreenchange', () => {
+    const isFullscreen = !!document.fullscreenElement;
+    const isVideoPlayer = document.fullscreenElement?.tagName === 'VIDEO' || 
+                          document.fullscreenElement?.classList.contains('video-player') ||
+                          document.fullscreenElement?.querySelector('video');
+    
+    if (isFullscreen && isVideoPlayer) {
+      // Lock to landscape in fullscreen video
+      (screen.orientation as any).lock?.('landscape').catch(() => {});
+    } else if (!isFullscreen) {
+      // Unlock orientation when exiting fullscreen
+      (screen.orientation as any).unlock?.();
+    }
+  });
 }
