@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -28,6 +28,8 @@ interface M3UList {
   file_url?: string;
 }
 
+const BATCH_SIZE = 300; // Load 300 channels per batch for quick initial display
+
 export function useIPTVPlayerAdmin(selectedListId?: string) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
@@ -37,8 +39,14 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   const [hasLoadedLists, setHasLoadedLists] = useState(false);
   const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
+  const [totalChannels, setTotalChannels] = useState(0);
+  const [loadedChannels, setLoadedChannels] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fileUrlRef = useRef<string | null>(null);
 
-  // Load available M3U lists for admin selection - using default playlist from m3u_lists
+  // Load available M3U lists for admin selection
   const loadAvailableLists = useCallback(async () => {
     if (hasLoadedLists) return;
     
@@ -55,7 +63,6 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
       setAvailableLists(data || []);
       setHasLoadedLists(true);
       
-      // Auto-select default list if found
       if (!selectedListId && data && data.length > 0) {
         setCustomListId(data[0].id);
       } else if (!data || data.length === 0) {
@@ -70,14 +77,125 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     }
   }, [selectedListId, hasLoadedLists]);
 
-  // Load playlist from default M3U list - now loads ALL channels
+  // Group channels into categories (helper function)
+  const groupChannelsIntoCategories = useCallback((channels: any[], existingCategories: Category[] = []): Category[] => {
+    const categoriesMap = new Map<string, Category>();
+    
+    // Start with existing categories
+    existingCategories.forEach(cat => {
+      categoriesMap.set(cat.name, { ...cat, channels: [...cat.channels] });
+    });
+
+    for (const channel of channels) {
+      const categoryName = channel.category_name || 'Sem Categoria';
+      
+      if (!categoriesMap.has(categoryName)) {
+        categoriesMap.set(categoryName, {
+          id: `cat-${categoriesMap.size}`,
+          name: categoryName,
+          display_name: categoryName,
+          icon: null,
+          channels: []
+        });
+      }
+      
+      const category = categoriesMap.get(categoryName)!;
+      category.channels.push({
+        id: channel.id,
+        name: channel.name,
+        stream_url: channel.stream_url,
+        tvg_logo: channel.tvg_logo,
+        tvg_id: null,
+        category_id: category.id,
+        category_name: categoryName,
+        order_position: category.channels.length
+      });
+    }
+
+    return Array.from(categoriesMap.values());
+  }, []);
+
+  // Load more channels in background
+  const loadMoreChannels = useCallback(async (fileUrl: string, offset: number, total: number, existingCategories: Category[]) => {
+    if (offset >= total) {
+      setIsLoadingMore(false);
+      return;
+    }
+
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
+      const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
+      
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          url: fileUrl,
+          limit: BATCH_SIZE,
+          offset: offset
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar mais canais');
+      }
+
+      const { channels, hasMore } = await response.json();
+      
+      // Merge with existing categories
+      const updatedCategories = groupChannelsIntoCategories(channels, existingCategories);
+      setCategories(updatedCategories);
+      setLoadedChannels(prev => prev + channels.length);
+      
+      const newLoaded = offset + channels.length;
+      setLoadingProgress(`Carregando: ${newLoaded.toLocaleString()}/${total.toLocaleString()}`);
+      
+      // Continue loading more if available
+      if (hasMore && !controller.signal.aborted) {
+        // Small delay to not overwhelm the server
+        setTimeout(() => {
+          loadMoreChannels(fileUrl, offset + BATCH_SIZE, total, updatedCategories);
+        }, 100);
+      } else {
+        setIsLoadingMore(false);
+        setLoadingProgress('');
+        toast.success(`${total.toLocaleString()} canais carregados`);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('[IPTV Admin] Background loading cancelled');
+      } else {
+        console.error('[IPTV Admin] Error loading more channels:', error);
+      }
+      setIsLoadingMore(false);
+    }
+  }, [groupChannelsIntoCategories]);
+
+  // Load playlist with progressive loading
   const loadPlaylist = useCallback(async (listId: string) => {
     if (isLoadingPlaylist) return;
+    
+    // Cancel any ongoing background loading
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     
     try {
       setIsLoading(true);
       setIsLoadingPlaylist(true);
       setLoadingProgress('Buscando playlist...');
+      setCategories([]);
+      setTotalChannels(0);
+      setLoadedChannels(0);
 
       // Get the M3U file URL
       const { data: listData, error: listError } = await supabase
@@ -86,103 +204,93 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         .eq('id', listId)
         .single();
 
-      if (listError) {
-        throw listError;
-      }
+      if (listError) throw listError;
+      
+      fileUrlRef.current = listData.file_url;
 
-      // Fetch and parse M3U file using proxy - NO LIMIT to get all channels
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      // Fetch first batch quickly
       const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
       
       const controller = new AbortController();
-      // Increased timeout to 60 seconds for large playlists
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for first batch
       
-      try {
-        setLoadingProgress('Baixando e processando canais...');
-        
-        const proxyResponse = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-          body: JSON.stringify({ 
-            url: listData.file_url
-            // No limit - fetch all channels
-          }),
-          signal: controller.signal
-        });
+      setLoadingProgress('Carregando canais...');
+      
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          url: listData.file_url,
+          limit: BATCH_SIZE,
+          offset: 0
+        }),
+        signal: controller.signal
+      });
 
-        clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-        if (!proxyResponse.ok) {
-          const errorData = await proxyResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
-          throw new Error(errorData.error || 'Erro ao buscar M3U');
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(errorData.error || 'Erro ao buscar M3U');
+      }
 
-        const { channels, total } = await proxyResponse.json();
-        
-        setLoadingProgress(`Organizando ${total.toLocaleString()} canais...`);
-        
-        // Group channels by category
-        const categoriesMap = new Map<string, Category>();
-
-        for (const channel of channels) {
-          const categoryName = channel.category_name || 'Sem Categoria';
-          
-          if (!categoriesMap.has(categoryName)) {
-            categoriesMap.set(categoryName, {
-              id: `cat-${categoriesMap.size}`,
-              name: categoryName,
-              display_name: categoryName,
-              icon: null,
-              channels: []
-            });
-          }
-          
-          const category = categoriesMap.get(categoryName)!;
-          category.channels.push({
-            id: channel.id,
-            name: channel.name,
-            stream_url: channel.stream_url,
-            tvg_logo: channel.tvg_logo,
-            tvg_id: null,
-            category_id: category.id,
-            category_name: categoryName,
-            order_position: category.channels.length
-          });
-        }
-
-        const categoriesArray = Array.from(categoriesMap.values());
-        setCategories(categoriesArray);
-        
-        // Log totals for debugging
-        const totalChannels = categoriesArray.reduce((acc, cat) => acc + cat.channels.length, 0);
-        console.log(`[IPTV Admin] Loaded ${totalChannels} channels in ${categoriesArray.length} categories`);
-        
+      const { channels, total, hasMore } = await response.json();
+      
+      setTotalChannels(total);
+      setLoadedChannels(channels.length);
+      
+      // Group channels into categories
+      const categoriesArray = groupChannelsIntoCategories(channels);
+      setCategories(categoriesArray);
+      
+      // Set first channel as default
+      if (categoriesArray.length > 0 && categoriesArray[0].channels.length > 0) {
+        setCurrentChannel(categoriesArray[0].channels[0]);
+      }
+      
+      // Show initial content
+      setIsLoading(false);
+      setIsLoadingPlaylist(false);
+      
+      const loadedCount = channels.length;
+      console.log(`[IPTV Admin] First batch: ${loadedCount} of ${total} channels`);
+      
+      if (loadedCount < total) {
+        toast.success(`${loadedCount.toLocaleString()} canais carregados, carregando mais...`);
+        setLoadingProgress(`Carregando: ${loadedCount.toLocaleString()}/${total.toLocaleString()}`);
+      } else {
         toast.success(`${total.toLocaleString()} canais carregados`);
-
-        // Set first channel as default
-        if (categoriesArray.length > 0 && categoriesArray[0].channels.length > 0) {
-          setCurrentChannel(categoriesArray[0].channels[0]);
-        }
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          throw new Error('Tempo limite excedido (60s). A playlist é muito grande.');
-        }
-        throw error;
+        setLoadingProgress('');
+      }
+      
+      // Continue loading remaining channels in background
+      if (hasMore) {
+        setIsLoadingMore(true);
+        setTimeout(() => {
+          loadMoreChannels(listData.file_url, BATCH_SIZE, total, categoriesArray);
+        }, 500);
       }
 
     } catch (error: any) {
       console.error('[IPTV Admin] Error loading playlist:', error);
-      toast.error(error.message || 'Erro ao carregar playlist');
-    } finally {
+      
+      let errorMsg = error.message || 'Erro ao carregar playlist';
+      if (error.name === 'AbortError') {
+        errorMsg = 'Timeout ao carregar. Tente novamente.';
+      }
+      
+      toast.error(errorMsg);
       setIsLoading(false);
       setIsLoadingPlaylist(false);
       setLoadingProgress('');
     }
-  }, [isLoadingPlaylist]);
+  }, [isLoadingPlaylist, groupChannelsIntoCategories, loadMoreChannels]);
 
   useEffect(() => {
     loadAvailableLists();
@@ -192,6 +300,13 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     if (customListId && !isLoadingPlaylist) {
       loadPlaylist(customListId);
     }
+    
+    // Cleanup on unmount or list change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [customListId]);
 
   const changeChannel = useCallback((channel: Channel) => {
@@ -227,6 +342,9 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
     loadingProgress,
     customListId,
     availableLists,
+    totalChannels,
+    loadedChannels,
+    isLoadingMore,
     changeChannel,
     nextChannel,
     previousChannel,
