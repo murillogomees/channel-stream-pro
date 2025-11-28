@@ -96,6 +96,7 @@ export default function YouTubeStylePlayer({
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [volume, setVolume] = useState(muted ? 0 : 100);
@@ -113,6 +114,10 @@ export default function YouTubeStylePlayer({
     codec: '',
     fps: 0,
   });
+  
+  // Refs for debouncing
+  const hasConnectedOnceRef = useRef(false);
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Detect stream info
   const streamInfo = detectStreamType(url);
@@ -219,16 +224,46 @@ export default function YouTubeStylePlayer({
     const handlers = {
       play: () => setIsPlaying(true),
       pause: () => setIsPlaying(false),
-      waiting: () => setIsLoading(true),
+      waiting: () => {
+        // Only show loading if we haven't connected yet
+        // After first connection, show subtle buffering indicator instead
+        if (!hasConnectedOnceRef.current) {
+          setIsLoading(true);
+        } else {
+          // Debounce buffer indicator - only show if waiting > 500ms
+          if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+          bufferTimeoutRef.current = setTimeout(() => {
+            setIsBuffering(true);
+          }, 500);
+        }
+      },
       canplay: () => {
+        // Clear buffer timeout
+        if (bufferTimeoutRef.current) {
+          clearTimeout(bufferTimeoutRef.current);
+          bufferTimeoutRef.current = null;
+        }
         setIsLoading(false);
-        setConnectionStatus('connected');
+        setIsBuffering(false);
+        if (!hasConnectedOnceRef.current) {
+          hasConnectedOnceRef.current = true;
+          setConnectionStatus('connected');
+        }
       },
       playing: () => {
+        // Clear buffer timeout
+        if (bufferTimeoutRef.current) {
+          clearTimeout(bufferTimeoutRef.current);
+          bufferTimeoutRef.current = null;
+        }
         setIsLoading(false);
+        setIsBuffering(false);
         setIsPlaying(true);
         setHasError(false);
-        setConnectionStatus('connected');
+        if (!hasConnectedOnceRef.current) {
+          hasConnectedOnceRef.current = true;
+          setConnectionStatus('connected');
+        }
         // Track playback start
         if (!hasStartedPlayingRef.current) {
           hasStartedPlayingRef.current = true;
@@ -263,7 +298,17 @@ export default function YouTubeStylePlayer({
       },
       error: () => {
         setIsLoading(false);
+        setIsBuffering(false);
         setConnectionStatus('error');
+      },
+      stalled: () => {
+        // Stream stalled - only show indicator after delay
+        if (hasConnectedOnceRef.current) {
+          if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+          bufferTimeoutRef.current = setTimeout(() => {
+            setIsBuffering(true);
+          }, 1000);
+        }
       },
     };
 
@@ -272,6 +317,7 @@ export default function YouTubeStylePlayer({
     });
 
     return () => {
+      if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
       Object.entries(handlers).forEach(([event, handler]) => {
         video.removeEventListener(event, handler);
       });
@@ -283,7 +329,10 @@ export default function YouTubeStylePlayer({
     const video = videoRef.current;
     if (!video || !url) return;
 
+    // Reset connection state for new URL
+    hasConnectedOnceRef.current = false;
     setIsLoading(true);
+    setIsBuffering(false);
     setHasError(false);
     setErrorMessage('');
     setConnectionStatus('connecting');
@@ -322,6 +371,11 @@ export default function YouTubeStylePlayer({
         enableWorker: true,
         liveBufferLatencyChasing: true,
         liveSync: true,
+        stashInitialSize: 384 * 1024, // 384KB initial buffer
+        enableStashBuffer: true,
+        autoCleanupSourceBuffer: true,
+        autoCleanupMaxBackwardDuration: 60,
+        autoCleanupMinBackwardDuration: 30,
       });
       
       mpegtsRef.current = player;
@@ -330,6 +384,18 @@ export default function YouTubeStylePlayer({
       
       player.on(mpegts.Events.ERROR, (errorType, errorDetail) => {
         console.error('[Player] MPEGTS error:', errorType, errorDetail);
+        // Only show error for fatal errors, try to recover from network hiccups
+        if (errorType === 'NetworkError' && mpegtsRef.current) {
+          console.log('[Player] Attempting MPEGTS recovery...');
+          // Try to reload
+          setTimeout(() => {
+            if (mpegtsRef.current && video) {
+              mpegtsRef.current.unload();
+              mpegtsRef.current.load();
+            }
+          }, 2000);
+          return;
+        }
         setHasError(true);
         setErrorMessage('Falha na conexão com o stream');
         setConnectionStatus('error');
@@ -338,6 +404,7 @@ export default function YouTubeStylePlayer({
       
       player.on(mpegts.Events.METADATA_ARRIVED, () => {
         setIsLoading(false);
+        hasConnectedOnceRef.current = true;
         setConnectionStatus('connected');
         onReady?.();
         if (autoplay) video.play().catch(console.warn);
@@ -359,6 +426,16 @@ export default function YouTubeStylePlayer({
       const hls = new Hls({
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
+        maxBufferHole: 0.5,
+        startFragPrefetch: true,
+        // Better error recovery
+        fragLoadingTimeOut: 20000,
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 15000,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingTimeOut: 15000,
+        levelLoadingMaxRetry: 4,
       });
       hlsRef.current = hls;
 
@@ -367,6 +444,7 @@ export default function YouTubeStylePlayer({
       
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
+        hasConnectedOnceRef.current = true;
         setConnectionStatus('connected');
         onReady?.();
         if (autoplay) video.play().catch(console.warn);
@@ -380,11 +458,28 @@ export default function YouTubeStylePlayer({
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        console.warn('[Player] HLS error:', data.type, data.details, data.fatal);
+        
         if (data.fatal) {
-          setHasError(true);
-          setErrorMessage('Erro ao carregar stream');
-          setConnectionStatus('error');
-          onError?.(data);
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              // Try to recover from network errors
+              console.log('[Player] Attempting network error recovery...');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              // Try to recover from media errors
+              console.log('[Player] Attempting media error recovery...');
+              hls.recoverMediaError();
+              break;
+            default:
+              // Cannot recover - show error
+              setHasError(true);
+              setErrorMessage('Erro ao carregar stream');
+              setConnectionStatus('error');
+              onError?.(data);
+              break;
+          }
         }
       });
 
@@ -484,13 +579,20 @@ export default function YouTubeStylePlayer({
               controls={false}
             />
 
-            {/* Loading Overlay */}
+            {/* Loading Overlay - Only for initial connection */}
             {isLoading && !hasError && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
                   <span className="text-white/70 text-sm">Conectando...</span>
                 </div>
+              </div>
+            )}
+
+            {/* Buffering Indicator - Subtle, after connection */}
+            {isBuffering && !isLoading && !hasError && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="w-10 h-10 border-3 border-white/30 border-t-white rounded-full animate-spin" />
               </div>
             )}
 
