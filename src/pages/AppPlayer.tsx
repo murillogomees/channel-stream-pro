@@ -8,8 +8,8 @@ import { ChannelGrid } from '@/components/app/ChannelGrid';
 import { IPTVControls } from '@/components/app/IPTVControls';
 import { useIPTVPlayer } from '@/hooks/useIPTVPlayer';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
-import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
+import { streamService } from '@/modules/player/services/StreamService';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -76,11 +76,10 @@ export default function AppPlayer() {
 
   const allFilteredChannels = filteredCategories.flatMap(cat => cat.channels);
 
-  // Use proxy to bypass Mixed Content (HTTP streams on HTTPS page)
+  // Use streamService for proper URL handling (proxy + HLS conversion)
   const getStreamUrl = useCallback((channel: typeof currentChannel) => {
-    if (!channel) return '';
-    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
-    return `${proxyUrl}?url=${encodeURIComponent(channel.stream_url)}`;
+    if (!channel?.stream_url) return '';
+    return streamService.getPlayableUrl(channel.stream_url);
   }, []);
 
   if (playerLoading || favoritesLoading) {
