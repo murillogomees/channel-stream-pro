@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, startTransition, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Tv, ArrowLeft, Search, Settings, RefreshCw, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -89,6 +89,13 @@ export default function AppPlayer() {
   } = useBackendSearch({ playlistKey: 'lista-vip', debounceMs: 400 });
 
   const [activeTab, setActiveTab] = useState<'home' | 'live' | 'movies' | 'series' | 'favorites'>('home');
+  
+  // Use startTransition for tab changes to keep UI responsive
+  const handleTabChange = useCallback((tab: typeof activeTab) => {
+    startTransition(() => {
+      setActiveTab(tab);
+    });
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
@@ -111,14 +118,13 @@ export default function AppPlayer() {
     updateBackendSearch(value);
   }, [updateBackendSearch]);
 
-  // Reset category selection when tab changes
+  // Reset category selection when tab changes - use transition for smooth UX
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    startTransition(() => {
       setSelectedCategory(null);
       setSearchQuery('');
       clearSearch();
-    }, 0);
-    return () => clearTimeout(timeoutId);
+    });
   }, [activeTab, clearSearch]);
 
   // Categorize content by type
@@ -407,7 +413,7 @@ export default function AppPlayer() {
       {/* Left Navigation Rail */}
       <TVNavRail
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         onSettings={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
       />
 
