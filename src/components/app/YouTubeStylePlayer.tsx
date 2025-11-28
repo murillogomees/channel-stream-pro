@@ -785,23 +785,25 @@ export default function YouTubeStylePlayer({
 
           {/* Details Panel - Mobile */}
           {showDetails && (
-            <ScrollArea className="lg:hidden flex-1 p-4">
-              <StreamDetailsPanel 
-                title={title}
-                category={category}
-                streamInfo={streamInfo}
-                connectionStatus={connectionStatus}
-                metadata={displayMetadata}
-                isLoadingMetadata={isLoadingMetadata}
-              />
+            <ScrollArea className="lg:hidden flex-1 min-h-0 max-h-[40vh]">
+              <div className="p-4">
+                <StreamDetailsPanel 
+                  title={title}
+                  category={category}
+                  streamInfo={streamInfo}
+                  connectionStatus={connectionStatus}
+                  metadata={displayMetadata}
+                  isLoadingMetadata={isLoadingMetadata}
+                />
+              </div>
             </ScrollArea>
           )}
         </div>
 
         {/* Details Sidebar - Desktop */}
-        <aside className="hidden lg:flex w-[380px] border-l border-border flex-col bg-muted/30">
-          <ScrollArea className="flex-1">
-            <div className="p-4">
+        <aside className="hidden lg:flex w-[320px] xl:w-[380px] border-l border-border flex-col bg-muted/30 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 h-full">
+            <div className="p-3 xl:p-4">
               <StreamDetailsPanel 
                 title={title}
                 category={category}
@@ -842,31 +844,31 @@ function StreamDetailsPanel({
   const rating = metadata?.tmdb_rating || metadata?.imdb_rating;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Channel Info Card */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start gap-3">
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 xl:pb-3">
+          <div className="flex items-start gap-2 xl:gap-3">
             {logo && (
               <img 
                 src={logo} 
                 alt="" 
-                className="w-16 h-16 rounded-lg object-contain bg-muted"
+                className="w-12 h-12 xl:w-16 xl:h-16 rounded-lg object-contain bg-muted flex-shrink-0"
                 onError={(e) => e.currentTarget.style.display = 'none'}
               />
             )}
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg line-clamp-2">{metadata?.title || title}</CardTitle>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-                <span>{category}</span>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <CardTitle className="text-base xl:text-lg line-clamp-2 break-words">{metadata?.title || title}</CardTitle>
+              <div className="flex flex-wrap items-center gap-1.5 xl:gap-2 mt-1 text-xs xl:text-sm text-muted-foreground">
+                <span className="truncate max-w-[100px]">{category}</span>
                 {metadata?.year && (
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 flex-shrink-0">
                     <Calendar className="w-3 h-3" />
                     {metadata.year}
                   </span>
                 )}
                 {metadata?.duration_minutes && (
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 flex-shrink-0">
                     <Clock className="w-3 h-3" />
                     {Math.floor(metadata.duration_minutes / 60)}h {metadata.duration_minutes % 60}min
                   </span>
@@ -875,7 +877,7 @@ function StreamDetailsPanel({
               {metadata?.genres && metadata.genres.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {metadata.genres.slice(0, 3).map((genre) => (
-                    <Badge key={genre} variant="secondary" className="text-xs">
+                    <Badge key={genre} variant="secondary" className="text-xs px-1.5 py-0">
                       {genre}
                     </Badge>
                   ))}
@@ -887,31 +889,31 @@ function StreamDetailsPanel({
       </Card>
 
       {/* Connection Status */}
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Signal className="w-4 h-4" />
+            <Signal className="w-4 h-4 flex-shrink-0" />
             Status da Conexão
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="p-3 pt-0">
           <div className="flex items-center gap-2">
             {connectionStatus === 'connected' && (
               <>
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                <span className="text-green-600 dark:text-green-400 font-medium">Conectado</span>
+                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <span className="text-green-600 dark:text-green-400 font-medium text-sm">Conectado</span>
               </>
             )}
             {connectionStatus === 'connecting' && (
               <>
-                <Wifi className="w-5 h-5 text-yellow-500 animate-pulse" />
-                <span className="text-yellow-600 dark:text-yellow-400 font-medium">Conectando...</span>
+                <Wifi className="w-4 h-4 text-yellow-500 animate-pulse flex-shrink-0" />
+                <span className="text-yellow-600 dark:text-yellow-400 font-medium text-sm">Conectando...</span>
               </>
             )}
             {connectionStatus === 'error' && (
               <>
-                <WifiOff className="w-5 h-5 text-red-500" />
-                <span className="text-red-600 dark:text-red-400 font-medium">Desconectado</span>
+                <WifiOff className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <span className="text-red-600 dark:text-red-400 font-medium text-sm">Desconectado</span>
               </>
             )}
           </div>
@@ -920,21 +922,21 @@ function StreamDetailsPanel({
 
       {/* Rating */}
       {rating && rating > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="p-3 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Star className="w-4 h-4" />
+              <Star className="w-4 h-4 flex-shrink-0" />
               Avaliação
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
+          <CardContent className="p-3 pt-0">
+            <div className="flex items-center gap-2 xl:gap-3">
+              <div className="flex items-center gap-0.5">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
                     className={cn(
-                      "w-5 h-5",
+                      "w-4 h-4 xl:w-5 xl:h-5",
                       i < Math.round(rating / 2)
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-muted-foreground/30"
@@ -942,8 +944,8 @@ function StreamDetailsPanel({
                   />
                 ))}
               </div>
-              <span className="text-lg font-bold">{rating.toFixed(1)}</span>
-              <span className="text-sm text-muted-foreground">/10</span>
+              <span className="text-base xl:text-lg font-bold">{rating.toFixed(1)}</span>
+              <span className="text-xs xl:text-sm text-muted-foreground">/10</span>
             </div>
           </CardContent>
         </Card>
@@ -951,21 +953,21 @@ function StreamDetailsPanel({
 
       {/* Synopsis */}
       {metadata?.description && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="p-3 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Info className="w-4 h-4" />
+              <Info className="w-4 h-4 flex-shrink-0" />
               Sinopse
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-sm text-muted-foreground leading-relaxed">
+          <CardContent className="p-3 pt-0">
+            <p className="text-xs xl:text-sm text-muted-foreground leading-relaxed line-clamp-6 xl:line-clamp-none">
               {metadata.description}
             </p>
             {metadata.director && (
-              <p className="text-sm mt-3">
+              <p className="text-xs xl:text-sm mt-2">
                 <span className="text-muted-foreground">Diretor: </span>
-                <span className="font-medium">{metadata.director}</span>
+                <span className="font-medium truncate">{metadata.director}</span>
               </p>
             )}
           </CardContent>
@@ -974,22 +976,22 @@ function StreamDetailsPanel({
 
       {/* Cast */}
       {metadata?.cast_members && metadata.cast_members.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="p-3 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="w-4 h-4" />
+              <Users className="w-4 h-4 flex-shrink-0" />
               Elenco
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-3">
-              {metadata.cast_members.slice(0, 6).map((actor, index) => (
-                <div key={index} className="flex items-center gap-3">
+          <CardContent className="p-3 pt-0">
+            <div className="space-y-2">
+              {metadata.cast_members.slice(0, 4).map((actor, index) => (
+                <div key={index} className="flex items-center gap-2">
                   {actor.profile_url ? (
                     <img
                       src={actor.profile_url}
                       alt={actor.name}
-                      className="w-10 h-10 rounded-full object-cover bg-muted"
+                      className="w-8 h-8 rounded-full object-cover bg-muted flex-shrink-0"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -998,16 +1000,16 @@ function StreamDetailsPanel({
                   ) : null}
                   <div 
                     className={cn(
-                      "w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium",
+                      "w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium flex-shrink-0",
                       actor.profile_url && "hidden"
                     )}
                   >
                     {actor.name.charAt(0)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{actor.name}</p>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className="text-xs xl:text-sm font-medium truncate">{actor.name}</p>
                     {actor.character && (
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-[10px] xl:text-xs text-muted-foreground truncate">
                         {actor.character}
                       </p>
                     )}
@@ -1021,21 +1023,21 @@ function StreamDetailsPanel({
 
       {/* Loading metadata */}
       {isLoadingMetadata && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="p-3 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
               Carregando informações
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <div className="flex gap-2 mt-4">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <Skeleton className="h-10 w-10 rounded-full" />
+          <CardContent className="p-3 pt-0 space-y-2">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+            <div className="flex gap-2 mt-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-full" />
             </div>
           </CardContent>
         </Card>
@@ -1043,14 +1045,14 @@ function StreamDetailsPanel({
 
       {/* No metadata fallback */}
       {!isLoadingMetadata && !metadata?.description && !rating && (!metadata?.cast_members || metadata.cast_members.length === 0) && (
-        <Card>
-          <CardContent className="py-6">
+        <Card className="overflow-hidden">
+          <CardContent className="p-4">
             <div className="text-center text-muted-foreground">
-              <Film className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Informações do conteúdo não disponíveis</p>
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <Badge variant="outline">{streamInfo.type}</Badge>
-                <Badge variant={streamInfo.isLive ? "destructive" : "secondary"}>
+              <Film className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-xs xl:text-sm">Informações do conteúdo não disponíveis</p>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Badge variant="outline" className="text-xs">{streamInfo.type}</Badge>
+                <Badge variant={streamInfo.isLive ? "destructive" : "secondary"} className="text-xs">
                   {streamInfo.isLive ? "Ao Vivo" : "VOD"}
                 </Badge>
               </div>
