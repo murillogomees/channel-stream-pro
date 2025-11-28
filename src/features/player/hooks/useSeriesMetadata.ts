@@ -33,6 +33,12 @@ export function useSeriesMetadata() {
 
       // Fetch from TMDB via edge function
       const cleanedName = cleanSeriesName(seriesName);
+      
+      // Validate query before calling API
+      if (!cleanedName || cleanedName.length < 2) {
+        return cached ? transformCachedToMetadata(cached, contentId) : null;
+      }
+      
       const { data, error } = await supabase.functions.invoke('fetch-tmdb', {
         body: {
           action: 'search',
