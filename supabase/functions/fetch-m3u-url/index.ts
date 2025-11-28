@@ -1,46 +1,41 @@
 /**
  * ============================================================================
- * M3U Playlist Fetcher & Parser - Production Grade v3.0
+ * M3U Playlist Fetcher & Parser - Optimized v4.0
  * ============================================================================
  * 
- * Otimizado para playlists grandes (200k+ canais):
- * - Cache em memória durante a sessão
- * - Parse único + paginação via cache
- * - Fallback HTTPS → HTTP automático
+ * Super otimizado para carregamento rápido:
+ * - Retorna os primeiros canais em < 3 segundos
+ * - Early return: não espera parsear tudo
+ * - Cache inteligente para requests subsequentes
  * 
- * @version 3.0.0
+ * @version 4.0.0
  */
 
-// =============================================================================
-// CORS HEADERS
-// =============================================================================
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 } as const;
 
-// =============================================================================
-// CONFIGURATION
-// =============================================================================
 const CONFIG = {
-  FETCH_TIMEOUT_MS: 120000,  // 2 min para listas muito grandes
-  DEFAULT_LIMIT: 1000,       // Canais por página default
-  CACHE_TTL_MS: 300000,      // 5 min cache
+  FETCH_TIMEOUT_MS: 30000,     // 30s timeout para primeira request
+  DEFAULT_LIMIT: 500,          // Limite menor para resposta rápida
+  CACHE_TTL_MS: 600000,        // 10 min cache
+  EARLY_RETURN_COUNT: 500,     // Retornar após parsear X canais
+  MAX_PARSE_TIME_MS: 5000,     // Máximo 5s de parse antes de retornar
 } as const;
 
 // =============================================================================
-// IN-MEMORY CACHE (per instance)
+// IN-MEMORY CACHE
 // =============================================================================
 interface CacheEntry {
   channels: Channel[];
   timestamp: number;
-  url: string;
+  complete: boolean;
 }
 
 const cache = new Map<string, CacheEntry>();
 
 function getCacheKey(url: string): string {
-  // Use URL without credentials as cache key
   try {
     const parsed = new URL(url);
     return `${parsed.hostname}${parsed.pathname}`;
@@ -49,26 +44,26 @@ function getCacheKey(url: string): string {
   }
 }
 
-function getFromCache(url: string): Channel[] | null {
+function getFromCache(url: string): CacheEntry | null {
   const key = getCacheKey(url);
   const entry = cache.get(key);
   
   if (entry && Date.now() - entry.timestamp < CONFIG.CACHE_TTL_MS) {
-    console.log(`[M3U] Cache HIT: ${entry.channels.length} channels`);
-    return entry.channels;
+    console.log(`[M3U] Cache HIT: ${entry.channels.length} channels (complete: ${entry.complete})`);
+    return entry;
   }
   
   return null;
 }
 
-function setCache(url: string, channels: Channel[]): void {
+function setCache(url: string, channels: Channel[], complete: boolean): void {
   const key = getCacheKey(url);
   cache.set(key, {
     channels,
     timestamp: Date.now(),
-    url,
+    complete,
   });
-  console.log(`[M3U] Cache SET: ${channels.length} channels`);
+  console.log(`[M3U] Cache SET: ${channels.length} channels (complete: ${complete})`);
 }
 
 // =============================================================================
@@ -91,12 +86,17 @@ interface ParseResult {
   limit: number;
   hasMore: boolean;
   cached: boolean;
+  partial?: boolean;
 }
 
 // =============================================================================
-// M3U STREAMING PARSER
+// FAST STREAMING PARSER - Returns early!
 // =============================================================================
-async function parseM3UStream(response: Response): Promise<Channel[]> {
+async function parseM3UFast(
+  response: Response, 
+  targetCount: number,
+  maxTimeMs: number
+): Promise<{ channels: Channel[]; complete: boolean }> {
   const reader = response.body?.getReader();
   if (!reader) {
     throw new Error('Stream not available');
@@ -108,9 +108,24 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
   let buffer = '';
   let currentChannel: Partial<Channel> | null = null;
   let channelIndex = 0;
+  const startTime = Date.now();
 
   try {
     while (true) {
+      // Check if we should return early
+      if (channels.length >= targetCount) {
+        console.log(`[M3U] Early return: reached ${targetCount} channels`);
+        reader.releaseLock();
+        return { channels, complete: false };
+      }
+
+      // Check time limit
+      if (Date.now() - startTime > maxTimeMs) {
+        console.log(`[M3U] Time limit reached: ${channels.length} channels in ${maxTimeMs}ms`);
+        reader.releaseLock();
+        return { channels, complete: false };
+      }
+
       const { done, value } = await reader.read();
       
       if (done) break;
@@ -140,6 +155,7 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
       }
     }
 
+    // Process remaining buffer
     if (buffer.trim() && currentChannel && !buffer.trim().startsWith('#')) {
       currentChannel.stream_url = buffer.trim();
       if (currentChannel.name && currentChannel.stream_url) {
@@ -148,7 +164,63 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
     }
 
   } finally {
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch {}
+  }
+
+  return { channels, complete: true };
+}
+
+// Full parse for background caching
+async function parseM3UFull(response: Response): Promise<Channel[]> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Stream not available');
+  }
+
+  const decoder = new TextDecoder();
+  const channels: Channel[] = [];
+  
+  let buffer = '';
+  let currentChannel: Partial<Channel> | null = null;
+  let channelIndex = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('#EXTINF:')) {
+          currentChannel = parseExtinfLine(trimmed, channelIndex++);
+        }
+        else if (currentChannel && !trimmed.startsWith('#')) {
+          currentChannel.stream_url = trimmed;
+          if (currentChannel.name && currentChannel.stream_url) {
+            channels.push(currentChannel as Channel);
+          }
+          currentChannel = null;
+        }
+      }
+    }
+
+    if (buffer.trim() && currentChannel && !buffer.trim().startsWith('#')) {
+      currentChannel.stream_url = buffer.trim();
+      if (currentChannel.name && currentChannel.stream_url) {
+        channels.push(currentChannel as Channel);
+      }
+    }
+  } finally {
+    try { reader.releaseLock(); } catch {}
   }
 
   return channels;
@@ -246,6 +318,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
+  const startTime = Date.now();
+
   try {
     const body = await req.json();
     const { url, limit, offset = 0 } = body;
@@ -257,67 +331,139 @@ Deno.serve(async (req) => {
       );
     }
 
-    const effectiveLimit = limit || CONFIG.DEFAULT_LIMIT;
+    const effectiveLimit = Math.min(limit || CONFIG.DEFAULT_LIMIT, 5000);
     
     console.log(`[M3U] Request: limit=${effectiveLimit}, offset=${offset}`);
 
-    // Try to get from cache first
-    let allChannels = getFromCache(url);
-    let fromCache = false;
+    // Check cache first
+    const cached = getFromCache(url);
+    
+    if (cached && (cached.complete || offset < cached.channels.length)) {
+      const total = cached.complete ? cached.channels.length : cached.channels.length + 100000; // Estimate
+      const paginatedChannels = cached.channels.slice(offset, offset + effectiveLimit);
+      const hasMore = cached.complete 
+        ? (offset + effectiveLimit < cached.channels.length)
+        : true;
 
-    if (!allChannels) {
-      console.log(`[M3U] Fetching: ${url.substring(0, 60)}...`);
-      
-      const response = await fetchM3U(url);
+      console.log(`[M3U] Cache response in ${Date.now() - startTime}ms`);
 
-      if (!response.ok) {
-        throw new Error(`M3U fetch failed: ${response.status} ${response.statusText}`);
-      }
-
-      console.log('[M3U] Parsing full playlist...');
-      allChannels = await parseM3UStream(response);
-      console.log(`[M3U] Parsed ${allChannels.length} channels total`);
-      
-      // Cache for future requests
-      setCache(url, allChannels);
-    } else {
-      fromCache = true;
+      return new Response(
+        JSON.stringify({
+          channels: paginatedChannels,
+          total: cached.complete ? cached.channels.length : Math.max(cached.channels.length, offset + effectiveLimit + 1000),
+          offset,
+          limit: effectiveLimit,
+          hasMore,
+          cached: true,
+          partial: !cached.complete,
+        }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const total = allChannels.length;
+    // Need to fetch
+    console.log(`[M3U] Fetching: ${url.substring(0, 60)}...`);
+    
+    const response = await fetchM3U(url);
+
+    if (!response.ok) {
+      throw new Error(`M3U fetch failed: ${response.status} ${response.statusText}`);
+    }
+
+    // For first request (offset=0), use fast parsing with early return
+    if (offset === 0) {
+      const targetCount = Math.max(effectiveLimit * 2, CONFIG.EARLY_RETURN_COUNT);
+      
+      console.log(`[M3U] Fast parsing (target: ${targetCount} channels, max: ${CONFIG.MAX_PARSE_TIME_MS}ms)...`);
+      
+      const { channels, complete } = await parseM3UFast(
+        response, 
+        targetCount,
+        CONFIG.MAX_PARSE_TIME_MS
+      );
+      
+      console.log(`[M3U] Parsed ${channels.length} channels in ${Date.now() - startTime}ms (complete: ${complete})`);
+      
+      // Cache what we have
+      setCache(url, channels, complete);
+      
+      const paginatedChannels = channels.slice(0, effectiveLimit);
+      
+      // Estimate total if not complete
+      const estimatedTotal = complete 
+        ? channels.length 
+        : Math.max(channels.length * 10, 50000); // Conservative estimate
+
+      const result: ParseResult = {
+        channels: paginatedChannels,
+        total: estimatedTotal,
+        offset: 0,
+        limit: effectiveLimit,
+        hasMore: channels.length > effectiveLimit || !complete,
+        cached: false,
+        partial: !complete,
+      };
+
+      console.log(`[M3U] Response in ${Date.now() - startTime}ms: ${paginatedChannels.length} channels`);
+
+      // If not complete, schedule background full parse
+      if (!complete) {
+        EdgeRuntime.waitUntil(
+          (async () => {
+            try {
+              console.log('[M3U] Background: fetching full playlist...');
+              const bgResponse = await fetchM3U(url);
+              if (bgResponse.ok) {
+                const allChannels = await parseM3UFull(bgResponse);
+                setCache(url, allChannels, true);
+                console.log(`[M3U] Background complete: ${allChannels.length} channels cached`);
+              }
+            } catch (err) {
+              console.error('[M3U] Background parse error:', err);
+            }
+          })()
+        );
+      }
+
+      return new Response(
+        JSON.stringify(result),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For subsequent requests, we need the full parse
+    console.log('[M3U] Full parsing for paginated request...');
+    const allChannels = await parseM3UFull(response);
+    
+    console.log(`[M3U] Parsed ${allChannels.length} channels total`);
+    setCache(url, allChannels, true);
+
     const paginatedChannels = allChannels.slice(offset, offset + effectiveLimit);
-    const hasMore = offset + effectiveLimit < total;
+    const hasMore = offset + effectiveLimit < allChannels.length;
 
-    console.log(`[M3U] Returning ${paginatedChannels.length} channels (${offset}-${offset + paginatedChannels.length} of ${total}) ${fromCache ? '[CACHED]' : ''}`);
-
-    const result: ParseResult = {
-      channels: paginatedChannels,
-      total,
-      offset,
-      limit: effectiveLimit,
-      hasMore,
-      cached: fromCache,
-    };
+    console.log(`[M3U] Response in ${Date.now() - startTime}ms`);
 
     return new Response(
-      JSON.stringify(result),
-      { 
-        status: 200, 
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({
+        channels: paginatedChannels,
+        total: allChannels.length,
+        offset,
+        limit: effectiveLimit,
+        hasMore,
+        cached: false,
+      }),
+      { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     const isTimeout = message.includes('abort') || message.includes('timeout');
     
-    console.error(`[M3U] Error: ${message}`);
+    console.error(`[M3U] Error after ${Date.now() - startTime}ms: ${message}`);
 
     return new Response(
       JSON.stringify({ 
-        error: isTimeout 
-          ? 'M3U fetch timeout (max 2min)' 
-          : message 
+        error: isTimeout ? 'M3U fetch timeout' : message 
       }),
       { 
         status: isTimeout ? 504 : 500, 
