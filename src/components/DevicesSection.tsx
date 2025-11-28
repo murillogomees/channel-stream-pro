@@ -2,18 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
-import androidIconWebP from "@/assets/icons/android-device-sm.webp";
-import androidIconOptWebP from "@/assets/icons/android-device-opt.webp";
-import iosIconWebP from "@/assets/icons/ios-device-sm.webp";
-import iosIconOptWebP from "@/assets/icons/ios-device-opt.webp";
-import windowsIconWebP from "@/assets/icons/windows-device-sm.webp";
-import windowsIconOptWebP from "@/assets/icons/windows-device-opt.webp";
-import macIconWebP from "@/assets/icons/mac-device-sm.webp";
-import macIconOptWebP from "@/assets/icons/mac-device-opt.webp";
-import tabletIconWebP from "@/assets/icons/tablet-device-sm.webp";
-import tabletIconOptWebP from "@/assets/icons/tablet-device-opt.webp";
-import smarttvIconWebP from "@/assets/icons/smarttv-device-sm.webp";
-import smarttvIconOptWebP from "@/assets/icons/smarttv-device-opt.webp";
+// Usando versões otimizadas de 160px para melhor performance
+import androidIcon160 from "@/assets/icons/android-device-160.webp";
+import iosIcon160 from "@/assets/icons/ios-device-160.webp";
+import windowsIcon160 from "@/assets/icons/windows-device-160.webp";
+import macIcon160 from "@/assets/icons/mac-device-160.webp";
+import tabletIcon160 from "@/assets/icons/tablet-device-160.webp";
+import smarttvIcon160 from "@/assets/icons/smarttv-device-160.webp";
 
 const DevicesSection = () => {
   const devicesConfig = {
@@ -30,13 +25,14 @@ const DevicesSection = () => {
     ]
   };
 
-  const deviceImageMapWebP: Record<string, { src: string; srcSet: string }> = {
-    android: { src: androidIconOptWebP, srcSet: `${androidIconOptWebP} 256w, ${androidIconWebP} 160w` },
-    ios: { src: iosIconOptWebP, srcSet: `${iosIconOptWebP} 256w, ${iosIconWebP} 160w` },
-    windows: { src: windowsIconOptWebP, srcSet: `${windowsIconOptWebP} 256w, ${windowsIconWebP} 160w` },
-    mac: { src: macIconOptWebP, srcSet: `${macIconOptWebP} 256w, ${macIconWebP} 160w` },
-    tablet: { src: tabletIconOptWebP, srcSet: `${tabletIconOptWebP} 256w, ${tabletIconWebP} 160w` },
-    smarttv: { src: smarttvIconOptWebP, srcSet: `${smarttvIconOptWebP} 256w, ${smarttvIconWebP} 160w` },
+  // Mapa de imagens otimizadas (160x160 - ideal para display 80px em 2x DPR)
+  const deviceImageMap: Record<string, string> = {
+    android: androidIcon160,
+    ios: iosIcon160,
+    windows: windowsIcon160,
+    mac: macIcon160,
+    tablet: tabletIcon160,
+    smarttv: smarttvIcon160,
   };
 
   return (
@@ -76,7 +72,7 @@ const DevicesSection = () => {
           {devicesConfig.platforms
             ?.filter((platform: any) => platform.enabled)
             .map((platform: any) => {
-              const deviceImage = deviceImageMapWebP[platform.id];
+              const deviceImage = deviceImageMap[platform.id];
               
               return (
                 <Card
@@ -96,15 +92,13 @@ const DevicesSection = () => {
                     }
                   }}
                 >
-                  <div className="w-20 h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center" role="img" aria-label={`Ícone da plataforma ${platform.name}`}>
                     <OptimizedImage 
-                      src={deviceImage.src}
-                      srcSet={deviceImage.srcSet}
-                      sizes="80px"
+                      src={deviceImage}
                       alt={`Ícone do dispositivo ${platform.name} - compatível com IPTV LINK para streaming de TV ao vivo`}
                       className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                      width={160}
-                      height={160}
+                      width={80}
+                      height={80}
                       loading="lazy"
                       decoding="async"
                       aria-hidden="true"

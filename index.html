@@ -50,8 +50,8 @@
 
     <link rel="icon" type="image/x-icon" href="https://storage.googleapis.com/gpt-engineer-file-uploads/zUtesfyGM4bYgcaTU4s6IM4QrcF2/uploads/1763607620523-ChatGPT Image 17 de set. de 2025, 17_41_45.png">
     
-    <!-- Preload LCP image for faster rendering -->
-    <link rel="preload" as="image" href="/src/assets/logo-white-sm.webp" fetchpriority="high" type="image/webp">
+    <!-- Preload LCP image for faster rendering - usando versão otimizada -->
+    <link rel="preload" as="image" href="/src/assets/logo-white-400.webp" fetchpriority="high" type="image/webp">
     
 
     <!-- Schema.org JSON-LD -->
@@ -118,9 +118,10 @@
     }
     </script>
 
-    <!-- Meta Pixel Code - Deferred for performance -->
-    <script defer>
-    window.addEventListener('load', function() {
+    <!-- Meta Pixel Code - Loaded after page is idle for better performance -->
+    <script>
+    // Usar requestIdleCallback para carregar Meta Pixel sem impactar performance
+    function loadMetaPixel() {
       !function(f,b,e,v,n,t,s)
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
       n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -131,7 +132,12 @@
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '706630189163732');
       fbq('track', 'PageView');
-    });
+    }
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadMetaPixel, { timeout: 3000 });
+    } else {
+      setTimeout(loadMetaPixel, 2000);
+    }
     </script>
     <!-- End Meta Pixel Code -->
   
