@@ -362,7 +362,7 @@ export default function AppPlayer() {
       {/* Main Content Area */}
       <main className="md:ml-[72px] lg:ml-[88px]">
         {/* Top Bar */}
-        <header className="fixed top-0 right-0 left-0 md:left-[72px] lg:left-[88px] h-14 sm:h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
+        <header className="fixed top-0 right-0 left-0 md:left-[72px] lg:left-[88px] h-14 sm:h-16 bg-background/95 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6 safe-area-top">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             {isAdmin && (
               <Button
@@ -576,7 +576,7 @@ export default function AppPlayer() {
 
           {/* Live TV View - Special layout with EPG, zapping, PIP */}
           {activeTab === 'live' && (
-            <div className="p-4 lg:p-6 pb-20">
+            <div className="px-3 py-2 sm:p-4 lg:p-6 pb-20">
               <LiveTVView
                 channels={categorizedContent.live.flatMap(cat => 
                   cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))

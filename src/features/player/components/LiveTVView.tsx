@@ -101,7 +101,7 @@ export function LiveTVView({
   return (
     <div className={cn('relative', className)}>
       {/* Main Content Area */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Featured Channel / Current Preview */}
         {currentChannel && (
           <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted to-background border border-border">
@@ -113,16 +113,75 @@ export function LiveTVView({
                   <img
                     src={currentChannel.tvg_logo}
                     alt={currentChannel.name}
-                    className="max-w-[200px] max-h-[100px] object-contain drop-shadow-lg"
+                    className="max-w-[120px] sm:max-w-[200px] max-h-[60px] sm:max-h-[100px] object-contain drop-shadow-lg"
                   />
                 ) : (
-                  <Tv className="w-24 h-24 text-muted-foreground/30" />
+                  <Tv className="w-16 h-16 sm:w-24 sm:h-24 text-muted-foreground/30" />
                 )}
               </div>
 
               {/* Channel Info Overlay */}
-              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-background to-transparent">
-                <div className="flex items-center gap-4">
+              <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 bg-gradient-to-t from-background to-transparent">
+                {/* Mobile Layout */}
+                <div className="flex flex-col gap-3 sm:hidden">
+                  <div className="flex items-center gap-3">
+                    {/* Channel Number */}
+                    <div className="w-10 h-10 flex items-center justify-center bg-primary/20 rounded-lg flex-shrink-0">
+                      <span className="text-lg font-bold text-primary">
+                        {getChannelNumber(currentChannel) || '?'}
+                      </span>
+                    </div>
+
+                    {/* Channel Details */}
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-base font-bold text-foreground truncate">
+                        {currentChannel.name}
+                      </h2>
+                      {currentChannel.category_name && (
+                        <span className="text-xs text-muted-foreground line-clamp-1">
+                          {currentChannel.category_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mobile Actions */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() => handlePlayChannel(currentChannel)}
+                      className="flex-1 h-10 text-sm"
+                    >
+                      Assistir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10"
+                      onClick={() => onToggleFavorite(currentChannel.id)}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill={isFavorite(currentChannel.id) ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10"
+                      onClick={() => setShowChannelList(true)}
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Desktop Layout */}
+                <div className="hidden sm:flex items-center gap-4">
                   {/* Channel Number */}
                   <div className="w-14 h-14 flex items-center justify-center bg-primary/20 rounded-lg">
                     <span className="text-2xl font-bold text-primary">
@@ -182,7 +241,7 @@ export function LiveTVView({
 
                 {/* EPG Strip */}
                 {(currentProgram || nextProgram) && (
-                  <div className="mt-4">
+                  <div className="mt-3 sm:mt-4">
                     <EPGStrip
                       currentProgram={currentProgram}
                       nextProgram={nextProgram}
@@ -194,8 +253,8 @@ export function LiveTVView({
               </div>
 
               {/* Live Badge */}
-              <div className="absolute top-4 left-4">
-                <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full animate-pulse">
+              <div className="absolute top-2 left-2 sm:top-4 sm:left-4">
+                <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-red-600 text-white text-[10px] sm:text-xs font-bold rounded-full animate-pulse">
                   AO VIVO
                 </span>
               </div>
@@ -204,14 +263,14 @@ export function LiveTVView({
         )}
 
         {/* Quick Access Channels */}
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Recent Channels */}
           {recentChannels.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-3">
+              <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">
                 Canais Recentes
               </h3>
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
                 {recentChannels.map((channel) => (
                   <ChannelChip
                     key={channel.id}
@@ -225,8 +284,39 @@ export function LiveTVView({
             </div>
           )}
 
-          {/* Zapping Controls */}
-          <div className="flex items-center justify-center gap-4 py-4">
+          {/* Zapping Controls - Mobile */}
+          <div className="flex sm:hidden items-center justify-between gap-2 py-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={previousChannel}
+              className="flex-1 h-9 text-xs"
+            >
+              ◀ Anterior
+            </Button>
+            
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={zapBack}
+              disabled={recentChannels.length === 0}
+              className="h-9 px-4 text-xs"
+            >
+              ⌫
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={nextChannel}
+              className="flex-1 h-9 text-xs"
+            >
+              Próximo ▶
+            </Button>
+          </div>
+
+          {/* Zapping Controls - Desktop */}
+          <div className="hidden sm:flex items-center justify-center gap-4 py-4">
             <Button
               variant="outline"
               size="lg"
@@ -257,7 +347,7 @@ export function LiveTVView({
           </div>
 
           {/* Channel Count */}
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-xs sm:text-sm text-muted-foreground">
             Canal {currentIndex + 1} de {totalChannels}
           </div>
         </div>
@@ -308,8 +398,8 @@ function ChannelChip({
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-        'hover:bg-muted whitespace-nowrap',
+        'flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-colors',
+        'hover:bg-muted whitespace-nowrap flex-shrink-0 active:scale-95',
         isCurrent 
           ? 'border-primary bg-primary/10 text-primary' 
           : 'border-border bg-background'
@@ -319,14 +409,14 @@ function ChannelChip({
         <img
           src={channel.tvg_logo}
           alt=""
-          className="w-6 h-6 rounded object-contain"
+          className="w-5 h-5 sm:w-6 sm:h-6 rounded object-contain"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
         />
       )}
-      <span className="text-sm font-medium">
-        {channelNumber && <span className="text-muted-foreground mr-1">{channelNumber}.</span>}
+      <span className="text-xs sm:text-sm font-medium max-w-[100px] sm:max-w-none truncate">
+        {channelNumber && <span className="text-muted-foreground mr-0.5 sm:mr-1">{channelNumber}.</span>}
         {channel.name}
       </span>
     </button>
