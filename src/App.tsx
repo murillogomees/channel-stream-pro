@@ -19,6 +19,7 @@ const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
 const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
 const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
 const AdminM3UImportHistory = lazy(() => import("./pages/AdminM3UImportHistory"));
+const AdminM3USync = lazy(() => import("./pages/AdminM3USync"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
 const AdminNotificationQueue = lazy(() => import("./pages/AdminNotificationQueue"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
@@ -82,6 +83,7 @@ const App = () => (
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           <Route path="/app/home" element={<ProtectedRoute><PlayerHome /></ProtectedRoute>} />
           <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
+          <Route path="/app/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
           
@@ -97,6 +99,7 @@ const App = () => (
           <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
           <Route path="/admin/m3u-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
           <Route path="/admin/m3u-import-history" element={<ProtectedRoute requireAdmin><AdminM3UImportHistory /></ProtectedRoute>} />
+          <Route path="/admin/m3u-sync" element={<ProtectedRoute requireAdmin><AdminM3USync /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/notification-queue" element={<ProtectedRoute requireAdmin><AdminNotificationQueue /></ProtectedRoute>} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />

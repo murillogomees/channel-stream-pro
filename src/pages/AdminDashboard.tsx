@@ -10,7 +10,7 @@ import {
   UserCog, ArrowLeft, Tv, Play, Download,
   History, MessageSquare, Send, Cog,
   ListVideo, Hammer, Sparkles, LayoutDashboard, 
-  CreditCard, PanelTop
+  CreditCard, PanelTop, RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -283,6 +283,13 @@ const AdminDashboard = () => {
               description="Veja o histórico de importações M3U"
               icon={<History className="h-5 w-5" />}
               path="/admin/m3u-import-history"
+            />
+            <NavCard
+              title="M3U Sync"
+              description="Sincronização automática de playlists externas"
+              icon={<RefreshCw className="h-5 w-5" />}
+              path="/admin/m3u-sync"
+              badge="Novo"
             />
           </div>
         </section>
