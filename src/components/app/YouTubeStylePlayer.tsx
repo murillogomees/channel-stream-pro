@@ -6,9 +6,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
-  SkipBack, SkipForward, X, Radio, Film,
+  SkipBack, SkipForward, X, Radio, Film, Clock, Calendar,
   Signal, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp,
-  Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users
+  Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -16,11 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
+import { useMovieMetadata } from "@/features/player/hooks/useMovieMetadata";
 
 interface ContentMetadata {
+  title?: string;
   description?: string;
   tmdb_rating?: number;
   imdb_rating?: number;
@@ -28,6 +31,9 @@ interface ContentMetadata {
   genres?: string[];
   year?: number;
   director?: string;
+  duration_minutes?: number;
+  poster_url?: string;
+  backdrop_url?: string;
 }
 
 interface YouTubeStylePlayerProps {
@@ -121,6 +127,25 @@ export default function YouTubeStylePlayer({
 
   // Detect stream info
   const streamInfo = detectStreamType(url);
+
+  // Auto-fetch metadata if not provided
+  const { 
+    metadata: fetchedMetadata, 
+    isLoading: isLoadingMetadata, 
+    fetchMetadata 
+  } = useMovieMetadata();
+  
+  // Use provided metadata or fetched metadata
+  const displayMetadata = metadata || fetchedMetadata;
+
+  // Fetch metadata automatically for VOD content
+  useEffect(() => {
+    if (!metadata && title && title !== "Canal sem nome" && (streamInfo.isVod || !streamInfo.isLive)) {
+      // Generate a content ID based on title and URL
+      const contentId = btoa(title.slice(0, 20) + url.slice(-20)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+      fetchMetadata(contentId, title);
+    }
+  }, [metadata, title, url, streamInfo.isVod, streamInfo.isLive, fetchMetadata]);
 
   // Extract original URL from proxy
   const getOriginalUrl = (proxyUrl: string): string => {
@@ -766,7 +791,8 @@ export default function YouTubeStylePlayer({
                 category={category}
                 streamInfo={streamInfo}
                 connectionStatus={connectionStatus}
-                metadata={metadata}
+                metadata={displayMetadata}
+                isLoadingMetadata={isLoadingMetadata}
               />
             </ScrollArea>
           )}
@@ -782,7 +808,8 @@ export default function YouTubeStylePlayer({
                 logo={logo}
                 streamInfo={streamInfo}
                 connectionStatus={connectionStatus}
-                metadata={metadata}
+                metadata={displayMetadata}
+                isLoadingMetadata={isLoadingMetadata}
               />
             </div>
           </ScrollArea>
@@ -800,6 +827,7 @@ interface StreamDetailsPanelProps {
   streamInfo: ReturnType<typeof detectStreamType>;
   connectionStatus: 'connected' | 'connecting' | 'error';
   metadata?: ContentMetadata;
+  isLoadingMetadata?: boolean;
 }
 
 function StreamDetailsPanel({ 
@@ -808,7 +836,8 @@ function StreamDetailsPanel({
   logo,
   streamInfo, 
   connectionStatus,
-  metadata
+  metadata,
+  isLoadingMetadata,
 }: StreamDetailsPanelProps) {
   const rating = metadata?.tmdb_rating || metadata?.imdb_rating;
 
@@ -827,11 +856,20 @@ function StreamDetailsPanel({
               />
             )}
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg line-clamp-2">{title}</CardTitle>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-sm text-muted-foreground">{category}</p>
+              <CardTitle className="text-lg line-clamp-2">{metadata?.title || title}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+                <span>{category}</span>
                 {metadata?.year && (
-                  <span className="text-sm text-muted-foreground">• {metadata.year}</span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {metadata.year}
+                  </span>
+                )}
+                {metadata?.duration_minutes && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {Math.floor(metadata.duration_minutes / 60)}h {metadata.duration_minutes % 60}min
+                  </span>
                 )}
               </div>
               {metadata?.genres && metadata.genres.length > 0 && (
@@ -981,8 +1019,30 @@ function StreamDetailsPanel({
         </Card>
       )}
 
+      {/* Loading metadata */}
+      {isLoadingMetadata && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Carregando informações
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <div className="flex gap-2 mt-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* No metadata fallback */}
-      {!metadata?.description && !rating && (!metadata?.cast_members || metadata.cast_members.length === 0) && (
+      {!isLoadingMetadata && !metadata?.description && !rating && (!metadata?.cast_members || metadata.cast_members.length === 0) && (
         <Card>
           <CardContent className="py-6">
             <div className="text-center text-muted-foreground">
