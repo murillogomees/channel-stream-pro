@@ -881,6 +881,60 @@ export type Database = {
         }
         Relationships: []
       }
+      homepage_content: {
+        Row: {
+          content: Json
+          id: string
+          section_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content?: Json
+          id?: string
+          section_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: Json
+          id?: string
+          section_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      homepage_faqs: {
+        Row: {
+          answer: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          question: string
+          updated_at: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          question: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          question?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ip_blacklist: {
         Row: {
           auto_blocked: boolean | null
@@ -2494,6 +2548,66 @@ export type Database = {
           new_status?: string
           previous_status?: string | null
           service_name?: string
+        }
+        Relationships: []
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          cta_text: string
+          currency: string
+          display_order: number
+          features: string[]
+          id: string
+          is_active: boolean
+          is_highlighted: boolean
+          name: string
+          period: string
+          period_months: number
+          price: number
+          savings_amount: number | null
+          savings_percent: number | null
+          slug: string
+          updated_at: string
+          whatsapp_message: string | null
+        }
+        Insert: {
+          created_at?: string
+          cta_text?: string
+          currency?: string
+          display_order?: number
+          features?: string[]
+          id?: string
+          is_active?: boolean
+          is_highlighted?: boolean
+          name: string
+          period: string
+          period_months?: number
+          price: number
+          savings_amount?: number | null
+          savings_percent?: number | null
+          slug: string
+          updated_at?: string
+          whatsapp_message?: string | null
+        }
+        Update: {
+          created_at?: string
+          cta_text?: string
+          currency?: string
+          display_order?: number
+          features?: string[]
+          id?: string
+          is_active?: boolean
+          is_highlighted?: boolean
+          name?: string
+          period?: string
+          period_months?: number
+          price?: number
+          savings_amount?: number | null
+          savings_percent?: number | null
+          slug?: string
+          updated_at?: string
+          whatsapp_message?: string | null
         }
         Relationships: []
       }

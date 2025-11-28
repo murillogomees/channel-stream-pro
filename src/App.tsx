@@ -28,6 +28,8 @@ const AdminIntegrations = lazy(() => import("./pages/AdminIntegrations"));
 const AdminUsersPermissions = lazy(() => import("./pages/AdminUsersPermissions"));
 const AdminCreateUser = lazy(() => import("./pages/AdminCreateUser"));
 const AdminWhatsAppConfig = lazy(() => import("./pages/AdminWhatsAppConfig"));
+const AdminPlansManager = lazy(() => import("./pages/AdminPlansManager"));
+const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
 
 // Standalone pages
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
@@ -87,6 +89,8 @@ const App = () => (
           <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPermissions /></ProtectedRoute>} />
           <Route path="/admin/create-user" element={<ProtectedRoute requireSuperAdmin><AdminCreateUser /></ProtectedRoute>} />
           <Route path="/admin/whatsapp-config" element={<ProtectedRoute requireAdmin><AdminWhatsAppConfig /></ProtectedRoute>} />
+          <Route path="/dashboard/plans" element={<ProtectedRoute requireAdmin><AdminPlansManager /></ProtectedRoute>} />
+          <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
           
           {/* Legacy routes - redirect to consolidated pages */}
           <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
