@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
+import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import {
   Select,
@@ -26,20 +28,35 @@ import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useF
 
 export default function AppPlayer() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  
+  // Use different hooks based on role
+  const clientPlayer = useIPTVPlayerClient();
+  const adminPlayer = useIPTVPlayerAdmin();
+  
+  // Select appropriate player based on role
+  const player = isAdmin ? adminPlayer : clientPlayer;
+  
   const {
     categories,
     currentChannel,
     isLoading: playerLoading,
     loadingProgress,
-    assignedPlaylist,
-    hasPlaylist,
-    totalChannels,
-    loadedChannels,
-    isLoadingMore,
     changeChannel,
     nextChannel,
     previousChannel,
-  } = useIPTVPlayerClient();
+  } = player;
+  
+  // Role-specific properties
+  const assignedPlaylist = isAdmin ? (adminPlayer as any).selectedList : (clientPlayer as any).assignedPlaylist;
+  const hasPlaylist = isAdmin ? categories.length > 0 : (clientPlayer as any).hasPlaylist;
+  const totalChannels = isAdmin ? (adminPlayer as any).totalChannels : (clientPlayer as any).totalChannels;
+  const loadedChannels = isAdmin ? (adminPlayer as any).loadedChannels : (clientPlayer as any).loadedChannels;
+  const isLoadingMore = isAdmin ? (adminPlayer as any).isLoadingMore : (clientPlayer as any).isLoadingMore;
+  
+  // Admin-specific
+  const availableLists = isAdmin ? (adminPlayer as any).availableLists : [];
+  const selectList = isAdmin ? (adminPlayer as any).selectList : undefined;
 
   const {
     isFavorite,
@@ -248,7 +265,7 @@ export default function AppPlayer() {
       setShowPlayerDialog(false);
       setPlayerChannel(null);
     } else {
-      navigate('/app/profile');
+      navigate(isAdmin ? '/dashboard' : '/app/profile');
     }
   }, true);
 
@@ -291,8 +308,8 @@ export default function AppPlayer() {
           <p className="text-muted-foreground mb-8">
             Entre em contato com o suporte para ativar sua playlist IPTV.
           </p>
-          <Button size="lg" onClick={() => navigate('/app/profile')}>
-            Ver Meu Perfil
+          <Button size="lg" onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}>
+            {isAdmin ? 'Voltar ao Dashboard' : 'Ver Meu Perfil'}
           </Button>
         </Card>
       </div>
@@ -314,7 +331,7 @@ export default function AppPlayer() {
       <TVNavRail
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSettings={() => navigate('/app/profile')}
+        onSettings={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
       />
 
       {/* Main Content Area */}
@@ -325,7 +342,7 @@ export default function AppPlayer() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/app/profile')}
+              onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
               className="flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -363,8 +380,23 @@ export default function AppPlayer() {
               />
             </div>
 
-            {/* Playlist name badge */}
-            {assignedPlaylist && (
+            {/* Admin playlist selector */}
+            {isAdmin && availableLists.length > 0 && (
+              <select
+                value={assignedPlaylist?.id || ""}
+                onChange={(e) => selectList?.(e.target.value)}
+                className="hidden sm:block px-3 py-1.5 rounded-lg bg-background/50 border border-border text-xs text-foreground"
+              >
+                {availableLists.map((list: any) => (
+                  <option key={list.id} value={list.id}>
+                    {list.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Client playlist name badge */}
+            {!isAdmin && assignedPlaylist && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
                 <Tv className="w-3 h-3" />
                 <span className="truncate max-w-[120px]">{assignedPlaylist.name}</span>
@@ -375,7 +407,7 @@ export default function AppPlayer() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/app/profile')}
+              onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
               className="flex-shrink-0"
             >
               <Settings className="w-5 h-5" />
