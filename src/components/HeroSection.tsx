@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, CheckCircle, Tv } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
-// Logo otimizado para performance (400px width)
-import logoWhite400 from "@/assets/logo-white-400.webp";
+// Logo otimizado para performance (transparente)
+import logoWhite from "@/assets/logo-white.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,14 +72,14 @@ const HeroSection = () => {
         <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
           {/* Logo as Main Title */}
           <div className="flex justify-center mb-4">
-            <OptimizedImage
-              src={logoWhite400}
+            <img
+              src={logoWhite}
               alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
-              className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain"
+              className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain drop-shadow-lg"
               style={{ maxWidth: '90vw' }}
               width={400}
               height={175}
-              eager
+              loading="eager"
               decoding="async"
               role="img"
               aria-label="IPTV LINK - Streaming Premium"
