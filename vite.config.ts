@@ -43,9 +43,24 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        globPatterns: ['**/*.{js,css,html,ico,png,webp,svg,jpg,jpeg}'],
+        // Apenas arquivos essenciais - NÃO incluir JS chunks dinâmicos
+        globPatterns: ['**/*.{html,ico,png,webp,svg}'],
+        // Ignorar chunks de páginas específicas para evitar erros de cache
+        navigateFallback: null,
         maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
+          {
+            // JS e CSS via NetworkFirst para evitar cache stale
+            urlPattern: /\.(?:js|css)$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'assets-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 dias
+              }
+            }
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
