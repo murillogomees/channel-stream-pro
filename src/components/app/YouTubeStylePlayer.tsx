@@ -517,17 +517,36 @@ export default function YouTubeStylePlayer({
         }
       }, 8000);
       
+      // Track network error count to avoid infinite restarts
+      let networkErrorCount = 0;
+      const MAX_NETWORK_ERRORS = 3;
+      
       player.on(mpegts.Events.ERROR, (errorType, errorDetail) => {
-        console.error('[Player] MPEGTS error:', errorType, errorDetail);
+        console.warn('[Player] MPEGTS error:', errorType, errorDetail);
+        
+        // NetworkError - try to recover without restarting from beginning
         if (errorType === 'NetworkError' && mpegtsRef.current) {
-          setTimeout(() => {
-            if (mpegtsRef.current && video) {
-              mpegtsRef.current.unload();
-              mpegtsRef.current.load();
-            }
-          }, 1500);
+          networkErrorCount++;
+          
+          // Only restart if we had too many errors
+          if (networkErrorCount >= MAX_NETWORK_ERRORS) {
+            console.log('[Player] Too many network errors, showing error state');
+            clearTimeout(connectionTimeout);
+            setHasError(true);
+            setErrorMessage('Conexão instável - tente novamente');
+            setConnectionStatus('error');
+            return;
+          }
+          
+          // Don't restart if already playing - just let it buffer
+          if (hasConnectedOnceRef.current && !video.paused) {
+            console.log('[Player] Network hiccup, buffering...');
+            return; // Let mpegts.js handle recovery automatically
+          }
           return;
         }
+        
+        // Fatal errors - show error state
         clearTimeout(connectionTimeout);
         setHasError(true);
         setErrorMessage('Falha na conexão com o stream');

@@ -278,20 +278,23 @@ export function useIPTVPlayerClient() {
     return { channels: [], total: 0, hasMore: true, version: 0, shouldRetry: true };
   };
 
-  // Background loading - OPTIMIZED: stops immediately when done
+  // Track if background loading is already running
+  const isBackgroundLoadingRef = useRef(false);
+  
+  // Background loading - OPTIMIZED: stops immediately when done, prevents duplicate calls
   const loadAllChannelsBackground = useCallback(async (
     url: string,
     estimatedTotal: number,
     initialChannels: any[],
     version: number
   ) => {
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    // CRITICAL: Prevent duplicate background loading
+    if (isBackgroundLoadingRef.current) {
+      console.log('[IPTV] Background loading already in progress, skipping');
+      return;
+    }
     
-    let currentOffset = initialChannels.length;
-    let consecutiveEmptyBatches = 0;
-    
-    console.log(`[IPTV] Background loading from offset ${currentOffset}, total: ${estimatedTotal}...`);
+    const currentOffset = initialChannels.length;
     
     // CRITICAL: Stop immediately if we've already loaded everything
     if (currentOffset >= estimatedTotal) {
@@ -301,24 +304,38 @@ export function useIPTVPlayerClient() {
       return;
     }
     
-    while (!controller.signal.aborted && currentOffset < estimatedTotal) {
-      // Stop after 3 consecutive empty batches
-      if (consecutiveEmptyBatches >= 3) {
-        console.log(`[IPTV] Stopping: ${consecutiveEmptyBatches} empty batches`);
-        break;
-      }
-      
-      try {
-        const result = await fetchBatch(url, currentOffset, CONFIG.BACKGROUND_BATCH_SIZE, controller.signal);
+    isBackgroundLoadingRef.current = true;
+    
+    // Abort any previous controller
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    let offset = currentOffset;
+    let consecutiveEmptyBatches = 0;
+    
+    console.log(`[IPTV] Background loading from offset ${offset}, total: ${estimatedTotal}...`);
+    
+    try {
+      while (!controller.signal.aborted && offset < estimatedTotal) {
+        // Stop after 3 consecutive empty batches
+        if (consecutiveEmptyBatches >= 3) {
+          console.log(`[IPTV] Stopping: ${consecutiveEmptyBatches} consecutive empty batches`);
+          break;
+        }
+        
+        const result = await fetchBatch(url, offset, CONFIG.BACKGROUND_BATCH_SIZE, controller.signal);
         
         // CRITICAL: Check hasMore and empty channels - definitive stop condition
         if (result.channels.length === 0) {
           if (!result.hasMore) {
-            console.log(`[IPTV] Complete: server returned hasMore=false at offset ${currentOffset}`);
+            console.log(`[IPTV] Complete: server returned hasMore=false at offset ${offset}`);
             break;
           }
           consecutiveEmptyBatches++;
-          currentOffset += CONFIG.BACKGROUND_BATCH_SIZE;
           await new Promise(r => setTimeout(r, 500));
           continue;
         }
@@ -326,9 +343,9 @@ export function useIPTVPlayerClient() {
         // Reset empty counter and add channels
         consecutiveEmptyBatches = 0;
         allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
-        currentOffset += result.channels.length;
+        offset = allChannelsRef.current.length; // Use actual loaded count
         
-        // Update UI efficiently
+        // Update UI every 10k channels
         if (allChannelsRef.current.length % 10000 < CONFIG.BACKGROUND_BATCH_SIZE) {
           updateUIInBackground(
             allChannelsRef.current, 
@@ -339,37 +356,39 @@ export function useIPTVPlayerClient() {
         
         // Small delay to not block main thread
         await new Promise(r => setTimeout(r, 50));
-        
-      } catch (err: any) {
-        if (err.name === 'AbortError') break;
-        console.error('[IPTV] Batch error:', err.message);
-        consecutiveEmptyBatches++;
-        await new Promise(r => setTimeout(r, 1000));
       }
-    }
 
-    // Final save and update
-    if (!controller.signal.aborted && allChannelsRef.current.length > 0) {
-      const finalTotal = allChannelsRef.current.length;
-      
-      await cache.save({
-        key: playlistKeyRef.current,
-        channels: allChannelsRef.current,
-        version,
-        cachedAt: Date.now(),
-        total: finalTotal,
-        complete: true,
-      });
-      
-      startTransition(() => {
-        setCategories(groupChannelsIntoCategories(allChannelsRef.current));
-        setTotalChannels(finalTotal);
-        setLoadedChannels(finalTotal);
-        setIsLoadingMore(false);
-        setLoadingProgress('');
-      });
-      
-      console.log(`[IPTV] Background complete: ${finalTotal} channels`);
+      // Final save and update
+      if (!controller.signal.aborted && allChannelsRef.current.length > 0) {
+        const finalTotal = allChannelsRef.current.length;
+        
+        await cache.save({
+          key: playlistKeyRef.current,
+          channels: allChannelsRef.current,
+          version,
+          cachedAt: Date.now(),
+          total: finalTotal,
+          complete: true,
+        });
+        
+        startTransition(() => {
+          setCategories(groupChannelsIntoCategories(allChannelsRef.current));
+          setTotalChannels(finalTotal);
+          setLoadedChannels(finalTotal);
+          setIsLoadingMore(false);
+          setLoadingProgress('');
+        });
+        
+        console.log(`[IPTV] Background complete: ${finalTotal} channels`);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('[IPTV] Background loading error:', err.message);
+      }
+    } finally {
+      isBackgroundLoadingRef.current = false;
+      setIsLoadingMore(false);
+      setLoadingProgress('');
     }
   }, [groupChannelsIntoCategories, updateUIInBackground]);
 
