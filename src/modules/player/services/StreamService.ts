@@ -36,6 +36,11 @@ export interface Channel {
   tvg_id?: string | null;
   tvg_name?: string | null;
   category_name: string;
+  // VOD/R2 fields
+  is_vod?: boolean;
+  r2_uploaded?: boolean;
+  r2_url?: string | null;
+  content_type?: 'live' | 'vod' | 'unknown';
 }
 
 export interface Category {
@@ -108,14 +113,34 @@ class StreamService {
    * Retorna URL pronta para o player (com proxy se necessário)
    * Aceita Channel ou string diretamente
    * 
+   * PRIORIDADE:
+   * 1. URL do R2 se disponível (conteúdo hospedado no CDN)
+   * 2. URL original com proxy se necessário
+   * 
    * NOTA: Não convertemos automaticamente para HLS (.m3u8) pois nem todos
    * os servidores Xtream suportam isso e pode causar 404
    */
   getPlayableUrl(channelOrUrl: Channel | string): string {
-    const streamUrl = typeof channelOrUrl === 'string' 
-      ? channelOrUrl 
-      : channelOrUrl?.stream_url;
+    // Se é objeto Channel, verificar se tem R2 URL disponível
+    if (typeof channelOrUrl === 'object' && channelOrUrl) {
+      // Priorizar R2 URL se o VOD foi uploaded
+      if (channelOrUrl.r2_uploaded && channelOrUrl.r2_url) {
+        console.log('[StreamService] Using R2 CDN URL for:', channelOrUrl.name);
+        return channelOrUrl.r2_url;
+      }
       
+      // Fallback para stream_url original
+      const streamUrl = channelOrUrl.stream_url;
+      if (!streamUrl) return '';
+      
+      if (this.needsProxy(streamUrl)) {
+        return this.getProxyUrl(streamUrl);
+      }
+      return streamUrl;
+    }
+    
+    // Se é string direta
+    const streamUrl = channelOrUrl as string;
     if (!streamUrl) return '';
     
     // Usar proxy para resolver CORS e mixed content (HTTP em HTTPS)
@@ -124,6 +149,13 @@ class StreamService {
     }
     
     return streamUrl;
+  }
+  
+  /**
+   * Verifica se um canal tem conteúdo otimizado no R2
+   */
+  isOptimizedContent(channel: Channel): boolean {
+    return Boolean(channel.r2_uploaded && channel.r2_url);
   }
 
   // ===========================================================================

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Heart, MoreVertical } from 'lucide-react';
+import { Play, Heart, MoreVertical, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,8 @@ interface TVContentCardProps {
   variant?: 'default' | 'wide' | 'poster';
   /** When true, card fills its container (for grid layouts). When false, uses fixed width (for scroll rows) */
   fillContainer?: boolean;
+  /** Indicates if content is optimized and served from CDN (R2) */
+  isOptimized?: boolean;
   className?: string;
 }
 
@@ -27,6 +29,7 @@ export function TVContentCard({
   onToggleFavorite,
   variant = 'default',
   fillContainer = false,
+  isOptimized = false,
   className
 }: TVContentCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -95,12 +98,25 @@ export function TVContentCard({
           </div>
         </div>
 
-        {/* Favorite Badge */}
-        {isFavorite && (
-          <div className="absolute top-2 right-2 bg-primary rounded-full p-1.5 shadow-lg">
-            <Heart className="w-3 h-3 text-primary-foreground fill-current" />
-          </div>
-        )}
+        {/* Badges */}
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          {/* CDN Optimized Badge */}
+          {isOptimized && (
+            <div 
+              className="bg-emerald-500/90 rounded-full p-1.5 shadow-lg"
+              title="Conteúdo otimizado - CDN"
+            >
+              <Zap className="w-3 h-3 text-white" />
+            </div>
+          )}
+          
+          {/* Favorite Badge */}
+          {isFavorite && (
+            <div className="bg-primary rounded-full p-1.5 shadow-lg">
+              <Heart className="w-3 h-3 text-primary-foreground fill-current" />
+            </div>
+          )}
+        </div>
       </button>
 
       {/* Card Info */}
