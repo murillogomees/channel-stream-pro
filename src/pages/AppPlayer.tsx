@@ -25,6 +25,11 @@ import { TVCategoryFilter } from '@/components/iptv/TVCategoryFilter';
 import { TVContentGrid } from '@/components/iptv/TVContentGrid';
 import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
+// Smart features imports
+import { useContinueWatching, useTrending } from '@/features/player/hooks';
+import { ContinueWatchingRow, Top10Row } from '@/features/player/components';
+import { favoritesService as playerFavoritesService } from '@/features/player/services';
+import type { WatchProgress, TrendingItem } from '@/features/player/types';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -69,6 +74,14 @@ export default function AppPlayer() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+  
+  // Smart features hooks
+  const { 
+    items: continueWatchingItems, 
+    isLoading: loadingContinueWatching, 
+    removeItem: removeContinueWatchingItem 
+  } = useContinueWatching();
+  const { items: trendingItems, isLoading: loadingTrending } = useTrending('weekly');
 
   // Reset category selection when tab changes
   useEffect(() => {
@@ -441,7 +454,54 @@ export default function AppPlayer() {
                 />
               )}
               
-              <div className="pb-16">
+              <div className="pb-16 space-y-2">
+                {/* Continue Watching - Smart Feature */}
+                <ContinueWatchingRow
+                  items={continueWatchingItems}
+                  onPlay={(item: WatchProgress) => {
+                    // Try to find channel in playlist or just navigate with the data
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) {
+                      handlePlay(channel);
+                    } else {
+                      // Navigate with resume position
+                      setPlayerChannel({
+                        id: item.content_id,
+                        name: item.content_name,
+                        tvg_logo: item.content_logo,
+                        category_name: item.content_category,
+                        stream_url: '', // Will need to be resolved
+                      });
+                      setShowPlayerDialog(true);
+                    }
+                  }}
+                  onRemove={async (contentId: string) => {
+                    await removeContinueWatchingItem(contentId);
+                  }}
+                  isLoading={loadingContinueWatching}
+                />
+
+                {/* Top 10 - Smart Feature */}
+                <Top10Row
+                  items={trendingItems}
+                  title="Top 10 da Semana"
+                  onPlay={(item: TrendingItem) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) {
+                      handlePlay(channel);
+                    }
+                  }}
+                  onInfo={(item: TrendingItem) => {
+                    // For now, just play the content
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) {
+                      handlePlay(channel);
+                    }
+                  }}
+                  isLoading={loadingTrending}
+                />
+
+                {/* Existing category content rows */}
                 {homeContent.map((category) => (
                   <TVContentRow
                     key={category.id}
