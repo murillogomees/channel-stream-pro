@@ -43,17 +43,18 @@ export default function Login() {
       const isClientRole = user.roles?.includes('client');
       console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin: isAdminRole, isClient: isClientRole });
       
-      // Prioridade: state.from > role-based redirect
-      const stateFrom = (location.state as any)?.from?.pathname;
-      let redirectTo = stateFrom;
+      let redirectTo: string;
       
-      if (!redirectTo) {
-        if (isAdminRole) {
-          redirectTo = '/dashboard';
-        } else if (isClientRole) {
-          redirectTo = '/app/player'; // Clientes vão direto para o player
+      // Admins SEMPRE vão para o dashboard (ignorar state.from)
+      if (isAdminRole) {
+        redirectTo = '/dashboard';
+      } else {
+        // Para clientes, usar state.from se existir, senão /app/player
+        const stateFrom = (location.state as any)?.from?.pathname;
+        if (isClientRole) {
+          redirectTo = stateFrom || '/app/player';
         } else {
-          redirectTo = '/';
+          redirectTo = stateFrom || '/';
         }
       }
       
