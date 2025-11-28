@@ -1215,12 +1215,17 @@ export type Database = {
       m3u_channels: {
         Row: {
           category_id: string
+          content_type: string | null
           created_at: string | null
           group_title: string | null
           id: string
+          is_vod: boolean | null
           metadata: Json | null
           name: string
           order_position: number | null
+          r2_uploaded: boolean | null
+          r2_uploaded_at: string | null
+          r2_url: string | null
           stream_url: string
           tvg_id: string | null
           tvg_logo: string | null
@@ -1229,12 +1234,17 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          content_type?: string | null
           created_at?: string | null
           group_title?: string | null
           id?: string
+          is_vod?: boolean | null
           metadata?: Json | null
           name: string
           order_position?: number | null
+          r2_uploaded?: boolean | null
+          r2_uploaded_at?: string | null
+          r2_url?: string | null
           stream_url: string
           tvg_id?: string | null
           tvg_logo?: string | null
@@ -1243,12 +1253,17 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          content_type?: string | null
           created_at?: string | null
           group_title?: string | null
           id?: string
+          is_vod?: boolean | null
           metadata?: Json | null
           name?: string
           order_position?: number | null
+          r2_uploaded?: boolean | null
+          r2_uploaded_at?: string | null
+          r2_url?: string | null
           stream_url?: string
           tvg_id?: string | null
           tvg_logo?: string | null
@@ -3736,6 +3751,68 @@ export type Database = {
           },
         ]
       }
+      vod_downloads: {
+        Row: {
+          channel_id: string | null
+          created_at: string | null
+          download_completed_at: string | null
+          download_started_at: string | null
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          max_retries: number | null
+          original_url: string
+          r2_url: string | null
+          retry_count: number | null
+          segment_count: number | null
+          segments_downloaded: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string | null
+          download_completed_at?: string | null
+          download_started_at?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          max_retries?: number | null
+          original_url: string
+          r2_url?: string | null
+          retry_count?: number | null
+          segment_count?: number | null
+          segments_downloaded?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string | null
+          download_completed_at?: string | null
+          download_started_at?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          max_retries?: number | null
+          original_url?: string
+          r2_url?: string | null
+          retry_count?: number | null
+          segment_count?: number | null
+          segments_downloaded?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vod_downloads_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watch_history: {
         Row: {
           content_category: string | null
@@ -4001,6 +4078,7 @@ export type Database = {
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
       cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
+      cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       detect_permission_discrepancies: {
         Args: {
@@ -4013,6 +4091,14 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      detect_vod_channels: {
+        Args: never
+        Returns: {
+          live_count: number
+          updated_count: number
+          vod_count: number
+        }[]
       }
       get_active_sessions: {
         Args: never
@@ -4156,6 +4242,18 @@ export type Database = {
           is_blocked: boolean
           last_event: string
           suspicious_activities: number
+        }[]
+      }
+      get_vod_statistics: {
+        Args: never
+        Returns: {
+          avg_file_size_mb: number
+          downloads_failed: number
+          downloads_in_progress: number
+          total_storage_bytes: number
+          total_vods: number
+          vods_pending: number
+          vods_uploaded: number
         }[]
       }
       has_role: {

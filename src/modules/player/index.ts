@@ -96,7 +96,7 @@ export { TVChannelGrid } from './ui/TVChannelGrid';
 export { TVPlayerOverlay } from './ui/TVPlayerOverlay';
 
 // Services
-export { streamService, type Channel, type Category, type M3UFetchResult } from './services/StreamService';
+export { streamService, type Channel, type Category, type M3UFetchResult, type StreamHealthResult } from './services/StreamService';
 export { focusManager, default as FocusManager } from './FocusManager';
 
 // Hooks - Focus

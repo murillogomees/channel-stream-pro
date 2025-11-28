@@ -28,6 +28,12 @@ export interface VODStatistics {
   avg_file_size_mb: number;
 }
 
+export interface VODDetectionResult {
+  updated_count: number;
+  vod_count: number;
+  live_count: number;
+}
+
 export const useVODManagement = () => {
   const { toast } = useToast();
   const [downloads, setDownloads] = useState<VODDownload[]>([]);
@@ -63,6 +69,29 @@ export const useVODManagement = () => {
       console.error('Error fetching VOD statistics:', error);
     }
   }, []);
+
+  // Detectar VODs automaticamente
+  const detectVODs = useCallback(async (): Promise<VODDetectionResult> => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.rpc('detect_vod_channels' as any);
+      
+      if (error) throw error;
+      
+      const result = data?.[0] || { updated_count: 0, vod_count: 0, live_count: 0 };
+      
+      // Atualizar estatísticas após detecção
+      await fetchStatistics();
+      
+      return result as VODDetectionResult;
+    } catch (error: any) {
+      console.error('Error detecting VODs:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchStatistics]);
 
   // Iniciar download de um canal
   const downloadChannel = useCallback(async (channelId: string, channelName: string) => {
@@ -243,6 +272,10 @@ export const useVODManagement = () => {
     downloadBatch,
     markAsVOD,
     deleteVOD,
-    refresh: fetchDownloads,
+    detectVODs,
+    refresh: () => {
+      fetchDownloads();
+      fetchStatistics();
+    },
   };
 };
