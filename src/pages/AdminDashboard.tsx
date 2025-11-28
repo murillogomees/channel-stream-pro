@@ -239,11 +239,11 @@ const AdminDashboard = () => {
 
         <Separator className="my-8" />
 
-        {/* Gestão de Clientes */}
+        {/* Gestão de Clientes & Usuários */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Gestão de Clientes</h2>
+            <h2 className="text-lg font-semibold">Gestão de Clientes & Usuários</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
@@ -257,6 +257,13 @@ const AdminDashboard = () => {
               description="Cadastre um novo cliente no sistema"
               icon={<User className="h-5 w-5" />}
               path="/admin/clientes/novo"
+            />
+            <NavCard
+              title="Gestão de Usuários"
+              description="Roles, auditoria e permissões"
+              icon={<UserCog className="h-5 w-5" />}
+              path="/admin/users"
+              badge="Consolidado"
             />
             <NavCard
               title="Gestão M3U"
@@ -370,24 +377,6 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        <Separator className="my-8" />
-
-        {/* Usuários & Permissões */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <UserCog className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Usuários & Permissões</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NavCard
-              title="Gestão de Usuários"
-              description="Roles, auditoria e permissões"
-              icon={<UserCog className="h-5 w-5" />}
-              path="/admin/users"
-              badge="Consolidado"
-            />
-          </div>
-        </section>
       </main>
     </div>
   );
