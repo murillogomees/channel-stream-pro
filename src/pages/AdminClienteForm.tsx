@@ -8,7 +8,6 @@ import { useClientesDb } from '@/hooks/useClientesDb';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler, EventNotificationHandler } from '@/services/notifications';
-import { smartoneService } from '@/services/smartoneService';
 import { supabase } from '@/integrations/supabase/client';
 import { activityLogService } from '@/services/activityLogService';
 import { Button } from '@/components/ui/button';
@@ -200,11 +199,10 @@ export default function AdminClienteForm() {
     loadCliente();
   }, [id, setValue, toast]);
 
-  // Validação SmartOne em tempo real
+  // Validação de MAC em tempo real (simplificada, sem SmartOne API)
   useEffect(() => {
-    const validateSmartOneFields = async () => {
+    const validateMacFields = () => {
       const macSmartOne = watch('macSmartOne');
-      const nome = watch('nome');
 
       // Se MAC não está preenchido, não validar
       if (!macSmartOne) {
@@ -212,21 +210,20 @@ export default function AdminClienteForm() {
         return;
       }
 
-      // Criar objeto cliente temporário para validação
-      const tempCliente: Partial<Cliente> = {
-        macSmartOne: macSmartOne || '',
-        nome: nome || '',
-      } as any;
+      // Validação local do formato MAC
+      const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+      const errors: string[] = [];
+      const warnings: string[] = [];
 
-      const validation = await smartoneService.validateClientForSync(tempCliente as Cliente);
-      setSmartoneValidation({
-        errors: validation.errors,
-        warnings: validation.warnings,
-      });
+      if (!macRegex.test(macSmartOne)) {
+        errors.push('Formato de MAC inválido. Use XX:XX:XX:XX:XX:XX');
+      }
+
+      setSmartoneValidation({ errors, warnings });
     };
 
-    validateSmartOneFields();
-  }, [watch('macSmartOne'), watch('nome')]);
+    validateMacFields();
+  }, [watch('macSmartOne')]);
 
   // Cálculo automático de data de vencimento e pagamento
   useEffect(() => {

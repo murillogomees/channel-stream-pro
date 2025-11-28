@@ -31,10 +31,9 @@ const searchItems: SearchItem[] = [
   { title: 'Histórico de Notificações', description: 'Visualize histórico de envios', path: '/admin/notificacoes', icon: <Bell className="h-4 w-4" />, category: 'Notificações' },
   { title: 'Estatísticas de Notificações', description: 'Análise de performance', path: '/admin/notification-stats', icon: <BarChart3 className="h-4 w-4" />, category: 'Notificações' },
   
-  // SmartOne
-  { title: 'Configuração SmartOne', description: 'Configure API SmartOne', path: '/admin/smartone-config', icon: <Smartphone className="h-4 w-4" />, category: 'SmartOne' },
-  { title: 'Sincronização SmartOne', description: 'Sincronize clientes', path: '/admin/smartone-sync', icon: <Smartphone className="h-4 w-4" />, category: 'SmartOne' },
-  { title: 'Saúde das Playlists', description: 'Monitore URLs M3U', path: '/admin/playlist-health', icon: <BarChart3 className="h-4 w-4" />, category: 'SmartOne' },
+  // M3U / Playlists
+  { title: 'Saúde das Playlists', description: 'Monitore URLs M3U', path: '/admin/playlist-health', icon: <BarChart3 className="h-4 w-4" />, category: 'Playlists' },
+  { title: 'Integrações', description: 'WhatsApp e SmartOne', path: '/admin/integrations', icon: <Smartphone className="h-4 w-4" />, category: 'Playlists' },
   
   // Segurança
   { title: 'Monitor de Segurança', description: 'Eventos em tempo real', path: '/admin/security-monitor', icon: <Shield className="h-4 w-4" />, category: 'Segurança' },
