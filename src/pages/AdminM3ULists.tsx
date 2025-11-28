@@ -267,11 +267,11 @@ export default function AdminM3ULists() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
       <PageHeader title="Listas M3U" description="Gerencie as listas de canais IPTV" />
       
-      <div className="flex justify-end gap-2 mb-6">
-        <Button onClick={() => handleOpenDialog()}>
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mb-4 sm:mb-6">
+        <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nova Lista
         </Button>

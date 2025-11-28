@@ -94,17 +94,19 @@ const AdminSystemHealth = () => {
   })).slice(-30);
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/admin/dashboard')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">Saúde do Sistema</h1>
-            <p className="text-muted-foreground">Monitoramento de todos os serviços</p>
+    <div className="min-h-screen bg-background p-3 sm:p-6 overflow-x-hidden">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/admin/dashboard')} className="flex-shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Saúde do Sistema</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Monitoramento de todos os serviços</p>
+            </div>
           </div>
-          <Button onClick={exportMetrics}>
+          <Button onClick={exportMetrics} className="w-full sm:w-auto flex-shrink-0">
             <Download className="h-4 w-4 mr-2" />
             Exportar Métricas
           </Button>
@@ -190,22 +192,22 @@ const AdminSystemHealth = () => {
         {/* Trend Charts */}
         {snapshots.length > 5 && (
           <Tabs defaultValue="latency" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="latency">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Latência
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+              <TabsTrigger value="latency" className="text-xs sm:text-sm py-2">
+                <TrendingUp className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Latência</span>
               </TabsTrigger>
-              <TabsTrigger value="uptime">
-                <Clock className="h-4 w-4 mr-2" />
-                Uptime
+              <TabsTrigger value="uptime" className="text-xs sm:text-sm py-2">
+                <Clock className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Uptime</span>
               </TabsTrigger>
-              <TabsTrigger value="connections">
-                <Activity className="h-4 w-4 mr-2" />
-                Conexões
+              <TabsTrigger value="connections" className="text-xs sm:text-sm py-2">
+                <Activity className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Conexões</span>
               </TabsTrigger>
-              <TabsTrigger value="events">
-                <Zap className="h-4 w-4 mr-2" />
-                Eventos
+              <TabsTrigger value="events" className="text-xs sm:text-sm py-2">
+                <Zap className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Eventos</span>
               </TabsTrigger>
             </TabsList>
 

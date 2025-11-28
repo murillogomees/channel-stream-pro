@@ -207,24 +207,24 @@ export default function AdminPlaylistHealth() {
   const healthPercentage = stats && stats.total > 0 ? (stats.active / stats.total) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Saúde das Listas M3U</h2>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg sm:text-2xl font-bold truncate">Saúde das Listas M3U</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
             Monitoramento e verificação das listas M3U do sistema
           </p>
         </div>
           
-        <Button onClick={handleRunHealthCheck} disabled={isRunning} size="lg">
+        <Button onClick={handleRunHealthCheck} disabled={isRunning} size="lg" className="w-full sm:w-auto flex-shrink-0">
           <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-          {isRunning ? 'Verificando...' : 'Executar Verificação'}
+          {isRunning ? 'Verificando...' : 'Verificar'}
         </Button>
       </div>
 
       {/* Estatísticas Gerais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Listas</CardTitle>
