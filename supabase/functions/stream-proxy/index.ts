@@ -133,15 +133,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Criar cliente autenticado
+    // Extrair o token do header
+    const token = authHeader.replace('Bearer ', '');
+
+    // Criar cliente Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    // Verificar usuário autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Verificar usuário autenticado passando o token diretamente
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     console.log(`[StreamProxy] User check: user=${user?.id}, error=${authError?.message}`);
     
     if (authError || !user) {
