@@ -2705,6 +2705,7 @@ export type Database = {
           storage_path_m3u: string | null
           sync_enabled: boolean | null
           sync_interval_minutes: number | null
+          sync_progress: Json | null
           trimmed_count: number | null
           updated_at: string | null
           version: number | null
@@ -2732,6 +2733,7 @@ export type Database = {
           storage_path_m3u?: string | null
           sync_enabled?: boolean | null
           sync_interval_minutes?: number | null
+          sync_progress?: Json | null
           trimmed_count?: number | null
           updated_at?: string | null
           version?: number | null
@@ -2759,6 +2761,7 @@ export type Database = {
           storage_path_m3u?: string | null
           sync_enabled?: boolean | null
           sync_interval_minutes?: number | null
+          sync_progress?: Json | null
           trimmed_count?: number | null
           updated_at?: string | null
           version?: number | null
