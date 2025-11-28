@@ -11,17 +11,19 @@
  * 
  * Features:
  * - HLS nativo (Safari, TVs) + fallback hls.js
+ * - MPEG-TS direto via mpegts.js (Xtream Codes live)
  * - Controle remoto completo (setas, OK, Back)
  * - Autoplay seguro
  * - Recovery automático de erros
  * - Zero memory leaks
  * 
- * @version 2.0.0
+ * @version 3.0.0
  * @author IPTV Link
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
+import mpegts from "mpegts.js";
 
 // =============================================================================
 // TYPES
@@ -38,18 +40,32 @@ interface UniversalPlayerProps {
   /** Iniciar mutado */
   muted?: boolean;
   /** Callback de erro fatal */
-  onError?: (error: HlsError) => void;
+  onError?: (error: PlayerError) => void;
   /** Callback quando player está pronto */
   onReady?: () => void;
   /** Callback para voltar/fechar */
   onBack?: () => void;
 }
 
-interface HlsError {
+interface PlayerError {
   type: string;
   details: string;
   fatal: boolean;
 }
+
+// =============================================================================
+// MPEGTS.JS CONFIGURATION
+// =============================================================================
+const MPEGTS_CONFIG: mpegts.Config = {
+  enableWorker: true,
+  enableStashBuffer: true,
+  stashInitialSize: 384 * 1024,
+  liveBufferLatencyChasing: true,
+  liveSync: true,
+  autoCleanupSourceBuffer: true,
+  autoCleanupMaxBackwardDuration: 30,
+  autoCleanupMinBackwardDuration: 10,
+};
 
 // =============================================================================
 // HLS.JS CONFIGURATION
@@ -102,6 +118,7 @@ export default function UniversalPlayer({
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const mpegtsRef = useRef<mpegts.Player | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryAttempts = useRef(0);
 
@@ -270,7 +287,7 @@ export default function UniversalPlayer({
     // Check if it's an HLS stream
     const isHlsStream = originalLower.includes('.m3u8') || originalLower.includes('.m3u');
     
-    // Xtream Codes live pattern (no extension) - these need HLS
+    // Xtream Codes live pattern (no extension) - these output MPEG-TS directly
     const isXtreamLive = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/.test(originalUrl) && !isHlsStream && !hasVideoExtension;
 
     console.log('[Player] ==========================================');
@@ -278,9 +295,11 @@ export default function UniversalPlayer({
     console.log('[Player] Proxy URL:', url.substring(0, 60) + '...');
     console.log('[Player] Original URL:', originalUrl.substring(0, 60) + '...');
     console.log('[Player] Has video extension:', hasVideoExtension);
-    console.log('[Player] Is Xtream live:', isXtreamLive);
+    console.log('[Player] Is Xtream live (MPEG-TS):', isXtreamLive);
+    console.log('[Player] Is HLS stream:', isHlsStream);
     console.log('[Player] Native playable:', isNativePlayable);
     console.log('[Player] HLS.js supported:', Hls.isSupported());
+    console.log('[Player] MPEGTS.js supported:', mpegts.isSupported());
     
     // Reset state
     setIsLoading(true);
@@ -288,33 +307,24 @@ export default function UniversalPlayer({
     setErrorMessage('');
     recoveryAttempts.current = 0;
 
-    // Cleanup previous instance
+    // Cleanup previous instances
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-    
-    // For Xtream Codes live streams, convert to HLS format by adding .m3u8
-    let playbackUrl = url;
-    if (isXtreamLive) {
-      // Append .m3u8 to get HLS stream from Xtream Codes
-      const hlsOriginalUrl = originalUrl + '.m3u8';
-      // Reconstruct proxy URL with HLS version
-      try {
-        const proxyBase = new URL(url);
-        proxyBase.searchParams.set('url', hlsOriginalUrl);
-        playbackUrl = proxyBase.toString();
-        console.log('[Player] Converted to HLS:', hlsOriginalUrl.substring(0, 60) + '...');
-      } catch {
-        playbackUrl = url;
-      }
+    if (mpegtsRef.current) {
+      mpegtsRef.current.pause();
+      mpegtsRef.current.unload();
+      mpegtsRef.current.detachMediaElement();
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
     }
 
     // ==== NATIVE VIDEO (MP4, WebM, MKV) ====
     if (isNativePlayable) {
       console.log('[Player] Using native video playback');
       
-      video.src = playbackUrl;
+      video.src = url;
       video.load();
       
       const onLoadedMetadata = () => {
@@ -329,7 +339,7 @@ export default function UniversalPlayer({
         }
       };
 
-      const onError = () => {
+      const onVideoError = () => {
         console.error('[Player] Native video error');
         setIsLoading(false);
         setHasError(true);
@@ -341,14 +351,74 @@ export default function UniversalPlayer({
       };
 
       video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
-      video.addEventListener('error', onError, { once: true });
+      video.addEventListener('error', onVideoError, { once: true });
       video.addEventListener('canplay', onCanPlay, { once: true });
 
       return () => {
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
-        video.removeEventListener('error', onError);
+        video.removeEventListener('error', onVideoError);
         video.removeEventListener('canplay', onCanPlay);
         video.src = '';
+      };
+    }
+
+    // ==== XTREAM CODES LIVE (MPEG-TS via mpegts.js) ====
+    if (isXtreamLive && mpegts.isSupported()) {
+      console.log('[Player] Using mpegts.js for Xtream live stream');
+      
+      const player = mpegts.createPlayer({
+        type: 'mpegts',
+        isLive: true,
+        url: url, // Use proxy URL directly
+      }, MPEGTS_CONFIG);
+      
+      mpegtsRef.current = player;
+      
+      player.attachMediaElement(video);
+      player.load();
+      
+      player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+        console.error('[Player] MPEGTS error:', errorType, errorDetail, errorInfo);
+        
+        recoveryAttempts.current++;
+        if (recoveryAttempts.current > 3) {
+          setHasError(true);
+          setErrorMessage('Falha ao carregar stream ao vivo');
+          onError?.({ type: String(errorType), details: String(errorDetail), fatal: true });
+        } else {
+          console.log('[Player] Attempting MPEGTS recovery...');
+          player.unload();
+          setTimeout(() => {
+            player.load();
+            if (autoplay) player.play();
+          }, 1000);
+        }
+      });
+      
+      player.on(mpegts.Events.LOADING_COMPLETE, () => {
+        console.log('[Player] MPEGTS loading complete');
+      });
+      
+      player.on(mpegts.Events.METADATA_ARRIVED, () => {
+        console.log('[Player] MPEGTS metadata arrived');
+        setIsLoading(false);
+        onReady?.();
+        
+        if (autoplay) {
+          video.play().catch(err => {
+            console.warn('[Player] Autoplay blocked:', err.message);
+          });
+        }
+      });
+      
+      return () => {
+        if (mpegtsRef.current) {
+          mpegtsRef.current.pause();
+          mpegtsRef.current.unload();
+          mpegtsRef.current.detachMediaElement();
+          mpegtsRef.current.destroy();
+          mpegtsRef.current = null;
+        }
       };
     }
 
@@ -358,7 +428,7 @@ export default function UniversalPlayer({
     if (supportsNativeHls && !Hls.isSupported()) {
       console.log('[Player] Using native HLS (Safari/iOS/TV)');
       
-      video.src = playbackUrl;
+      video.src = url;
       
       const onLoadedMetadata = () => {
         console.log('[Player] Native HLS ready');
@@ -394,7 +464,7 @@ export default function UniversalPlayer({
       // Fallback to native if HLS.js not supported but native is
       if (supportsNativeHls) {
         console.log('[Player] Falling back to native HLS');
-        video.src = playbackUrl;
+        video.src = url;
         video.load();
         if (autoplay) video.play().catch(console.warn);
         return;
@@ -412,14 +482,14 @@ export default function UniversalPlayer({
     const hls = new Hls({
       ...HLS_CONFIG,
       debug: false,
-      xhrSetup: (xhr: XMLHttpRequest, url: string) => {
-        console.log('[Player] Loading:', url.substring(0, 60) + '...');
+      xhrSetup: (xhr: XMLHttpRequest, loadingUrl: string) => {
+        console.log('[Player] Loading:', loadingUrl.substring(0, 60) + '...');
       },
     });
     hlsRef.current = hls;
 
     // Load source
-    hls.loadSource(playbackUrl);
+    hls.loadSource(url);
     hls.attachMedia(video);
     
     console.log('[Player] HLS source attached');
