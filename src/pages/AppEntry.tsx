@@ -25,12 +25,18 @@ export default function AppEntry() {
         // User is logged in, go to player
         navigate('/app/player', { replace: true });
       } else {
-        // User not logged in, go to login
-        navigate('/app/login', { replace: true });
+        // User not logged in, go to unified login with return URL
+        navigate('/login', { 
+          replace: true,
+          state: { from: { pathname: '/app/player' } }
+        });
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      navigate('/app/login', { replace: true });
+      navigate('/login', { 
+        replace: true,
+        state: { from: { pathname: '/app/player' } }
+      });
     } finally {
       setIsCheckingAuth(false);
     }

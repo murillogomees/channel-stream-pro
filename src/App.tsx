@@ -39,7 +39,7 @@ const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
-const AppLogin = lazy(() => import("./pages/app/AppLogin"));
+// AppLogin now redirects to unified Login page
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppProfile = lazy(() => import("./pages/app/AppProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
@@ -77,7 +77,7 @@ const App = () => (
               - /app/profile = Client profile/settings
               ======================================== */}
           <Route path="/app" element={<AppEntry />} />
-          <Route path="/app/login" element={<AppLogin />} />
+          <Route path="/app/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
           <Route path="/tv-player" element={<TVPlayer />} />
