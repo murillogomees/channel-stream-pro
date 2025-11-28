@@ -27,8 +27,8 @@ import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
 import { useContinueWatching, useTrending } from '@/features/player/hooks';
-import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView } from '@/features/player/components';
-import type { MovieSortOption } from '@/features/player/components';
+import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView, SeriesView } from '@/features/player/components';
+import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { 
   favoritesService as playerFavoritesService, 
   watchProgressService,
@@ -80,6 +80,7 @@ export default function AppPlayer() {
   const [playerChannel, setPlayerChannel] = useState<any>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
   const [movieSortBy, setMovieSortBy] = useState<MovieSortOption>('name');
+  const [seriesSortBy, setSeriesSortBy] = useState<SeriesSortOption>('name');
   
   // Smart features hooks
   const { 
@@ -420,6 +421,20 @@ export default function AppPlayer() {
               </Select>
             )}
 
+            {/* Sort select for series */}
+            {activeTab === 'series' && (
+              <Select value={seriesSortBy} onValueChange={(v) => setSeriesSortBy(v as SeriesSortOption)}>
+                <SelectTrigger className="w-[90px] sm:w-[100px] h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">A-Z</SelectItem>
+                  <SelectItem value="rating">Avaliação</SelectItem>
+                  <SelectItem value="year">Ano</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
             {/* Admin playlist selector */}
             {isAdmin && availableLists.length > 0 && (
               <select
@@ -587,66 +602,16 @@ export default function AppPlayer() {
             />
           )}
 
-          {/* Series View - Keep existing grid */}
+          {/* Series View - Enhanced with TMDB integration */}
           {activeTab === 'series' && (
-            <div className="flex min-h-[calc(100vh-4rem)]">
-              {/* Category Sidebar */}
-              <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border py-4 lg:py-6 px-4">
-                <TVCategoryFilter
-                  categories={currentTabCategories}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={setSelectedCategory}
-                  title="Categorias"
-                />
-              </aside>
-
-              {/* Content Area */}
-              <div className="flex-1 pb-16">
-                {/* Mobile Category Select */}
-                <div className="lg:hidden px-4 lg:px-8 py-4">
-                  <Select 
-                    value={selectedCategory || "all"} 
-                    onValueChange={(v) => setSelectedCategory(v === "all" ? null : v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Todas as categorias" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        Todas as categorias ({filteredChannels.length})
-                      </SelectItem>
-                      {currentTabCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.display_name} ({cat.channelCount})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Results info for search */}
-                {searchQuery && (
-                  <div className="px-4 lg:px-8 pb-2">
-                    <p className="text-sm text-muted-foreground">
-                      {filteredChannels.length} resultado{filteredChannels.length !== 1 ? 's' : ''} 
-                      {searchQuery && ` para "${searchQuery}"`}
-                    </p>
-                  </div>
-                )}
-
-                <TVContentGrid
-                  channels={filteredChannels}
-                  isFavorite={isFavorite}
-                  onPlay={handlePlay}
-                  onToggleFavorite={toggleFavorite}
-                  emptyMessage={
-                    searchQuery 
-                      ? "Nenhum resultado encontrado" 
-                      : "Selecione uma categoria para ver o conteúdo"
-                  }
-                />
-              </div>
-            </div>
+            <SeriesView
+              categories={categorizedContent.series}
+              onPlay={handlePlay}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              searchQuery={searchQuery}
+              sortBy={seriesSortBy}
+            />
           )}
         </div>
       </main>

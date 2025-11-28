@@ -18,3 +18,9 @@ export { MoviesView } from './MoviesView';
 export type { MovieSortOption } from './MoviesView';
 export { MovieCard, MovieCardSkeleton } from './MovieCard';
 export { MovieDetailSheet } from './MovieDetailSheet';
+
+// Series components
+export { SeriesView } from './SeriesView';
+export type { SeriesSortOption } from './SeriesView';
+export { SeriesCard, SeriesCardSkeleton } from './SeriesCard';
+export { SeriesDetailSheet } from './SeriesDetailSheet';

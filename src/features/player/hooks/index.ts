@@ -15,3 +15,6 @@ export { usePictureInPicture } from './usePictureInPicture';
 
 // Movie hooks
 export { useMovieMetadata } from './useMovieMetadata';
+
+// Series hooks
+export { useSeriesMetadata } from './useSeriesMetadata';
