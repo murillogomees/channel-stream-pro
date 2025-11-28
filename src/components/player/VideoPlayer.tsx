@@ -78,25 +78,47 @@ const HLS_CONFIG: Partial<Hls['config']> = {
 // STREAM TYPE DETECTION
 // =============================================================================
 
+function extractOriginalUrl(url: string): string {
+  if (url.includes('stream-proxy') && url.includes('url=')) {
+    try {
+      const urlObj = new URL(url);
+      const originalUrl = urlObj.searchParams.get('url');
+      if (originalUrl) return decodeURIComponent(originalUrl);
+    } catch {
+      // Fall through
+    }
+  }
+  return url;
+}
+
 function isHlsUrl(url: string): boolean {
-  const urlLower = url.toLowerCase();
-  return urlLower.includes('.m3u8') || urlLower.includes('.m3u');
+  const checkUrl = extractOriginalUrl(url).toLowerCase();
+  return checkUrl.includes('.m3u8') || checkUrl.includes('.m3u');
 }
 
 function isDirectVideoUrl(url: string): boolean {
-  const urlLower = url.toLowerCase();
-  // MP4, MKV, AVI, etc
-  if (urlLower.includes('.mp4') || urlLower.includes('.mkv') || 
-      urlLower.includes('.avi') || urlLower.includes('.ts') ||
-      urlLower.includes('.webm')) {
+  const checkUrl = extractOriginalUrl(url).toLowerCase();
+  
+  if (checkUrl.includes('.mp4') || checkUrl.includes('.mkv') || 
+      checkUrl.includes('.avi') || checkUrl.includes('.ts') ||
+      checkUrl.includes('.webm')) {
     return true;
   }
-  // Xtream Codes live/movie patterns (direct streams)
-  // /live/user/pass/123 or /movie/user/pass/123.mp4 or /user/pass/123
-  const xtreamPattern = /\/(?:live|movie|series)?\/?\d+/;
-  if (xtreamPattern.test(urlLower)) {
+  
+  // Proxy URL without HLS extension = direct stream
+  if (url.includes('stream-proxy')) {
+    return !isHlsUrl(url);
+  }
+  
+  const xtreamPattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
+  if (xtreamPattern.test(checkUrl)) {
     return true;
   }
+  
+  if (/\/\d+$/.test(checkUrl) && !checkUrl.includes('.m3u')) {
+    return true;
+  }
+  
   return false;
 }
 
