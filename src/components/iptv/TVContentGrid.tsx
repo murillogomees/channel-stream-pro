@@ -1,8 +1,7 @@
-import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { TVContentCard } from './TVContentCard';
-import { Button } from '@/components/ui/button';
-import { ChevronDown } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { useLazyLoadContent } from '@/hooks/useLazyLoadContent';
 
 interface Channel {
   id: string;
@@ -21,8 +20,6 @@ interface TVContentGridProps {
   initialLimit?: number;
 }
 
-const ITEMS_PER_PAGE = 50;
-
 export function TVContentGrid({
   channels,
   isFavorite,
@@ -30,23 +27,20 @@ export function TVContentGrid({
   onToggleFavorite,
   emptyMessage = "Nenhum conteúdo encontrado",
   className,
-  initialLimit = ITEMS_PER_PAGE,
+  initialLimit = 30,
 }: TVContentGridProps) {
-  const [displayCount, setDisplayCount] = useState(initialLimit);
-
-  // Reset display count when channels change significantly
-  const channelsKey = channels.length;
-  
-  const visibleChannels = useMemo(() => {
-    return channels.slice(0, displayCount);
-  }, [channels, displayCount]);
-
-  const hasMore = displayCount < channels.length;
-  const remainingCount = channels.length - displayCount;
-
-  const loadMore = () => {
-    setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, channels.length));
-  };
+  const {
+    visibleItems,
+    hasMore,
+    remainingCount,
+    loadMoreRef,
+    visibleCount,
+    totalCount,
+  } = useLazyLoadContent(channels, {
+    initialCount: initialLimit,
+    incrementCount: 30,
+    rootMargin: '400px',
+  });
 
   if (channels.length === 0) {
     return (
@@ -58,17 +52,17 @@ export function TVContentGrid({
 
   return (
     <section className={cn("py-4 lg:py-6", className)}>
-      {/* Results count - matching TVContentRow header padding */}
+      {/* Results count */}
       <div className="px-4 lg:px-8 mb-3 lg:mb-4">
         <p className="text-sm text-muted-foreground">
-          Mostrando {visibleChannels.length} de {channels.length.toLocaleString()} itens
+          Mostrando {visibleCount} de {totalCount.toLocaleString()} itens
         </p>
       </div>
 
-      {/* Grid - matching TVContentRow content padding */}
+      {/* Grid */}
       <div className="px-4 lg:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-          {visibleChannels.map((channel) => (
+          {visibleItems.map((channel) => (
             <TVContentCard
               key={channel.id}
               id={channel.id}
@@ -84,18 +78,18 @@ export function TVContentGrid({
         </div>
       </div>
 
-      {/* Load More Button */}
+      {/* Lazy load trigger */}
       {hasMore && (
-        <div className="flex justify-center pt-6 px-4 lg:px-8">
-          <Button 
-            variant="outline" 
-            size="lg"
-            onClick={loadMore}
-            className="gap-2"
-          >
-            <ChevronDown className="w-4 h-4" />
-            Carregar mais ({Math.min(ITEMS_PER_PAGE, remainingCount).toLocaleString()} de {remainingCount.toLocaleString()} restantes)
-          </Button>
+        <div 
+          ref={loadMoreRef}
+          className="flex justify-center items-center py-8 px-4"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">
+              Carregando mais {Math.min(30, remainingCount)} de {remainingCount.toLocaleString()}...
+            </span>
+          </div>
         </div>
       )}
     </section>
