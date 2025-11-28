@@ -451,15 +451,27 @@ export default function AdminClienteForm() {
 
           if (createUserError) {
             console.error('Erro ao criar usuário:', createUserError);
-            // Se o erro for de usuário já existente, tentar buscar o ID
-            if (createUserError.message?.includes('already registered') || createUserError.message?.includes('already exists')) {
+            // Se o erro for de usuário já existente, continuar sem criar auth user
+            toast({
+              title: 'Aviso',
+              description: 'Este email já está registrado. O cliente será criado sem nova conta de acesso.',
+              variant: 'default',
+            });
+          } else if (createUserResult?.error) {
+            // Erro retornado no body da resposta
+            console.error('Erro no resultado:', createUserResult.error);
+            if (createUserResult.code === 'EMAIL_EXISTS') {
               toast({
                 title: 'Aviso',
-                description: 'Este email já está registrado. O cliente será criado sem conta de acesso.',
+                description: 'Este email já está registrado no sistema.',
                 variant: 'default',
               });
             } else {
-              throw new Error(`Erro ao criar conta de acesso: ${createUserError.message}`);
+              toast({
+                title: 'Erro ao criar conta',
+                description: createUserResult.details || createUserResult.error,
+                variant: 'destructive',
+              });
             }
           } else if (createUserResult?.user?.id) {
             authUserId = createUserResult.user.id;
