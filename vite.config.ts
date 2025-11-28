@@ -21,8 +21,8 @@ export default defineConfig(({ mode }) => ({
         enabled: false,
       },
       manifest: {
-        name: "IPTV Link - TV Online",
-        short_name: "IPTV Link",
+        name: "IPTV LINK PLAYER",
+        short_name: "IPTV LINK PLAYER",
         description: "Assista mais de 209.000 canais em Full HD e 4K",
         theme_color: "#0A0A0A",
         background_color: "#0A0A0A",
