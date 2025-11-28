@@ -12,6 +12,8 @@ interface TVContentCardProps {
   onPlay: () => void;
   onToggleFavorite: () => void;
   variant?: 'default' | 'wide' | 'poster';
+  /** When true, card fills its container (for grid layouts). When false, uses fixed width (for scroll rows) */
+  fillContainer?: boolean;
   className?: string;
 }
 
@@ -24,6 +26,7 @@ export function TVContentCard({
   onPlay,
   onToggleFavorite,
   variant = 'default',
+  fillContainer = false,
   className
 }: TVContentCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -32,15 +35,16 @@ export function TVContentCard({
   const aspectRatio = variant === 'poster' ? 'aspect-[2/3]' : 
                       variant === 'wide' ? 'aspect-[21/9]' : 'aspect-video';
   
-  const cardWidth = variant === 'poster' ? 'w-[140px] lg:w-[160px]' : 
-                    variant === 'wide' ? 'w-[300px] lg:w-[380px]' : 'w-[200px] lg:w-[240px] xl:w-[280px]';
+  // Fixed widths for horizontal scroll (TVContentRow)
+  const fixedWidth = variant === 'poster' ? 'w-[140px] lg:w-[160px]' : 
+                     variant === 'wide' ? 'w-[300px] lg:w-[380px]' : 'w-[200px] lg:w-[240px] xl:w-[280px]';
 
   return (
     <div
       className={cn(
-        "group relative flex-shrink-0 transition-all duration-300 ease-out",
+        "group relative transition-all duration-300 ease-out",
         "focus-within:scale-105 focus-within:z-20 hover:scale-105 hover:z-20",
-        cardWidth,
+        fillContainer ? "w-full" : cn("flex-shrink-0", fixedWidth),
         className
       )}
       onFocus={() => setIsFocused(true)}
