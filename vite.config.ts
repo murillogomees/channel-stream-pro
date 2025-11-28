@@ -15,37 +15,54 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      // Desabilitar injeção automática para evitar render-blocking
       injectRegister: null,
       includeAssets: ["favicon.png", "logo.png", "logo.webp"],
       devOptions: {
         enabled: false,
       },
       manifest: {
-        name: "IPTV LINK Player",
-        short_name: "IPTV LINK",
-        description: "Assista TV online com qualidade HD",
-        theme_color: "#000000",
-        background_color: "#000000",
+        name: "IPTV Link - TV Online",
+        short_name: "IPTV Link",
+        description: "Assista mais de 209.000 canais em Full HD e 4K",
+        theme_color: "#0A0A0A",
+        background_color: "#0A0A0A",
         display: "standalone",
-        orientation: "any",
+        orientation: "portrait",
+        start_url: "/app",
+        scope: "/",
+        categories: ["entertainment", "video"],
         icons: [
           {
             src: "logo.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: "logo.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
-        categories: ["entertainment", "video"],
         screenshots: [],
+        shortcuts: [
+          {
+            name: "Abrir Player",
+            short_name: "Player",
+            description: "Abrir o player IPTV",
+            url: "/app/player",
+            icons: [{ src: "logo.png", sizes: "192x192" }],
+          },
+        ],
       },
       workbox: {
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ["**/*.{html,ico,png,webp,svg}"],
-        navigateFallback: null,
+        navigateFallback: "/app",
+        navigateFallbackAllowlist: [/^\/app/],
         maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
           {
@@ -55,7 +72,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: "assets-cache",
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 30,
               },
             },
           },
@@ -81,7 +98,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: "images-cache",
               expiration: {
                 maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365,
               },
             },
           },
@@ -135,9 +152,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     rollupOptions: {
       output: {
-        // Manual chunks for better caching
         manualChunks: {
-          // Vendor chunks - rarely change
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-ui": [
             "@radix-ui/react-dialog",
@@ -146,10 +161,8 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-tooltip",
           ],
           "vendor-utils": ["date-fns", "clsx", "tailwind-merge", "class-variance-authority"],
-          // Supabase in its own chunk
           "vendor-supabase": ["@supabase/supabase-js"],
         },
-        // Optimize chunk file names
         chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash].[ext]",

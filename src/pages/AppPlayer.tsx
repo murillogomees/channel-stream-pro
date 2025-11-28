@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, Heart, Tv } from 'lucide-react';
+import { Loader2, Heart, Tv, User, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
 import { ChannelList } from '@/components/app/ChannelList';
@@ -10,6 +10,12 @@ import { useIPTVPlayer } from '@/hooks/useIPTVPlayer';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
 import { streamService } from '@/modules/player/services/StreamService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -102,8 +108,8 @@ export default function AppPlayer() {
           <p className="text-muted-foreground mb-6">
             Entre em contato com o suporte para ativar sua playlist IPTV.
           </p>
-          <Button onClick={() => navigate('/cliente/account')}>
-            Voltar para Minha Conta
+          <Button onClick={() => navigate('/app/profile')}>
+            Ver Meu Perfil
           </Button>
         </Card>
       </div>
@@ -112,24 +118,38 @@ export default function AppPlayer() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="bg-background border-b border-border p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/cliente/account')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
+      {/* Header - Simplified for App */}
+      <div className="bg-background border-b border-border p-3">
+        <div className="flex items-center justify-between">
+          {/* Left - Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => navigate('/app/profile')}>
+                <User className="w-4 h-4 mr-2" />
+                Meu Perfil
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
+          {/* Center - Title */}
           <div className="flex items-center gap-2">
             <Tv className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-bold">IPTV Player</h1>
+            <h1 className="text-lg font-bold">IPTV Link</h1>
           </div>
 
-          <div className="w-[80px]" /> {/* Spacer for alignment */}
+          {/* Right - Profile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/app/profile')}
+          >
+            <User className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
