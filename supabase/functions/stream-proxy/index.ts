@@ -1,7 +1,7 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
 };
 
@@ -18,7 +18,7 @@ function getBaseUrl(url: string): string {
   }
 }
 
-// Get origin (protocol + host) from URL
+// Get origin from URL
 function getOrigin(url: string): string {
   try {
     const urlObj = new URL(url);
@@ -28,7 +28,7 @@ function getOrigin(url: string): string {
   }
 }
 
-// Rewrite URLs in HLS manifest to go through proxy
+// Rewrite URLs in HLS manifest
 function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
   const lines = content.split('\n');
   const rewrittenLines = lines.map(line => {
@@ -97,8 +97,53 @@ function isHlsContent(url: string, contentType: string | null): boolean {
   return false;
 }
 
+async function fetchWithRetry(url: string, headers: Headers, maxRetries = 3): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(url, {
+        headers,
+        signal: controller.signal,
+        redirect: 'follow',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok || response.status === 206) {
+        return response;
+      }
+      
+      // If 403/401, don't retry - server is blocking us
+      if (response.status === 403 || response.status === 401) {
+        console.error(`[StreamProxy] Auth error ${response.status} for: ${url.substring(0, 60)}...`);
+        return response;
+      }
+      
+      console.warn(`[StreamProxy] Attempt ${attempt + 1} failed with status ${response.status}`);
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (err) {
+      lastError = err as Error;
+      console.warn(`[StreamProxy] Attempt ${attempt + 1} error: ${lastError.message}`);
+      
+      if (lastError.name === 'AbortError') {
+        continue;
+      }
+    }
+    
+    // Wait before retry
+    if (attempt < maxRetries - 1) {
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -115,45 +160,44 @@ Deno.serve(async (req) => {
     }
 
     const decodedStreamUrl = decodeURIComponent(streamUrl);
-    console.log(`[StreamProxy] Proxying: ${decodedStreamUrl.substring(0, 80)}...`);
-
     const origin = getOrigin(decodedStreamUrl);
+    const isSegment = decodedStreamUrl.toLowerCase().includes('.ts');
+    
+    console.log(`[StreamProxy] ${isSegment ? 'Segment' : 'Manifest'}: ${decodedStreamUrl.substring(0, 70)}...`);
 
-    // Prepare headers for upstream - mimic a real browser/player request
+    // Build headers to mimic a real player
     const upstreamHeaders = new Headers();
     
+    // Copy range header if present
     const rangeHeader = req.headers.get('Range');
     if (rangeHeader) {
       upstreamHeaders.set('Range', rangeHeader);
     }
     
-    // Set headers to mimic real player/browser request
-    upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // Essential headers for IPTV servers
+    upstreamHeaders.set('User-Agent', 'VLC/3.0.20 LibVLC/3.0.20');
     upstreamHeaders.set('Accept', '*/*');
-    upstreamHeaders.set('Accept-Language', 'en-US,en;q=0.9');
-    upstreamHeaders.set('Accept-Encoding', 'identity'); // Don't compress, we need to stream
+    upstreamHeaders.set('Connection', 'keep-alive');
     
-    // Critical: Set Referer and Origin to the IPTV server itself
+    // Critical: Set Referer to IPTV origin
     if (origin) {
       upstreamHeaders.set('Referer', origin + '/');
-      upstreamHeaders.set('Origin', origin);
     }
-    
-    // Connection keep-alive for streaming
-    upstreamHeaders.set('Connection', 'keep-alive');
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const streamResponse = await fetch(decodedStreamUrl, {
-        headers: upstreamHeaders,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      const streamResponse = await fetchWithRetry(decodedStreamUrl, upstreamHeaders);
 
-      if (!streamResponse.ok) {
+      if (!streamResponse.ok && streamResponse.status !== 206) {
         console.error(`[StreamProxy] Upstream error: ${streamResponse.status}`);
+        
+        // For 403 errors, return specific message
+        if (streamResponse.status === 403) {
+          return new Response('Stream access denied by server', { 
+            status: 403,
+            headers: corsHeaders 
+          });
+        }
+        
         return new Response(`Stream unavailable (${streamResponse.status})`, { 
           status: 502,
           headers: corsHeaders 
@@ -163,27 +207,25 @@ Deno.serve(async (req) => {
       let contentType = streamResponse.headers.get('Content-Type');
       const isHls = isHlsContent(decodedStreamUrl, contentType);
       
+      // Fix content types
       if (!contentType || contentType === 'application/octet-stream') {
         if (isHls) {
           contentType = 'application/vnd.apple.mpegurl';
-        } else if (decodedStreamUrl.includes('.ts')) {
-          contentType = 'video/mp2t';
-        } else {
+        } else if (isSegment) {
           contentType = 'video/mp2t';
         }
       }
 
       const headers = new Headers(corsHeaders);
-      headers.set('Content-Type', contentType);
+      headers.set('Content-Type', contentType || 'application/octet-stream');
       
       if (isHls) {
         headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       } else {
-        // Short cache for segments - they change frequently in live streams
-        headers.set('Cache-Control', 'public, max-age=5');
+        headers.set('Cache-Control', 'public, max-age=2');
       }
 
-      // Rewrite HLS manifest URLs
+      // For HLS manifests, rewrite URLs
       if (isHls) {
         const manifestContent = await streamResponse.text();
         const baseUrl = getBaseUrl(decodedStreamUrl);
@@ -197,6 +239,7 @@ Deno.serve(async (req) => {
         });
       }
       
+      // Copy important headers for range requests
       const keepHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
       keepHeaders.forEach(header => {
         const value = streamResponse.headers.get(header);
@@ -207,24 +250,32 @@ Deno.serve(async (req) => {
         headers.set('Accept-Ranges', 'bytes');
       }
 
+      // Stream the response body directly
       return new Response(streamResponse.body, {
         status: streamResponse.status,
         headers,
       });
     } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
+      const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+      console.error(`[StreamProxy] Fetch error: ${errorMessage}`);
+      
+      if (errorMessage.includes('AbortError') || errorMessage.includes('timeout')) {
         return new Response('Stream timeout', { 
           status: 504,
           headers: corsHeaders 
         });
       }
-      throw fetchError;
+      
+      return new Response(`Fetch error: ${errorMessage}`, { 
+        status: 502,
+        headers: corsHeaders 
+      });
     }
 
   } catch (error) {
-    console.error('[StreamProxy] Error:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[StreamProxy] Error:', errorMessage);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
