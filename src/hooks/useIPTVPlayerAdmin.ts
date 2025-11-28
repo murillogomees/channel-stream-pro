@@ -33,10 +33,10 @@ const INITIAL_BATCH_SIZE = 500;     // Small first batch for instant display
 const BACKGROUND_BATCH_SIZE = 3000; // Background loading
 const PARALLEL_REQUESTS = 2;        // Parallel requests
 
-export function useIPTVPlayerAdmin(selectedListId?: string) {
+export function useIPTVPlayerAdmin(selectedListId?: string, enabled: boolean = true) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [customListId, setCustomListId] = useState<string | null>(selectedListId || null);
   const [availableLists, setAvailableLists] = useState<M3UList[]>([]);
   const [hasLoadedLists, setHasLoadedLists] = useState(false);
@@ -52,7 +52,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
 
   // Load available M3U lists
   const loadAvailableLists = useCallback(async () => {
-    if (hasLoadedLists) return;
+    if (!enabled || hasLoadedLists) return;
     
     try {
       const { data, error } = await supabase
@@ -326,10 +326,14 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
   }, [isLoadingPlaylist, groupChannelsIntoCategories, loadAllChannels]);
 
   useEffect(() => {
-    loadAvailableLists();
-  }, []);
+    if (enabled) {
+      loadAvailableLists();
+    }
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
+    
     if (customListId && !isLoadingPlaylist) {
       loadPlaylist(customListId);
     }
@@ -339,7 +343,7 @@ export function useIPTVPlayerAdmin(selectedListId?: string) {
         abortControllerRef.current.abort();
       }
     };
-  }, [customListId]);
+  }, [customListId, enabled]);
 
   const changeChannel = useCallback((channel: Channel) => {
     setCurrentChannel(channel);

@@ -42,9 +42,9 @@ export default function AppPlayer() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   
-  // Use different hooks based on role
+  // Use different hooks based on role - admin hook only enabled for admins
   const clientPlayer = useIPTVPlayerClient();
-  const adminPlayer = useIPTVPlayerAdmin();
+  const adminPlayer = useIPTVPlayerAdmin(undefined, isAdmin);
   
   // Select appropriate player based on role
   const player = isAdmin ? adminPlayer : clientPlayer;
