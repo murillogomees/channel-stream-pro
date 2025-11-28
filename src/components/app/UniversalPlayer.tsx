@@ -243,16 +243,36 @@ export default function UniversalPlayer({
       return;
     }
 
-    // Detect content type from URL
-    const urlLower = url.toLowerCase();
-    const isMP4 = urlLower.includes('.mp4') || urlLower.includes('/movie/');
-    const isMKV = urlLower.includes('.mkv');
-    const isNativePlayable = isMP4 || isMKV || urlLower.includes('.webm');
+    // Extract original URL from proxy if needed
+    const getOriginalUrl = (proxyUrl: string): string => {
+      try {
+        const urlObj = new URL(proxyUrl);
+        const encodedUrl = urlObj.searchParams.get('url');
+        if (encodedUrl) {
+          return decodeURIComponent(encodedUrl);
+        }
+      } catch {
+        // Not a valid URL or no proxy param
+      }
+      return proxyUrl;
+    };
+
+    const originalUrl = getOriginalUrl(url);
+    const originalLower = originalUrl.toLowerCase();
+    
+    // Detect content type from ORIGINAL URL (not proxy URL)
+    const isMP4 = originalLower.includes('.mp4') || originalLower.includes('/movie/') || originalLower.includes('/series/');
+    const isMKV = originalLower.includes('.mkv');
+    const isAVI = originalLower.includes('.avi');
+    const isWebM = originalLower.includes('.webm');
+    const isDirectStream = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/.test(originalUrl) && !originalLower.includes('.m3u');
+    const isNativePlayable = isMP4 || isMKV || isAVI || isWebM || isDirectStream;
 
     console.log('[Player] ==========================================');
     console.log('[Player] Initializing playback');
-    console.log('[Player] URL:', url.substring(0, 80) + '...');
-    console.log('[Player] Native content:', isNativePlayable);
+    console.log('[Player] Proxy URL:', url.substring(0, 60) + '...');
+    console.log('[Player] Original URL:', originalUrl.substring(0, 60) + '...');
+    console.log('[Player] Detected as native/direct:', isNativePlayable);
     console.log('[Player] HLS.js supported:', Hls.isSupported());
     
     // Reset state
