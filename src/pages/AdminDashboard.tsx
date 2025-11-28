@@ -118,42 +118,42 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/')}
-                className="hover:bg-primary/10"
+                className="hover:bg-primary/10 flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
-                <p className="text-sm text-muted-foreground mt-1">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold truncate">Dashboard Administrativo</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 truncate">
                   Bem-vindo, {user?.email?.split('@')[0]?.charAt(0).toUpperCase() + (user?.email?.split('@')[0]?.slice(1) || '') || 'Admin'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 pl-11 sm:pl-0 overflow-x-auto">
               <GlobalSearch />
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')}>
-                <User className="h-4 w-4 mr-2" />
-                Perfil
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/perfil')} className="flex-shrink-0">
+                <User className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Perfil</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="flex-shrink-0">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sair</span>
               </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Quick Stats & Shortcuts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="lg:col-span-2 space-y-4">
             <section>
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">

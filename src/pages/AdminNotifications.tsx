@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminNotificacoes from "./AdminNotificacoes";
 import AdminNotificationSettings from "./AdminNotificationSettings";
 import AdminAutoNotifications from "./AdminAutoNotifications";
@@ -8,20 +9,23 @@ import AdminTemplates from "./AdminTemplates";
 
 export default function AdminNotifications() {
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
       <PageHeader
         title="Sistema de Notificações"
         description="Gerencie notificações, templates e configurações"
       />
 
       <Tabs defaultValue="main" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="main">Notificações</TabsTrigger>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
-          <TabsTrigger value="auto">Automáticas</TabsTrigger>
-          <TabsTrigger value="queue">Fila</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex h-auto min-w-full p-1">
+            <TabsTrigger value="main" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Notificações</TabsTrigger>
+            <TabsTrigger value="settings" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Configurações</TabsTrigger>
+            <TabsTrigger value="auto" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Automáticas</TabsTrigger>
+            <TabsTrigger value="queue" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Fila</TabsTrigger>
+            <TabsTrigger value="templates" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Templates</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" className="invisible" />
+        </ScrollArea>
 
         <TabsContent value="main" className="space-y-4">
           <AdminNotificacoes />

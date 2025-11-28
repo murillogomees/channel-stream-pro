@@ -133,7 +133,7 @@ export default function AdminPlansManager() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
         <PageHeader title="Gerenciar Planos" description="Crie e edite os planos de assinatura" />
         <div className="grid gap-4">
           {[1, 2, 3, 4].map(i => (
@@ -145,13 +145,13 @@ export default function AdminPlansManager() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
       <PageHeader 
         title="Gerenciar Planos" 
         description="Crie e edite os planos de assinatura exibidos na página inicial" 
       />
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <p className="text-muted-foreground">
           {plans.length} plano(s) cadastrado(s)
         </p>

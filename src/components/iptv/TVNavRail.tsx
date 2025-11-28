@@ -1,6 +1,8 @@
 import { cn } from '@/lib/utils';
-import { Tv, Film, Clapperboard, Heart, Home, Search, Settings } from 'lucide-react';
+import { Tv, Film, Clapperboard, Heart, Home, Search, Settings, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface TVNavRailProps {
   activeTab: 'home' | 'live' | 'movies' | 'series' | 'favorites';
@@ -17,14 +19,19 @@ const navItems = [
   { id: 'favorites', label: 'Favoritos', icon: Heart },
 ] as const;
 
-export function TVNavRail({
+function NavContent({
   activeTab,
   onTabChange,
   onSearch,
   onSettings,
-}: TVNavRailProps) {
+  isMobile = false,
+  onClose,
+}: TVNavRailProps & { isMobile?: boolean; onClose?: () => void }) {
   return (
-    <nav className="fixed left-0 top-0 bottom-0 w-[72px] lg:w-[88px] bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border z-50 flex flex-col py-4">
+    <div className={cn(
+      "flex flex-col h-full",
+      isMobile ? "py-4" : "py-4"
+    )}>
       {/* Logo Area */}
       <div className="flex items-center justify-center h-16 mb-4">
         <div className="w-10 h-10 lg:w-12 lg:h-12 bg-primary rounded-xl flex items-center justify-center">
@@ -41,7 +48,10 @@ export function TVNavRail({
           return (
             <button
               key={item.id}
-              onClick={() => onTabChange(item.id as typeof activeTab)}
+              onClick={() => {
+                onTabChange(item.id as typeof activeTab);
+                onClose?.();
+              }}
               className={cn(
                 "relative w-full flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-all duration-200",
                 "hover:bg-sidebar-accent group focus:outline-none focus:ring-2 focus:ring-primary",
@@ -77,7 +87,10 @@ export function TVNavRail({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onSearch}
+            onClick={() => {
+              onSearch();
+              onClose?.();
+            }}
             className="w-12 h-12 rounded-xl hover:bg-sidebar-accent"
           >
             <Search className="w-5 h-5 text-sidebar-foreground/70" />
@@ -87,13 +100,62 @@ export function TVNavRail({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onSettings}
+            onClick={() => {
+              onSettings();
+              onClose?.();
+            }}
             className="w-12 h-12 rounded-xl hover:bg-sidebar-accent"
           >
             <Settings className="w-5 h-5 text-sidebar-foreground/70" />
           </Button>
         )}
       </div>
-    </nav>
+    </div>
+  );
+}
+
+export function TVNavRail({
+  activeTab,
+  onTabChange,
+  onSearch,
+  onSettings,
+}: TVNavRailProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile Menu Button - fixed at bottom left */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="default"
+            size="icon"
+            className="fixed bottom-4 left-4 z-[60] md:hidden w-12 h-12 rounded-full shadow-lg"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[200px] p-0 bg-sidebar">
+          <NavContent
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            onSearch={onSearch}
+            onSettings={onSettings}
+            isMobile
+            onClose={() => setMobileOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop Nav Rail */}
+      <nav className="hidden md:flex fixed left-0 top-0 bottom-0 w-[72px] lg:w-[88px] bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border z-50 flex-col py-4">
+        <NavContent
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          onSearch={onSearch}
+          onSettings={onSettings}
+        />
+      </nav>
+    </>
   );
 }
