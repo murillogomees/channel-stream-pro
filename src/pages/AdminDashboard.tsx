@@ -5,12 +5,12 @@ import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
 import { RecentActivities } from "@/components/admin/RecentActivities";
 import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
-  Users, Bell, Shield, BarChart3, Settings, 
-  LogOut, User, Package, Clock, AlertTriangle,
-  Plug, UserCog, ArrowLeft, Tv, Play, Download,
-  FileText, History, MessageSquare, Send, Cog,
-  ListVideo, Hammer, Database, UserPlus, BookOpen,
-  Sparkles, LayoutDashboard, CreditCard, PanelTop
+  Users, Bell, Shield, BarChart3, 
+  LogOut, User, Clock, AlertTriangle,
+  UserCog, ArrowLeft, Tv, Play, Download,
+  History, MessageSquare, Send, Cog,
+  ListVideo, Hammer, Sparkles, LayoutDashboard, 
+  CreditCard, PanelTop
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -313,49 +313,11 @@ const AdminDashboard = () => {
 
         <Separator className="my-8" />
 
-        {/* Segurança & Monitoramento */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Segurança & Monitoramento</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NavCard
-              title="Centro de Segurança"
-              description="Alertas, monitoramento, IP blocking e 2FA"
-              icon={<Shield className="h-5 w-5" />}
-              path="/admin/security"
-              badge="Consolidado"
-            />
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Analytics & Conversão */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Analytics & Conversão</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NavCard
-              title="Analytics Hub"
-              description="Métricas gerais, conversão e cupons"
-              icon={<BarChart3 className="h-5 w-5" />}
-              path="/admin/analytics"
-              badge="Consolidado"
-            />
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Gestão do Site */}
+        {/* Gestão do Site & Sistema */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <PanelTop className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Gestão do Site</h2>
+            <h2 className="text-lg font-semibold">Gestão do Site & Sistema</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
@@ -372,18 +334,6 @@ const AdminDashboard = () => {
               path="/dashboard/plans"
               isNew
             />
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Sistema & Configurações */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Sistema & Configurações</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Configurações do Sistema"
               description="Saúde, playlist, backup e customização"
@@ -396,19 +346,26 @@ const AdminDashboard = () => {
 
         <Separator className="my-8" />
 
-        {/* Integrações */}
+        {/* Analytics & Segurança */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Plug className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Integrações Externas</h2>
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Analytics & Segurança</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
-              title="WhatsApp"
-              description="Configuração de notificações"
-              icon={<Plug className="h-5 w-5" />}
-              path="/admin/integrations"
-              badge="Configurar"
+              title="Analytics Hub"
+              description="Métricas gerais, conversão e cupons"
+              icon={<BarChart3 className="h-5 w-5" />}
+              path="/admin/analytics"
+              badge="Consolidado"
+            />
+            <NavCard
+              title="Centro de Segurança"
+              description="Alertas, monitoramento, IP blocking e 2FA"
+              icon={<Shield className="h-5 w-5" />}
+              path="/admin/security"
+              badge="Consolidado"
             />
           </div>
         </section>
@@ -428,43 +385,6 @@ const AdminDashboard = () => {
               icon={<UserCog className="h-5 w-5" />}
               path="/admin/users"
               badge="Consolidado"
-            />
-            <NavCard
-              title="Criar Usuário Admin"
-              description="Crie novos usuários administradores"
-              icon={<UserPlus className="h-5 w-5" />}
-              path="/admin/create-user"
-              badge="Super Admin"
-            />
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Outras Páginas */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Outras Páginas</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NavCard
-              title="Meu Perfil"
-              description="Gerencie suas informações pessoais"
-              icon={<User className="h-5 w-5" />}
-              path="/admin/perfil"
-            />
-            <NavCard
-              title="Tutorial SmartOne"
-              description="Guia de configuração do SmartOne"
-              icon={<BookOpen className="h-5 w-5" />}
-              path="/tutorial"
-            />
-            <NavCard
-              title="Página Inicial"
-              description="Landing page do sistema"
-              icon={<Database className="h-5 w-5" />}
-              path="/"
             />
           </div>
         </section>
