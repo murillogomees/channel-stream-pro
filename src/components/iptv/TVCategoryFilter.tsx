@@ -28,14 +28,16 @@ export function TVCategoryFilter({
 
   if (categories.length === 0) return null;
 
-  // Truncate category name to max 25 characters
-  const truncateName = (name: string, maxLength: number = 25) => {
+  // Truncate category name - leave space for count
+  const truncateName = (name: string, maxLength: number = 22) => {
     if (name.length <= maxLength) return name;
-    return name.substring(0, maxLength) + '...';
+    return name.substring(0, maxLength).trim() + '…';
   };
 
+  const totalCount = categories.reduce((acc, cat) => acc + cat.channelCount, 0);
+
   return (
-    <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border overflow-hidden min-w-[220px] w-[220px]">
+    <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border overflow-hidden w-[280px] flex-shrink-0">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -63,18 +65,18 @@ export function TVCategoryFilter({
             <button
               onClick={() => onSelectCategory(null)}
               className={cn(
-                "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-all",
+                "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all",
                 selectedCategory === null
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted/70 text-foreground"
               )}
             >
-              <span className="truncate flex-1 text-left">Todos</span>
+              <span className="flex-1 text-left">Todos</span>
               <span className={cn(
-                "text-xs tabular-nums flex-shrink-0 min-w-[40px] text-right",
+                "text-xs tabular-nums ml-2",
                 selectedCategory === null ? "text-primary-foreground/80" : "text-muted-foreground"
               )}>
-                {categories.reduce((acc, cat) => acc + cat.channelCount, 0).toLocaleString()}
+                {totalCount.toLocaleString()}
               </span>
             </button>
 
@@ -84,16 +86,18 @@ export function TVCategoryFilter({
                 key={category.id}
                 onClick={() => onSelectCategory(category.id)}
                 className={cn(
-                  "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-all",
+                  "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all",
                   selectedCategory === category.id
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-muted/70 text-foreground"
                 )}
                 title={category.display_name}
               >
-                <span className="truncate flex-1 text-left">{truncateName(category.display_name)}</span>
+                <span className="flex-1 text-left overflow-hidden whitespace-nowrap">
+                  {truncateName(category.display_name)}
+                </span>
                 <span className={cn(
-                  "text-xs tabular-nums flex-shrink-0 min-w-[40px] text-right",
+                  "text-xs tabular-nums ml-2 flex-shrink-0",
                   selectedCategory === category.id ? "text-primary-foreground/80" : "text-muted-foreground"
                 )}>
                   {category.channelCount.toLocaleString()}
