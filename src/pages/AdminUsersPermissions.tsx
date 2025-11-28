@@ -4,8 +4,6 @@ import AdminUserRoles from "./AdminUserRoles";
 import AdminCreateUser from "./AdminCreateUser";
 import AdminRoleAudit from "./AdminRoleAudit";
 import AdminPermissionTest from "./AdminPermissionTest";
-import AdminLeaderboard from "./AdminLeaderboard";
-import AdminScheduleConfig from "./AdminScheduleConfig";
 
 export default function AdminUsersPermissions() {
   return (
@@ -16,13 +14,11 @@ export default function AdminUsersPermissions() {
       />
 
       <Tabs defaultValue="roles" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="roles">Roles</TabsTrigger>
           <TabsTrigger value="create">Criar Usuário</TabsTrigger>
           <TabsTrigger value="audit">Auditoria</TabsTrigger>
           <TabsTrigger value="test">Teste</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          <TabsTrigger value="schedule">Agenda</TabsTrigger>
         </TabsList>
 
         <TabsContent value="roles" className="space-y-4">
@@ -39,14 +35,6 @@ export default function AdminUsersPermissions() {
 
         <TabsContent value="test" className="space-y-4">
           <AdminPermissionTest />
-        </TabsContent>
-
-        <TabsContent value="leaderboard" className="space-y-4">
-          <AdminLeaderboard />
-        </TabsContent>
-
-        <TabsContent value="schedule" className="space-y-4">
-          <AdminScheduleConfig />
         </TabsContent>
       </Tabs>
     </div>

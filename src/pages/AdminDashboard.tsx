@@ -404,11 +404,11 @@ const AdminDashboard = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
-              title="SmartOne IPTV"
-              description="Sincronização e testes de conectividade"
+              title="WhatsApp"
+              description="Configuração de notificações"
               icon={<Plug className="h-5 w-5" />}
               path="/admin/integrations"
-              badge="Consolidado"
+              badge="Configurar"
             />
           </div>
         </section>
@@ -424,7 +424,7 @@ const AdminDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
               title="Gestão de Usuários"
-              description="Roles, auditoria, leaderboard e agenda"
+              description="Roles, auditoria e permissões"
               icon={<UserCog className="h-5 w-5" />}
               path="/admin/users"
               badge="Consolidado"

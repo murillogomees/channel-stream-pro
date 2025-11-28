@@ -33,7 +33,7 @@ const searchItems: SearchItem[] = [
   
   // M3U / Playlists
   { title: 'Saúde das Playlists', description: 'Monitore URLs M3U', path: '/admin/playlist-health', icon: <BarChart3 className="h-4 w-4" />, category: 'Playlists' },
-  { title: 'Integrações', description: 'WhatsApp e SmartOne', path: '/admin/integrations', icon: <Smartphone className="h-4 w-4" />, category: 'Playlists' },
+  { title: 'Integrações', description: 'WhatsApp', path: '/admin/integrations', icon: <Smartphone className="h-4 w-4" />, category: 'Playlists' },
   
   // Segurança
   { title: 'Monitor de Segurança', description: 'Eventos em tempo real', path: '/admin/security-monitor', icon: <Shield className="h-4 w-4" />, category: 'Segurança' },

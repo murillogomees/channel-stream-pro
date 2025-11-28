@@ -30,11 +30,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, ExternalLink, Filter, Download } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, Filter, Download } from 'lucide-react';
 import { Cliente } from '@/types/cliente';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
-import { SmartOneDataDialog } from '@/components/admin/SmartOneDataDialog';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -95,12 +94,6 @@ export default function AdminClientes() {
   const [showFileDialog, setShowFileDialog] = useState(false);
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
-  const [showSmartOneData, setShowSmartOneData] = useState(false);
-  const [smartOneClientData, setSmartOneClientData] = useState<{
-    nome: string;
-    macSmartOne: string;
-    m3uLists: Array<{ name: string; file_url: string }>;
-  } | null>(null);
   const [clienteM3ULists, setClienteM3ULists] = useState<Record<string, string>>({});
 
   // Filtros avançados
@@ -206,54 +199,6 @@ export default function AdminClientes() {
       deleteCliente(deleteId);
       setDeleteId(null);
       setShowConfirm(false);
-    }
-  };
-
-  const handleViewSmartOneData = async (cliente: Cliente) => {
-    if (!cliente.macSmartOne) {
-      toast({
-        title: 'Sem dados',
-        description: 'Cliente não possui MAC Address cadastrado',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      // Buscar M3U lists atribuídas ao cliente
-      const { data: m3uAssignments, error } = await supabase
-        .from('client_m3u_lists')
-        .select(`
-          m3u_list_id,
-          m3u_lists (
-            id,
-            name,
-            file_url
-          )
-        `)
-        .eq('client_id', cliente.id)
-        .eq('is_active', true);
-
-      if (error) throw error;
-
-      const m3uLists = m3uAssignments?.map(assignment => ({
-        name: (assignment.m3u_lists as any)?.name || 'N/A',
-        file_url: (assignment.m3u_lists as any)?.file_url || '',
-      })) || [];
-
-      setSmartOneClientData({
-        nome: cliente.nome,
-        macSmartOne: cliente.macSmartOne,
-        m3uLists,
-      });
-      setShowSmartOneData(true);
-    } catch (error) {
-      console.error('Error loading M3U lists:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as listas M3U',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -596,17 +541,7 @@ export default function AdminClientes() {
                         }}
                         title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
                       >
-                        <Paperclip className="h-4 w-4" />
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleViewSmartOneData(cliente)}
-                        disabled={!cliente.macSmartOne}
-                        title={!cliente.macSmartOne ? 'Cliente sem MAC Address' : 'Ver dados para SmartOne'}
-                      >
-                        <ExternalLink className="h-4 w-4" />
+                      <Paperclip className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
@@ -650,15 +585,6 @@ export default function AdminClientes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Modal com dados para SmartOne */}
-      {smartOneClientData && (
-        <SmartOneDataDialog
-          open={showSmartOneData}
-          onOpenChange={setShowSmartOneData}
-          clientData={smartOneClientData}
-        />
-      )}
 
       {/* Dialog de WhatsApp */}
       <Dialog open={showWhatsAppDialog} onOpenChange={setShowWhatsAppDialog}>
