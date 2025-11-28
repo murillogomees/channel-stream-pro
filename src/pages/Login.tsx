@@ -40,9 +40,24 @@ export default function Login() {
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
       const isAdminRole = isAdmin || user.roles?.includes('admin');
-      console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin: isAdminRole });
-      const from = (location.state as any)?.from?.pathname || (isAdminRole ? '/dashboard' : '/conta');
-      navigate(from, { replace: true });
+      const isClientRole = user.roles?.includes('client');
+      console.log('[Login] Usuário autenticado, redirecionando...', { isAdmin: isAdminRole, isClient: isClientRole });
+      
+      // Prioridade: state.from > role-based redirect
+      const stateFrom = (location.state as any)?.from?.pathname;
+      let redirectTo = stateFrom;
+      
+      if (!redirectTo) {
+        if (isAdminRole) {
+          redirectTo = '/dashboard';
+        } else if (isClientRole) {
+          redirectTo = '/app/player'; // Clientes vão direto para o player
+        } else {
+          redirectTo = '/';
+        }
+      }
+      
+      navigate(redirectTo, { replace: true });
     }
   }, [isAuthenticated, isAdmin, authLoading, navigate, location, user]);
 
