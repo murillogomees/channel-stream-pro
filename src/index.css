@@ -399,3 +399,97 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* =============================================================================
+   TV FOCUS STYLES - Samsung Tizen, LG webOS, Android TV
+   ============================================================================= */
+
+@layer components {
+  /* TV Focus indicator - visible border for remote navigation */
+  .tv-focused {
+    @apply ring-4 ring-primary ring-offset-2 ring-offset-background;
+    @apply scale-105 z-10;
+    @apply shadow-lg;
+    box-shadow: 
+      0 0 0 4px hsl(var(--primary)),
+      0 0 20px hsl(var(--primary) / 0.4),
+      0 10px 30px -10px hsl(var(--background) / 0.8);
+    transition: all 0.15s ease-out;
+  }
+
+  /* TV Safe zones - padding for overscan on older TVs */
+  .tv-safe-zone {
+    padding: env(safe-area-inset-top, 24px) env(safe-area-inset-right, 48px) env(safe-area-inset-bottom, 24px) env(safe-area-inset-left, 48px);
+  }
+
+  /* Large touch/remote targets */
+  .tv-button {
+    @apply min-h-[48px] min-w-[48px] px-6 py-3;
+    @apply text-lg font-medium;
+    @apply rounded-lg;
+    @apply transition-all duration-150;
+  }
+
+  .tv-button:focus,
+  .tv-button.tv-focused {
+    @apply ring-4 ring-primary scale-105;
+  }
+
+  /* TV Grid - optimized for 10ft UI */
+  .tv-grid {
+    @apply grid gap-4;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+
+  @media (min-width: 1920px) {
+    .tv-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      @apply gap-6;
+    }
+  }
+
+  /* TV Card - larger for visibility */
+  .tv-card {
+    @apply rounded-xl overflow-hidden;
+    @apply transition-all duration-200;
+    @apply bg-card border border-border;
+  }
+
+  .tv-card:focus,
+  .tv-card.tv-focused {
+    @apply ring-4 ring-primary ring-offset-2 ring-offset-background;
+    @apply scale-[1.05] z-10;
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.3);
+  }
+
+  /* TV Text - larger for 10ft viewing */
+  .tv-title {
+    @apply text-xl lg:text-2xl font-semibold;
+  }
+
+  .tv-subtitle {
+    @apply text-base lg:text-lg text-muted-foreground;
+  }
+
+  .tv-body {
+    @apply text-lg lg:text-xl;
+  }
+
+  /* TV Player overlay */
+  .tv-player-overlay {
+    @apply absolute inset-0;
+    @apply bg-gradient-to-t from-black/90 via-black/40 to-transparent;
+    @apply opacity-0 transition-opacity duration-300;
+  }
+
+  .tv-player-overlay.visible {
+    @apply opacity-100;
+  }
+
+  /* TV Loading spinner - larger */
+  .tv-spinner {
+    @apply w-16 h-16 lg:w-20 lg:h-20;
+    @apply border-4 border-white/20 border-t-primary;
+    @apply rounded-full animate-spin;
+  }
+}
