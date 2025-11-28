@@ -27,10 +27,11 @@ interface AssignedPlaylist {
   cdn_url: string | null;
 }
 
-// Optimized batch settings
+// Optimized batch settings - sequential to avoid server overload
 const INITIAL_BATCH_SIZE = 2000;
-const BACKGROUND_BATCH_SIZE = 5000;
-const PARALLEL_REQUESTS = 3;
+const BACKGROUND_BATCH_SIZE = 3000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
 
 export function useIPTVPlayerClient() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -79,14 +80,18 @@ export function useIPTVPlayerClient() {
     return Array.from(categoriesMap.values());
   }, []);
 
-  // Fetch a single batch from M3U URL
+  // Delay helper
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Fetch a single batch from M3U URL with retry support
   const fetchBatch = async (
     fileUrl: string, 
     offset: number, 
     limit: number, 
     token: string,
-    signal: AbortSignal
-  ): Promise<{ channels: any[]; total: number; hasMore: boolean }> => {
+    signal: AbortSignal,
+    retryCount = 0
+  ): Promise<{ channels: any[]; total: number; hasMore: boolean; retryAfter?: number }> => {
     const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
     
     const response = await fetch(proxyUrl, {
@@ -99,15 +104,31 @@ export function useIPTVPlayerClient() {
       signal
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-      throw new Error(errorData.error || 'Erro ao buscar M3U');
+    // Handle 5xx errors with retry
+    if (response.status >= 500 && retryCount < MAX_RETRIES) {
+      console.log(`[IPTV Client] Server error ${response.status}, retrying in ${RETRY_DELAY_MS}ms...`);
+      await delay(RETRY_DELAY_MS * (retryCount + 1));
+      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount + 1);
     }
 
-    return response.json();
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(errorData.error || errorData.message || 'Erro ao buscar M3U');
+    }
+
+    const data = await response.json();
+    
+    // Handle retryAfter from server (cache not ready)
+    if (data.retryAfter && data.channels.length === 0 && retryCount < MAX_RETRIES) {
+      console.log(`[IPTV Client] Server cache building, retrying in ${data.retryAfter}s...`);
+      await delay(data.retryAfter * 1000);
+      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount + 1);
+    }
+
+    return data;
   };
 
-  // Load all remaining channels in parallel
+  // Load all remaining channels sequentially (to avoid server overload)
   const loadAllChannels = useCallback(async (
     fileUrl: string, 
     total: number, 
@@ -125,52 +146,63 @@ export function useIPTVPlayerClient() {
       return;
     }
 
-    console.log(`[IPTV Client] Loading ${remaining} remaining channels...`);
+    console.log(`[IPTV Client] Loading ${remaining} remaining channels sequentially...`);
     
-    const batches: { offset: number; limit: number }[] = [];
-    for (let offset = startOffset; offset < total; offset += BACKGROUND_BATCH_SIZE) {
-      batches.push({
-        offset,
-        limit: Math.min(BACKGROUND_BATCH_SIZE, total - offset)
-      });
-    }
-
+    let currentOffset = startOffset;
     let loadedCount = initialChannels.length;
+    let consecutiveErrors = 0;
     
-    for (let i = 0; i < batches.length; i += PARALLEL_REQUESTS) {
-      if (controller.signal.aborted) break;
-      
-      const batchGroup = batches.slice(i, i + PARALLEL_REQUESTS);
-      
+    while (currentOffset < total && !controller.signal.aborted) {
       try {
-        const results = await Promise.all(
-          batchGroup.map(batch => 
-            fetchBatch(fileUrl, batch.offset, batch.limit, token, controller.signal)
-              .catch(err => {
-                console.error(`[IPTV Client] Batch error:`, err);
-                return { channels: [], total, hasMore: false };
-              })
-          )
+        const batchLimit = Math.min(BACKGROUND_BATCH_SIZE, total - currentOffset);
+        
+        const result = await fetchBatch(
+          fileUrl, 
+          currentOffset, 
+          batchLimit, 
+          token, 
+          controller.signal
         );
 
-        for (const result of results) {
-          if (result.channels.length > 0) {
-            allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
-            loadedCount += result.channels.length;
-          }
-        }
-
-        setLoadedChannels(loadedCount);
-        setLoadingProgress(`Carregando: ${loadedCount.toLocaleString()}/${total.toLocaleString()}`);
-        
-        if ((i % (PARALLEL_REQUESTS * 2) === 0) || (i + PARALLEL_REQUESTS >= batches.length)) {
+        if (result.channels.length > 0) {
+          allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
+          loadedCount += result.channels.length;
+          currentOffset += result.channels.length;
+          consecutiveErrors = 0;
+          
+          setLoadedChannels(loadedCount);
+          setLoadingProgress(`Carregando: ${loadedCount.toLocaleString()}/${total.toLocaleString()}`);
+          
+          // Update UI every few batches
           const updatedCategories = groupChannelsIntoCategories(allChannelsRef.current);
           setCategories(updatedCategories);
+        } else if (result.retryAfter) {
+          // Server asked us to wait
+          console.log(`[IPTV Client] Server requested retry, waiting...`);
+          await delay(result.retryAfter * 1000);
+        } else {
+          // Empty response without retry - might be at the end
+          currentOffset += batchLimit;
+        }
+
+        if (!result.hasMore) {
+          console.log('[IPTV Client] Server indicated no more data');
+          break;
         }
 
       } catch (error: any) {
         if (error.name === 'AbortError') break;
-        console.error('[IPTV Client] Batch group error:', error);
+        
+        consecutiveErrors++;
+        console.error(`[IPTV Client] Batch error (${consecutiveErrors}):`, error);
+        
+        if (consecutiveErrors >= 3) {
+          console.error('[IPTV Client] Too many consecutive errors, stopping');
+          break;
+        }
+        
+        // Wait before retrying
+        await delay(2000);
       }
     }
 
