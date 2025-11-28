@@ -916,14 +916,126 @@ export function useIPTVPlayerClient() {
     loadClientPlaylist();
   }, [loadClientPlaylist]);
 
-  // Initial load
+  // Realtime subscription for live content updates during sync
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastRefreshRef = useRef<number>(0);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Incremental fetch of new entries (lightweight - only fetches new content)
+  const fetchNewEntries = useCallback(async (playlistKey: string) => {
+    const currentCount = allChannelsRef.current.length;
+    if (currentCount === 0) return; // Initial load not done yet
+    
+    try {
+      const endpoint = `${CONFIG.PLAYLIST_SERVE_URL}/playlist/${playlistKey}`;
+      const params = new URLSearchParams({ 
+        offset: String(currentCount), 
+        limit: '5000' // Fetch new entries only
+      });
+      
+      const response = await fetch(`${endpoint}?${params}`);
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      
+      if (data.channels && data.channels.length > 0) {
+        console.log(`[IPTV Realtime] Found ${data.channels.length} new entries (offset: ${currentCount})`);
+        
+        // Merge new channels without reloading
+        allChannelsRef.current = [...allChannelsRef.current, ...data.channels];
+        
+        // Update UI seamlessly using startTransition
+        startTransition(() => {
+          setLoadedChannels(allChannelsRef.current.length);
+          setTotalChannels(data.total || allChannelsRef.current.length);
+          setCategories(groupChannelsIntoCategories(allChannelsRef.current));
+          
+          if (data.hasMore) {
+            setIsLoadingMore(true);
+            setLoadingProgress(`Sincronizando: ${allChannelsRef.current.length.toLocaleString()}/${(data.total || 0).toLocaleString()}`);
+          } else {
+            setIsLoadingMore(false);
+            setLoadingProgress('');
+          }
+        });
+        
+        // Save to cache
+        await cache.save({
+          key: playlistKey,
+          channels: allChannelsRef.current,
+          version: data.version || 1,
+          cachedAt: Date.now(),
+          total: data.total || allChannelsRef.current.length,
+          complete: !data.hasMore,
+        });
+      } else if (!data.hasMore) {
+        // Sync complete
+        startTransition(() => {
+          setIsLoadingMore(false);
+          setLoadingProgress('');
+        });
+      }
+    } catch (err) {
+      console.error('[IPTV Realtime] Fetch error:', err);
+    }
+  }, [groupChannelsIntoCategories]);
+
+  // Store fetchNewEntries in a ref to avoid re-creating the effect
+  const fetchNewEntriesRef = useRef(fetchNewEntries);
+  fetchNewEntriesRef.current = fetchNewEntries;
+  
+  const loadClientPlaylistRef = useRef(loadClientPlaylist);
+  loadClientPlaylistRef.current = loadClientPlaylist;
+
+  // Initial load + realtime subscription
   useEffect(() => {
-    loadClientPlaylist();
+    loadClientPlaylistRef.current();
+    
+    // Set up realtime subscription for playlist_entries changes
+    const playlistKey = 'lista-vip';
+    
+    // Subscribe to INSERT events on playlist_entries
+    realtimeChannelRef.current = supabase
+      .channel('playlist-entries-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'playlist_entries',
+        },
+        () => {
+          console.log('[IPTV Realtime] New entries detected via realtime');
+          // Debounce - don't fetch more than once per 5 seconds
+          const now = Date.now();
+          if (now - lastRefreshRef.current > 5000) {
+            lastRefreshRef.current = now;
+            fetchNewEntriesRef.current(playlistKey);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[IPTV Realtime] Subscription status:', status);
+      });
+    
+    // Also poll for new content every 30 seconds as backup (in case realtime misses events)
+    refreshIntervalRef.current = setInterval(() => {
+      // Only poll if we have some content loaded
+      if (allChannelsRef.current.length > 0) {
+        fetchNewEntriesRef.current(playlistKey);
+      }
+    }, 30000);
     
     return () => {
       abortControllerRef.current?.abort();
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+      }
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
     };
-  }, []);
+  }, []); // Run once on mount
 
   // Channel navigation
   const changeChannel = useCallback((channel: Channel) => {
