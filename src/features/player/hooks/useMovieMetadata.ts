@@ -65,8 +65,14 @@ export function useMovieMetadata(): UseMovieMetadataResult {
     query: string, 
     type: 'movie' | 'tv' = 'movie'
   ): Promise<TMDBMovie[]> => {
+    // Validate query before calling API
+    const trimmedQuery = query?.trim();
+    if (!trimmedQuery || trimmedQuery.length < 2) {
+      return [];
+    }
+    
     try {
-      const data = await callTMDB({ action: 'search', type, query });
+      const data = await callTMDB({ action: 'search', type, query: trimmedQuery });
       return data?.results || [];
     } catch (err) {
       console.error('[useMovieMetadata] Search error:', err);
@@ -125,6 +131,11 @@ export function useMovieMetadata(): UseMovieMetadataResult {
     contentId: string,
     contentName: string
   ): Promise<ContentMetadata | null> => {
+    // Validate inputs
+    if (!contentId || !contentName || contentName.trim().length < 2) {
+      return null;
+    }
+    
     setIsLoading(true);
     setError(null);
 
