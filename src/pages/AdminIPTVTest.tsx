@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, X, Tv, Film, Clapperboard, ArrowLeft } from 'lucide-react';
+import { Loader2, X, Tv, Film, Clapperboard, ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { VideoPlayer } from '@/components/app/VideoPlayer';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
@@ -24,7 +25,9 @@ import { TVNavRail } from '@/components/iptv/TVNavRail';
 import { TVHeroSection } from '@/components/iptv/TVHeroSection';
 import { TVContentRow } from '@/components/iptv/TVContentRow';
 import { TVContentCard } from '@/components/iptv/TVContentCard';
-import { TVSearchOverlay } from '@/components/iptv/TVSearchOverlay';
+import { TVCategoryFilter } from '@/components/iptv/TVCategoryFilter';
+import { TVContentGrid } from '@/components/iptv/TVContentGrid';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AdminIPTVTest() {
   const navigate = useNavigate();
@@ -48,10 +51,16 @@ export default function AdminIPTVTest() {
   } = useFavoriteChannels();
 
   const [activeTab, setActiveTab] = useState<'home' | 'live' | 'movies' | 'series' | 'favorites'>('home');
-  const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+
+  // Reset category selection when tab changes
+  useEffect(() => {
+    setSelectedCategory(null);
+    setSearchQuery('');
+  }, [activeTab]);
 
   // Categorize content by type
   const categorizedContent = useMemo(() => {
@@ -107,82 +116,99 @@ export default function AdminIPTVTest() {
     }));
   }, [allChannels]);
 
-  // Filter by search
-  const filteredCategories = useMemo(() => {
-    const filterCats = (cats: typeof categories) => {
-      if (!searchQuery) return cats;
-      
-      return cats.map(cat => ({
-        ...cat,
-        channels: cat.channels.filter(ch => 
-          ch.name.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      })).filter(cat => cat.channels.length > 0);
+  // Get categories for current tab
+  const currentTabCategories = useMemo(() => {
+    const getCats = () => {
+      switch (activeTab) {
+        case 'live': return categorizedContent.live;
+        case 'movies': return categorizedContent.movies;
+        case 'series': return categorizedContent.series;
+        default: return [];
+      }
     };
+    
+    return getCats().map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      display_name: cat.display_name,
+      channelCount: cat.channels.length,
+    }));
+  }, [activeTab, categorizedContent]);
 
-    return {
-      live: filterCats(categorizedContent.live),
-      movies: filterCats(categorizedContent.movies),
-      series: filterCats(categorizedContent.series),
-    };
-  }, [categorizedContent, searchQuery]);
-
-  // Current content based on tab
-  const currentContent = useMemo(() => {
+  // Filtered channels based on search and category
+  const filteredChannels = useMemo(() => {
+    let sourceCategories: typeof categories = [];
+    
     if (activeTab === 'favorites') {
-      const favoriteChannels = allChannels.filter(ch => isFavorite(ch.id));
-      return [{
-        id: 'favorites',
-        name: 'favorites',
-        display_name: 'Meus Favoritos',
-        icon: null,
-        channels: favoriteChannels
-      }];
+      return allChannels.filter(ch => 
+        isFavorite(ch.id) && 
+        (!searchQuery || ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
     }
     
     if (activeTab === 'home') {
-      // Mix of all content for home
-      const homeSections = [];
-      
-      if (filteredCategories.live.length > 0) {
-        homeSections.push({
-          ...filteredCategories.live[0],
-          display_name: `📺 ${filteredCategories.live[0].display_name}`
-        });
-      }
-      if (filteredCategories.movies.length > 0) {
-        homeSections.push({
-          ...filteredCategories.movies[0],
-          display_name: `🎬 ${filteredCategories.movies[0].display_name}`
-        });
-      }
-      if (filteredCategories.series.length > 0) {
-        homeSections.push({
-          ...filteredCategories.series[0],
-          display_name: `📺 ${filteredCategories.series[0].display_name}`
-        });
-      }
-      
-      // Add more categories
-      filteredCategories.live.slice(1, 3).forEach(cat => homeSections.push(cat));
-      filteredCategories.movies.slice(1, 2).forEach(cat => homeSections.push(cat));
-      
-      return homeSections;
+      return [];
     }
 
     switch (activeTab) {
-      case 'live': return filteredCategories.live;
-      case 'movies': return filteredCategories.movies;
-      case 'series': return filteredCategories.series;
-      default: return [];
+      case 'live': sourceCategories = categorizedContent.live; break;
+      case 'movies': sourceCategories = categorizedContent.movies; break;
+      case 'series': sourceCategories = categorizedContent.series; break;
     }
-  }, [activeTab, filteredCategories, allChannels, isFavorite]);
 
-  // Search result count
-  const searchResultCount = useMemo(() => {
-    if (!searchQuery) return 0;
-    return currentContent.reduce((acc, cat) => acc + cat.channels.length, 0);
-  }, [currentContent, searchQuery]);
+    // Filter by selected category
+    if (selectedCategory) {
+      sourceCategories = sourceCategories.filter(cat => cat.id === selectedCategory);
+    }
+
+    // Get all channels from filtered categories
+    let channels = sourceCategories.flatMap(cat => 
+      cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
+    );
+
+    // Filter by search
+    if (searchQuery) {
+      channels = channels.filter(ch => 
+        ch.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return channels;
+  }, [activeTab, categorizedContent, selectedCategory, searchQuery, allChannels, isFavorite]);
+
+  // Home content (simplified)
+  const homeContent = useMemo(() => {
+    const sections = [];
+    
+    if (categorizedContent.live.length > 0) {
+      const liveSection = categorizedContent.live[0];
+      sections.push({
+        ...liveSection,
+        display_name: `📺 ${liveSection.display_name}`,
+        channels: liveSection.channels.slice(0, 20),
+      });
+    }
+    
+    if (categorizedContent.movies.length > 0) {
+      const movieSection = categorizedContent.movies[0];
+      sections.push({
+        ...movieSection,
+        display_name: `🎬 ${movieSection.display_name}`,
+        channels: movieSection.channels.slice(0, 20),
+      });
+    }
+    
+    if (categorizedContent.series.length > 0) {
+      const seriesSection = categorizedContent.series[0];
+      sections.push({
+        ...seriesSection,
+        display_name: `📺 ${seriesSection.display_name}`,
+        channels: seriesSection.channels.slice(0, 20),
+      });
+    }
+    
+    return sections;
+  }, [categorizedContent]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -248,6 +274,15 @@ export default function AdminIPTVTest() {
     );
   }
 
+  const showSidebar = activeTab !== 'home' && activeTab !== 'favorites';
+  const tabTitle = {
+    home: 'Início',
+    live: 'TV ao Vivo',
+    movies: 'Filmes',
+    series: 'Séries',
+    favorites: 'Meus Favoritos',
+  }[activeTab];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Left Navigation Rail */}
@@ -255,38 +290,44 @@ export default function AdminIPTVTest() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         counts={counts}
-        onSearch={() => setShowSearch(true)}
-        onSettings={() => navigate('/admin/dashboard')}
+        onSettings={() => navigate('/dashboard')}
       />
 
       {/* Main Content Area */}
       <main className="ml-[72px] lg:ml-[88px]">
         {/* Top Bar */}
-        <header className="fixed top-0 right-0 left-[72px] lg:left-[88px] h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-4 lg:px-8">
+        <header className="fixed top-0 right-0 left-[72px] lg:left-[88px] h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/admin/dashboard')}
+              onClick={() => navigate('/dashboard')}
               className="lg:hidden"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
             
-            <h1 className="text-lg font-semibold hidden sm:block">
-              {activeTab === 'home' && 'Início'}
-              {activeTab === 'live' && 'TV ao Vivo'}
-              {activeTab === 'movies' && 'Filmes'}
-              {activeTab === 'series' && 'Séries'}
-              {activeTab === 'favorites' && 'Meus Favoritos'}
-            </h1>
+            <h1 className="text-lg font-semibold">{tabTitle}</h1>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Search */}
+            {activeTab !== 'home' && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-[180px] lg:w-[240px] pl-9 h-9"
+                />
+              </div>
+            )}
+
             {/* Playlist Selector */}
             <Select value={customListId || undefined} onValueChange={selectList}>
-              <SelectTrigger className="w-[160px] lg:w-[200px] h-9">
-                <SelectValue placeholder="Selecionar Playlist" />
+              <SelectTrigger className="w-[140px] lg:w-[180px] h-9">
+                <SelectValue placeholder="Playlist" />
               </SelectTrigger>
               <SelectContent>
                 {availableLists.map((list) => (
@@ -301,48 +342,23 @@ export default function AdminIPTVTest() {
 
         {/* Content */}
         <div className="pt-16">
-          {/* Hero Section (only on home) */}
-          {activeTab === 'home' && featuredItems.length > 0 && (
-            <TVHeroSection
-              items={featuredItems}
-              onPlay={(item) => {
-                const channel = allChannels.find(ch => ch.id === item.id);
-                if (channel) handlePlay(channel);
-              }}
-              onToggleFavorite={toggleFavorite}
-              isFavorite={isFavorite}
-            />
-          )}
-
-          {/* Content Rows */}
-          <div className={cn(
-            "pb-16",
-            activeTab !== 'home' && "pt-8"
-          )}>
-            {currentContent.length === 0 ? (
-              <div className="flex items-center justify-center min-h-[50vh] px-4">
-                <Card className="p-8 max-w-md text-center">
-                  {activeTab === 'live' && <Tv className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-                  {activeTab === 'movies' && <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-                  {activeTab === 'series' && <Clapperboard className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />}
-                  {activeTab === 'favorites' && (
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                      <span className="text-3xl">❤️</span>
-                    </div>
-                  )}
-                  <h2 className="text-xl font-bold mb-2">
-                    {activeTab === 'favorites' ? 'Nenhum favorito' : 'Nenhum conteúdo'}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    {activeTab === 'favorites' 
-                      ? 'Adicione canais aos favoritos para vê-los aqui'
-                      : 'Selecione outra categoria ou playlist'}
-                  </p>
-                </Card>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {currentContent.map((category) => (
+          {/* Home View */}
+          {activeTab === 'home' && (
+            <>
+              {featuredItems.length > 0 && (
+                <TVHeroSection
+                  items={featuredItems}
+                  onPlay={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.id);
+                    if (channel) handlePlay(channel);
+                  }}
+                  onToggleFavorite={toggleFavorite}
+                  isFavorite={isFavorite}
+                />
+              )}
+              
+              <div className="pb-16">
+                {homeContent.map((category) => (
                   <TVContentRow
                     key={category.id}
                     title={category.display_name}
@@ -363,22 +379,83 @@ export default function AdminIPTVTest() {
                   </TVContentRow>
                 ))}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {/* Favorites View */}
+          {activeTab === 'favorites' && (
+            <div className="p-4 lg:p-6 pb-16">
+              <TVContentGrid
+                channels={filteredChannels}
+                isFavorite={isFavorite}
+                onPlay={handlePlay}
+                onToggleFavorite={toggleFavorite}
+                emptyMessage="Adicione canais aos favoritos para vê-los aqui"
+              />
+            </div>
+          )}
+
+          {/* Category Views (Live, Movies, Series) */}
+          {showSidebar && (
+            <div className="flex min-h-[calc(100vh-4rem)]">
+              {/* Category Sidebar */}
+              <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border p-4 pt-6">
+                <TVCategoryFilter
+                  categories={currentTabCategories}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={setSelectedCategory}
+                  title="Categorias"
+                />
+              </aside>
+
+              {/* Content Area */}
+              <div className="flex-1 p-4 lg:p-6 pb-16">
+                {/* Mobile Category Select */}
+                <div className="lg:hidden mb-4">
+                  <Select 
+                    value={selectedCategory || "all"} 
+                    onValueChange={(v) => setSelectedCategory(v === "all" ? null : v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todas as categorias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        Todas as categorias ({filteredChannels.length})
+                      </SelectItem>
+                      {currentTabCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.display_name} ({cat.channelCount})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Results info */}
+                {searchQuery && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {filteredChannels.length} resultado{filteredChannels.length !== 1 ? 's' : ''} 
+                    {searchQuery && ` para "${searchQuery}"`}
+                  </p>
+                )}
+
+                <TVContentGrid
+                  channels={filteredChannels}
+                  isFavorite={isFavorite}
+                  onPlay={handlePlay}
+                  onToggleFavorite={toggleFavorite}
+                  emptyMessage={
+                    searchQuery 
+                      ? "Nenhum resultado encontrado" 
+                      : "Selecione uma categoria para ver o conteúdo"
+                  }
+                />
+              </div>
+            </div>
+          )}
         </div>
       </main>
-
-      {/* Search Overlay */}
-      <TVSearchOverlay
-        isOpen={showSearch}
-        onClose={() => {
-          setShowSearch(false);
-          setSearchQuery('');
-        }}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        resultCount={searchResultCount}
-      />
 
       {/* Video Player Dialog */}
       <Dialog open={showPlayerDialog} onOpenChange={setShowPlayerDialog}>
