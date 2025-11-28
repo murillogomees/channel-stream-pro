@@ -390,7 +390,7 @@ export default function AdminIPTVTest() {
 
           {/* Favorites View */}
           {activeTab === 'favorites' && (
-            <div className="p-4 lg:p-6 pb-16">
+            <div className="pb-16">
               <TVContentGrid
                 channels={filteredChannels}
                 isFavorite={isFavorite}
@@ -405,7 +405,7 @@ export default function AdminIPTVTest() {
           {showSidebar && (
             <div className="flex min-h-[calc(100vh-4rem)]">
               {/* Category Sidebar */}
-              <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border p-4 pt-6">
+              <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border py-4 lg:py-6 px-4">
                 <TVCategoryFilter
                   categories={currentTabCategories}
                   selectedCategory={selectedCategory}
@@ -415,9 +415,9 @@ export default function AdminIPTVTest() {
               </aside>
 
               {/* Content Area */}
-              <div className="flex-1 p-4 lg:p-6 pb-16">
+              <div className="flex-1 pb-16">
                 {/* Mobile Category Select */}
-                <div className="lg:hidden mb-4">
+                <div className="lg:hidden px-4 lg:px-8 py-4">
                   <Select 
                     value={selectedCategory || "all"} 
                     onValueChange={(v) => setSelectedCategory(v === "all" ? null : v)}
@@ -438,12 +438,14 @@ export default function AdminIPTVTest() {
                   </Select>
                 </div>
 
-                {/* Results info */}
+                {/* Results info for search */}
                 {searchQuery && (
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {filteredChannels.length} resultado{filteredChannels.length !== 1 ? 's' : ''} 
-                    {searchQuery && ` para "${searchQuery}"`}
-                  </p>
+                  <div className="px-4 lg:px-8 pb-2">
+                    <p className="text-sm text-muted-foreground">
+                      {filteredChannels.length} resultado{filteredChannels.length !== 1 ? 's' : ''} 
+                      {searchQuery && ` para "${searchQuery}"`}
+                    </p>
+                  </div>
                 )}
 
                 <TVContentGrid
