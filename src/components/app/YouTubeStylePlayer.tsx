@@ -349,29 +349,29 @@ export default function YouTubeStylePlayer({
     };
   }, []);
 
-  // HLS Player initialization function
+  // HLS Player initialization function - OPTIMIZED for fast startup
   const initHlsPlayer = useCallback((streamUrl: string, video: HTMLVideoElement) => {
     const hls = new Hls({
-      // OPTIMIZED for fast startup
-      maxBufferLength: 10, // Start playing faster with smaller buffer
-      maxMaxBufferLength: 30,
+      // OPTIMIZED for absolute fastest startup
+      maxBufferLength: 5,           // Minimal buffer = instant start
+      maxMaxBufferLength: 15,       // Keep memory low
       maxBufferHole: 0.5,
       startFragPrefetch: true,
-      startLevel: -1, // Auto quality selection
-      abrEwmaDefaultEstimate: 500000, // 500kbps initial estimate
+      startLevel: -1,               // Auto quality
+      abrEwmaDefaultEstimate: 1000000, // Assume 1Mbps
       abrEwmaFastLive: 3,
       abrEwmaSlowLive: 9,
-      // Faster loading timeouts
-      fragLoadingTimeOut: 10000,
-      fragLoadingMaxRetry: 3,
-      fragLoadingRetryDelay: 500,
-      manifestLoadingTimeOut: 8000,
+      // Aggressive timeouts for fast failure/recovery
+      fragLoadingTimeOut: 8000,
+      fragLoadingMaxRetry: 2,
+      fragLoadingRetryDelay: 300,
+      manifestLoadingTimeOut: 6000,
       manifestLoadingMaxRetry: 2,
-      levelLoadingTimeOut: 8000,
+      levelLoadingTimeOut: 6000,
       levelLoadingMaxRetry: 2,
-      // Low latency mode
+      // Performance
       lowLatencyMode: false,
-      backBufferLength: 30,
+      backBufferLength: 20,
     });
     hlsRef.current = hls;
 
@@ -394,7 +394,7 @@ export default function YouTubeStylePlayer({
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      console.warn('[Player] HLS error:', data.type, data.details, data.fatal);
+      console.warn('[Player] HLS error:', data.type, data.details);
       
       if (data.fatal) {
         switch (data.type) {
@@ -469,7 +469,7 @@ export default function YouTubeStylePlayer({
       return;
     }
 
-    // MPEG-TS live - OPTIMIZED for fast startup
+    // MPEG-TS live - OPTIMIZED for fast startup with shorter timeout
     if (info.type === 'MPEG-TS' && mpegts.isSupported()) {
       const player = mpegts.createPlayer({
         type: 'mpegts',
@@ -483,11 +483,11 @@ export default function YouTubeStylePlayer({
         lazyLoadMaxDuration: 0,
         lazyLoadRecoverDuration: 0,
         deferLoadAfterSourceOpen: false,
-        stashInitialSize: 128 * 1024, // 128KB - smaller for faster start
+        stashInitialSize: 64 * 1024,  // 64KB - smaller for faster start
         enableStashBuffer: true,
         autoCleanupSourceBuffer: true,
-        autoCleanupMaxBackwardDuration: 30,
-        autoCleanupMinBackwardDuration: 15,
+        autoCleanupMaxBackwardDuration: 20,
+        autoCleanupMinBackwardDuration: 10,
         fixAudioTimestampGap: true,
       });
       
@@ -495,11 +495,10 @@ export default function YouTubeStylePlayer({
       player.attachMediaElement(video);
       player.load();
       
-      // Timeout for connection - don't wait forever
+      // SHORTER timeout - 5 seconds for MPEG-TS before fallback
       const connectionTimeout = setTimeout(() => {
         if (!hasConnectedOnceRef.current && mpegtsRef.current) {
-          console.log('[Player] MPEGTS timeout, trying HLS fallback...');
-          // Try HLS as fallback
+          console.log('[Player] MPEGTS timeout (5s), trying HLS fallback...');
           player.pause();
           player.unload();
           player.detachMediaElement();
@@ -515,7 +514,7 @@ export default function YouTubeStylePlayer({
             if (autoplay) video.play().catch(console.warn);
           }
         }
-      }, 8000);
+      }, 5000); // 5 seconds instead of 8
       
       // Track network error count to avoid infinite restarts
       let networkErrorCount = 0;
