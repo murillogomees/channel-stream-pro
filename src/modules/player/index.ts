@@ -10,6 +10,12 @@
  * - TVFocusableCard: Card com suporte a foco TV
  * - TVGridLayout: Grid otimizado para TVs
  * - PlayerOverlay: Overlay do player
+ * - VideoPlayer: Player completo com UI
+ * 
+ * Core:
+ * - PlayerStateMachine: State machine do player
+ * - TelemetryService: Métricas e telemetria
+ * - TechAdapter: Adaptadores de playback (HLS.js, Native)
  * 
  * Services:
  * - StreamService: Serviço de streaming
@@ -31,6 +37,10 @@ export { default as UniversalPlayer } from '@/components/app/UniversalPlayer';
 export { default as TVFocusableCard } from './components/TVFocusableCard';
 export { TVGridLayout, TVChannelGrid, TVMovieGrid, TVCompactGrid } from './components/TVGridLayout';
 export { default as PlayerOverlay } from './components/PlayerOverlay';
+export { VideoPlayer } from '@/components/player/VideoPlayer';
+
+// Core
+export * from './core';
 
 // Services
 export { streamService, type Channel, type Category, type M3UFetchResult } from './services/StreamService';
@@ -46,6 +56,6 @@ export {
 } from './hooks/useFocusManager';
 
 // Hooks - Player
-export { usePlayerController, type PlayerState, type PlayerControls } from './hooks/usePlayerController';
+export { usePlayerController, type PlayerState as PlayerControllerState, type PlayerControls } from './hooks/usePlayerController';
 export { useRemoteInput, type RemoteAction } from './hooks/useRemoteInput';
 export { useIPTVPlaylist, type PlaylistState, type PlaylistFilters } from './hooks/useIPTVPlaylist';
