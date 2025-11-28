@@ -145,7 +145,7 @@ export function useMovieMetadata(): UseMovieMetadataResult {
         .from('content_metadata')
         .select('*')
         .eq('content_id', contentId)
-        .single();
+        .maybeSingle();
 
       if (cached) {
         const meta = cached as unknown as ContentMetadata;
