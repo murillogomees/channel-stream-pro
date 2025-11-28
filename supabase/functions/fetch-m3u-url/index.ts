@@ -95,8 +95,11 @@ const fetchWithTimeout = async (url: string, timeoutMs = 55000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
+  // Try the URL as-is first
+  let urlToFetch = url;
+  
   try {
-    const response = await fetch(url, {
+    const response = await fetch(urlToFetch, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; M3U-Fetcher/1.0)',
@@ -105,6 +108,33 @@ const fetchWithTimeout = async (url: string, timeoutMs = 55000) => {
     clearTimeout(timeout);
     return response;
   } catch (error) {
+    // If HTTPS fails with TLS error, try HTTP instead
+    if (urlToFetch.startsWith('https://') && 
+        (error.message?.includes('InvalidContentType') || 
+         error.message?.includes('corrupt message') ||
+         error.message?.includes('tls') ||
+         error.message?.includes('SSL'))) {
+      console.log(`[FetchM3U] HTTPS failed, trying HTTP...`);
+      urlToFetch = urlToFetch.replace('https://', 'http://');
+      
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), timeoutMs);
+      
+      try {
+        const response = await fetch(urlToFetch, {
+          signal: controller2.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; M3U-Fetcher/1.0)',
+          },
+        });
+        clearTimeout(timeout2);
+        return response;
+      } catch (error2) {
+        clearTimeout(timeout2);
+        throw error2;
+      }
+    }
+    
     clearTimeout(timeout);
     throw error;
   }
