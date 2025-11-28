@@ -557,15 +557,6 @@ export default function AppPlayer() {
 
         {/* Content */}
         <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
-          {/* Category filter for live/movies/series */}
-          {(activeTab === 'live' || activeTab === 'movies' || activeTab === 'series') && currentTabCategories.length > 0 && (
-            <TVCategoryFilter
-              categories={currentTabCategories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
-            />
-          )}
-
           {/* Content based on active tab */}
           {activeTab === 'home' && (
             <div className="space-y-6 px-4 lg:px-6 py-4">
@@ -574,6 +565,8 @@ export default function AppPlayer() {
                 <TVHeroSection
                   items={featuredItems}
                   onPlay={handlePlay}
+                  onToggleFavorite={toggleFavorite}
+                  isFavorite={isFavorite}
                 />
               )}
 
@@ -597,6 +590,10 @@ export default function AppPlayer() {
                     const channel = allChannels.find(ch => ch.id === item.content_id);
                     if (channel) handlePlay(channel);
                   }}
+                  onInfo={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }}
                 />
               )}
 
@@ -611,50 +608,57 @@ export default function AppPlayer() {
               )}
 
               {/* Home sections */}
-              {!isBackendSearchActive && homeContent.map((section, index) => (
+              {!isBackendSearchActive && homeContent.map((section) => (
                 <TVContentRow
                   key={section.id}
                   title={section.display_name}
-                  channels={section.channels}
-                  onPlay={handlePlay}
-                  isFavorite={isFavorite}
-                  onToggleFavorite={toggleFavorite}
-                />
+                  itemCount={section.channels.length}
+                >
+                  {section.channels.map((channel) => (
+                    <TVContentCard
+                      key={channel.id}
+                      id={channel.id}
+                      name={channel.name}
+                      logo={channel.tvg_logo}
+                      category={section.display_name}
+                      isFavorite={isFavorite(channel.id)}
+                      onPlay={() => handlePlay(channel)}
+                      onToggleFavorite={() => toggleFavorite(channel.id)}
+                    />
+                  ))}
+                </TVContentRow>
               ))}
             </div>
           )}
 
           {activeTab === 'live' && (
-            <LiveTVView
-              categories={categorizedContent.live}
-              selectedCategory={selectedCategory}
-              onPlay={handlePlay}
-              isFavorite={isFavorite}
-              onToggleFavorite={toggleFavorite}
-            />
+            <div className="px-4 lg:px-6 py-4">
+              <TVContentGrid
+                channels={filteredChannels}
+                onPlay={handlePlay}
+                isFavorite={isFavorite}
+                onToggleFavorite={toggleFavorite}
+              />
+            </div>
           )}
 
           {activeTab === 'movies' && (
             <MoviesView
               categories={categorizedContent.movies}
-              selectedCategory={selectedCategory}
               onPlay={handlePlay}
               isFavorite={isFavorite}
               onToggleFavorite={toggleFavorite}
               sortBy={movieSortBy}
-              onSortChange={setMovieSortBy}
             />
           )}
 
           {activeTab === 'series' && (
             <SeriesView
               categories={categorizedContent.series}
-              selectedCategory={selectedCategory}
               onPlay={handlePlay}
               isFavorite={isFavorite}
               onToggleFavorite={toggleFavorite}
               sortBy={seriesSortBy}
-              onSortChange={setSeriesSortBy}
             />
           )}
 
@@ -701,30 +705,29 @@ export default function AppPlayer() {
           onTimeUpdate={(time, dur) => {
             // Track watch progress
             if (time > 10 && dur > 0) {
-              watchProgressService.updateProgress({
-                profile_id: '', // Will be set by service
-                content_id: playerChannel.id,
-                content_type: streamService.needsProxy(playerChannel.stream_url) ? 'live' : 'vod',
-                content_name: playerChannel.name,
-                content_logo: playerChannel.tvg_logo,
-                content_category: playerChannel.category_name,
-                progress_seconds: Math.floor(time),
-                duration_seconds: Math.floor(dur),
-              }).catch(console.warn);
+              const contentType = streamService.needsProxy(playerChannel.stream_url) ? 'live' : 'movie';
+              watchProgressService.updateProgress(
+                playerChannel.id,
+                contentType,
+                playerChannel.name,
+                Math.floor(time),
+                Math.floor(dur),
+                {
+                  contentLogo: playerChannel.tvg_logo,
+                  contentCategory: playerChannel.category_name,
+                }
+              ).catch(console.warn);
             }
           }}
           onPlaybackStart={() => {
-            // Track view start
-            analyticsService.trackEvent({
-              event_type: 'view_start',
-              content_id: playerChannel.id,
-              content_type: 'channel',
-              content_name: playerChannel.name,
-              metadata: {
+            // Track play start
+            analyticsService.trackPlay(
+              playerChannel.id,
+              'live',
+              {
                 category: playerChannel.category_name,
-                has_logo: !!playerChannel.tvg_logo,
-              },
-            }).catch(console.warn);
+              }
+            ).catch(console.warn);
           }}
         />
       )}
