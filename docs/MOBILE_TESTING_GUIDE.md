@@ -7,12 +7,14 @@ Este guia explica como testar o IPTV Link em dispositivos Android e iOS durante 
 ## 🚀 Modos de Teste
 
 ### Modo 1: Hot Reload (Desenvolvimento Rápido)
+
 - O app carrega do servidor Lovable
 - Mudanças no código aparecem instantaneamente
 - **Requer conexão com internet**
 - Ideal para desenvolvimento ativo
 
 ### Modo 2: Build Local (Standalone)
+
 - O app é compilado com todo o código embarcado
 - Funciona offline
 - Mais lento para iterar
@@ -23,6 +25,7 @@ Este guia explica como testar o IPTV Link em dispositivos Android e iOS durante 
 ## 📱 Android - Teste em Dispositivo Real
 
 ### Pré-requisitos
+
 - [ ] Android Studio instalado
 - [ ] Cabo USB de dados (não apenas de carga)
 - [ ] Celular Android (Android 7.0+)
@@ -64,12 +67,14 @@ Se aparecer `unauthorized`, desconecte e reconecte o celular, aceitando o popup 
 ### Passo 5: Executar o App
 
 #### Hot Reload (Recomendado para Dev)
+
 ```bash
 # O capacitor.config.ts já está configurado para hot reload
 npx cap run android
 ```
 
 #### Build Local
+
 ```bash
 # 1. Build do projeto
 npm run build
@@ -84,6 +89,7 @@ npx cap run android
 ### Passo 6: Selecionar Dispositivo
 
 Quando executar `npx cap run android`:
+
 1. Uma lista de dispositivos aparecerá
 2. Selecione seu dispositivo físico
 3. Aguarde a instalação e execução
@@ -93,6 +99,7 @@ Quando executar `npx cap run android`:
 ## 🍎 iOS - Teste em Dispositivo Real
 
 ### Pré-requisitos
+
 - [ ] Mac com macOS
 - [ ] Xcode instalado (App Store)
 - [ ] iPhone ou iPad
@@ -210,6 +217,7 @@ cd ios && xcodebuild clean && cd ..
 ### Debug Remoto
 
 #### Android (Chrome DevTools)
+
 1. Execute o app no dispositivo
 2. No computador, abra Chrome
 3. Digite na barra de endereço: `chrome://inspect`
@@ -217,6 +225,7 @@ cd ios && xcodebuild clean && cd ..
 5. Clique em **inspect** para abrir DevTools
 
 #### iOS (Safari Web Inspector)
+
 1. No iPhone: **Ajustes** → **Safari** → **Avançado** → **Web Inspector** (ativar)
 2. No Mac: **Safari** → **Preferências** → **Avançado** → **Mostrar menu Desenvolvedor**
 3. Execute o app
@@ -301,32 +310,32 @@ npx cap run android  # ou ios
 
 ### Android
 
-| Problema | Solução |
-|----------|---------|
-| `device unauthorized` | Desconecte/reconecte USB e aceite popup no celular |
-| `no devices found` | Verifique cabo e modo desenvolvedor |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Desinstale app antigo: `adb uninstall [package]` |
-| App não carrega conteúdo | Verifique conexão de internet do celular |
-| Build lento | Use `--no-build` se só mudou web |
+| Problema                             | Solução                                            |
+| ------------------------------------ | -------------------------------------------------- |
+| `device unauthorized`                | Desconecte/reconecte USB e aceite popup no celular |
+| `no devices found`                   | Verifique cabo e modo desenvolvedor                |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Desinstale app antigo: `adb uninstall [package]`   |
+| App não carrega conteúdo             | Verifique conexão de internet do celular           |
+| Build lento                          | Use `--no-build` se só mudou web                   |
 
 ### iOS
 
-| Problema | Solução |
-|----------|---------|
-| `No provisioning profile` | Configure Team no Xcode |
-| `Device is busy` | Aguarde ou reinicie dispositivo |
-| `Unable to install app` | Confie no desenvolvedor nas configurações |
-| `Signing requires a development team` | Adicione Apple ID no Xcode |
-| Build falha | `cd ios && pod install && cd ..` |
+| Problema                              | Solução                                   |
+| ------------------------------------- | ----------------------------------------- |
+| `No provisioning profile`             | Configure Team no Xcode                   |
+| `Device is busy`                      | Aguarde ou reinicie dispositivo           |
+| `Unable to install app`               | Confie no desenvolvedor nas configurações |
+| `Signing requires a development team` | Adicione Apple ID no Xcode                |
+| Build falha                           | `cd ios && pod install && cd ..`          |
 
 ### Geral
 
-| Problema | Solução |
-|----------|---------|
-| Mudanças não aparecem | Verifique se salvou arquivos, `npx cap sync` |
-| App crashando | Verifique logs com `-l` flag |
-| Sem hot reload | Confirme URL correta em `capacitor.config.ts` |
-| Tela branca | Erro JavaScript, verifique console |
+| Problema              | Solução                                       |
+| --------------------- | --------------------------------------------- |
+| Mudanças não aparecem | Verifique se salvou arquivos, `npx cap sync`  |
+| App crashando         | Verifique logs com `-l` flag                  |
+| Sem hot reload        | Confirme URL correta em `capacitor.config.ts` |
+| Tela branca           | Erro JavaScript, verifique console            |
 
 ---
 
