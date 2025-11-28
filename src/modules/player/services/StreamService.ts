@@ -16,7 +16,8 @@
 // CONFIGURATION
 // =============================================================================
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+// URL do Supabase - usar valor fixo para garantir funcionamento
+const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 
 const ENDPOINTS = {
   STREAM_PROXY: `${SUPABASE_URL}/functions/v1/stream-proxy`,
