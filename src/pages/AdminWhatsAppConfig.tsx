@@ -166,21 +166,22 @@ export default function AdminWhatsAppConfig() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background p-3 sm:p-4 lg:p-8 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Button
             variant="outline"
             size="icon"
             onClick={() => navigate('/admin/dashboard')}
+            className="flex-shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-foreground truncate">
               Configuração WhatsApp
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
               Configure as credenciais para envio de notificações
             </p>
           </div>

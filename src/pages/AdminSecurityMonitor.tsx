@@ -55,29 +55,29 @@ export default function AdminSecurityMonitor() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Shield className="h-8 w-8" />
-            Monitor de Segurança
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhe eventos de segurança em tempo real
-          </p>
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <Button variant="outline" size="icon" onClick={() => navigate('/admin/dashboard')} className="flex-shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold flex items-center gap-2 flex-wrap">
+              <Shield className="h-5 w-5 sm:h-8 sm:w-8 flex-shrink-0" />
+              <span className="truncate">Monitor de Segurança</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
+              Acompanhe eventos de segurança em tempo real
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={refetch}>
+        <Button onClick={refetch} className="w-full sm:w-auto flex-shrink-0">
           Atualizar
         </Button>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Eventos</CardTitle>
@@ -148,16 +148,16 @@ export default function AdminSecurityMonitor() {
       {/* Filters and Events List */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1 min-w-0">
               <CardTitle>Eventos de Segurança</CardTitle>
               <CardDescription>
                 Monitoramento em tempo real de atividades de segurança
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Tipo de evento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,7 +171,7 @@ export default function AdminSecurityMonitor() {
               </Select>
 
               <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue placeholder="Severidade" />
                 </SelectTrigger>
                 <SelectContent>

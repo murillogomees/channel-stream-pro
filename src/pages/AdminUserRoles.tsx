@@ -293,16 +293,16 @@ const AdminUserRoles = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-3 sm:p-6 overflow-x-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')} className="flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
+              <span className="hidden sm:inline">Voltar</span>
             </Button>
           </div>
-          <Button onClick={() => { loadUsers(); loadAuditLogs(); }} variant="outline">
+          <Button onClick={() => { loadUsers(); loadAuditLogs(); }} variant="outline" className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
@@ -316,14 +316,16 @@ const AdminUserRoles = () => {
         </Alert>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="users">
-              <Shield className="h-4 w-4 mr-2" />
-              Gerenciar Roles
+          <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6 h-auto">
+            <TabsTrigger value="users" className="text-xs sm:text-sm py-2">
+              <Shield className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Gerenciar Roles</span>
+              <span className="sm:hidden">Roles</span>
             </TabsTrigger>
-            <TabsTrigger value="audit">
-              <History className="h-4 w-4 mr-2" />
-              Histórico de Auditoria
+            <TabsTrigger value="audit" className="text-xs sm:text-sm py-2">
+              <History className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Histórico</span>
+              <span className="sm:hidden">Histórico</span>
             </TabsTrigger>
           </TabsList>
 

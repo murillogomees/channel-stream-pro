@@ -74,25 +74,24 @@ export default function AdminConversionDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/admin/dashboard')}
-          className="hover:bg-primary/10"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard de Conversão</h1>
-          <p className="text-muted-foreground">Métricas de conversão de teste para planos pagos</p>
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/admin/dashboard')}
+            className="hover:bg-primary/10 flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">Dashboard de Conversão</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">Métricas de conversão de teste para planos pagos</p>
+          </div>
         </div>
         <Select value={period.toString()} onValueChange={(v) => setPeriod(parseInt(v))}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px] flex-shrink-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

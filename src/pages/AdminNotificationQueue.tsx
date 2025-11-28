@@ -128,22 +128,22 @@ export default function AdminNotificationQueue() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Fila de Notificações</h1>
-          <p className="text-muted-foreground">
+    <div className="container mx-auto p-3 sm:p-6 py-4 sm:py-8 space-y-4 sm:space-y-6 max-w-7xl overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Fila de Notificações</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
             Monitoramento em tempo real do sistema de notificações automáticas
           </p>
         </div>
-        <Button onClick={loadData} disabled={loading}>
+        <Button onClick={loadData} disabled={loading} className="w-full sm:w-auto flex-shrink-0">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Atualizar
         </Button>
       </div>
 
       {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -187,15 +187,15 @@ export default function AdminNotificationQueue() {
 
       {/* Botão de Retry */}
       {stats.failed > 0 && (
-        <Card className="p-4 bg-destructive/10 border-destructive">
-          <div className="flex items-center justify-between">
+        <Card className="p-3 sm:p-4 bg-destructive/10 border-destructive">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <p className="text-sm font-medium">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+              <p className="text-xs sm:text-sm font-medium">
                 {stats.failed} notificação(ões) falharam. Deseja tentar reenviar?
               </p>
             </div>
-            <Button onClick={retryFailed} variant="destructive">
+            <Button onClick={retryFailed} variant="destructive" className="w-full sm:w-auto flex-shrink-0">
               Reprocessar Falhas
             </Button>
           </div>
