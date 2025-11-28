@@ -4,43 +4,96 @@
  * ============================================================================
  * 
  * Módulo de player IPTV universal enterprise.
- * 
- * Componentes:
- * - UniversalPlayer: Player HLS universal
- * - TVFocusableCard: Card com suporte a foco TV
- * - TVGridLayout: Grid otimizado para TVs
- * - PlayerOverlay: Overlay do player
- * - VideoPlayer: Player completo com UI
- * 
- * Core:
- * - PlayerStateMachine: State machine do player
- * - TelemetryService: Métricas e telemetria
- * - TechAdapter: Adaptadores de playback (HLS.js, Native)
- * 
- * Services:
- * - StreamService: Serviço de streaming
- * - FocusManager: Gerenciador de foco para TVs
- * 
- * Hooks:
- * - useFocusable: Registra elemento focável
- * - useFocusGroup: Gerencia grupo de foco
- * - useFocusManagerInit: Inicializa FocusManager
- * - useBackHandler: Handler para botão Back
- * - useCurrentFocus: Estado do foco atual
- * - usePlayerController: Controles do player
- * - useRemoteInput: Captura eventos de controle remoto
- * - useIPTVPlaylist: Gerenciamento de playlist
  */
 
 // Components
 export { default as UniversalPlayer } from '@/components/app/UniversalPlayer';
 export { default as TVFocusableCard } from './components/TVFocusableCard';
-export { TVGridLayout, TVChannelGrid, TVMovieGrid, TVCompactGrid } from './components/TVGridLayout';
+export { TVGridLayout, TVChannelGrid as TVChannelGridLayout, TVMovieGrid, TVCompactGrid } from './components/TVGridLayout';
 export { default as PlayerOverlay } from './components/PlayerOverlay';
 export { VideoPlayer } from '@/components/player/VideoPlayer';
 
-// Core
-export * from './core';
+// Core exports
+export {
+  PlayerStateMachine,
+  createPlayerStateMachine,
+  TelemetryService,
+  telemetryService,
+  BaseTechAdapter,
+  NativeAdapter,
+  HlsJsAdapter,
+  detectCapabilities,
+  selectBestTech,
+  createAdapter,
+  DeviceDetector,
+  deviceDetector,
+  QoSMonitor,
+  qosMonitor,
+  RemoteKeyMap,
+  remoteKeyMap,
+  Logger,
+  logger,
+  type PlayerState,
+  type PlayerContext,
+  type PlayerEvent,
+  type PlaybackMetrics,
+  type ErrorEvent,
+  type BufferMetrics,
+  type TechType as CoreTechType,
+  type TechCapabilities,
+  type TechAdapterEvents,
+  type TechAdapterConfig,
+  type DeviceInfo,
+  type DevicePlatform,
+  type InputMethod,
+  type DeviceCapabilities,
+  type QoSMetrics,
+  type QoSReport,
+  type RemoteAction as CoreRemoteAction,
+  type RemotePlatform,
+  type LogLevel,
+  type LogEntry,
+  type LogContext,
+  type LoggerConfig,
+} from './core';
+
+// M3U Pipeline exports
+export {
+  M3UParser,
+  m3uParser,
+  parseM3U,
+  M3UValidator,
+  m3uValidator,
+  validateM3U,
+  M3USanitizer,
+  m3uSanitizer,
+  sanitizeM3U,
+  M3ULoader,
+  m3uLoader,
+  loadM3U,
+  type M3UChannel,
+  type M3UCategory,
+  type M3UParseResult,
+  type ValidationResult,
+  type SanitizeResult,
+  type LoadResult,
+} from './m3u';
+
+// Engine exports
+export {
+  PlayerEngine,
+  createPlayerEngine,
+  type EngineState,
+  type TechType as EngineTechType,
+  type EngineConfig,
+  type EngineEvents,
+  type EngineError,
+  type EngineMetrics,
+} from './engine';
+
+// TV UI Components
+export { TVChannelGrid } from './ui/TVChannelGrid';
+export { TVPlayerOverlay } from './ui/TVPlayerOverlay';
 
 // Services
 export { streamService, type Channel, type Category, type M3UFetchResult } from './services/StreamService';
