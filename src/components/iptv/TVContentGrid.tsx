@@ -67,7 +67,7 @@ export function TVContentGrid({
 
       {/* Grid - matching TVContentRow content padding */}
       <div className="px-4 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 lg:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
           {visibleChannels.map((channel) => (
             <TVContentCard
               key={channel.id}
@@ -78,6 +78,7 @@ export function TVContentGrid({
               isFavorite={isFavorite(channel.id)}
               onPlay={() => onPlay(channel)}
               onToggleFavorite={() => onToggleFavorite(channel.id)}
+              fillContainer
             />
           ))}
         </div>
