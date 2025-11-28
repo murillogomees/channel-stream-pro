@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Desabilitar injeção automática para evitar render-blocking
+      injectRegister: null,
       includeAssets: ['favicon.png', 'logo.png', 'logo.webp'],
       devOptions: {
         enabled: false
@@ -43,7 +45,7 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        // Apenas arquivos essenciais - NÃO incluir JS chunks dinâmicos
+        // Apenas arquivos essenciais - NÃO incluir JS/CSS no precache
         globPatterns: ['**/*.{html,ico,png,webp,svg}'],
         // Ignorar chunks de páginas específicas para evitar erros de cache
         navigateFallback: null,

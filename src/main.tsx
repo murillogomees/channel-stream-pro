@@ -44,9 +44,10 @@ createRoot(document.getElementById("root")!).render(
   <App />
 );
 
-// Register service worker for PWA - only in production
+// Register service worker for PWA - only in production, defer to idle
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
+  // Usar requestIdleCallback para não bloquear render
+  const registerSW = () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {
         // Check for updates periodically
@@ -55,5 +56,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .catch(() => {
         // Silent fail - SW not critical
       });
-  });
+  };
+  
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(registerSW, { timeout: 5000 });
+  } else {
+    setTimeout(registerSW, 3000);
+  }
 }

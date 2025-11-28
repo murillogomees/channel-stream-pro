@@ -5,7 +5,7 @@
 
 const criticalAssets = [
   '/logo.webp',
-  // Hero background é carregado via CSS, não precisa preload
+  // Hero logo é carregado via eager loading no componente
 ];
 
 export function preloadCriticalAssets() {
@@ -16,6 +16,8 @@ export function preloadCriticalAssets() {
     link.rel = 'preload';
     link.as = asset.endsWith('.webp') || asset.endsWith('.jpg') ? 'image' : 'fetch';
     link.href = asset;
+    // Definir fetchpriority para assets críticos
+    (link as any).fetchpriority = 'high';
     document.head.appendChild(link);
   });
 }
