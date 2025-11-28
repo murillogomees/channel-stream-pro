@@ -38,6 +38,7 @@ const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 
 // IPTV App pages
+const AppEntry = lazy(() => import("./pages/AppEntry"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
@@ -66,6 +67,7 @@ const App = () => (
           <Route path="/cliente/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
           
           {/* IPTV App Routes */}
+          <Route path="/app" element={<AppEntry />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />

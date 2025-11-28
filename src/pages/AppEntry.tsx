@@ -59,17 +59,18 @@ const AppEntry = () => {
   const handleSplashComplete = () => {
     setShowSplash(false);
 
-    // Detectar tipo de dispositivo e redirecionar
-    const deviceType = deviceDetector.getDeviceType();
+    // Detectar tipo de dispositivo usando DeviceDetector
+    const isTv = deviceDetector.isTv;
+    const isMobile = deviceDetector.isMobile;
     const platform = Capacitor.getPlatform();
 
-    console.log("Device detection:", { deviceType, platform });
+    console.log("Device detection:", { isTv, isMobile, platform });
 
     // Redirecionar baseado no dispositivo
-    if (deviceType === "tv" || deviceType === "console") {
-      // Smart TV ou console - usar player TV
+    if (isTv) {
+      // Smart TV - usar player TV
       navigate("/tv-player", { replace: true });
-    } else if (platform === "android" || platform === "ios" || deviceType === "mobile" || deviceType === "tablet") {
+    } else if (platform === "android" || platform === "ios" || isMobile) {
       // Mobile ou tablet - usar player mobile
       navigate("/app/player", { replace: true });
     } else {
