@@ -1,14 +1,14 @@
 /**
  * ============================================================================
- * IPTV Player Client Hook - Optimized v3
+ * IPTV Player Client Hook - Optimized v4
  * ============================================================================
  * 
- * Fixed background loading with proper empty batch handling and retry limits
+ * Fixed background loading - continues until all content is loaded
+ * Removed toasts for cleaner UX
  */
 
 import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 interface Channel {
   id: string;
@@ -51,13 +51,14 @@ const CONFIG = {
   INITIAL_BATCH_SIZE: 3000,
   BACKGROUND_BATCH_SIZE: 3000,
   PARALLEL_BATCHES: 4,
-  MAX_RETRIES: 3,
-  MAX_EMPTY_BATCHES: 5, // Stop after this many consecutive empty batches
+  MAX_RETRIES: 5,
+  MAX_CONSECUTIVE_ERRORS: 10, // Only stop on actual errors, not retry requests
   CACHE_TTL_MS: 2 * 60 * 60 * 1000, // 2 hours
   DB_NAME: 'iptv_playlist_v4',
   DB_VERSION: 1,
   STORE_NAME: 'playlists',
-  BATCH_DELAY_MS: 100, // Delay between batch groups to avoid overwhelming server
+  BATCH_DELAY_MS: 200, // Delay between batch groups
+  RETRY_DELAY_MS: 2000, // Delay when server requests retry
 };
 
 // ============================================================================
@@ -223,13 +224,13 @@ export function useIPTVPlayerClient() {
     });
   }, [groupChannelsIntoCategories]);
 
-  // Fetch batch with improved retry and empty handling
+  // Fetch batch with improved retry and error handling
   const fetchBatch = async (
     url: string, 
     offset: number, 
     limit: number,
     signal: AbortSignal
-  ): Promise<{ channels: any[]; total: number; hasMore: boolean; version: number; partial?: boolean }> => {
+  ): Promise<{ channels: any[]; total: number; hasMore: boolean; version: number; shouldRetry?: boolean }> => {
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token || '';
     
@@ -251,34 +252,32 @@ export function useIPTVPlayerClient() {
         
         // Handle server retry request (server is building cache)
         if (data.partial && data.retryAfter && data.channels?.length === 0) {
-          if (attempt < CONFIG.MAX_RETRIES - 1) {
-            console.log(`[IPTV] Server building cache (attempt ${attempt + 1}), waiting ${data.retryAfter}s...`);
-            await new Promise(r => setTimeout(r, data.retryAfter * 1000));
-            continue;
-          }
+          console.log(`[IPTV] Server building cache for offset ${offset}, waiting ${data.retryAfter}s...`);
+          await new Promise(r => setTimeout(r, data.retryAfter * 1000));
+          continue; // Retry the same request
         }
 
         return {
           channels: data.channels || [],
           total: data.total || 0,
-          hasMore: data.hasMore ?? false,
+          hasMore: data.hasMore ?? (data.partial === true),
           version: data.version || 0,
-          partial: data.partial,
+          shouldRetry: data.partial && data.channels?.length === 0,
         };
       } catch (err: any) {
         if (err.name === 'AbortError') throw err;
-        console.error(`[IPTV] Fetch attempt ${attempt + 1} failed:`, err);
+        console.error(`[IPTV] Fetch attempt ${attempt + 1} failed:`, err.message);
         if (attempt < CONFIG.MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         }
       }
     }
 
-    // Return empty result instead of throwing to allow graceful handling
-    return { channels: [], total: 0, hasMore: false, version: 0 };
+    // Return with shouldRetry flag to indicate we should try again later
+    return { channels: [], total: 0, hasMore: true, version: 0, shouldRetry: true };
   };
 
-  // Background loading with proper empty batch detection
+  // Background loading - continues until all content is truly loaded
   const loadAllChannelsBackground = useCallback(async (
     url: string,
     estimatedTotal: number,
@@ -289,19 +288,26 @@ export function useIPTVPlayerClient() {
     abortControllerRef.current = controller;
     
     let currentOffset = initialChannels.length;
-    let emptyBatchCount = 0;
+    let consecutiveErrors = 0;
     let actualTotal = estimatedTotal;
+    let lastProgress = currentOffset;
     
     console.log(`[IPTV] Background loading from offset ${currentOffset}, estimated total: ${estimatedTotal}...`);
     
     while (!controller.signal.aborted) {
-      // Stop if we've likely loaded everything
-      if (emptyBatchCount >= CONFIG.MAX_EMPTY_BATCHES) {
-        console.log(`[IPTV] Stopping: ${emptyBatchCount} consecutive empty batches`);
+      // Stop if we've had too many consecutive errors
+      if (consecutiveErrors >= CONFIG.MAX_CONSECUTIVE_ERRORS) {
+        console.log(`[IPTV] Stopping: ${consecutiveErrors} consecutive errors`);
         break;
       }
       
-      const batchPromises: Promise<{ channels: any[]; offset: number; hasMore: boolean }>[] = [];
+      // Stop if we've loaded more than the estimated total and no new channels for a while
+      if (allChannelsRef.current.length >= actualTotal && lastProgress === allChannelsRef.current.length) {
+        console.log(`[IPTV] Reached estimated total: ${allChannelsRef.current.length}`);
+        break;
+      }
+      
+      const batchPromises: Promise<{ channels: any[]; offset: number; hasMore: boolean; shouldRetry?: boolean }>[] = [];
       
       for (let i = 0; i < CONFIG.PARALLEL_BATCHES; i++) {
         const batchOffset = currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE);
@@ -312,42 +318,52 @@ export function useIPTVPlayerClient() {
               channels: result.channels, 
               offset: batchOffset,
               hasMore: result.hasMore,
+              shouldRetry: result.shouldRetry,
             }))
-            .catch(() => ({ channels: [], offset: batchOffset, hasMore: false }))
+            .catch(() => ({ channels: [], offset: batchOffset, hasMore: true, shouldRetry: true }))
         );
       }
-
-      if (batchPromises.length === 0) break;
 
       const results = await Promise.all(batchPromises);
       results.sort((a, b) => a.offset - b.offset);
       
       let batchNewCount = 0;
-      let shouldContinue = false;
+      let anyHasMore = false;
+      let anyNeedsRetry = false;
       
       for (const result of results) {
         if (result.channels.length > 0) {
           allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
           batchNewCount += result.channels.length;
-          emptyBatchCount = 0; // Reset empty counter
+          consecutiveErrors = 0; // Reset error counter on success
         }
-        if (result.hasMore) {
-          shouldContinue = true;
-        }
+        if (result.hasMore) anyHasMore = true;
+        if (result.shouldRetry) anyNeedsRetry = true;
       }
 
+      // Update progress tracking
+      lastProgress = allChannelsRef.current.length;
+      
       if (batchNewCount === 0) {
-        emptyBatchCount++;
-        console.log(`[IPTV] Empty batch group #${emptyBatchCount}`);
-        
-        // If server says no more and we got nothing, stop
-        if (!shouldContinue) {
+        if (anyNeedsRetry) {
+          // Server is building cache, wait and retry same offsets
+          console.log(`[IPTV] Server building cache, waiting ${CONFIG.RETRY_DELAY_MS}ms...`);
+          await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS));
+          continue; // Don't advance offset, retry
+        } else if (!anyHasMore) {
+          // Server says no more data
           console.log('[IPTV] Server indicates no more data');
           break;
+        } else {
+          consecutiveErrors++;
+          console.log(`[IPTV] Empty batch group #${consecutiveErrors}`);
         }
       }
 
-      currentOffset += CONFIG.PARALLEL_BATCHES * CONFIG.BACKGROUND_BATCH_SIZE;
+      // Only advance offset if we got data or server confirmed no retry needed
+      if (batchNewCount > 0 || !anyNeedsRetry) {
+        currentOffset += CONFIG.PARALLEL_BATCHES * CONFIG.BACKGROUND_BATCH_SIZE;
+      }
       
       // Update actual total based on loaded content
       actualTotal = Math.max(actualTotal, allChannelsRef.current.length);
@@ -371,7 +387,7 @@ export function useIPTVPlayerClient() {
         });
       }
 
-      // Small delay between batch groups to avoid overwhelming the server
+      // Delay between batch groups
       await new Promise(r => setTimeout(r, CONFIG.BATCH_DELAY_MS));
     }
 
@@ -715,7 +731,7 @@ export function useIPTVPlayerClient() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error('Usuário não autenticado');
+        console.error('[IPTV] User not authenticated');
         setIsLoading(false);
         setHasPlaylist(false);
         return;
@@ -793,7 +809,6 @@ export function useIPTVPlayerClient() {
 
     } catch (err) {
       console.error('[IPTV] Load error:', err);
-      toast.error('Erro ao carregar playlist');
       setIsLoading(false);
       setHasPlaylist(false);
     }
