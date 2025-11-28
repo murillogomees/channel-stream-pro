@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Tv, ArrowLeft, Search, Settings } from 'lucide-react';
+import { Loader2, Tv, ArrowLeft, Search, Settings, RefreshCw, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
@@ -63,6 +63,8 @@ export default function AppPlayer() {
   const totalChannels = isAdmin ? (adminPlayer as any).totalChannels : (clientPlayer as any).totalChannels;
   const loadedChannels = isAdmin ? (adminPlayer as any).loadedChannels : (clientPlayer as any).loadedChannels;
   const isLoadingMore = isAdmin ? (adminPlayer as any).isLoadingMore : (clientPlayer as any).isLoadingMore;
+  const isCached = !isAdmin && (clientPlayer as any).isCached;
+  const clearCacheAndReload = !isAdmin ? (clientPlayer as any).clearCacheAndReload : undefined;
   
   // Admin-specific
   const availableLists = isAdmin ? (adminPlayer as any).availableLists : [];
@@ -385,6 +387,13 @@ export default function AppPlayer() {
                 {activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
                 {activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
               </span>
+              {/* Cache indicator */}
+              {isCached && !isLoadingMore && (
+                <div className="hidden sm:flex items-center gap-1 text-xs text-green-500 flex-shrink-0">
+                  <Database className="w-3 h-3" />
+                  <span>Cache</span>
+                </div>
+              )}
               {/* Background loading indicator */}
               {isLoadingMore && (
                 <div className="hidden sm:flex items-center gap-2 text-xs text-primary animate-pulse flex-shrink-0">
@@ -396,6 +405,18 @@ export default function AppPlayer() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Refresh button */}
+            {!isAdmin && clearCacheAndReload && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={clearCacheAndReload}
+                className="h-9 w-9"
+                title="Atualizar playlist"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            )}
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

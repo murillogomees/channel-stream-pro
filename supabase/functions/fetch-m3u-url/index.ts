@@ -1,16 +1,18 @@
 /**
  * ============================================================================
- * M3U Playlist Fetcher & Parser - Optimized v5.0
+ * M3U Playlist Fetcher & Parser - Optimized v6.0
  * ============================================================================
  * 
- * Otimizado para evitar CPU Time Exceeded:
- * - Limita parsing por tempo
- * - Cache com TTL mais longo
- * - Retorna parcial quando necessário
- * - Paginação inteligente sem full parse
+ * Otimizações:
+ * - Parsing mais rápido com regex otimizados
+ * - Cache em memória + persistência no DB
+ * - Retorna mais dados na primeira requisição
+ * - Background parsing com mais tempo
  * 
- * @version 5.0.0
+ * @version 6.0.0
  */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -18,59 +20,50 @@ const CORS_HEADERS = {
 } as const;
 
 const CONFIG = {
-  FETCH_TIMEOUT_MS: 25000,     // 25s timeout
-  DEFAULT_LIMIT: 500,          // Limite padrão
-  CACHE_TTL_MS: 1800000,       // 30 min cache (mais longo)
-  MAX_PARSE_TIME_MS: 8000,     // Máximo 8s de parse
-  CHUNK_SIZE: 65536,           // 64KB chunks for reading
+  FETCH_TIMEOUT_MS: 30000,     // 30s timeout
+  DEFAULT_LIMIT: 2000,         // Mais dados por padrão
+  MAX_LIMIT: 10000,            // Máximo por requisição
+  CACHE_TTL_MS: 3600000,       // 1 hora cache
+  MAX_PARSE_TIME_MS: 12000,    // 12s de parse na requisição principal
+  BG_PARSE_TIME_MS: 55000,     // 55s em background
+  DB_CACHE_TTL_HOURS: 24,      // 24h no banco
 } as const;
 
 // =============================================================================
-// IN-MEMORY CACHE (Global para instância do worker)
+// IN-MEMORY CACHE
 // =============================================================================
 interface CacheEntry {
   channels: Channel[];
   timestamp: number;
   complete: boolean;
-  parsing?: boolean;
 }
 
-const cache = new Map<string, CacheEntry>();
+const memoryCache = new Map<string, CacheEntry>();
 
 function getCacheKey(url: string): string {
   try {
     const parsed = new URL(url);
-    // Include query params in key for different users
     return `${parsed.hostname}${parsed.pathname}${parsed.search}`;
   } catch {
     return url;
   }
 }
 
-function getFromCache(url: string): CacheEntry | null {
+function getFromMemoryCache(url: string): CacheEntry | null {
   const key = getCacheKey(url);
-  const entry = cache.get(key);
+  const entry = memoryCache.get(key);
   
   if (entry && Date.now() - entry.timestamp < CONFIG.CACHE_TTL_MS) {
-    console.log(`[M3U] Cache HIT: ${entry.channels.length} channels (complete: ${entry.complete})`);
     return entry;
   }
   
-  if (entry) {
-    cache.delete(key); // Expired
-  }
-  
+  if (entry) memoryCache.delete(key);
   return null;
 }
 
-function setCache(url: string, channels: Channel[], complete: boolean): void {
+function setMemoryCache(url: string, channels: Channel[], complete: boolean): void {
   const key = getCacheKey(url);
-  cache.set(key, {
-    channels,
-    timestamp: Date.now(),
-    complete,
-  });
-  console.log(`[M3U] Cache SET: ${channels.length} channels (complete: ${complete})`);
+  memoryCache.set(key, { channels, timestamp: Date.now(), complete });
 }
 
 // =============================================================================
@@ -84,106 +77,38 @@ interface Channel {
   tvg_name: string | null;
   stream_url: string;
   category_name: string;
-}
-
-interface ParseResult {
-  channels: Channel[];
-  total: number;
-  offset: number;
-  limit: number;
-  hasMore: boolean;
-  cached: boolean;
-  partial?: boolean;
-  retryAfter?: number;
+  group_title?: string;
 }
 
 // =============================================================================
-// OPTIMIZED STREAMING PARSER - Time-limited with yield points
+// FAST STRING PARSER (sem regex onde possível)
 // =============================================================================
-async function parseM3UWithTimeLimit(
-  response: Response, 
-  maxTimeMs: number,
-  startOffset: number = 0
-): Promise<{ channels: Channel[]; complete: boolean; parsedCount: number }> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('Stream not available');
-  }
-
-  const decoder = new TextDecoder();
+function parseM3UFast(content: string): Channel[] {
   const channels: Channel[] = [];
-  
-  let buffer = '';
+  const lines = content.split('\n');
   let currentChannel: Partial<Channel> | null = null;
   let channelIndex = 0;
-  const startTime = Date.now();
-  let lastYieldTime = startTime;
 
-  try {
-    while (true) {
-      const elapsed = Date.now() - startTime;
-      
-      // Hard time limit
-      if (elapsed > maxTimeMs) {
-        console.log(`[M3U] Time limit (${maxTimeMs}ms): parsed ${channels.length} channels`);
-        reader.releaseLock();
-        return { channels, complete: false, parsedCount: channelIndex };
-      }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
 
-      // Yield to event loop every 100ms to prevent blocking
-      if (Date.now() - lastYieldTime > 100) {
-        await new Promise(resolve => setTimeout(resolve, 0));
-        lastYieldTime = Date.now();
-      }
-
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      
-      // Process lines
-      let newlineIndex;
-      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.substring(0, newlineIndex).trim();
-        buffer = buffer.substring(newlineIndex + 1);
-        
-        if (!line) continue;
-
-        if (line.startsWith('#EXTINF:')) {
-          currentChannel = parseExtinfLine(line, channelIndex);
-          channelIndex++;
-        }
-        else if (currentChannel && !line.startsWith('#')) {
-          currentChannel.stream_url = line;
-          
-          if (currentChannel.name && currentChannel.stream_url) {
-            channels.push(currentChannel as Channel);
-          }
-          
-          currentChannel = null;
-        }
-      }
-    }
-
-    // Process remaining buffer
-    if (buffer.trim() && currentChannel && !buffer.trim().startsWith('#')) {
-      currentChannel.stream_url = buffer.trim();
+    if (line.startsWith('#EXTINF:')) {
+      currentChannel = parseExtinfFast(line, channelIndex);
+      channelIndex++;
+    } else if (currentChannel && !line.startsWith('#')) {
+      currentChannel.stream_url = line;
       if (currentChannel.name && currentChannel.stream_url) {
         channels.push(currentChannel as Channel);
       }
+      currentChannel = null;
     }
-
-  } finally {
-    try {
-      reader.releaseLock();
-    } catch {}
   }
 
-  return { channels, complete: true, parsedCount: channelIndex };
+  return channels;
 }
 
-function parseExtinfLine(line: string, index: number): Partial<Channel> {
+function parseExtinfFast(line: string, index: number): Partial<Channel> {
   const channel: Partial<Channel> = {
     id: `ch-${index}`,
     name: '',
@@ -192,35 +117,169 @@ function parseExtinfLine(line: string, index: number): Partial<Channel> {
     tvg_name: null,
     stream_url: '',
     category_name: 'Outros',
+    group_title: 'Outros',
   };
 
-  // Fast regex matching
-  const nameMatch = line.match(/,\s*(.+)$/);
-  if (nameMatch) {
-    channel.name = nameMatch[1].trim();
+  // Extract name (after last comma)
+  const commaIdx = line.lastIndexOf(',');
+  if (commaIdx !== -1) {
+    channel.name = line.substring(commaIdx + 1).trim();
   }
 
-  const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
-  if (logoMatch?.[1]) {
-    channel.tvg_logo = logoMatch[1];
-  }
+  // Fast attribute extraction
+  const extractAttr = (attr: string): string | null => {
+    const start = line.indexOf(`${attr}="`);
+    if (start === -1) return null;
+    const valueStart = start + attr.length + 2;
+    const valueEnd = line.indexOf('"', valueStart);
+    if (valueEnd === -1) return null;
+    return line.substring(valueStart, valueEnd);
+  };
 
-  const idMatch = line.match(/tvg-id="([^"]*)"/i);
-  if (idMatch?.[1]) {
-    channel.tvg_id = idMatch[1];
-  }
-
-  const tvgNameMatch = line.match(/tvg-name="([^"]*)"/i);
-  if (tvgNameMatch?.[1]) {
-    channel.tvg_name = tvgNameMatch[1];
-  }
-
-  const categoryMatch = line.match(/group-title="([^"]*)"/i);
-  if (categoryMatch?.[1]) {
-    channel.category_name = categoryMatch[1];
+  channel.tvg_logo = extractAttr('tvg-logo');
+  channel.tvg_id = extractAttr('tvg-id');
+  channel.tvg_name = extractAttr('tvg-name');
+  
+  const groupTitle = extractAttr('group-title');
+  if (groupTitle) {
+    channel.category_name = groupTitle;
+    channel.group_title = groupTitle;
   }
 
   return channel;
+}
+
+// =============================================================================
+// STREAMING PARSER WITH TIME LIMIT
+// =============================================================================
+async function parseM3UStreaming(
+  response: Response, 
+  maxTimeMs: number
+): Promise<{ channels: Channel[]; complete: boolean }> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Stream not available');
+
+  const decoder = new TextDecoder();
+  const channels: Channel[] = [];
+  
+  let buffer = '';
+  let currentChannel: Partial<Channel> | null = null;
+  let channelIndex = 0;
+  const startTime = Date.now();
+  let lastYield = startTime;
+
+  try {
+    while (true) {
+      if (Date.now() - startTime > maxTimeMs) {
+        console.log(`[M3U] Time limit: ${channels.length} channels in ${maxTimeMs}ms`);
+        return { channels, complete: false };
+      }
+
+      // Yield every 50ms
+      if (Date.now() - lastYield > 50) {
+        await new Promise(r => setTimeout(r, 0));
+        lastYield = Date.now();
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.substring(0, newlineIdx).trim();
+        buffer = buffer.substring(newlineIdx + 1);
+        
+        if (!line) continue;
+
+        if (line.startsWith('#EXTINF:')) {
+          currentChannel = parseExtinfFast(line, channelIndex);
+          channelIndex++;
+        } else if (currentChannel && !line.startsWith('#')) {
+          currentChannel.stream_url = line;
+          if (currentChannel.name && currentChannel.stream_url) {
+            channels.push(currentChannel as Channel);
+          }
+          currentChannel = null;
+        }
+      }
+    }
+
+    // Process remaining
+    if (buffer.trim() && currentChannel && !buffer.trim().startsWith('#')) {
+      currentChannel.stream_url = buffer.trim();
+      if (currentChannel.name && currentChannel.stream_url) {
+        channels.push(currentChannel as Channel);
+      }
+    }
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+
+  return { channels, complete: true };
+}
+
+// =============================================================================
+// DATABASE CACHE
+// =============================================================================
+async function getFromDbCache(supabase: any, url: string): Promise<{ channels: Channel[]; total: number } | null> {
+  try {
+    const hash = await hashString(url);
+    
+    const { data, error } = await supabase
+      .from('m3u_import_cache')
+      .select('channels_data, channel_count, created_at')
+      .eq('source_hash', hash)
+      .single();
+
+    if (error || !data) return null;
+
+    // Check if expired (24 hours)
+    const createdAt = new Date(data.created_at).getTime();
+    if (Date.now() - createdAt > CONFIG.DB_CACHE_TTL_HOURS * 60 * 60 * 1000) {
+      return null;
+    }
+
+    console.log(`[M3U] DB cache hit: ${data.channel_count} channels`);
+    return {
+      channels: data.channels_data as Channel[],
+      total: data.channel_count,
+    };
+  } catch (err) {
+    console.error('[M3U] DB cache read error:', err);
+    return null;
+  }
+}
+
+async function saveToDbCache(supabase: any, url: string, channels: Channel[]): Promise<void> {
+  try {
+    const hash = await hashString(url);
+    
+    await supabase
+      .from('m3u_import_cache')
+      .upsert({
+        source_hash: hash,
+        source_url: url.substring(0, 500),
+        channels_data: channels,
+        categories_data: [],
+        channel_count: channels.length,
+        last_used_at: new Date().toISOString(),
+        use_count: 1,
+      }, { onConflict: 'source_hash' });
+
+    console.log(`[M3U] Saved ${channels.length} channels to DB cache`);
+  } catch (err) {
+    console.error('[M3U] DB cache write error:', err);
+  }
+}
+
+async function hashString(str: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // =============================================================================
@@ -249,14 +308,13 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   const timeoutId = setTimeout(() => controller.abort(), CONFIG.FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
+    return await fetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'VLC/3.0.21 LibVLC/3.0.21',
         'Accept': '*/*',
       },
     });
-    return response;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -264,8 +322,7 @@ async function fetchWithTimeout(url: string): Promise<Response> {
 
 function isTlsError(message: string): boolean {
   const indicators = ['tls', 'ssl', 'certificate', 'handshake', 'corrupt', 'InvalidContentType'];
-  const lower = message.toLowerCase();
-  return indicators.some(i => lower.includes(i.toLowerCase()));
+  return indicators.some(i => message.toLowerCase().includes(i.toLowerCase()));
 }
 
 // =============================================================================
@@ -289,60 +346,61 @@ Deno.serve(async (req) => {
       );
     }
 
-    const effectiveLimit = Math.min(limit || CONFIG.DEFAULT_LIMIT, 5000);
-    
+    const effectiveLimit = Math.min(limit || CONFIG.DEFAULT_LIMIT, CONFIG.MAX_LIMIT);
     console.log(`[M3U] Request: limit=${effectiveLimit}, offset=${offset}`);
 
-    // Check cache first
-    const cached = getFromCache(url);
-    
-    if (cached) {
-      // If cache has enough data or is complete
-      if (cached.complete || offset + effectiveLimit <= cached.channels.length) {
-        const paginatedChannels = cached.channels.slice(offset, offset + effectiveLimit);
-        const hasMore = cached.complete 
-          ? (offset + effectiveLimit < cached.channels.length)
-          : true;
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-        console.log(`[M3U] Cache response in ${Date.now() - startTime}ms`);
-
-        return new Response(
-          JSON.stringify({
-            channels: paginatedChannels,
-            total: cached.complete ? cached.channels.length : Math.max(cached.channels.length * 2, 100000),
-            offset,
-            limit: effectiveLimit,
-            hasMore,
-            cached: true,
-            partial: !cached.complete,
-          }),
-          { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
+    // 1. Check memory cache
+    const memCached = getFromMemoryCache(url);
+    if (memCached && (memCached.complete || memCached.channels.length >= offset + effectiveLimit)) {
+      const paginated = memCached.channels.slice(offset, offset + effectiveLimit);
+      console.log(`[M3U] Memory cache: ${paginated.length} channels in ${Date.now() - startTime}ms`);
       
-      // Cache exists but not enough data for this offset
-      // Return what we have with retry indication
-      if (offset > 0 && !cached.complete) {
-        console.log(`[M3U] Cache partial, offset ${offset} exceeds ${cached.channels.length}`);
+      return new Response(
+        JSON.stringify({
+          channels: paginated,
+          total: memCached.channels.length,
+          offset,
+          limit: effectiveLimit,
+          hasMore: offset + effectiveLimit < memCached.channels.length,
+          cached: true,
+          partial: !memCached.complete,
+        }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Check DB cache (only for offset=0 to avoid repeated queries)
+    if (offset === 0) {
+      const dbCached = await getFromDbCache(supabase, url);
+      if (dbCached && dbCached.channels.length > 0) {
+        // Also set memory cache
+        setMemoryCache(url, dbCached.channels, true);
+        
+        const paginated = dbCached.channels.slice(0, effectiveLimit);
+        console.log(`[M3U] DB cache: ${paginated.length}/${dbCached.total} channels in ${Date.now() - startTime}ms`);
+        
         return new Response(
           JSON.stringify({
-            channels: [],
-            total: cached.channels.length,
-            offset,
+            channels: paginated,
+            total: dbCached.total,
+            offset: 0,
             limit: effectiveLimit,
-            hasMore: true,
+            hasMore: effectiveLimit < dbCached.total,
             cached: true,
-            partial: true,
-            retryAfter: 3, // Client should retry in 3 seconds
+            partial: false,
           }),
           { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // For offset > 0 without cache, tell client to retry
-    // This prevents CPU-intensive full parses for every paginated request
-    if (offset > 0 && !cached) {
+    // 3. For offset > 0 without cache, tell client to retry
+    if (offset > 0 && !memCached) {
       console.log(`[M3U] No cache for offset ${offset}, requesting retry`);
       return new Response(
         JSON.stringify({
@@ -353,76 +411,70 @@ Deno.serve(async (req) => {
           hasMore: true,
           cached: false,
           partial: true,
-          retryAfter: 2, // Client should make offset=0 request first
+          retryAfter: 2,
         }),
         { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Need to fetch (only for offset=0 or cache complete but needs more)
+    // 4. Fetch and parse
     console.log(`[M3U] Fetching: ${url.substring(0, 60)}...`);
-    
     const response = await fetchM3U(url);
 
     if (!response.ok) {
-      throw new Error(`M3U fetch failed: ${response.status} ${response.statusText}`);
+      throw new Error(`M3U fetch failed: ${response.status}`);
     }
 
-    // Parse with time limit
-    const { channels, complete, parsedCount } = await parseM3UWithTimeLimit(
-      response, 
-      CONFIG.MAX_PARSE_TIME_MS
-    );
+    const { channels, complete } = await parseM3UStreaming(response, CONFIG.MAX_PARSE_TIME_MS);
+    console.log(`[M3U] Parsed ${channels.length} channels (complete: ${complete}) in ${Date.now() - startTime}ms`);
     
-    console.log(`[M3U] Parsed ${channels.length} channels (total lines: ${parsedCount}) in ${Date.now() - startTime}ms (complete: ${complete})`);
+    // Cache in memory
+    setMemoryCache(url, channels, complete);
     
-    // Cache what we have
-    setCache(url, channels, complete);
-    
-    const paginatedChannels = channels.slice(offset, offset + effectiveLimit);
-    
-    // Estimate total if not complete
-    const estimatedTotal = complete 
-      ? channels.length 
-      : Math.max(channels.length * 3, parsedCount * 2, 100000);
+    const paginated = channels.slice(offset, offset + effectiveLimit);
+    const estimatedTotal = complete ? channels.length : Math.max(channels.length * 5, 100000);
 
-    const result: ParseResult = {
-      channels: paginatedChannels,
-      total: estimatedTotal,
-      offset,
-      limit: effectiveLimit,
-      hasMore: channels.length > offset + effectiveLimit || !complete,
-      cached: false,
-      partial: !complete,
-    };
-
-    console.log(`[M3U] Response in ${Date.now() - startTime}ms: ${paginatedChannels.length} channels`);
-
-    // If not complete, try to continue parsing in background
-    if (!complete) {
+    // Background: continue parsing and save to DB
+    if (!complete || channels.length > 10000) {
       EdgeRuntime.waitUntil(
         (async () => {
           try {
-            console.log('[M3U] Background: continuing parse...');
+            console.log('[M3U] Background: full parse...');
             const bgResponse = await fetchM3U(url);
             if (bgResponse.ok) {
-              // Allow more time in background but still limit
-              const { channels: allChannels, complete: bgComplete } = await parseM3UWithTimeLimit(
+              const { channels: allChannels, complete: bgComplete } = await parseM3UStreaming(
                 bgResponse,
-                45000 // 45s in background
+                CONFIG.BG_PARSE_TIME_MS
               );
-              setCache(url, allChannels, bgComplete);
-              console.log(`[M3U] Background: ${allChannels.length} channels (complete: ${bgComplete})`);
+              
+              setMemoryCache(url, allChannels, bgComplete);
+              
+              if (bgComplete || allChannels.length > channels.length) {
+                await saveToDbCache(supabase, url, allChannels);
+              }
+              
+              console.log(`[M3U] Background: ${allChannels.length} channels saved (complete: ${bgComplete})`);
             }
           } catch (err) {
-            console.error('[M3U] Background parse error:', err);
+            console.error('[M3U] Background error:', err);
           }
         })()
       );
+    } else {
+      // Save small playlists to DB immediately
+      EdgeRuntime.waitUntil(saveToDbCache(supabase, url, channels));
     }
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        channels: paginated,
+        total: estimatedTotal,
+        offset,
+        limit: effectiveLimit,
+        hasMore: channels.length > offset + effectiveLimit || !complete,
+        cached: false,
+        partial: !complete,
+      }),
       { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
 
@@ -430,16 +482,11 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : 'Unknown error';
     const isTimeout = message.includes('abort') || message.includes('timeout');
     
-    console.error(`[M3U] Error after ${Date.now() - startTime}ms: ${message}`);
+    console.error(`[M3U] Error: ${message}`);
 
     return new Response(
-      JSON.stringify({ 
-        error: isTimeout ? 'M3U fetch timeout' : message 
-      }),
-      { 
-        status: isTimeout ? 504 : 500, 
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: isTimeout ? 'M3U fetch timeout' : message }),
+      { status: isTimeout ? 504 : 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
   }
 });
