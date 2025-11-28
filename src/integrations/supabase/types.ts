@@ -405,6 +405,44 @@ export type Database = {
         }
         Relationships: []
       }
+      channel_usage_stats: {
+        Row: {
+          channel_id: string
+          created_at: string | null
+          id: string
+          last_watched_at: string | null
+          profile_id: string
+          total_watch_time_seconds: number | null
+          view_count: number | null
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string | null
+          id?: string
+          last_watched_at?: string | null
+          profile_id: string
+          total_watch_time_seconds?: number | null
+          view_count?: number | null
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string | null
+          id?: string
+          last_watched_at?: string | null
+          profile_id?: string
+          total_watch_time_seconds?: number | null
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_usage_stats_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_m3u_custom_assignments: {
         Row: {
           assigned_at: string | null
@@ -624,6 +662,84 @@ export type Database = {
         }
         Relationships: []
       }
+      content_metadata: {
+        Row: {
+          backdrop_url: string | null
+          cast_members: Json | null
+          content_id: string
+          content_type: string
+          country: string | null
+          created_at: string | null
+          description: string | null
+          director: string | null
+          duration_minutes: number | null
+          fetched_at: string | null
+          genres: string[] | null
+          id: string
+          imdb_id: string | null
+          imdb_rating: number | null
+          language: string | null
+          metadata: Json | null
+          original_title: string | null
+          poster_url: string | null
+          title: string
+          tmdb_id: string | null
+          tmdb_rating: number | null
+          trailer_url: string | null
+          year: number | null
+        }
+        Insert: {
+          backdrop_url?: string | null
+          cast_members?: Json | null
+          content_id: string
+          content_type: string
+          country?: string | null
+          created_at?: string | null
+          description?: string | null
+          director?: string | null
+          duration_minutes?: number | null
+          fetched_at?: string | null
+          genres?: string[] | null
+          id?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          language?: string | null
+          metadata?: Json | null
+          original_title?: string | null
+          poster_url?: string | null
+          title: string
+          tmdb_id?: string | null
+          tmdb_rating?: number | null
+          trailer_url?: string | null
+          year?: number | null
+        }
+        Update: {
+          backdrop_url?: string | null
+          cast_members?: Json | null
+          content_id?: string
+          content_type?: string
+          country?: string | null
+          created_at?: string | null
+          description?: string | null
+          director?: string | null
+          duration_minutes?: number | null
+          fetched_at?: string | null
+          genres?: string[] | null
+          id?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          language?: string | null
+          metadata?: Json | null
+          original_title?: string | null
+          poster_url?: string | null
+          title?: string
+          tmdb_id?: string | null
+          tmdb_rating?: number | null
+          trailer_url?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       conversion_metrics: {
         Row: {
           client_id: string | null
@@ -824,6 +940,54 @@ export type Database = {
           target_plan?: string | null
           valid_from?: string
           valid_until?: string
+        }
+        Relationships: []
+      }
+      epg_data: {
+        Row: {
+          category: string | null
+          channel_id: string
+          created_at: string | null
+          end_time: string
+          id: string
+          is_live: boolean | null
+          is_new: boolean | null
+          metadata: Json | null
+          poster_url: string | null
+          program_description: string | null
+          program_title: string
+          rating: string | null
+          start_time: string
+        }
+        Insert: {
+          category?: string | null
+          channel_id: string
+          created_at?: string | null
+          end_time: string
+          id?: string
+          is_live?: boolean | null
+          is_new?: boolean | null
+          metadata?: Json | null
+          poster_url?: string | null
+          program_description?: string | null
+          program_title: string
+          rating?: string | null
+          start_time: string
+        }
+        Update: {
+          category?: string | null
+          channel_id?: string
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          is_live?: boolean | null
+          is_new?: boolean | null
+          metadata?: Json | null
+          poster_url?: string | null
+          program_description?: string | null
+          program_title?: string
+          rating?: string | null
+          start_time?: string
         }
         Relationships: []
       }
@@ -2057,6 +2221,56 @@ export type Database = {
           },
         ]
       }
+      player_analytics: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string | null
+          device_type: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          profile_id: string
+          session_id: string | null
+          watch_day: number | null
+          watch_hour: number | null
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          device_type?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          profile_id: string
+          session_id?: string | null
+          watch_day?: number | null
+          watch_hour?: number | null
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          device_type?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          profile_id?: string
+          session_id?: string | null
+          watch_day?: number | null
+          watch_hour?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_analytics_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_health_checks: {
         Row: {
           client_id: string | null
@@ -2179,6 +2393,47 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
+      }
+      recommendations_cache: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          generated_at: string | null
+          id: string
+          profile_id: string
+          recommendation_type: string
+          recommended_items: Json
+          source_content_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          generated_at?: string | null
+          id?: string
+          profile_id: string
+          recommendation_type: string
+          recommended_items?: Json
+          source_content_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          generated_at?: string | null
+          id?: string
+          profile_id?: string
+          recommendation_type?: string
+          recommended_items?: Json
+          source_content_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendations_cache_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rls_policy_backups: {
         Row: {
@@ -2467,6 +2722,62 @@ export type Database = {
         }
         Relationships: []
       }
+      series_episodes: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          episode_name: string | null
+          episode_number: number
+          id: string
+          metadata: Json | null
+          profile_id: string
+          progress_seconds: number | null
+          season_number: number
+          series_id: string
+          series_name: string
+          watched: boolean | null
+          watched_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          episode_name?: string | null
+          episode_number: number
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+          progress_seconds?: number | null
+          season_number: number
+          series_id: string
+          series_name: string
+          watched?: boolean | null
+          watched_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          episode_name?: string | null
+          episode_number?: number
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+          progress_seconds?: number | null
+          season_number?: number
+          series_id?: string
+          series_name?: string
+          watched?: boolean | null
+          watched_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "series_episodes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       smartone_sync_retry_queue: {
         Row: {
           attempt_count: number | null
@@ -2650,6 +2961,54 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_rankings: {
+        Row: {
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          rank_position: number
+          ranking_date: string
+          ranking_type: string
+          score: number | null
+          view_count: number | null
+        }
+        Insert: {
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          rank_position: number
+          ranking_date?: string
+          ranking_type: string
+          score?: number | null
+          view_count?: number | null
+        }
+        Update: {
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          rank_position?: number
+          ranking_date?: string
+          ranking_type?: string
+          score?: number | null
+          view_count?: number | null
+        }
+        Relationships: []
+      }
       trial_behavior_tracking: {
         Row: {
           client_id: string | null
@@ -2689,6 +3048,89 @@ export type Database = {
           },
         ]
       }
+      user_favorites: {
+        Row: {
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          profile_id: string
+        }
+        Insert: {
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+        }
+        Update: {
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_favorites_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          pin_code: string | null
+          preferences: Json | null
+          profile_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          pin_code?: string | null
+          preferences?: Json | null
+          profile_type?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          pin_code?: string | null
+          preferences?: Json | null
+          profile_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2709,6 +3151,165 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_watchlist: {
+        Row: {
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          id: string
+          imdb_rating: number | null
+          metadata: Json | null
+          profile_id: string
+          tmdb_id: string | null
+        }
+        Insert: {
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          imdb_rating?: number | null
+          metadata?: Json | null
+          profile_id: string
+          tmdb_id?: string | null
+        }
+        Update: {
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          imdb_rating?: number | null
+          metadata?: Json | null
+          profile_id?: string
+          tmdb_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_watchlist_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watch_history: {
+        Row: {
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          metadata: Json | null
+          profile_id: string
+          watched_at: string | null
+        }
+        Insert: {
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+          watched_at?: string | null
+        }
+        Update: {
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+          watched_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watch_history_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watch_progress: {
+        Row: {
+          completed: boolean | null
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          duration_seconds: number
+          id: string
+          metadata: Json | null
+          profile_id: string
+          progress_percent: number | null
+          progress_seconds: number
+          updated_at: string | null
+        }
+        Insert: {
+          completed?: boolean | null
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          duration_seconds?: number
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+          progress_percent?: number | null
+          progress_seconds?: number
+          updated_at?: string | null
+        }
+        Update: {
+          completed?: boolean | null
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          duration_seconds?: number
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+          progress_percent?: number | null
+          progress_seconds?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watch_progress_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_config: {
         Row: {
@@ -2941,6 +3542,21 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_continue_watching: {
+        Args: { p_limit?: number; p_profile_id: string }
+        Returns: {
+          content_category: string
+          content_id: string
+          content_logo: string
+          content_name: string
+          content_type: string
+          duration_seconds: number
+          metadata: Json
+          progress_percent: number
+          progress_seconds: number
+          updated_at: string
+        }[]
+      }
       get_conversion_rate: {
         Args: { days_period?: number }
         Returns: {
@@ -3021,7 +3637,50 @@ export type Database = {
         Returns: string
       }
       make_user_admin: { Args: { user_email: string }; Returns: undefined }
+      record_channel_view: {
+        Args: {
+          p_channel_id: string
+          p_profile_id: string
+          p_watch_seconds?: number
+        }
+        Returns: undefined
+      }
       save_monthly_leaderboard: { Args: never; Returns: undefined }
+      update_watch_progress: {
+        Args: {
+          p_content_category: string
+          p_content_id: string
+          p_content_logo: string
+          p_content_name: string
+          p_content_type: string
+          p_duration_seconds: number
+          p_metadata?: Json
+          p_profile_id: string
+          p_progress_seconds: number
+        }
+        Returns: {
+          completed: boolean | null
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          duration_seconds: number
+          id: string
+          metadata: Json | null
+          profile_id: string
+          progress_percent: number | null
+          progress_seconds: number
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "watch_progress"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "client" | "admin" | "super_admin"
