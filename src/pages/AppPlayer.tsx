@@ -76,10 +76,11 @@ export default function AppPlayer() {
 
   const allFilteredChannels = filteredCategories.flatMap(cat => cat.channels);
 
-  // Use direct stream URL
+  // Use proxy to bypass Mixed Content (HTTP streams on HTTPS page)
   const getStreamUrl = useCallback((channel: typeof currentChannel) => {
     if (!channel) return '';
-    return channel.stream_url;
+    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
+    return `${proxyUrl}?url=${encodeURIComponent(channel.stream_url)}`;
   }, []);
 
   if (playerLoading || favoritesLoading) {

@@ -249,10 +249,11 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPlayerDialog]);
 
-  // Use direct stream URL
+  // Use proxy to bypass Mixed Content (HTTP streams on HTTPS page)
   const getStreamUrl = useCallback((channel: any) => {
     if (!channel) return '';
-    return channel.stream_url;
+    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
+    return `${proxyUrl}?url=${encodeURIComponent(channel.stream_url)}`;
   }, []);
 
   // Handle play
