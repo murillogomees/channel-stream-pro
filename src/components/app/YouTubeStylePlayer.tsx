@@ -32,6 +32,11 @@ interface YouTubeStylePlayerProps {
   onReady?: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  // Progress tracking
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
+  onPlaybackStart?: () => void;
+  onPlaybackComplete?: () => void;
+  initialTime?: number;
 }
 
 // Stream type detection
@@ -63,6 +68,10 @@ export default function YouTubeStylePlayer({
   onReady,
   isFavorite = false,
   onToggleFavorite,
+  onTimeUpdate,
+  onPlaybackStart,
+  onPlaybackComplete,
+  initialTime = 0,
 }: YouTubeStylePlayerProps) {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -186,6 +195,9 @@ export default function YouTubeStylePlayer({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Track if playback has started
+  const hasStartedPlayingRef = useRef(false);
+
   // Video event handlers
   useEffect(() => {
     const video = videoRef.current;
@@ -204,11 +216,20 @@ export default function YouTubeStylePlayer({
         setIsPlaying(true);
         setHasError(false);
         setConnectionStatus('connected');
+        // Track playback start
+        if (!hasStartedPlayingRef.current) {
+          hasStartedPlayingRef.current = true;
+          onPlaybackStart?.();
+        }
       },
       timeupdate: () => {
         setCurrentTime(video.currentTime);
         if (video.buffered.length > 0) {
           setBuffered(video.buffered.end(video.buffered.length - 1));
+        }
+        // Call progress callback
+        if (video.currentTime > 0 && video.duration > 0) {
+          onTimeUpdate?.(video.currentTime, video.duration);
         }
       },
       durationchange: () => setDuration(video.duration),
@@ -218,6 +239,14 @@ export default function YouTubeStylePlayer({
           ...prev,
           resolution: `${video.videoWidth}x${video.videoHeight}`,
         }));
+        // Seek to initial time if provided
+        if (initialTime > 0 && video.duration > initialTime) {
+          video.currentTime = initialTime;
+        }
+      },
+      ended: () => {
+        // Track playback complete
+        onPlaybackComplete?.();
       },
       error: () => {
         setIsLoading(false);

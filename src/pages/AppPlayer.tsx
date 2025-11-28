@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Tv, ArrowLeft, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,8 +28,12 @@ import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useF
 // Smart features imports
 import { useContinueWatching, useTrending } from '@/features/player/hooks';
 import { ContinueWatchingRow, Top10Row } from '@/features/player/components';
-import { favoritesService as playerFavoritesService } from '@/features/player/services';
-import type { WatchProgress, TrendingItem } from '@/features/player/types';
+import { 
+  favoritesService as playerFavoritesService, 
+  watchProgressService,
+  analyticsService 
+} from '@/features/player/services';
+import type { WatchProgress, TrendingItem, ContentType } from '@/features/player/types';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -79,7 +83,8 @@ export default function AppPlayer() {
   const { 
     items: continueWatchingItems, 
     isLoading: loadingContinueWatching, 
-    removeItem: removeContinueWatchingItem 
+    removeItem: removeContinueWatchingItem,
+    refresh: refreshContinueWatching,
   } = useContinueWatching();
   const { items: trendingItems, isLoading: loadingTrending } = useTrending('weekly');
 
@@ -603,16 +608,13 @@ export default function AppPlayer() {
         </div>
       </main>
 
-      {/* YouTube Style Player */}
+      {/* YouTube Style Player with Progress Tracking */}
       {showPlayerDialog && playerChannel && (
-        <YouTubeStylePlayer
-          url={getStreamUrl(playerChannel)}
-          title={playerChannel.name}
-          logo={playerChannel.tvg_logo || undefined}
-          category={playerChannel.category_name || 'Geral'}
-          autoplay
-          isFavorite={isFavorite(playerChannel.id)}
-          onToggleFavorite={() => toggleFavorite(playerChannel.id)}
+        <PlayerWithProgressTracking
+          channel={playerChannel}
+          getStreamUrl={getStreamUrl}
+          isFavorite={isFavorite}
+          toggleFavorite={toggleFavorite}
           onBack={() => {
             setShowPlayerDialog(false);
             setPlayerChannel(null);
@@ -620,8 +622,156 @@ export default function AppPlayer() {
           onError={(error) => {
             console.error('[IPTV] Player error:', error);
           }}
+          refreshContinueWatching={refreshContinueWatching}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Player wrapper with progress tracking
+ */
+function PlayerWithProgressTracking({
+  channel,
+  getStreamUrl,
+  isFavorite,
+  toggleFavorite,
+  onBack,
+  onError,
+  refreshContinueWatching,
+}: {
+  channel: any;
+  getStreamUrl: (channel: any) => string;
+  isFavorite: (id: string) => boolean;
+  toggleFavorite: (id: string) => void;
+  onBack: () => void;
+  onError: (error: any) => void;
+  refreshContinueWatching: () => void;
+}) {
+  const lastSaveTimeRef = useRef<number>(0);
+  const currentProgressRef = useRef<number>(0);
+  const totalDurationRef = useRef<number>(0);
+  const hasStartedRef = useRef<boolean>(false);
+  
+  // Determine content type from channel data
+  const getContentType = (): ContentType => {
+    const catName = (channel.category_name || '').toLowerCase();
+    if (catName.includes('filme') || catName.includes('movie')) return 'movie';
+    if (catName.includes('série') || catName.includes('series')) return 'series';
+    return 'live';
+  };
+  
+  const contentType = getContentType();
+  
+  // Handle time updates - save progress every 30 seconds
+  const handleTimeUpdate = useCallback(async (currentTime: number, duration: number) => {
+    currentProgressRef.current = currentTime;
+    totalDurationRef.current = duration;
+    
+    const now = Date.now();
+    // Only save every 30 seconds
+    if (now - lastSaveTimeRef.current < 30000) return;
+    
+    lastSaveTimeRef.current = now;
+    
+    // Only save progress for VOD content (not live)
+    if (contentType === 'live') return;
+    
+    try {
+      await watchProgressService.updateProgress(
+        channel.id,
+        contentType,
+        channel.name,
+        currentTime,
+        duration,
+        {
+          contentLogo: channel.tvg_logo,
+          contentCategory: channel.category_name,
+        }
+      );
+      console.log(`[Progress] Saved: ${Math.round(currentTime)}s / ${Math.round(duration)}s`);
+    } catch (error) {
+      console.error('[Progress] Error saving:', error);
+    }
+  }, [channel, contentType]);
+  
+  // Handle playback start
+  const handlePlaybackStart = useCallback(async () => {
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+    
+    try {
+      await analyticsService.trackPlay(channel.id, contentType, {
+        category: channel.category_name,
+      });
+      console.log(`[Analytics] Playback started: ${channel.name}`);
+    } catch (error) {
+      console.error('[Analytics] Error tracking play:', error);
+    }
+  }, [channel, contentType]);
+  
+  // Handle playback complete
+  const handlePlaybackComplete = useCallback(async () => {
+    if (contentType === 'live') return;
+    
+    try {
+      await watchProgressService.markCompleted(channel.id);
+      await watchProgressService.addToHistory(
+        channel.id,
+        contentType,
+        channel.name,
+        totalDurationRef.current,
+        {
+          contentLogo: channel.tvg_logo,
+          contentCategory: channel.category_name,
+        }
+      );
+      console.log(`[Progress] Completed: ${channel.name}`);
+    } catch (error) {
+      console.error('[Progress] Error marking complete:', error);
+    }
+  }, [channel, contentType]);
+  
+  // Save progress when closing player
+  const handleBack = useCallback(async () => {
+    if (contentType !== 'live' && currentProgressRef.current > 0) {
+      try {
+        await watchProgressService.updateProgress(
+          channel.id,
+          contentType,
+          channel.name,
+          currentProgressRef.current,
+          totalDurationRef.current,
+          {
+            contentLogo: channel.tvg_logo,
+            contentCategory: channel.category_name,
+          }
+        );
+        console.log(`[Progress] Final save: ${Math.round(currentProgressRef.current)}s`);
+        // Refresh continue watching list
+        refreshContinueWatching();
+      } catch (error) {
+        console.error('[Progress] Error final save:', error);
+      }
+    }
+    onBack();
+  }, [channel, contentType, onBack, refreshContinueWatching]);
+  
+  return (
+    <YouTubeStylePlayer
+      url={getStreamUrl(channel)}
+      title={channel.name}
+      logo={channel.tvg_logo || undefined}
+      category={channel.category_name || 'Geral'}
+      autoplay
+      isFavorite={isFavorite(channel.id)}
+      onToggleFavorite={() => toggleFavorite(channel.id)}
+      onBack={handleBack}
+      onError={onError}
+      onTimeUpdate={handleTimeUpdate}
+      onPlaybackStart={handlePlaybackStart}
+      onPlaybackComplete={handlePlaybackComplete}
+    />
   );
 }
