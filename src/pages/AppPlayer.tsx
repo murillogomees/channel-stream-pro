@@ -27,7 +27,7 @@ import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
 import { useContinueWatching, useTrending } from '@/features/player/hooks';
-import { ContinueWatchingRow, Top10Row, LiveTVView } from '@/features/player/components';
+import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView } from '@/features/player/components';
 import { 
   favoritesService as playerFavoritesService, 
   watchProgressService,
@@ -559,8 +559,19 @@ export default function AppPlayer() {
             </div>
           )}
 
-          {/* Category Views (Movies, Series) */}
-          {(activeTab === 'movies' || activeTab === 'series') && (
+          {/* Movies View - Enhanced with TMDB integration */}
+          {activeTab === 'movies' && (
+            <MoviesView
+              categories={categorizedContent.movies}
+              onPlay={handlePlay}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              searchQuery={searchQuery}
+            />
+          )}
+
+          {/* Series View - Keep existing grid */}
+          {activeTab === 'series' && (
             <div className="flex min-h-[calc(100vh-4rem)]">
               {/* Category Sidebar */}
               <aside className="hidden lg:block w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border py-4 lg:py-6 px-4">

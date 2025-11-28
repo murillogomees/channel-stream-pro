@@ -12,3 +12,8 @@ export { LiveTVView } from './LiveTVView';
 export { EPGStrip } from './EPGStrip';
 export { ChannelOSD } from './ChannelOSD';
 export { MiniChannelList } from './MiniChannelList';
+
+// Movie components
+export { MoviesView } from './MoviesView';
+export { MovieCard, MovieCardSkeleton } from './MovieCard';
+export { MovieDetailSheet } from './MovieDetailSheet';
