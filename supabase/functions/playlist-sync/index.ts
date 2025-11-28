@@ -306,6 +306,8 @@ function sleep(ms: number): Promise<void> {
 async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string): Promise<void> {
   const { url, key } = request;
   const startTime = Date.now();
+  const PARALLEL_BATCHES = 5;
+  const OPTIMIZED_BATCH_SIZE = 2000;
   
   console.log(`[Sync] Starting sync for ${key} from ${url.substring(0, 50)}...`);
   
@@ -319,9 +321,10 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
     // Fetch content
     console.log('[Sync] Fetching content...');
     const { content, etag } = await fetchM3UContent(url);
+    console.log(`[Sync] Fetched ${(content.length / 1024 / 1024).toFixed(2)}MB`);
     
     // Compute content hash
-    const contentHash = await sha256(content.substring(0, 10000)); // Hash first 10KB for speed
+    const contentHash = await sha256(content.substring(0, 10000));
     
     // Check if content changed (if not force sync)
     if (!request.force) {
@@ -351,28 +354,42 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
     // Parse content
     console.log('[Sync] Parsing content...');
     const parseResult = parseM3U(content);
-    console.log(`[Sync] Parsed ${parseResult.entries.length} entries, ${parseResult.invalidCount} invalid`);
+    console.log(`[Sync] Parsed ${parseResult.entries.length} entries in ${Date.now() - startTime}ms`);
     
-    // Delete old entries
+    // Delete old entries first
     console.log('[Sync] Clearing old entries...');
     await supabase.from('playlist_entries').delete().eq('playlist_key', key);
     
-    // Insert new entries in batches
-    console.log('[Sync] Inserting new entries...');
+    // Insert new entries in parallel batches
+    console.log('[Sync] Inserting entries in parallel...');
     const validEntries = parseResult.entries.filter(e => e.is_valid);
+    const totalBatches = Math.ceil(validEntries.length / OPTIMIZED_BATCH_SIZE);
     
-    for (let i = 0; i < validEntries.length; i += CONFIG.BATCH_SIZE) {
-      const batch = validEntries.slice(i, i + CONFIG.BATCH_SIZE).map(entry => ({
-        playlist_key: key,
-        ...entry,
-      }));
+    // Process in parallel groups
+    for (let groupStart = 0; groupStart < totalBatches; groupStart += PARALLEL_BATCHES) {
+      const batchPromises: Promise<any>[] = [];
       
-      const { error } = await supabase.from('playlist_entries').insert(batch);
-      if (error) {
-        console.error(`[Sync] Batch insert error: ${error.message}`);
+      for (let i = 0; i < PARALLEL_BATCHES && (groupStart + i) < totalBatches; i++) {
+        const batchIndex = groupStart + i;
+        const start = batchIndex * OPTIMIZED_BATCH_SIZE;
+        const batch = validEntries.slice(start, start + OPTIMIZED_BATCH_SIZE).map(entry => ({
+          playlist_key: key,
+          ...entry,
+        }));
+        
+        batchPromises.push(
+          supabase.from('playlist_entries').insert(batch)
+            .then((result: any) => {
+              if (result.error) {
+                console.error(`[Sync] Batch ${batchIndex + 1} error: ${result.error.message}`);
+              }
+              return result;
+            })
+        );
       }
       
-      console.log(`[Sync] Inserted batch ${Math.floor(i / CONFIG.BATCH_SIZE) + 1}/${Math.ceil(validEntries.length / CONFIG.BATCH_SIZE)}`);
+      await Promise.all(batchPromises);
+      console.log(`[Sync] Completed batches ${groupStart + 1}-${Math.min(groupStart + PARALLEL_BATCHES, totalBatches)} of ${totalBatches}`);
     }
     
     // Update playlist source metadata
@@ -383,7 +400,7 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
       categories_count: parseResult.categories.size,
       etag: etag || null,
       content_hash: contentHash,
-      version: supabase.sql`version + 1`,
+      version: 1,
       last_sync_at: new Date().toISOString(),
       last_sync_status: 'success',
       last_sync_duration_ms: duration,
@@ -398,10 +415,10 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
       entries_parsed: parseResult.entries.length,
       entries_invalid: parseResult.invalidCount,
       entries_deduplicated: parseResult.duplicatesRemoved,
-      parse_warnings: parseResult.parseWarnings,
+      parse_warnings: parseResult.parseWarnings.slice(0, 10), // Limit warnings
     }).eq('id', jobId);
     
-    console.log(`[Sync] Completed in ${duration}ms`);
+    console.log(`[Sync] Completed ${validEntries.length} entries in ${duration}ms`);
     
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
