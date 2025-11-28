@@ -333,8 +333,8 @@ export function useIPTVPlayerClient() {
         return;
       }
 
-      // Get assigned custom list
-      const { data: assignment, error: assignmentError } = await supabase
+      // First, try to get assigned custom list (m3u_custom_lists)
+      const { data: customAssignment } = await supabase
         .from('client_m3u_custom_assignments')
         .select(`
           custom_list_id,
@@ -346,39 +346,70 @@ export function useIPTVPlayerClient() {
           )
         `)
         .eq('cliente_id', cliente.id)
-        .single();
+        .maybeSingle();
 
-      if (assignmentError || !assignment) {
-        console.log('[IPTV Client] No playlist assigned');
-        setIsLoading(false);
-        setHasPlaylist(false);
-        return;
+      if (customAssignment?.m3u_custom_lists) {
+        const customList = customAssignment.m3u_custom_lists as any;
+        
+        if (customList.status === 'active') {
+          setAssignedPlaylist({
+            id: customList.id,
+            name: customList.name,
+            cdn_url: customList.cdn_url
+          });
+          setHasPlaylist(true);
+
+          // Load playlist - prefer CDN URL, fallback to database
+          if (customList.cdn_url) {
+            console.log('[IPTV Client] Loading from CDN:', customList.cdn_url);
+            await loadPlaylistFromCDN(customList.cdn_url);
+          } else {
+            console.log('[IPTV Client] Loading from database');
+            await loadPlaylistFromDatabase(customList.id);
+          }
+          return;
+        }
       }
 
-      const customList = assignment.m3u_custom_lists as any;
-      
-      if (!customList || customList.status !== 'active') {
-        console.log('[IPTV Client] Playlist not active');
-        setIsLoading(false);
-        setHasPlaylist(false);
-        return;
+      // Fallback: try to get traditional M3U list assignment (m3u_lists)
+      const { data: traditionalAssignment } = await supabase
+        .from('client_m3u_lists')
+        .select(`
+          m3u_list_id,
+          is_active,
+          m3u_lists (
+            id,
+            name,
+            file_url,
+            status
+          )
+        `)
+        .eq('client_id', cliente.id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (traditionalAssignment?.m3u_lists) {
+        const m3uList = traditionalAssignment.m3u_lists as any;
+        
+        if (m3uList.status === 'active' && m3uList.file_url) {
+          setAssignedPlaylist({
+            id: m3uList.id,
+            name: m3uList.name,
+            cdn_url: m3uList.file_url
+          });
+          setHasPlaylist(true);
+
+          console.log('[IPTV Client] Loading from traditional M3U list:', m3uList.name);
+          await loadPlaylistFromCDN(m3uList.file_url);
+          return;
+        }
       }
 
-      setAssignedPlaylist({
-        id: customList.id,
-        name: customList.name,
-        cdn_url: customList.cdn_url
-      });
-      setHasPlaylist(true);
-
-      // Load playlist - prefer CDN URL, fallback to database
-      if (customList.cdn_url) {
-        console.log('[IPTV Client] Loading from CDN:', customList.cdn_url);
-        await loadPlaylistFromCDN(customList.cdn_url);
-      } else {
-        console.log('[IPTV Client] Loading from database');
-        await loadPlaylistFromDatabase(customList.id);
-      }
+      // No valid playlist found
+      console.log('[IPTV Client] No playlist assigned');
+      setIsLoading(false);
+      setHasPlaylist(false);
 
     } catch (error: any) {
       console.error('[IPTV Client] Error loading playlist:', error);
