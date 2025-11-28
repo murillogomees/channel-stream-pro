@@ -124,6 +124,21 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     cleanup();
 
+    // Get auth token FIRST before anything else
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+    
+    if (!token) {
+      console.error('[VideoPlayer] No auth token available');
+      setHasError(true);
+      setErrorMessage('Sessão expirada. Faça login novamente.');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Store token in ref for HLS.js xhrSetup closure
+    const authToken = token;
+
     // Set a timeout for loading - if it takes too long, show error
     loadTimeoutRef.current = window.setTimeout(() => {
       if (isLoading && !hasError) {
@@ -132,36 +147,30 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         setErrorMessage('Tempo limite excedido. Stream pode estar indisponível.');
         setIsLoading(false);
       }
-    }, 30000); // 30 second timeout (increased for proxy + stream loading)
+    }, 30000); // 30 second timeout
 
     const streamType = getStreamType(url);
     console.log('[VideoPlayer] Stream type:', streamType, 'HLS.js supported:', Hls.isSupported());
-
-    // Get auth token for proxy authentication
-    let token = '';
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token || '';
 
     if (streamType === 'hls') {
       if (Hls.isSupported()) {
         // Use HLS.js with optimized settings for IPTV streams via proxy
         const hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: false, // Disable for better compatibility with various streams
+          lowLatencyMode: false,
           backBufferLength: 30,
-          maxBufferLength: 30, // Enough buffer for smooth playback
+          maxBufferLength: 30,
           maxMaxBufferLength: 60,
-          maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer
+          maxBufferSize: 60 * 1000 * 1000,
           maxBufferHole: 0.5,
-          startLevel: -1, // Auto quality selection
-          abrEwmaDefaultEstimate: 1000000, // 1Mbps initial estimate
+          startLevel: -1,
+          abrEwmaDefaultEstimate: 1000000,
           abrBandWidthFactor: 0.95,
           abrBandWidthUpFactor: 0.7,
           capLevelToPlayerSize: true,
           debug: false,
-          // Increased timeouts for proxy + external stream
-          fragLoadingTimeOut: 20000, // 20 second fragment timeout
-          manifestLoadingTimeOut: 15000, // 15 second manifest timeout
+          fragLoadingTimeOut: 20000,
+          manifestLoadingTimeOut: 15000,
           levelLoadingTimeOut: 15000,
           fragLoadingMaxRetry: 4,
           manifestLoadingMaxRetry: 3,
@@ -169,11 +178,9 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
           fragLoadingRetryDelay: 1000,
           manifestLoadingRetryDelay: 1000,
           levelLoadingRetryDelay: 1000,
-          xhrSetup: (xhr, xhrUrl) => {
-            // Always add auth header when going through proxy
-            if (token) {
-              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-            }
+          xhrSetup: (xhr: XMLHttpRequest, xhrUrl: string) => {
+            // Add auth header for proxy requests
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
           },
         });
 
