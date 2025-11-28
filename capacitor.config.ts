@@ -1,12 +1,12 @@
-import { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.a6d041f19e9649e8bc86f2d4dd4bc0b2',
-  appName: 'channel-stream-pro',
-  webDir: 'dist',
+  appId: "app.lovable.a6d041f19e9649e8bc86f2d4dd4bc0b2",
+  appName: "IPTV LINK PLAYER",
+  webDir: "dist",
   server: {
-    url: 'https://a6d041f1-9e96-49e8-bc86-f2d4dd4bc0b2.lovableproject.com?forceHideBadge=true',
-    cleartext: true
+    url: "https://a6d041f1-9e96-49e8-bc86-f2d4dd4bc0b2.lovableproject.com?forceHideBadge=true",
+    cleartext: true,
   },
   plugins: {
     SplashScreen: {
