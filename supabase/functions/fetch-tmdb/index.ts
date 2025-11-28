@@ -13,12 +13,16 @@ const corsHeaders = {
 };
 
 interface TMDBRequest {
-  action: 'search' | 'details' | 'trending' | 'popular' | 'genres';
+  action: 'search' | 'details' | 'trending' | 'popular' | 'genres' | 'season';
   type?: 'movie' | 'tv';
   query?: string;
   id?: string;
   page?: number;
   timeWindow?: 'day' | 'week';
+  seasonNumber?: number;
+  // Legacy support
+  tmdbId?: string;
+  contentId?: string;
 }
 
 serve(async (req) => {
@@ -37,7 +41,19 @@ serve(async (req) => {
     }
 
     const body: TMDBRequest = await req.json();
-    const { action, type = 'movie', query, id, page = 1, timeWindow = 'week' } = body;
+    let { action, type = 'movie', query, id, page = 1, timeWindow = 'week', seasonNumber, tmdbId, contentId } = body;
+
+    // Legacy support: if tmdbId provided without action, assume season fetch
+    if (tmdbId && !action && seasonNumber !== undefined) {
+      action = 'season';
+      id = tmdbId;
+      type = 'tv';
+    }
+    
+    // Legacy support: if query provided without action, assume search
+    if (query && !action) {
+      action = 'search';
+    }
 
     let endpoint = '';
     const params = new URLSearchParams({
@@ -66,7 +82,17 @@ serve(async (req) => {
           );
         }
         endpoint = `/${type}/${id}`;
-        params.set('append_to_response', 'credits,videos,similar,recommendations');
+        params.set('append_to_response', 'credits,videos,similar,recommendations,external_ids');
+        break;
+
+      case 'season':
+        if (!id || seasonNumber === undefined) {
+          return new Response(
+            JSON.stringify({ error: 'ID and seasonNumber required for season details' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        endpoint = `/tv/${id}/season/${seasonNumber}`;
         break;
 
       case 'trending':
@@ -120,6 +146,21 @@ serve(async (req) => {
       data.backdrop_url = `${TMDB_IMAGE_BASE}/original${data.backdrop_path}`;
     }
 
+    // Process season episodes
+    if (action === 'season' && data.episodes) {
+      data.episodes = data.episodes.map((ep: any) => ({
+        id: ep.id,
+        episode_number: ep.episode_number,
+        season_number: ep.season_number,
+        name: ep.name,
+        overview: ep.overview,
+        still_path: ep.still_path,
+        air_date: ep.air_date,
+        runtime: ep.runtime,
+        vote_average: ep.vote_average,
+      }));
+    }
+
     // Process credits
     if (data.credits) {
       data.cast = data.credits.cast?.slice(0, 10).map((c: any) => ({
@@ -134,6 +175,11 @@ serve(async (req) => {
       }
     }
 
+    // Process TV show creators
+    if (data.created_by && data.created_by.length > 0) {
+      data.creator = data.created_by[0].name;
+    }
+
     // Process videos for trailer
     if (data.videos?.results) {
       const trailer = data.videos.results.find(
@@ -143,6 +189,11 @@ serve(async (req) => {
         data.trailer_url = `https://www.youtube.com/watch?v=${trailer.key}`;
         data.trailer_key = trailer.key;
       }
+    }
+
+    // Add metadata wrapper for compatibility with hooks
+    if (action === 'search' && data.results?.length > 0) {
+      data.metadata = data.results[0];
     }
 
     return new Response(
