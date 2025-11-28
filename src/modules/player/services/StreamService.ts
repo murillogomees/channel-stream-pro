@@ -104,6 +104,33 @@ class StreamService {
   }
 
   /**
+   * Converte URL de stream para HLS se necessário
+   * Xtream Codes servers podem servir HLS adicionando .m3u8
+   */
+  private convertToHlsUrl(url: string): string {
+    // URL já é HLS
+    if (url.includes('.m3u8')) return url;
+    
+    // Xtream Codes pattern: http://server:port/username/password/streamid
+    // ou http://server:port/live/username/password/streamid
+    // Adicionar .m3u8 converte para HLS
+    const xtreamPattern = /^https?:\/\/[^\/]+(?::\d+)?\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
+    if (xtreamPattern.test(url)) {
+      console.log('[StreamService] Converting to HLS:', url);
+      return `${url}.m3u8`;
+    }
+    
+    // Também detectar URLs que terminam em stream_id numérico sem extensão
+    const numericEndPattern = /\/\d+$/;
+    if (numericEndPattern.test(url) && !url.includes('.')) {
+      console.log('[StreamService] Adding .m3u8 to numeric URL:', url);
+      return `${url}.m3u8`;
+    }
+    
+    return url;
+  }
+
+  /**
    * Retorna URL pronta para o player (com proxy se necessário)
    * Aceita Channel ou string diretamente
    */
@@ -114,11 +141,14 @@ class StreamService {
       
     if (!streamUrl) return '';
     
-    if (this.needsProxy(streamUrl)) {
-      return this.getProxyUrl(streamUrl);
+    // Converter para HLS se possível
+    const hlsUrl = this.convertToHlsUrl(streamUrl);
+    
+    if (this.needsProxy(hlsUrl)) {
+      return this.getProxyUrl(hlsUrl);
     }
     
-    return streamUrl;
+    return hlsUrl;
   }
 
   // ===========================================================================

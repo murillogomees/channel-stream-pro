@@ -90,9 +90,24 @@ function isHlsContent(url: string, contentType: string | null): boolean {
 
 function isSegment(url: string): boolean {
   const urlLower = url.toLowerCase();
-  return urlLower.includes('.ts') || urlLower.includes('.aac') || 
-         urlLower.includes('.mp4') || urlLower.includes('.fmp4') ||
-         urlLower.includes('.m4s');
+  // Check extensions
+  if (urlLower.includes('.ts') || urlLower.includes('.aac') || 
+      urlLower.includes('.mp4') || urlLower.includes('.fmp4') ||
+      urlLower.includes('.m4s')) {
+    return true;
+  }
+  // Xtream Codes movie/series paths (usually MP4/MKV content)
+  if (urlLower.includes('/movie/') || urlLower.includes('/series/')) {
+    return true;
+  }
+  return false;
+}
+
+function isDirectStream(url: string): boolean {
+  // Xtream Codes live stream pattern without extension: /username/password/streamid
+  // or /live/username/password/streamid
+  const xtreamLivePattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
+  return xtreamLivePattern.test(url) && !url.includes('.m3u8') && !url.includes('.m3u');
 }
 
 function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
@@ -217,10 +232,12 @@ Deno.serve(async (req) => {
     const decodedUrl = decodeURIComponent(streamUrl);
     const origin = getOrigin(decodedUrl);
     const isVideoSegment = isSegment(decodedUrl);
+    const isLiveStream = isDirectStream(decodedUrl);
     
     // Log request type
     const urlPreview = decodedUrl.length > 60 ? decodedUrl.substring(0, 60) + '...' : decodedUrl;
-    console.log(`[Proxy] ${req.method} ${isVideoSegment ? 'SEG' : 'M3U'}: ${urlPreview}`);
+    const reqType = isVideoSegment ? 'SEG' : isLiveStream ? 'LIVE' : 'M3U';
+    console.log(`[Proxy] ${req.method} ${reqType}: ${urlPreview}`);
 
     // Build headers
     const rangeHeader = req.headers.get('Range');
@@ -253,7 +270,7 @@ Deno.serve(async (req) => {
     if (!contentType || contentType === 'application/octet-stream') {
       contentType = isHls 
         ? 'application/vnd.apple.mpegurl' 
-        : isVideoSegment 
+        : (isVideoSegment || isLiveStream)
           ? 'video/mp2t' 
           : 'application/octet-stream';
     }

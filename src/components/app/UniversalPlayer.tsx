@@ -234,7 +234,7 @@ export default function UniversalPlayer({
   }, []);
 
   // ===========================================================================
-  // HLS INITIALIZATION
+  // PLAYBACK INITIALIZATION
   // ===========================================================================
   useEffect(() => {
     const video = videoRef.current;
@@ -243,11 +243,17 @@ export default function UniversalPlayer({
       return;
     }
 
+    // Detect content type from URL
+    const urlLower = url.toLowerCase();
+    const isMP4 = urlLower.includes('.mp4') || urlLower.includes('/movie/');
+    const isMKV = urlLower.includes('.mkv');
+    const isNativePlayable = isMP4 || isMKV || urlLower.includes('.webm');
+
     console.log('[Player] ==========================================');
     console.log('[Player] Initializing playback');
-    console.log('[Player] URL:', url);
+    console.log('[Player] URL:', url.substring(0, 80) + '...');
+    console.log('[Player] Native content:', isNativePlayable);
     console.log('[Player] HLS.js supported:', Hls.isSupported());
-    console.log('[Player] Native HLS:', video.canPlayType('application/vnd.apple.mpegurl'));
     
     // Reset state
     setIsLoading(true);
@@ -259,6 +265,48 @@ export default function UniversalPlayer({
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
+    }
+
+    // ==== NATIVE VIDEO (MP4, WebM, MKV) ====
+    if (isNativePlayable) {
+      console.log('[Player] Using native video playback');
+      
+      video.src = url;
+      video.load();
+      
+      const onLoadedMetadata = () => {
+        console.log('[Player] Native video ready');
+        setIsLoading(false);
+        onReady?.();
+        
+        if (autoplay) {
+          video.play().catch(err => {
+            console.warn('[Player] Autoplay blocked:', err.message);
+          });
+        }
+      };
+
+      const onError = () => {
+        console.error('[Player] Native video error');
+        setIsLoading(false);
+        setHasError(true);
+        setErrorMessage('Erro ao carregar vídeo');
+      };
+      
+      const onCanPlay = () => {
+        setIsLoading(false);
+      };
+
+      video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+      video.addEventListener('error', onError, { once: true });
+      video.addEventListener('canplay', onCanPlay, { once: true });
+
+      return () => {
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        video.removeEventListener('error', onError);
+        video.removeEventListener('canplay', onCanPlay);
+        video.src = '';
+      };
     }
 
     // ==== NATIVE HLS (Safari, iOS, Smart TVs) ====
