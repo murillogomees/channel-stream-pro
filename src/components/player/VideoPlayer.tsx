@@ -75,6 +75,32 @@ const HLS_CONFIG: Partial<Hls['config']> = {
 };
 
 // =============================================================================
+// STREAM TYPE DETECTION
+// =============================================================================
+
+function isHlsUrl(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.m3u8') || urlLower.includes('.m3u');
+}
+
+function isDirectVideoUrl(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  // MP4, MKV, AVI, etc
+  if (urlLower.includes('.mp4') || urlLower.includes('.mkv') || 
+      urlLower.includes('.avi') || urlLower.includes('.ts') ||
+      urlLower.includes('.webm')) {
+    return true;
+  }
+  // Xtream Codes live/movie patterns (direct streams)
+  // /live/user/pass/123 or /movie/user/pass/123.mp4 or /user/pass/123
+  const xtreamPattern = /\/(?:live|movie|series)?\/?\d+/;
+  if (xtreamPattern.test(urlLower)) {
+    return true;
+  }
+  return false;
+}
+
+// =============================================================================
 // COMPONENT
 // =============================================================================
 
@@ -129,8 +155,66 @@ export function VideoPlayer({
       hlsRef.current = null;
     }
 
-    // HLS.js for most browsers
-    if (Hls.isSupported()) {
+    const isHls = isHlsUrl(url);
+    const isDirect = isDirectVideoUrl(url);
+    
+    console.log(`[VideoPlayer] URL: ${url.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}`);
+
+    // DIRECT VIDEO STREAM (MP4, TS, MKV, Xtream live)
+    if (isDirect && !isHls) {
+      console.log('[VideoPlayer] Using direct video playback');
+      video.src = url;
+      
+      const onLoadedData = () => {
+        console.log('[VideoPlayer] Direct stream loaded');
+        setLoading(false);
+        retryCount.current = 0;
+        onReady?.();
+        
+        if (autoPlay) {
+          video.play().catch((e) => {
+            console.warn('[VideoPlayer] Autoplay blocked:', e);
+            video.muted = true;
+            setMuted(true);
+            video.play().catch(() => {});
+          });
+        }
+      };
+      
+      const onVideoError = () => {
+        const mediaError = video.error;
+        console.error('[VideoPlayer] Direct stream error:', mediaError?.code, mediaError?.message);
+        
+        if (retryCount.current < maxRetries) {
+          retryCount.current++;
+          console.log(`[VideoPlayer] Retry ${retryCount.current}/${maxRetries}`);
+          setTimeout(() => {
+            video.src = '';
+            video.src = url;
+            video.load();
+          }, 1000 * retryCount.current);
+        } else {
+          setError('Stream indisponível. Tente outro canal.');
+          setLoading(false);
+          onError?.('Direct stream error');
+        }
+      };
+      
+      const onCanPlay = () => {
+        setLoading(false);
+      };
+      
+      video.addEventListener('loadeddata', onLoadedData, { once: true });
+      video.addEventListener('error', onVideoError, { once: true });
+      video.addEventListener('canplay', onCanPlay);
+      
+      video.load();
+      return;
+    }
+
+    // HLS.js for HLS streams
+    if (Hls.isSupported() && isHls) {
+      console.log('[VideoPlayer] Using HLS.js');
       const hls = new Hls(HLS_CONFIG);
       hlsRef.current = hls;
 
@@ -146,7 +230,6 @@ export function VideoPlayer({
         if (autoPlay) {
           video.play().catch((e) => {
             console.warn('[VideoPlayer] Autoplay blocked:', e);
-            // Try muted autoplay
             video.muted = true;
             setMuted(true);
             video.play().catch(() => {});
@@ -166,6 +249,7 @@ export function VideoPlayer({
             setTimeout(() => hls.startLoad(), 1000 * retryCount.current);
           } else {
             setError('Erro de conexão. Verifique sua internet.');
+            setLoading(false);
             onError?.('Network error');
           }
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -173,11 +257,11 @@ export function VideoPlayer({
           hls.recoverMediaError();
         } else {
           setError('Stream indisponível');
+          setLoading(false);
           onError?.('Stream unavailable');
         }
       });
 
-      // Additional events
       hls.on(Hls.Events.FRAG_LOADED, () => {
         setLoading(false);
       });
@@ -202,11 +286,26 @@ export function VideoPlayer({
 
       video.addEventListener('error', () => {
         setError('Erro ao carregar stream');
+        setLoading(false);
         onError?.('Native playback error');
       });
     } else {
-      setError('Navegador não suporta HLS');
-      onError?.('HLS not supported');
+      // Fallback: try direct playback
+      console.log('[VideoPlayer] Fallback: direct playback');
+      video.src = url;
+      video.load();
+      
+      video.addEventListener('loadeddata', () => {
+        setLoading(false);
+        onReady?.();
+        if (autoPlay) video.play().catch(() => {});
+      }, { once: true });
+      
+      video.addEventListener('error', () => {
+        setError('Formato não suportado');
+        setLoading(false);
+        onError?.('Format not supported');
+      }, { once: true });
     }
   }, [url, autoPlay, onError, onReady]);
 

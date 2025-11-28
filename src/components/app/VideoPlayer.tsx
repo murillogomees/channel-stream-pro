@@ -11,6 +11,36 @@ interface VideoPlayerProps {
   className?: string;
 }
 
+// =============================================================================
+// STREAM TYPE DETECTION
+// =============================================================================
+
+function isHlsUrl(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.m3u8') || urlLower.includes('.m3u');
+}
+
+function isDirectVideoUrl(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  // Direct video files
+  if (urlLower.includes('.mp4') || urlLower.includes('.mkv') || 
+      urlLower.includes('.avi') || urlLower.includes('.ts') ||
+      urlLower.includes('.webm')) {
+    return true;
+  }
+  // Xtream Codes patterns (direct streams without extension)
+  // /live/user/pass/123 or /movie/user/pass/123 or /user/pass/123
+  const xtreamPattern = /\/(?:live|movie|series)?\/?\d+(?:\?|$)/;
+  if (xtreamPattern.test(urlLower)) {
+    return true;
+  }
+  // URLs ending in numeric ID without extension
+  if (/\/\d+$/.test(url) && !url.includes('.')) {
+    return true;
+  }
+  return false;
+}
+
 export function VideoPlayer({ url, title, logo, onError, className = '' }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -22,6 +52,8 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
+  const retryCount = useRef(0);
+  const maxRetries = 3;
 
   const cleanup = useCallback(() => {
     if (hlsRef.current) {
@@ -79,7 +111,10 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     const video = videoRef.current;
     if (!video || !url) return;
 
-    console.log('[VideoPlayer] Initializing:', url.substring(0, 80));
+    const isHls = isHlsUrl(url);
+    const isDirect = isDirectVideoUrl(url);
+    
+    console.log(`[VideoPlayer] Init: ${url.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}`);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -87,24 +122,66 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     cleanup();
 
-    if (Hls.isSupported()) {
-      // HLS.js with very aggressive recovery settings
+    // DIRECT VIDEO STREAM (MP4, TS, Xtream live/movie)
+    if (isDirect && !isHls) {
+      console.log('[VideoPlayer] Using direct video playback');
+      video.src = url;
+      
+      const onLoadedData = () => {
+        console.log('[VideoPlayer] Direct stream loaded');
+        setIsLoading(false);
+        retryCount.current = 0;
+        attemptPlay();
+      };
+      
+      const onVideoError = () => {
+        const mediaError = video.error;
+        console.error('[VideoPlayer] Direct stream error:', mediaError?.code, mediaError?.message);
+        
+        if (retryCount.current < maxRetries) {
+          retryCount.current++;
+          console.log(`[VideoPlayer] Retry ${retryCount.current}/${maxRetries}`);
+          setTimeout(() => {
+            video.src = '';
+            video.src = url;
+            video.load();
+          }, 1000 * retryCount.current);
+        } else {
+          setHasError(true);
+          setErrorMessage('Stream indisponível. Tente outro canal.');
+          setIsLoading(false);
+          onError?.('Direct stream error');
+        }
+      };
+      
+      const onCanPlay = () => {
+        setIsLoading(false);
+      };
+      
+      video.addEventListener('loadeddata', onLoadedData, { once: true });
+      video.addEventListener('error', onVideoError, { once: true });
+      video.addEventListener('canplay', onCanPlay);
+      
+      video.load();
+      return;
+    }
+
+    // HLS.js for HLS streams
+    if (Hls.isSupported() && isHls) {
+      console.log('[VideoPlayer] Using HLS.js');
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        // Buffer settings
         backBufferLength: 60,
         maxBufferLength: 60,
         maxMaxBufferLength: 120,
         maxBufferSize: 100 * 1000 * 1000,
         maxBufferHole: 2,
-        // ABR settings
         startLevel: -1,
         abrEwmaDefaultEstimate: 500000,
         abrBandWidthFactor: 0.7,
         abrBandWidthUpFactor: 0.5,
         capLevelToPlayerSize: true,
-        // Very aggressive timeout and retry settings
         fragLoadingTimeOut: 60000,
         manifestLoadingTimeOut: 30000,
         levelLoadingTimeOut: 30000,
@@ -117,11 +194,9 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         fragLoadingMaxRetryTimeout: 30000,
         manifestLoadingMaxRetryTimeout: 30000,
         levelLoadingMaxRetryTimeout: 30000,
-        // Streaming settings
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 10,
         liveDurationInfinity: true,
-        // Error recovery
         appendErrorMaxRetry: 5,
         debug: false,
       });
@@ -137,14 +212,11 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       });
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
-        // Successfully loaded a fragment - we're good
         if (isLoading) setIsLoading(false);
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        // Only handle fatal errors that can't be recovered
         if (!data.fatal) {
-          // Non-fatal: let HLS.js handle it with its retry logic
           console.log('[VideoPlayer] Non-fatal error, auto-recovering:', data.details);
           return;
         }
@@ -153,7 +225,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            // Try to recover from network errors
             console.log('[VideoPlayer] Attempting network recovery...');
             hls.startLoad();
             break;
@@ -163,7 +234,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
             break;
           default:
             setHasError(true);
-            setErrorMessage('Stream indisponível. Este servidor pode não suportar reprodução via web.');
+            setErrorMessage('Stream indisponível.');
             setIsLoading(false);
             onError?.('Stream indisponível');
             break;
@@ -172,6 +243,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS (Safari/iOS)
+      console.log('[VideoPlayer] Using native HLS');
       video.src = url;
       
       video.addEventListener('loadedmetadata', () => {
@@ -187,7 +259,22 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
       video.load();
     } else {
+      // Fallback: try direct playback
+      console.log('[VideoPlayer] Fallback: direct playback');
       video.src = url;
+      
+      video.addEventListener('loadeddata', () => {
+        setIsLoading(false);
+        attemptPlay();
+      }, { once: true });
+      
+      video.addEventListener('error', () => {
+        setHasError(true);
+        setErrorMessage('Formato não suportado');
+        setIsLoading(false);
+        onError?.('Format not supported');
+      }, { once: true });
+      
       video.load();
     }
   }, [url, cleanup, attemptPlay, onError, isLoading]);
