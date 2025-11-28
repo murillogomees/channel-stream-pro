@@ -124,6 +124,24 @@ Deno.serve(async (req) => {
 
     if (createError) {
       console.error('Error creating user in create-admin-user:', createError);
+      
+      // Check for duplicate email error
+      const isDuplicateEmail = createError.message?.includes('already registered') || 
+                               createError.message?.includes('already exists') ||
+                               createError.message?.includes('duplicate key') ||
+                               createError.message?.includes('Database error');
+      
+      if (isDuplicateEmail) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Email already registered', 
+            details: 'Este email já está registrado no sistema.',
+            code: 'EMAIL_EXISTS'
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: 'Failed to create user', details: createError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
