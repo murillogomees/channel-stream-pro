@@ -160,21 +160,7 @@ export default function Login() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
         {/* Logo Section */}
-        <div className="mb-8 flex flex-col items-center">
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center mb-4 shadow-lg">
-            <img src="/logo.png" alt="IPTV Link" className="w-16 h-16 object-contain" />
-          </div>
-          
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
-            IPTV Link
-          </h1>
-          
-          <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-primary to-transparent mt-2" />
-          
-          <p className="text-muted-foreground text-sm mt-2">
-            TV Online em Alta Definição
-          </p>
-        </div>
+        
 
         {/* Login Card */}
         <div className="w-full max-w-sm">
