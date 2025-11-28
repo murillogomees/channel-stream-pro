@@ -37,8 +37,11 @@ const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 
-// IPTV App pages
+// IPTV App pages - Standalone Mobile/TV App
+const AppEntry = lazy(() => import("./pages/AppEntry"));
+const AppLogin = lazy(() => import("./pages/app/AppLogin"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
+const AppProfile = lazy(() => import("./pages/app/AppProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const TVPlayer = lazy(() => import("./pages/TVPlayer"));
@@ -65,8 +68,18 @@ const App = () => (
           <Route path="/conta" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
           <Route path="/cliente/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
           
-          {/* IPTV App Routes */}
+          {/* ========================================
+              IPTV App Routes - Standalone Mobile/TV App
+              These are the ONLY pages in the native app:
+              - /app = Entry point with splash
+              - /app/login = Client login
+              - /app/player = IPTV Player
+              - /app/profile = Client profile/settings
+              ======================================== */}
+          <Route path="/app" element={<AppEntry />} />
+          <Route path="/app/login" element={<AppLogin />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
+          <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
           
@@ -126,11 +139,9 @@ const App = () => (
           <Route path="/admin/permission-test" element={<Navigate to="/admin/users" replace />} />
           
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
-          <Route path="/app/login" element={<Navigate to="/login" replace />} />
           <Route path="/auth" element={<Navigate to="/login" replace />} />
           <Route path="/settings" element={<Navigate to="/conta" replace />} />
           <Route path="/subscription" element={<Navigate to="/conta" replace />} />
-          <Route path="/app" element={<Navigate to="/conta" replace />} />
           
           {/* Access denied */}
           <Route path="/403" element={<Forbidden />} />
