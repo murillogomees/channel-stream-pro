@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle, Tv } from "lucide-react";
+import { Download, CheckCircle, Tv, ExternalLink } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { toast } from "sonner";
 // Logo otimizado para performance (transparente)
 import logoWhite from "@/assets/logo-white.png";
 import heroBg from "@/assets/hero-bg.jpg";
@@ -28,6 +29,73 @@ const HeroSection = () => {
     whatsapp_number: "556131425880",
     whatsapp_message: "Olá! Gostaria de fazer o teste grátis do IPTV.",
   });
+  
+  const deferredPromptRef = useRef<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if app is already installed
+    const checkInstalled = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone = (window.navigator as any).standalone === true;
+      setIsAppInstalled(isStandalone || isIOSStandalone);
+    };
+    
+    checkInstalled();
+
+    // Listen for the beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+    };
+
+    // Listen for app installed event
+    const handleAppInstalled = () => {
+      setIsAppInstalled(true);
+      deferredPromptRef.current = null;
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    trackEvent('Lead', { content_name: 'Hero CTA - Download App', content_category: 'button' });
+    
+    if (isAppInstalled) {
+      // App is already installed - open it
+      window.location.href = '/app';
+      return;
+    }
+
+    if (deferredPromptRef.current) {
+      // Show the install prompt
+      deferredPromptRef.current.prompt();
+      const { outcome } = await deferredPromptRef.current.userChoice;
+      
+      if (outcome === 'accepted') {
+        toast.success('App instalado com sucesso!');
+        setIsAppInstalled(true);
+      }
+      deferredPromptRef.current = null;
+    } else {
+      // Fallback for iOS or browsers that don't support beforeinstallprompt
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        toast.info('Para instalar: toque em Compartilhar e depois "Adicionar à Tela de Início"', {
+          duration: 5000,
+        });
+      } else {
+        // Redirect to install page as fallback
+        window.location.href = '/app/install';
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -119,13 +187,19 @@ const HeroSection = () => {
               variant="outline" 
               size="lg" 
               className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-              onClick={() => {
-                trackEvent('Lead', { content_name: 'Hero CTA - Download App', content_category: 'button' });
-                window.location.href = '/app/install';
-              }}
+              onClick={handleInstallClick}
             >
-              <Download className="h-5 w-5 sm:h-6 sm:w-6" />
-              Faça o download do app agora!
+              {isAppInstalled ? (
+                <>
+                  <ExternalLink className="h-5 w-5 sm:h-6 sm:w-6" />
+                  Abrir APP
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5 sm:h-6 sm:w-6" />
+                  Download do APP
+                </>
+              )}
             </Button>
           </div>
 
