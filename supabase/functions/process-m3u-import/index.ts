@@ -13,9 +13,10 @@ interface ImportPayload {
   customListId: string;
 }
 
-const DB_BATCH_SIZE = 50;
-const MAX_CHANNELS = 100000; // 100k channels max
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
+const DB_BATCH_SIZE = 100;
+const MAX_CHANNELS = 200000; // 200k channels max
+const MAX_SIZE = 100 * 1024 * 1024; // 100MB limit
+const UPDATE_INTERVAL = 500; // Update progress every 500 channels
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
 
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
 
     await supabase
       .from('m3u_import_sessions')
-      .update({ status: 'processing' })
+      .update({ status: 'processing', processed_channels: 0 })
       .eq('id', payload.sessionId);
 
     EdgeRuntime.waitUntil(processInBackground(payload, supabase));
@@ -89,7 +90,7 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
       console.log('[ProcessM3U] Fetching:', downloadUrl);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
       
       try {
         const response = await fetch(downloadUrl, { 
@@ -158,13 +159,13 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
           reader.cancel().catch(() => {});
           content = chunks.join('');
           chunks.length = 0; // Free memory
-          console.log(`[ProcessM3U] Downloaded: ${(totalSize / 1024).toFixed(1)}KB`);
+          console.log(`[ProcessM3U] Downloaded: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
         }
         
       } catch (e: any) {
         clearTimeout(timeoutId);
         if (e.name === 'AbortError') {
-          throw new Error('Timeout: o download demorou mais de 60 segundos');
+          throw new Error('Timeout: o download demorou mais de 120 segundos');
         }
         throw new Error(`Fetch: ${e.message}`);
       }
@@ -197,8 +198,35 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
 async function processContent(content: string, payload: ImportPayload, supabase: any) {
   const categoryMap = new Map<string, string>();
   let catOrder = 0;
-  let count = 0;
+  let insertedCount = 0;
   let batch: any[] = [];
+  
+  // First pass: count total channels quickly
+  const lines = content.split(/\r?\n/);
+  let totalChannels = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#EXTINF:')) {
+      totalChannels++;
+    }
+  }
+  
+  // Respect max limit
+  totalChannels = Math.min(totalChannels, MAX_CHANNELS);
+  
+  console.log(`[ProcessM3U] Total channels to import: ${totalChannels}`);
+  
+  // Update session with total channels count
+  await supabase
+    .from('m3u_import_sessions')
+    .update({ 
+      total_channels: totalChannels,
+      processed_channels: 0
+    })
+    .eq('id', payload.sessionId);
+  
+  content = ''; // Free the original string memory
   
   async function getCatId(name: string): Promise<string> {
     const key = name || 'Sem Categoria';
@@ -221,14 +249,12 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     }
     return categoryMap.values().next().value || '';
   }
-
-  // Process line by line
-  const lines = content.split(/\r?\n/);
-  content = ''; // Free memory
   
+  // Second pass: process and insert channels
   let channel: any = null;
+  let channelsProcessed = 0;
   
-  for (let i = 0; i < lines.length && count < MAX_CHANNELS; i++) {
+  for (let i = 0; i < lines.length && insertedCount < MAX_CHANNELS; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
@@ -257,38 +283,43 @@ async function processContent(content: string, payload: ImportPayload, supabase:
         tvg_name: channel.tvgName,
         tvg_logo: channel.tvgLogo,
         group_title: channel.group,
-        order_position: count,
+        order_position: insertedCount,
       });
       
-      count++;
+      insertedCount++;
+      channelsProcessed++;
       channel = null;
 
       if (batch.length >= DB_BATCH_SIZE) {
         await supabase.from('m3u_channels').insert(batch);
         batch = [];
 
-        if (count % 200 === 0) {
+        // Update progress every UPDATE_INTERVAL channels
+        if (channelsProcessed % UPDATE_INTERVAL === 0) {
           await supabase
             .from('m3u_import_sessions')
-            .update({ processed_channels: count, total_channels: count })
+            .update({ processed_channels: insertedCount })
             .eq('id', payload.sessionId);
-          console.log(`[ProcessM3U] Progress: ${count} channels`);
+          console.log(`[ProcessM3U] Progress: ${insertedCount}/${totalChannels} (${((insertedCount/totalChannels)*100).toFixed(1)}%)`);
         }
       }
     }
   }
 
+  // Insert remaining batch
   if (batch.length > 0) {
     await supabase.from('m3u_channels').insert(batch);
   }
 
-  const limited = count >= MAX_CHANNELS;
+  const limited = insertedCount >= MAX_CHANNELS;
+  
+  // Final update
   await supabase
     .from('m3u_import_sessions')
     .update({ 
       status: 'completed',
-      processed_channels: count,
-      total_channels: count,
+      processed_channels: insertedCount,
+      total_channels: insertedCount,
       completed_at: new Date().toISOString(),
       error_message: limited ? `Limitado a ${MAX_CHANNELS} canais` : null,
     })
@@ -297,11 +328,11 @@ async function processContent(content: string, payload: ImportPayload, supabase:
   await supabase
     .from('m3u_custom_lists')
     .update({
-      total_channels: count,
+      total_channels: insertedCount,
       total_categories: categoryMap.size,
       updated_at: new Date().toISOString(),
     })
     .eq('id', payload.customListId);
 
-  console.log(`[ProcessM3U] Completed: ${count} channels, ${categoryMap.size} categories`);
+  console.log(`[ProcessM3U] Completed: ${insertedCount} channels, ${categoryMap.size} categories`);
 }
