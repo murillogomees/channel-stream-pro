@@ -1,13 +1,14 @@
 /**
- * SeriesView - Complete series catalog with TMDB integration and episode tracking
+ * SeriesView - Optimized series catalog with lazy loading and background metadata
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect, useRef, memo, startTransition } from 'react';
+import { TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLazyLoadContent } from '@/hooks/useLazyLoadContent';
 import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
 import { SeriesCard } from './SeriesCard';
 import { SeriesDetailSheet } from './SeriesDetailSheet';
@@ -43,18 +44,21 @@ interface SeriesViewProps {
 // Helper to extract series name from episode name
 function extractSeriesName(name: string): string {
   return name
-    .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '') // Remove S01E01 and everything after
-    .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '') // Remove 1x01 and everything after
-    .replace(/\s*-\s*Temporada\s*\d+.*/gi, '') // Remove "- Temporada X" and everything after
-    .replace(/\s*Temporada\s*\d+.*/gi, '') // Remove "Temporada X" and everything after
-    .replace(/\s*Season\s*\d+.*/gi, '') // Remove "Season X" and everything after
-    .replace(/\s*T\d+\s*E?\d*.*/gi, '') // Remove "T1E01" patterns
-    .replace(/\s*Ep[is]*[óo]*d?i?o?\s*\d+.*/gi, '') // Remove "Episódio X" and everything after
-    .replace(/\s*\(\d{4}\)/g, '') // Remove (2024)
-    .replace(/\s*\[.*?\]/g, '') // Remove [tags]
-    .replace(/\s+/g, ' ') // Normalize spaces
+    .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
+    .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
+    .replace(/\s*-\s*Temporada\s*\d+.*/gi, '')
+    .replace(/\s*Temporada\s*\d+.*/gi, '')
+    .replace(/\s*Season\s*\d+.*/gi, '')
+    .replace(/\s*T\d+\s*E?\d*.*/gi, '')
+    .replace(/\s*Ep[is]*[óo]*d?i?o?\s*\d+.*/gi, '')
+    .replace(/\s*\(\d{4}\)/g, '')
+    .replace(/\s*\[.*?\]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
+
+// Memoized series card
+const MemoizedSeriesCard = memo(SeriesCard);
 
 export function SeriesView({
   categories,
@@ -70,11 +74,15 @@ export function SeriesView({
   const [seriesMetadata, setSeriesMetadata] = useState<SeriesMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   
-  // Metadata cache
-  const [metadataCache, setMetadataCache] = useState<Map<string, SeriesMetadata>>(new Map());
+  // Metadata cache - persists across renders
+  const metadataCacheRef = useRef<Map<string, SeriesMetadata>>(new Map());
+  const [metadataCacheVersion, setMetadataCacheVersion] = useState(0);
   const { fetchSeriesMetadata } = useSeriesMetadata();
+  
+  // Track loading state
+  const loadingSeriesRef = useRef<Set<string>>(new Set());
 
-  // Group episodes into series
+  // Group episodes into series - memoized
   const { seriesGroups, allEpisodes } = useMemo(() => {
     const episodesMap = new Map<string, Channel[]>();
     const allEps: Channel[] = [];
@@ -90,7 +98,6 @@ export function SeriesView({
       });
     });
 
-    // Create series entries (use first episode of each series as representative)
     const groups: Array<{
       seriesName: string;
       representative: Channel & { category_id?: string };
@@ -120,16 +127,14 @@ export function SeriesView({
     return { seriesGroups: groups, allEpisodes: allEps };
   }, [categories]);
 
-  // Filter series
+  // Filter series - memoized
   const filteredSeries = useMemo(() => {
     let series = [...seriesGroups];
 
-    // Filter by category
     if (selectedCategory) {
       series = series.filter(s => s.representative.category_id === selectedCategory);
     }
 
-    // Filter by search
     if (externalSearch) {
       const query = externalSearch.toLowerCase();
       series = series.filter(s =>
@@ -138,18 +143,16 @@ export function SeriesView({
       );
     }
 
-    // Sort
+    const cache = metadataCacheRef.current;
     series = series.sort((a, b) => {
-      const metaA = metadataCache.get(a.representative.id);
-      const metaB = metadataCache.get(b.representative.id);
+      const metaA = cache.get(a.representative.id);
+      const metaB = cache.get(b.representative.id);
 
       switch (sortBy) {
         case 'rating':
           return (metaB?.tmdb_rating || 0) - (metaA?.tmdb_rating || 0);
         case 'year':
           return (metaB?.year || 0) - (metaA?.year || 0);
-        case 'recent':
-          return 0;
         case 'name':
         default:
           return a.seriesName.localeCompare(b.seriesName);
@@ -157,37 +160,71 @@ export function SeriesView({
     });
 
     return series;
-  }, [seriesGroups, selectedCategory, externalSearch, sortBy, metadataCache]);
+  }, [seriesGroups, selectedCategory, externalSearch, sortBy, metadataCacheVersion]);
 
-  // Load metadata for visible series
+  // Use lazy loading
+  const {
+    visibleItems: visibleSeries,
+    hasMore,
+    loadMoreRef,
+    visibleCount,
+    totalCount,
+  } = useLazyLoadContent(filteredSeries, {
+    initialCount: 24,
+    incrementCount: 24,
+    rootMargin: '400px',
+  });
+
+  // Load metadata in background - non-blocking
   useEffect(() => {
-    const loadMetadataForVisible = async () => {
-      const seriesToLoad = filteredSeries
-        .slice(0, 15)
-        .filter(s => !metadataCache.has(s.representative.id));
+    const loadMetadataInBackground = async () => {
+      const cache = metadataCacheRef.current;
+      const loading = loadingSeriesRef.current;
+      
+      const seriesToLoad = visibleSeries
+        .slice(0, 20)
+        .filter(s => !cache.has(s.representative.id) && !loading.has(s.representative.id));
 
-      for (const series of seriesToLoad) {
-        try {
-          const meta = await fetchSeriesMetadata(series.representative.id, series.seriesName);
-          if (meta) {
-            setMetadataCache(prev => new Map(prev).set(series.representative.id, meta));
-          }
-        } catch (err) {
-          // Silently fail
-        }
+      if (seriesToLoad.length === 0) return;
+
+      seriesToLoad.forEach(s => loading.add(s.representative.id));
+
+      const batchSize = 5;
+      for (let i = 0; i < seriesToLoad.length; i += batchSize) {
+        const batch = seriesToLoad.slice(i, i + batchSize);
+        
+        await Promise.allSettled(
+          batch.map(async (series) => {
+            try {
+              const meta = await fetchSeriesMetadata(series.representative.id, series.seriesName);
+              if (meta) {
+                cache.set(series.representative.id, meta);
+              }
+            } catch {
+              // Silently fail
+            } finally {
+              loading.delete(series.representative.id);
+            }
+          })
+        );
+        
+        startTransition(() => {
+          setMetadataCacheVersion(v => v + 1);
+        });
       }
     };
 
-    loadMetadataForVisible();
-  }, [filteredSeries.slice(0, 15).map(s => s.representative.id).join(',')]);
+    const timeoutId = setTimeout(loadMetadataInBackground, 100);
+    return () => clearTimeout(timeoutId);
+  }, [visibleSeries.map(s => s.representative.id).slice(0, 10).join(','), fetchSeriesMetadata]);
 
-  // Handle series selection for details
+  // Handle series selection
   const handleSeriesInfo = useCallback(async (series: typeof seriesGroups[0]) => {
     setSelectedSeries(series.representative);
     setIsLoadingMetadata(true);
 
     try {
-      const cached = metadataCache.get(series.representative.id);
+      const cached = metadataCacheRef.current.get(series.representative.id);
       if (cached) {
         setSeriesMetadata(cached);
         setIsLoadingMetadata(false);
@@ -197,22 +234,32 @@ export function SeriesView({
       const meta = await fetchSeriesMetadata(series.representative.id, series.seriesName);
       if (meta) {
         setSeriesMetadata(meta);
-        setMetadataCache(prev => new Map(prev).set(series.representative.id, meta));
+        metadataCacheRef.current.set(series.representative.id, meta);
+        startTransition(() => {
+          setMetadataCacheVersion(v => v + 1);
+        });
       }
     } catch (err) {
       console.error('[SeriesView] Error loading metadata:', err);
     } finally {
       setIsLoadingMetadata(false);
     }
-  }, [fetchSeriesMetadata, metadataCache]);
+  }, [fetchSeriesMetadata]);
 
-  // Handle play
+  // Handle play - memoized
   const handlePlay = useCallback((channel: Channel) => {
     onPlay(channel);
     setSelectedSeries(null);
   }, [onPlay]);
 
-  // Get related episodes for selected series
+  // Handle category change with transition
+  const handleCategoryChange = useCallback((categoryId: string | null) => {
+    startTransition(() => {
+      setSelectedCategory(categoryId);
+    });
+  }, []);
+
+  // Related episodes for selected series
   const relatedEpisodes = useMemo(() => {
     if (!selectedSeries) return [];
     const group = seriesGroups.find(g => g.representative.id === selectedSeries.id);
@@ -240,7 +287,7 @@ export function SeriesView({
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             <button
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => handleCategoryChange(null)}
               className={cn(
                 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors',
                 'hover:bg-muted',
@@ -256,7 +303,7 @@ export function SeriesView({
             {categories.map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => handleCategoryChange(cat.id)}
                 className={cn(
                   'w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors',
                   'hover:bg-muted',
@@ -279,7 +326,7 @@ export function SeriesView({
         <div className="lg:hidden p-4 border-b border-border">
           <Select
             value={selectedCategory || 'all'}
-            onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
+            onValueChange={(v) => handleCategoryChange(v === 'all' ? null : v)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Categoria" />
@@ -297,11 +344,11 @@ export function SeriesView({
           </Select>
         </div>
 
-        {/* Series Grid */}
+        {/* Series Grid with lazy loading */}
         <ScrollArea className="flex-1">
-          <div className="p-4 lg:p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="p-4 lg:p-6">
             {filteredSeries.length === 0 ? (
-              <div className="col-span-full py-16 text-center">
+              <div className="py-16 text-center">
                 <div className="text-muted-foreground">
                   <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium">Nenhuma série encontrada</p>
@@ -309,20 +356,40 @@ export function SeriesView({
                 </div>
               </div>
             ) : (
-              filteredSeries.map((series) => (
-                <SeriesCard
-                  key={series.representative.id}
-                  id={series.representative.id}
-                  name={series.seriesName}
-                  logo={series.representative.tvg_logo}
-                  category={series.representative.category_name}
-                  metadata={metadataCache.get(series.representative.id)}
-                  isFavorite={isFavorite(series.representative.id)}
-                  onPlay={() => handlePlay(series.episodes[0])}
-                  onInfo={() => handleSeriesInfo(series)}
-                  onToggleFavorite={() => onToggleFavorite(series.representative.id)}
-                />
-              ))
+              <>
+                {/* Count indicator */}
+                <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+                  <span>
+                    Exibindo {visibleCount} de {totalCount} séries
+                  </span>
+                </div>
+                
+                {/* Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {visibleSeries.map((series) => (
+                    <MemoizedSeriesCard
+                      key={series.representative.id}
+                      id={series.representative.id}
+                      name={series.seriesName}
+                      logo={series.representative.tvg_logo}
+                      category={series.representative.category_name}
+                      metadata={metadataCacheRef.current.get(series.representative.id)}
+                      isFavorite={isFavorite(series.representative.id)}
+                      onPlay={() => handlePlay(series.episodes[0])}
+                      onInfo={() => handleSeriesInfo(series)}
+                      onToggleFavorite={() => onToggleFavorite(series.representative.id)}
+                    />
+                  ))}
+                </div>
+                
+                {/* Load more trigger */}
+                {hasMore && (
+                  <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+                    <span className="text-muted-foreground">Carregando mais...</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ScrollArea>
@@ -340,7 +407,6 @@ export function SeriesView({
         isLoadingMetadata={isLoadingMetadata}
         onPlay={(episode) => {
           if (episode && relatedEpisodes.length > 0) {
-            // Find specific episode
             const ep = relatedEpisodes.find(e => {
               const match = e.name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) ||
                            e.name.match(/(\d{1,2})x(\d{1,3})/i);
@@ -354,7 +420,6 @@ export function SeriesView({
               return;
             }
           }
-          // Default: play first episode
           if (relatedEpisodes.length > 0) {
             handlePlay(relatedEpisodes[0]);
           }

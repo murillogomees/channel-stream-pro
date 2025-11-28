@@ -1,13 +1,14 @@
 /**
- * MoviesView - Complete movies catalog with TMDB integration
+ * MoviesView - Optimized movies catalog with lazy loading and background metadata
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect, useRef, memo, startTransition } from 'react';
+import { TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLazyLoadContent } from '@/hooks/useLazyLoadContent';
 import { useMovieMetadata } from '../hooks/useMovieMetadata';
 import { MovieCard } from './MovieCard';
 import { MovieDetailSheet } from './MovieDetailSheet';
@@ -40,6 +41,9 @@ interface MoviesViewProps {
   className?: string;
 }
 
+// Memoized movie card to prevent unnecessary re-renders
+const MemoizedMovieCard = memo(MovieCard);
+
 export function MoviesView({
   categories,
   onPlay,
@@ -54,11 +58,15 @@ export function MoviesView({
   const [movieMetadata, setMovieMetadata] = useState<ContentMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   
-  // Metadata cache
-  const [metadataCache, setMetadataCache] = useState<Map<string, ContentMetadata>>(new Map());
-  const { fetchMetadata, fetchTMDBDetails } = useMovieMetadata();
+  // Metadata cache - persists across renders
+  const metadataCacheRef = useRef<Map<string, ContentMetadata>>(new Map());
+  const [metadataCacheVersion, setMetadataCacheVersion] = useState(0);
+  const { fetchMetadata } = useMovieMetadata();
+  
+  // Track which movies are being loaded to avoid duplicate requests
+  const loadingMoviesRef = useRef<Set<string>>(new Set());
 
-  // Flatten all movies
+  // Flatten all movies - memoized
   const allMovies = useMemo(() => {
     return categories.flatMap(cat =>
       cat.channels.map(ch => ({
@@ -69,7 +77,7 @@ export function MoviesView({
     );
   }, [categories]);
 
-  // Filter movies
+  // Filter and sort movies - memoized
   const filteredMovies = useMemo(() => {
     let movies = allMovies;
 
@@ -87,18 +95,17 @@ export function MoviesView({
       );
     }
 
-    // Sort
+    // Sort - use ref to avoid dependency on cache state
+    const cache = metadataCacheRef.current;
     movies = [...movies].sort((a, b) => {
-      const metaA = metadataCache.get(a.id);
-      const metaB = metadataCache.get(b.id);
+      const metaA = cache.get(a.id);
+      const metaB = cache.get(b.id);
 
       switch (sortBy) {
         case 'rating':
           return (metaB?.tmdb_rating || 0) - (metaA?.tmdb_rating || 0);
         case 'year':
           return (metaB?.year || 0) - (metaA?.year || 0);
-        case 'recent':
-          return 0; // Would need timestamp
         case 'name':
         default:
           return a.name.localeCompare(b.name);
@@ -106,29 +113,69 @@ export function MoviesView({
     });
 
     return movies;
-  }, [allMovies, selectedCategory, externalSearch, sortBy, metadataCache]);
+  }, [allMovies, selectedCategory, externalSearch, sortBy, metadataCacheVersion]);
 
-  // Load metadata for visible movies (lazy loading)
+  // Use lazy loading for visible items
+  const {
+    visibleItems: visibleMovies,
+    hasMore,
+    loadMoreRef,
+    visibleCount,
+    totalCount,
+  } = useLazyLoadContent(filteredMovies, {
+    initialCount: 24,
+    incrementCount: 24,
+    rootMargin: '400px',
+  });
+
+  // Load metadata for visible movies in background - non-blocking
   useEffect(() => {
-    const loadMetadataForVisible = async () => {
-      const moviesToLoad = filteredMovies
-        .slice(0, 20)
-        .filter(m => !metadataCache.has(m.id));
+    const loadMetadataInBackground = async () => {
+      const cache = metadataCacheRef.current;
+      const loading = loadingMoviesRef.current;
+      
+      // Get movies that need metadata
+      const moviesToLoad = visibleMovies
+        .slice(0, 30)
+        .filter(m => !cache.has(m.id) && !loading.has(m.id));
 
-      for (const movie of moviesToLoad) {
-        try {
-          const meta = await fetchMetadata(movie.id, movie.name);
-          if (meta) {
-            setMetadataCache(prev => new Map(prev).set(movie.id, meta));
-          }
-        } catch (err) {
-          // Silently fail, show original data
-        }
+      if (moviesToLoad.length === 0) return;
+
+      // Mark as loading
+      moviesToLoad.forEach(m => loading.add(m.id));
+
+      // Load in small batches to avoid overwhelming the API
+      const batchSize = 5;
+      for (let i = 0; i < moviesToLoad.length; i += batchSize) {
+        const batch = moviesToLoad.slice(i, i + batchSize);
+        
+        // Use Promise.allSettled to not block on failures
+        await Promise.allSettled(
+          batch.map(async (movie) => {
+            try {
+              const meta = await fetchMetadata(movie.id, movie.name);
+              if (meta) {
+                cache.set(movie.id, meta);
+              }
+            } catch {
+              // Silently fail
+            } finally {
+              loading.delete(movie.id);
+            }
+          })
+        );
+        
+        // Update version to trigger re-render with new metadata
+        startTransition(() => {
+          setMetadataCacheVersion(v => v + 1);
+        });
       }
     };
 
-    loadMetadataForVisible();
-  }, [filteredMovies.slice(0, 20).map(m => m.id).join(',')]);
+    // Run in background without blocking
+    const timeoutId = setTimeout(loadMetadataInBackground, 100);
+    return () => clearTimeout(timeoutId);
+  }, [visibleMovies.map(m => m.id).slice(0, 10).join(','), fetchMetadata]);
 
   // Handle movie selection for details
   const handleMovieInfo = useCallback(async (movie: Channel) => {
@@ -137,7 +184,7 @@ export function MoviesView({
 
     try {
       // Check cache first
-      const cached = metadataCache.get(movie.id);
+      const cached = metadataCacheRef.current.get(movie.id);
       if (cached) {
         setMovieMetadata(cached);
         setIsLoadingMetadata(false);
@@ -147,29 +194,39 @@ export function MoviesView({
       const meta = await fetchMetadata(movie.id, movie.name);
       if (meta) {
         setMovieMetadata(meta);
-        setMetadataCache(prev => new Map(prev).set(movie.id, meta));
+        metadataCacheRef.current.set(movie.id, meta);
+        startTransition(() => {
+          setMetadataCacheVersion(v => v + 1);
+        });
       }
     } catch (err) {
       console.error('[MoviesView] Error loading metadata:', err);
     } finally {
       setIsLoadingMetadata(false);
     }
-  }, [fetchMetadata, metadataCache]);
+  }, [fetchMetadata]);
 
-  // Handle play
+  // Handle play - memoized
   const handlePlay = useCallback((movie: Channel) => {
     onPlay(movie);
     setSelectedMovie(null);
   }, [onPlay]);
 
-  // Category counts
+  // Handle category change with transition
+  const handleCategoryChange = useCallback((categoryId: string | null) => {
+    startTransition(() => {
+      setSelectedCategory(categoryId);
+    });
+  }, []);
+
+  // Category counts - memoized
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: allMovies.length };
     categories.forEach(cat => {
       counts[cat.id] = cat.channels.length;
     });
     return counts;
-  }, [categories, allMovies]);
+  }, [categories, allMovies.length]);
 
   return (
     <div className={cn('flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]', className)}>
@@ -182,7 +239,7 @@ export function MoviesView({
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             <button
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => handleCategoryChange(null)}
               className={cn(
                 'w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors',
                 'hover:bg-muted',
@@ -198,7 +255,7 @@ export function MoviesView({
             {categories.map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => handleCategoryChange(cat.id)}
                 className={cn(
                   'w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors',
                   'hover:bg-muted',
@@ -221,7 +278,7 @@ export function MoviesView({
         <div className="lg:hidden p-4 border-b border-border">
           <Select
             value={selectedCategory || 'all'}
-            onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
+            onValueChange={(v) => handleCategoryChange(v === 'all' ? null : v)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Categoria" />
@@ -239,11 +296,12 @@ export function MoviesView({
           </Select>
         </div>
 
-        {/* Movies Grid */}
+        {/* Movies Grid with lazy loading */}
         <ScrollArea className="flex-1">
-          <div className="p-4 lg:p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="p-4 lg:p-6">
+            {/* Loading indicator */}
             {filteredMovies.length === 0 ? (
-              <div className="col-span-full py-16 text-center">
+              <div className="py-16 text-center">
                 <div className="text-muted-foreground">
                   <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium">Nenhum filme encontrado</p>
@@ -251,20 +309,40 @@ export function MoviesView({
                 </div>
               </div>
             ) : (
-              filteredMovies.map((movie) => (
-                <MovieCard
-                  key={movie.id}
-                  id={movie.id}
-                  name={movie.name}
-                  logo={movie.tvg_logo}
-                  category={movie.category_name}
-                  metadata={metadataCache.get(movie.id)}
-                  isFavorite={isFavorite(movie.id)}
-                  onPlay={() => handlePlay(movie)}
-                  onInfo={() => handleMovieInfo(movie)}
-                  onToggleFavorite={() => onToggleFavorite(movie.id)}
-                />
-              ))
+              <>
+                {/* Count indicator */}
+                <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+                  <span>
+                    Exibindo {visibleCount} de {totalCount} filmes
+                  </span>
+                </div>
+                
+                {/* Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {visibleMovies.map((movie) => (
+                    <MemoizedMovieCard
+                      key={movie.id}
+                      id={movie.id}
+                      name={movie.name}
+                      logo={movie.tvg_logo}
+                      category={movie.category_name}
+                      metadata={metadataCacheRef.current.get(movie.id)}
+                      isFavorite={isFavorite(movie.id)}
+                      onPlay={() => handlePlay(movie)}
+                      onInfo={() => handleMovieInfo(movie)}
+                      onToggleFavorite={() => onToggleFavorite(movie.id)}
+                    />
+                  ))}
+                </div>
+                
+                {/* Load more trigger */}
+                {hasMore && (
+                  <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+                    <span className="text-muted-foreground">Carregando mais...</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ScrollArea>
