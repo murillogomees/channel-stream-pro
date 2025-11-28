@@ -1,74 +1,107 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+/**
+ * ============================================================================
+ * M3U Playlist Fetcher & Parser - Production Grade
+ * ============================================================================
+ * 
+ * Edge function que:
+ * - Busca arquivos M3U/M3U8 de URLs externas
+ * - Parse streaming para arquivos grandes (200k+ canais)
+ * - Suporta paginação para carregamento progressivo
+ * - Fallback HTTPS → HTTP automático
+ * 
+ * @version 2.0.0
+ * @author IPTV Link
+ */
 
-const corsHeaders = {
+// =============================================================================
+// CORS HEADERS
+// =============================================================================
+const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+} as const;
 
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+const CONFIG = {
+  FETCH_TIMEOUT_MS: 60000,  // 60s para listas grandes
+  DEFAULT_LIMIT: 500,       // Canais por página default
+} as const;
+
+// =============================================================================
+// TYPES
+// =============================================================================
 interface Channel {
   id: string;
   name: string;
   tvg_logo: string | null;
+  tvg_id: string | null;
+  tvg_name: string | null;
   stream_url: string;
   category_name: string;
 }
 
-// Parse M3U content in chunks to avoid memory issues
-const parseM3UStream = async (response: Response): Promise<Channel[]> => {
-  const channels: Channel[] = [];
+interface ParseResult {
+  channels: Channel[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+// =============================================================================
+// M3U STREAMING PARSER
+// =============================================================================
+
+/**
+ * Parse M3U content em streaming para evitar problemas de memória
+ * Suporta arquivos com 200k+ canais
+ */
+async function parseM3UStream(response: Response): Promise<Channel[]> {
   const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Stream not available');
+  }
+
   const decoder = new TextDecoder();
-  
-  if (!reader) throw new Error('No stream available');
+  const channels: Channel[] = [];
   
   let buffer = '';
   let currentChannel: Partial<Channel> | null = null;
-  let channelCount = 0;
-  
+  let channelIndex = 0;
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       
       if (done) break;
-      
+
+      // Append chunk to buffer
       buffer += decoder.decode(value, { stream: true });
+      
+      // Split into lines
       const lines = buffer.split('\n');
       
       // Keep last incomplete line in buffer
       buffer = lines.pop() || '';
-      
+
+      // Process complete lines
       for (const line of lines) {
-        const trimmedLine = line.trim();
+        const trimmed = line.trim();
         
-        if (trimmedLine.startsWith('#EXTINF:')) {
-          currentChannel = {
-            id: `channel-${channelCount++}`,
-            name: '',
-            tvg_logo: null,
-            stream_url: '',
-            category_name: 'Outros'
-          };
+        // Skip empty lines
+        if (!trimmed) continue;
+
+        // #EXTINF line = start of new channel
+        if (trimmed.startsWith('#EXTINF:')) {
+          currentChannel = parseExtinfLine(trimmed, channelIndex++);
+        }
+        // URL line (not a comment) = channel URL
+        else if (currentChannel && !trimmed.startsWith('#')) {
+          currentChannel.stream_url = trimmed;
           
-          // Extract channel name (after last comma)
-          const nameMatch = trimmedLine.match(/,(.+)$/);
-          if (nameMatch) {
-            currentChannel.name = nameMatch[1].trim();
-          }
-          
-          // Extract tvg-logo
-          const logoMatch = trimmedLine.match(/tvg-logo="([^"]+)"/);
-          if (logoMatch) {
-            currentChannel.tvg_logo = logoMatch[1];
-          }
-          
-          // Extract group-title (category)
-          const categoryMatch = trimmedLine.match(/group-title="([^"]+)"/);
-          if (categoryMatch) {
-            currentChannel.category_name = categoryMatch[1];
-          }
-        } else if (currentChannel && trimmedLine && !trimmedLine.startsWith('#')) {
-          currentChannel.stream_url = trimmedLine;
-          
+          // Channel complete - add to list
           if (currentChannel.name && currentChannel.stream_url) {
             channels.push(currentChannel as Channel);
           }
@@ -77,143 +110,206 @@ const parseM3UStream = async (response: Response): Promise<Channel[]> => {
         }
       }
     }
-    
-    // Process any remaining buffer
-    if (buffer.trim() && currentChannel && currentChannel.name) {
+
+    // Process remaining buffer
+    if (buffer.trim() && currentChannel && !buffer.trim().startsWith('#')) {
       currentChannel.stream_url = buffer.trim();
-      channels.push(currentChannel as Channel);
+      if (currentChannel.name && currentChannel.stream_url) {
+        channels.push(currentChannel as Channel);
+      }
     }
+
   } finally {
     reader.releaseLock();
   }
-  
-  return channels;
-};
 
-// Timeout helper - increased to 55 seconds for large files
-const fetchWithTimeout = async (url: string, timeoutMs = 55000) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  
-  // Try the URL as-is first
+  return channels;
+}
+
+/**
+ * Parse uma linha #EXTINF extraindo metadados
+ * 
+ * Formato: #EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Channel Name
+ */
+function parseExtinfLine(line: string, index: number): Partial<Channel> {
+  const channel: Partial<Channel> = {
+    id: `ch-${index}`,
+    name: '',
+    tvg_logo: null,
+    tvg_id: null,
+    tvg_name: null,
+    stream_url: '',
+    category_name: 'Outros',
+  };
+
+  // Extract channel name (after last comma)
+  const nameMatch = line.match(/,\s*(.+)$/);
+  if (nameMatch) {
+    channel.name = nameMatch[1].trim();
+  }
+
+  // Extract tvg-logo
+  const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
+  if (logoMatch && logoMatch[1]) {
+    channel.tvg_logo = logoMatch[1];
+  }
+
+  // Extract tvg-id
+  const idMatch = line.match(/tvg-id="([^"]*)"/i);
+  if (idMatch && idMatch[1]) {
+    channel.tvg_id = idMatch[1];
+  }
+
+  // Extract tvg-name
+  const tvgNameMatch = line.match(/tvg-name="([^"]*)"/i);
+  if (tvgNameMatch && tvgNameMatch[1]) {
+    channel.tvg_name = tvgNameMatch[1];
+  }
+
+  // Extract group-title (category)
+  const categoryMatch = line.match(/group-title="([^"]*)"/i);
+  if (categoryMatch && categoryMatch[1]) {
+    channel.category_name = categoryMatch[1];
+  }
+
+  return channel;
+}
+
+// =============================================================================
+// HTTP FETCHING
+// =============================================================================
+
+/**
+ * Fetch com timeout e fallback HTTPS → HTTP
+ */
+async function fetchM3U(url: string): Promise<Response> {
   let urlToFetch = url;
   
+  // Primeira tentativa
   try {
-    const response = await fetch(urlToFetch, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; M3U-Fetcher/1.0)',
-      },
-    });
-    clearTimeout(timeout);
-    return response;
+    return await fetchWithTimeout(urlToFetch);
   } catch (error) {
-    // If HTTPS fails with TLS error, try HTTP instead
-    if (urlToFetch.startsWith('https://') && 
-        (error.message?.includes('InvalidContentType') || 
-         error.message?.includes('corrupt message') ||
-         error.message?.includes('tls') ||
-         error.message?.includes('SSL'))) {
-      console.log(`[FetchM3U] HTTPS failed, trying HTTP...`);
+    const message = error instanceof Error ? error.message : '';
+    
+    // Fallback para HTTP se HTTPS falhar com erro TLS
+    if (urlToFetch.startsWith('https://') && isTlsError(message)) {
+      console.log('[M3U] HTTPS failed, trying HTTP...');
       urlToFetch = urlToFetch.replace('https://', 'http://');
-      
-      const controller2 = new AbortController();
-      const timeout2 = setTimeout(() => controller2.abort(), timeoutMs);
-      
-      try {
-        const response = await fetch(urlToFetch, {
-          signal: controller2.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; M3U-Fetcher/1.0)',
-          },
-        });
-        clearTimeout(timeout2);
-        return response;
-      } catch (error2) {
-        clearTimeout(timeout2);
-        throw error2;
-      }
+      return await fetchWithTimeout(urlToFetch);
     }
     
-    clearTimeout(timeout);
     throw error;
   }
-};
+}
 
-serve(async (req) => {
+/**
+ * Fetch com timeout
+ */
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CONFIG.FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'VLC/3.0.21 LibVLC/3.0.21',
+        'Accept': '*/*',
+      },
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Verifica se é erro de TLS
+ */
+function isTlsError(message: string): boolean {
+  const indicators = ['tls', 'ssl', 'certificate', 'handshake', 'corrupt', 'InvalidContentType'];
+  const lower = message.toLowerCase();
+  return indicators.some(i => lower.includes(i.toLowerCase()));
+}
+
+// =============================================================================
+// MAIN HANDLER
+// =============================================================================
+
+Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: CORS_HEADERS });
   }
 
   try {
-    const { url, limit, offset = 0 } = await req.json();
-    
-    if (!url) {
+    // Parse request body
+    const body = await req.json();
+    const { url, limit, offset = 0 } = body;
+
+    // Validação
+    if (!url || typeof url !== 'string') {
       return new Response(
-        JSON.stringify({ error: 'URL é obrigatória' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[FetchM3U] Fazendo fetch da URL: ${url} (limit: ${limit || 'all'}, offset: ${offset})`);
+    const effectiveLimit = limit || CONFIG.DEFAULT_LIMIT;
     
-    // Fetch com timeout de 55 segundos para listas grandes
-    const response = await fetchWithTimeout(url);
+    console.log(`[M3U] Fetching: ${url.substring(0, 80)}... (limit: ${effectiveLimit}, offset: ${offset})`);
+
+    // Fetch M3U
+    const response = await fetchM3U(url);
 
     if (!response.ok) {
-      throw new Error(`Falha ao buscar M3U: ${response.status} ${response.statusText}`);
+      throw new Error(`M3U fetch failed: ${response.status} ${response.statusText}`);
     }
 
-    console.log(`[FetchM3U] Parseando M3U em streaming...`);
-    
-    // Parse M3U in streaming mode to avoid memory issues
+    console.log('[M3U] Parsing stream...');
+
+    // Parse em streaming
     const allChannels = await parseM3UStream(response);
-    
-    console.log(`[FetchM3U] ${allChannels.length} canais parseados no total`);
 
-    // Se limit for especificado, aplicar paginação
-    let resultChannels = allChannels;
-    let hasMore = false;
+    console.log(`[M3U] Parsed ${allChannels.length} channels total`);
+
+    // Aplicar paginação
+    const paginatedChannels = allChannels.slice(offset, offset + effectiveLimit);
+    const hasMore = offset + effectiveLimit < allChannels.length;
+
+    console.log(`[M3U] Returning ${paginatedChannels.length} channels (${offset} to ${offset + paginatedChannels.length})`);
+
+    const result: ParseResult = {
+      channels: paginatedChannels,
+      total: allChannels.length,
+      offset,
+      limit: effectiveLimit,
+      hasMore,
+    };
+
+    return new Response(
+      JSON.stringify(result),
+      { 
+        status: 200, 
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = message.includes('abort') || message.includes('timeout');
     
-    if (limit && limit > 0) {
-      resultChannels = allChannels.slice(offset, offset + limit);
-      hasMore = (offset + limit) < allChannels.length;
-      console.log(`[FetchM3U] Retornando ${resultChannels.length} canais (${offset} a ${offset + resultChannels.length})`);
-    } else {
-      console.log(`[FetchM3U] Retornando todos os ${allChannels.length} canais`);
-    }
+    console.error(`[M3U] Error: ${message}`);
 
     return new Response(
       JSON.stringify({ 
-        channels: resultChannels,
-        total: allChannels.length,
-        offset,
-        limit: limit || allChannels.length,
-        hasMore
+        error: isTimeout 
+          ? 'M3U fetch timeout (max 60s)' 
+          : message 
       }),
       { 
-        status: 200, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
-    );
-  } catch (error) {
-    console.error('[FetchM3U] Erro:', error);
-    
-    const errorMessage = error.name === 'AbortError' 
-      ? 'Timeout ao buscar URL M3U (máximo 55 segundos)'
-      : error.message || 'Erro ao buscar URL M3U';
-    
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        status: isTimeout ? 504 : 500, 
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
       }
     );
   }

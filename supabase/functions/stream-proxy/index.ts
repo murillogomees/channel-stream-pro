@@ -1,16 +1,59 @@
-const corsHeaders = {
+/**
+ * ============================================================================
+ * IPTV Stream Proxy - Production Grade
+ * ============================================================================
+ * 
+ * Proxy para streams HLS que:
+ * - Reescreve URLs de manifests (.m3u8) para passar pelo proxy
+ * - Faz proxy de segmentos (.ts) com headers corretos
+ * - Suporta Range requests (seek)
+ * - Fallback HTTPS → HTTP automático
+ * - Headers que bypassam proteção de IPTV servers
+ * 
+ * @version 2.0.0
+ * @author IPTV Link
+ */
+
+// =============================================================================
+// CORS HEADERS
+// =============================================================================
+const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
   'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
-};
+} as const;
 
-// Helper to get base URL from a full URL
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+const CONFIG = {
+  FETCH_TIMEOUT_MS: 20000,      // 20s timeout por request
+  MAX_RETRIES: 3,               // Máximo de tentativas
+  RETRY_DELAY_BASE_MS: 300,     // Base do delay entre retries (exponential)
+  SEGMENT_CACHE_SECONDS: 3,     // Cache de segmentos
+} as const;
+
+// =============================================================================
+// TYPES
+// =============================================================================
+interface FetchResult {
+  response: Response;
+  usedUrl: string;
+}
+
+// =============================================================================
+// URL UTILITIES
+// =============================================================================
+
+/**
+ * Extrai a base URL (sem o arquivo) de uma URL completa
+ */
 function getBaseUrl(url: string): string {
   try {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/');
-    pathParts.pop();
+    pathParts.pop(); // Remove filename
     return `${urlObj.protocol}//${urlObj.host}${pathParts.join('/')}`;
   } catch {
     const lastSlash = url.lastIndexOf('/');
@@ -18,7 +61,9 @@ function getBaseUrl(url: string): string {
   }
 }
 
-// Get origin from URL
+/**
+ * Extrai origin (protocol + host) de uma URL
+ */
 function getOrigin(url: string): string {
   try {
     const urlObj = new URL(url);
@@ -28,51 +73,16 @@ function getOrigin(url: string): string {
   }
 }
 
-// Rewrite URLs in HLS manifest
-function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
-  const lines = content.split('\n');
-  const rewrittenLines = lines.map(line => {
-    const trimmedLine = line.trim();
-    
-    if (!trimmedLine || (trimmedLine.startsWith('#') && !trimmedLine.includes('URI="'))) {
-      if (trimmedLine.includes('URI="')) {
-        return rewriteUriInTag(trimmedLine, baseUrl, proxyBaseUrl);
-      }
-      return line;
-    }
-    
-    if (trimmedLine.startsWith('#') && trimmedLine.includes('URI="')) {
-      return rewriteUriInTag(trimmedLine, baseUrl, proxyBaseUrl);
-    }
-    
-    if (!trimmedLine.startsWith('#')) {
-      return rewriteUrl(trimmedLine, baseUrl, proxyBaseUrl);
-    }
-    
-    return line;
-  });
-  
-  return rewrittenLines.join('\n');
-}
-
-function rewriteUriInTag(line: string, baseUrl: string, proxyBaseUrl: string): string {
-  return line.replace(/URI="([^"]+)"/g, (match, uri) => {
-    const fullUrl = resolveUrl(uri, baseUrl);
-    const proxiedUrl = `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
-    return `URI="${proxiedUrl}"`;
-  });
-}
-
-function rewriteUrl(url: string, baseUrl: string, proxyBaseUrl: string): string {
-  const fullUrl = resolveUrl(url.trim(), baseUrl);
-  return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
-}
-
+/**
+ * Resolve URL relativa para absoluta
+ */
 function resolveUrl(url: string, baseUrl: string): string {
+  // Já é absoluta
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
   
+  // Path absoluto (começa com /)
   if (url.startsWith('/')) {
     try {
       const base = new URL(baseUrl);
@@ -82,202 +92,335 @@ function resolveUrl(url: string, baseUrl: string): string {
     }
   }
   
+  // Path relativo
   return `${baseUrl}/${url}`;
 }
 
+// =============================================================================
+// HLS MANIFEST REWRITING
+// =============================================================================
+
+/**
+ * Detecta se o conteúdo é HLS baseado na URL ou Content-Type
+ */
 function isHlsContent(url: string, contentType: string | null): boolean {
   const urlLower = url.toLowerCase();
+  
+  // Check URL extension
   if (urlLower.includes('.m3u8') || urlLower.includes('.m3u')) {
     return true;
   }
+  
+  // Check Content-Type
   if (contentType) {
     const ctLower = contentType.toLowerCase();
-    return ctLower.includes('mpegurl') || ctLower.includes('x-mpegurl') || ctLower.includes('vnd.apple');
+    return ctLower.includes('mpegurl') || 
+           ctLower.includes('x-mpegurl') || 
+           ctLower.includes('vnd.apple');
   }
+  
   return false;
 }
 
-async function fetchWithRetry(url: string, headers: Headers, maxRetries = 3): Promise<Response> {
-  let lastError: Error | null = null;
+/**
+ * Detecta se é um segmento de vídeo
+ */
+function isSegment(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.ts') || 
+         urlLower.includes('.aac') || 
+         urlLower.includes('.mp4') ||
+         urlLower.includes('.fmp4');
+}
+
+/**
+ * Reescreve todas as URLs em um manifest HLS para passar pelo proxy
+ */
+function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
+  const lines = content.split('\n');
   
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  const rewrittenLines = lines.map(line => {
+    const trimmedLine = line.trim();
+    
+    // Linha vazia ou comentário simples - mantém
+    if (!trimmedLine || (trimmedLine.startsWith('#') && !trimmedLine.includes('URI="'))) {
+      return line;
+    }
+    
+    // Tags com URI (ex: #EXT-X-KEY:METHOD=AES-128,URI="...")
+    if (trimmedLine.includes('URI="')) {
+      return rewriteUriInTag(trimmedLine, baseUrl, proxyBaseUrl);
+    }
+    
+    // URL de segmento ou playlist (linha sem #)
+    if (!trimmedLine.startsWith('#')) {
+      const fullUrl = resolveUrl(trimmedLine, baseUrl);
+      return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
+    }
+    
+    return line;
+  });
+  
+  return rewrittenLines.join('\n');
+}
+
+/**
+ * Reescreve atributos URI="" dentro de tags HLS
+ */
+function rewriteUriInTag(line: string, baseUrl: string, proxyBaseUrl: string): string {
+  return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+    const fullUrl = resolveUrl(uri, baseUrl);
+    const proxiedUrl = `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
+    return `URI="${proxiedUrl}"`;
+  });
+}
+
+// =============================================================================
+// HTTP FETCHING
+// =============================================================================
+
+/**
+ * Cria headers que simulam um player real (VLC/IPTV box)
+ * Essencial para bypass de proteção de servidores IPTV
+ */
+function createUpstreamHeaders(origin: string, rangeHeader: string | null): Headers {
+  const headers = new Headers();
+  
+  // User-Agent de player real - CRÍTICO para bypass
+  headers.set('User-Agent', 'VLC/3.0.21 LibVLC/3.0.21');
+  headers.set('Accept', '*/*');
+  headers.set('Accept-Language', 'en-US,en;q=0.9');
+  headers.set('Connection', 'keep-alive');
+  
+  // Referer = origin do IPTV - CRÍTICO para bypass
+  if (origin) {
+    headers.set('Referer', `${origin}/`);
+    headers.set('Origin', origin);
+  }
+  
+  // Range para seek
+  if (rangeHeader) {
+    headers.set('Range', rangeHeader);
+  }
+  
+  return headers;
+}
+
+/**
+ * Fetch com retry, timeout e fallback HTTPS → HTTP
+ */
+async function fetchWithRetry(
+  url: string, 
+  headers: Headers
+): Promise<FetchResult> {
+  let lastError: Error | null = null;
+  let urlToFetch = url;
+  
+  for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const response = await fetchWithTimeout(urlToFetch, headers);
       
-      const response = await fetch(url, {
-        headers,
-        signal: controller.signal,
-        redirect: 'follow',
-      });
-      
-      clearTimeout(timeoutId);
-      
+      // Sucesso
       if (response.ok || response.status === 206) {
-        return response;
+        return { response, usedUrl: urlToFetch };
       }
       
-      // If 403/401, don't retry - server is blocking us
+      // 403/401 = bloqueado pelo servidor, não adianta retry
       if (response.status === 403 || response.status === 401) {
-        console.error(`[StreamProxy] Auth error ${response.status} for: ${url.substring(0, 60)}...`);
-        return response;
+        console.error(`[Proxy] Blocked (${response.status}): ${urlToFetch.substring(0, 80)}...`);
+        return { response, usedUrl: urlToFetch };
       }
       
-      console.warn(`[StreamProxy] Attempt ${attempt + 1} failed with status ${response.status}`);
       lastError = new Error(`HTTP ${response.status}`);
+      console.warn(`[Proxy] Attempt ${attempt + 1}/${CONFIG.MAX_RETRIES} failed: ${response.status}`);
+      
     } catch (err) {
       lastError = err as Error;
-      console.warn(`[StreamProxy] Attempt ${attempt + 1} error: ${lastError.message}`);
+      const msg = lastError.message || '';
       
-      if (lastError.name === 'AbortError') {
-        continue;
+      console.warn(`[Proxy] Attempt ${attempt + 1}/${CONFIG.MAX_RETRIES} error: ${msg.substring(0, 100)}`);
+      
+      // Fallback HTTPS → HTTP em caso de erro TLS
+      if (attempt === 0 && urlToFetch.startsWith('https://') && isTlsError(msg)) {
+        console.log(`[Proxy] TLS error, falling back to HTTP...`);
+        urlToFetch = urlToFetch.replace('https://', 'http://');
+        continue; // Retry imediatamente com HTTP
       }
     }
     
-    // Wait before retry
-    if (attempt < maxRetries - 1) {
-      await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+    // Exponential backoff
+    if (attempt < CONFIG.MAX_RETRIES - 1) {
+      const delay = CONFIG.RETRY_DELAY_BASE_MS * Math.pow(2, attempt);
+      await sleep(delay);
     }
   }
   
   throw lastError || new Error('Max retries exceeded');
 }
 
+/**
+ * Fetch com timeout
+ */
+async function fetchWithTimeout(url: string, headers: Headers): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CONFIG.FETCH_TIMEOUT_MS);
+  
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Verifica se é um erro de TLS
+ */
+function isTlsError(message: string): boolean {
+  const tlsIndicators = [
+    'tls', 'ssl', 'certificate', 'handshake', 
+    'corrupt', 'InvalidContentType', 'CERT_'
+  ];
+  const msgLower = message.toLowerCase();
+  return tlsIndicators.some(ind => msgLower.includes(ind.toLowerCase()));
+}
+
+/**
+ * Sleep helper
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// =============================================================================
+// MAIN HANDLER
+// =============================================================================
+
 Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: CORS_HEADERS });
   }
 
   try {
     const url = new URL(req.url);
     const streamUrl = url.searchParams.get('url');
 
+    // Validação de parâmetro
     if (!streamUrl) {
-      return new Response('Missing url parameter', { 
-        status: 400,
-        headers: corsHeaders 
-      });
+      return new Response(
+        JSON.stringify({ error: 'Missing url parameter' }), 
+        { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const decodedStreamUrl = decodeURIComponent(streamUrl);
-    const origin = getOrigin(decodedStreamUrl);
-    const isSegment = decodedStreamUrl.toLowerCase().includes('.ts');
+    const decodedUrl = decodeURIComponent(streamUrl);
+    const origin = getOrigin(decodedUrl);
+    const isVideoSegment = isSegment(decodedUrl);
     
-    console.log(`[StreamProxy] ${isSegment ? 'Segment' : 'Manifest'}: ${decodedStreamUrl.substring(0, 70)}...`);
+    // Log resumido
+    const urlPreview = decodedUrl.length > 80 ? decodedUrl.substring(0, 80) + '...' : decodedUrl;
+    console.log(`[Proxy] ${isVideoSegment ? 'SEG' : 'M3U'}: ${urlPreview}`);
 
-    // Build headers to mimic a real player
-    const upstreamHeaders = new Headers();
-    
-    // Copy range header if present
+    // Build headers
     const rangeHeader = req.headers.get('Range');
-    if (rangeHeader) {
-      upstreamHeaders.set('Range', rangeHeader);
+    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader);
+
+    // Fetch upstream
+    const { response: streamResponse, usedUrl } = await fetchWithRetry(decodedUrl, upstreamHeaders);
+
+    // Handle errors
+    if (!streamResponse.ok && streamResponse.status !== 206) {
+      const status = streamResponse.status;
+      
+      if (status === 403 || status === 401) {
+        return new Response(
+          JSON.stringify({ error: 'Access denied by upstream server' }), 
+          { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: `Upstream error: ${status}` }), 
+        { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
+
+    // Determine content type
+    let contentType = streamResponse.headers.get('Content-Type');
+    const isHls = isHlsContent(decodedUrl, contentType);
     
-    // Essential headers for IPTV servers
-    upstreamHeaders.set('User-Agent', 'VLC/3.0.20 LibVLC/3.0.20');
-    upstreamHeaders.set('Accept', '*/*');
-    upstreamHeaders.set('Connection', 'keep-alive');
+    // Fix content types
+    if (!contentType || contentType === 'application/octet-stream') {
+      contentType = isHls 
+        ? 'application/vnd.apple.mpegurl' 
+        : isVideoSegment 
+          ? 'video/mp2t' 
+          : 'application/octet-stream';
+    }
+
+    // Build response headers
+    const responseHeaders = new Headers(CORS_HEADERS);
+    responseHeaders.set('Content-Type', contentType);
     
-    // Critical: Set Referer to IPTV origin
-    if (origin) {
-      upstreamHeaders.set('Referer', origin + '/');
+    // Cache: manifests = no-cache, segments = short cache
+    if (isHls) {
+      responseHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else {
+      responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.SEGMENT_CACHE_SECONDS}`);
     }
 
-    try {
-      const streamResponse = await fetchWithRetry(decodedStreamUrl, upstreamHeaders);
-
-      if (!streamResponse.ok && streamResponse.status !== 206) {
-        console.error(`[StreamProxy] Upstream error: ${streamResponse.status}`);
-        
-        // For 403 errors, return specific message
-        if (streamResponse.status === 403) {
-          return new Response('Stream access denied by server', { 
-            status: 403,
-            headers: corsHeaders 
-          });
-        }
-        
-        return new Response(`Stream unavailable (${streamResponse.status})`, { 
-          status: 502,
-          headers: corsHeaders 
-        });
-      }
-
-      let contentType = streamResponse.headers.get('Content-Type');
-      const isHls = isHlsContent(decodedStreamUrl, contentType);
+    // HLS Manifest: rewrite URLs
+    if (isHls) {
+      const manifestContent = await streamResponse.text();
+      const baseUrl = getBaseUrl(usedUrl); // Usa URL final (pode ser HTTP após fallback)
+      const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
       
-      // Fix content types
-      if (!contentType || contentType === 'application/octet-stream') {
-        if (isHls) {
-          contentType = 'application/vnd.apple.mpegurl';
-        } else if (isSegment) {
-          contentType = 'video/mp2t';
-        }
-      }
-
-      const headers = new Headers(corsHeaders);
-      headers.set('Content-Type', contentType || 'application/octet-stream');
+      const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl);
       
-      if (isHls) {
-        headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-      } else {
-        headers.set('Cache-Control', 'public, max-age=2');
-      }
-
-      // For HLS manifests, rewrite URLs
-      if (isHls) {
-        const manifestContent = await streamResponse.text();
-        const baseUrl = getBaseUrl(decodedStreamUrl);
-        const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
-        
-        const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl);
-        
-        return new Response(rewrittenManifest, {
-          status: 200,
-          headers,
-        });
-      }
-      
-      // Copy important headers for range requests
-      const keepHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
-      keepHeaders.forEach(header => {
-        const value = streamResponse.headers.get(header);
-        if (value) headers.set(header, value);
-      });
-
-      if (!headers.has('Accept-Ranges')) {
-        headers.set('Accept-Ranges', 'bytes');
-      }
-
-      // Stream the response body directly
-      return new Response(streamResponse.body, {
-        status: streamResponse.status,
-        headers,
-      });
-    } catch (fetchError) {
-      const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-      console.error(`[StreamProxy] Fetch error: ${errorMessage}`);
-      
-      if (errorMessage.includes('AbortError') || errorMessage.includes('timeout')) {
-        return new Response('Stream timeout', { 
-          status: 504,
-          headers: corsHeaders 
-        });
-      }
-      
-      return new Response(`Fetch error: ${errorMessage}`, { 
-        status: 502,
-        headers: corsHeaders 
+      return new Response(rewrittenManifest, {
+        status: 200,
+        headers: responseHeaders,
       });
     }
+
+    // Video Segment: pass-through com headers de range
+    const passHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
+    passHeaders.forEach(header => {
+      const value = streamResponse.headers.get(header);
+      if (value) responseHeaders.set(header, value);
+    });
+
+    // Garante Accept-Ranges
+    if (!responseHeaders.has('Accept-Ranges')) {
+      responseHeaders.set('Accept-Ranges', 'bytes');
+    }
+
+    // Stream body directly
+    return new Response(streamResponse.body, {
+      status: streamResponse.status,
+      headers: responseHeaders,
+    });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[StreamProxy] Error:', errorMessage);
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Proxy] Fatal: ${message}`);
+    
+    // Timeout específico
+    if (message.includes('abort') || message.includes('timeout')) {
+      return new Response(
+        JSON.stringify({ error: 'Stream timeout' }), 
+        { status: 504, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    return new Response(
+      JSON.stringify({ error: message }), 
+      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
   }
 });
