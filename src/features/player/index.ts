@@ -17,5 +17,17 @@ export {
 } from './services';
 
 // Hooks
-export { useProfile } from './hooks/useProfile';
-export { useContinueWatching } from './hooks/useContinueWatching';
+export {
+  useProfile,
+  useContinueWatching,
+  useTrending,
+  useRecommendations,
+} from './hooks';
+
+// Components
+export {
+  TVHeroCarousel,
+  ContinueWatchingRow,
+  Top10Row,
+  ContentRow,
+} from './components';

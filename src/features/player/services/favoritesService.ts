@@ -189,6 +189,50 @@ class FavoritesService {
   }
 
   /**
+   * Add to watchlist (without toggle)
+   */
+  async addToWatchlist(
+    contentId: string,
+    contentType: ContentType,
+    contentName: string,
+    options?: {
+      contentLogo?: string;
+      contentCategory?: string;
+      tmdbId?: string;
+      imdbRating?: number;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<boolean> {
+    if (this.isInWatchlist(contentId)) {
+      return true; // Already in watchlist
+    }
+
+    const profile = await profileService.getCurrentProfile();
+    if (!profile) return false;
+
+    const { error } = await supabase
+      .from('user_watchlist')
+      .insert({
+        profile_id: profile.id,
+        content_id: contentId,
+        content_type: contentType,
+        content_name: contentName,
+        content_logo: options?.contentLogo,
+        content_category: options?.contentCategory,
+        tmdb_id: options?.tmdbId,
+        imdb_rating: options?.imdbRating,
+        metadata: options?.metadata || {},
+      });
+
+    if (!error) {
+      this.watchlistCache.add(contentId);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Get watchlist
    */
   async getWatchlist(): Promise<WatchlistItem[]> {
