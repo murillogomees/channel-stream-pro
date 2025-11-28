@@ -7,6 +7,7 @@ import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
+import { useBackendSearch } from '@/hooks/useBackendSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import {
@@ -76,6 +77,17 @@ export default function AppPlayer() {
     isLoading: favoritesLoading,
   } = useFavoriteChannels();
 
+  // Backend search hook
+  const {
+    query: backendQuery,
+    results: backendResults,
+    isSearching,
+    totalResults: backendTotalResults,
+    updateQuery: updateBackendSearch,
+    clearSearch,
+    isActive: isBackendSearchActive,
+  } = useBackendSearch({ playlistKey: 'lista-vip', debounceMs: 400 });
+
   const [activeTab, setActiveTab] = useState<'home' | 'live' | 'movies' | 'series' | 'favorites'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -93,14 +105,21 @@ export default function AppPlayer() {
   } = useContinueWatching();
   const { items: trendingItems, isLoading: loadingTrending } = useTrending('weekly');
 
+  // Handle search change - use backend search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    updateBackendSearch(value);
+  }, [updateBackendSearch]);
+
   // Reset category selection when tab changes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setSelectedCategory(null);
       setSearchQuery('');
+      clearSearch();
     }, 0);
     return () => clearTimeout(timeoutId);
-  }, [activeTab]);
+  }, [activeTab, clearSearch]);
 
   // Categorize content by type
   const categorizedContent = useMemo(() => {
@@ -176,18 +195,47 @@ export default function AppPlayer() {
   }, [activeTab, categorizedContent]);
 
   // Filtered channels based on search and category
+  // Uses backend search when there's an active query, otherwise local filter
   const filteredChannels = useMemo(() => {
+    // If backend search is active and has results, use those
+    if (isBackendSearchActive && backendResults.length > 0) {
+      return backendResults.map(r => ({
+        id: r.id,
+        name: r.name,
+        stream_url: r.stream_url,
+        tvg_logo: r.tvg_logo,
+        tvg_id: r.tvg_id,
+        category_id: 'search',
+        category_name: r.category_name,
+        order_position: 0,
+      }));
+    }
+    
     let sourceCategories: typeof categories = [];
     
     if (activeTab === 'favorites') {
       const favs = allChannels.filter(ch => isFavorite(ch.id));
       if (!searchQuery) return favs;
+      // For favorites, still use local filter as fallback
       return favs.filter(ch => 
         ch.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
     if (activeTab === 'home') {
+      // If searching on home, show backend results
+      if (isBackendSearchActive) {
+        return backendResults.map(r => ({
+          id: r.id,
+          name: r.name,
+          stream_url: r.stream_url,
+          tvg_logo: r.tvg_logo,
+          tvg_id: r.tvg_id,
+          category_id: 'search',
+          category_name: r.category_name,
+          order_position: 0,
+        }));
+      }
       return [];
     }
 
@@ -205,7 +253,9 @@ export default function AppPlayer() {
       cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
     );
 
-    if (searchQuery) {
+    // If we have search but no backend results yet, show loading placeholder
+    // Otherwise, the backend results take precedence
+    if (searchQuery && !isBackendSearchActive) {
       const query = searchQuery.toLowerCase();
       channels = channels.filter(ch => 
         ch.name.toLowerCase().includes(query)
@@ -213,7 +263,7 @@ export default function AppPlayer() {
     }
 
     return channels;
-  }, [activeTab, categorizedContent, selectedCategory, searchQuery, allChannels, isFavorite]);
+  }, [activeTab, categorizedContent, selectedCategory, searchQuery, allChannels, isFavorite, isBackendSearchActive, backendResults]);
 
   // Home content
   const homeContent = useMemo(() => {
@@ -378,17 +428,24 @@ export default function AppPlayer() {
             )}
             
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold truncate">{tabTitle}</h1>
+              <h1 className="text-base sm:text-lg font-semibold truncate">
+                {isBackendSearchActive ? 'Busca' : tabTitle}
+              </h1>
               {/* Content count */}
               <span className="hidden sm:inline text-sm text-muted-foreground flex-shrink-0">
-                {activeTab === 'home' && `${allChannels.length.toLocaleString()} itens`}
-                {activeTab === 'live' && `${counts.live.toLocaleString()} canais`}
-                {activeTab === 'movies' && `${counts.movies.toLocaleString()} filmes`}
-                {activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
-                {activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
+                {isBackendSearchActive && (
+                  isSearching 
+                    ? 'Buscando...' 
+                    : `${backendTotalResults.toLocaleString()} resultados`
+                )}
+                {!isBackendSearchActive && activeTab === 'home' && `${allChannels.length.toLocaleString()} itens`}
+                {!isBackendSearchActive && activeTab === 'live' && `${counts.live.toLocaleString()} canais`}
+                {!isBackendSearchActive && activeTab === 'movies' && `${counts.movies.toLocaleString()} filmes`}
+                {!isBackendSearchActive && activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
+                {!isBackendSearchActive && activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
               </span>
               {/* Cache indicator */}
-              {isCached && !isLoadingMore && (
+              {isCached && !isLoadingMore && !isBackendSearchActive && (
                 <div className="hidden sm:flex items-center gap-1 text-xs text-green-500 flex-shrink-0">
                   <Database className="w-3 h-3" />
                   <span>Cache</span>
@@ -421,11 +478,14 @@ export default function AppPlayer() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar..."
+                placeholder="Buscar em toda playlist..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-[120px] sm:w-[180px] lg:w-[240px] pl-9 h-9 text-sm"
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-[140px] sm:w-[200px] lg:w-[280px] pl-9 h-9 text-sm"
               />
+              {isSearching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary" />
+              )}
             </div>
 
             {/* Sort select for movies */}
@@ -498,87 +558,117 @@ export default function AppPlayer() {
           {/* Home View */}
           {activeTab === 'home' && (
             <>
-              {featuredItems.length > 0 && (
-                <TVHeroSection
-                  items={featuredItems}
-                  onPlay={(item) => {
-                    const channel = allChannels.find(ch => ch.id === item.id);
-                    if (channel) handlePlay(channel);
-                  }}
-                  onToggleFavorite={toggleFavorite}
-                  isFavorite={isFavorite}
-                />
-              )}
-              
-              <div className="pb-16 space-y-2">
-                {/* Continue Watching - Smart Feature */}
-                <ContinueWatchingRow
-                  items={continueWatchingItems}
-                  onPlay={(item: WatchProgress) => {
-                    // Try to find channel in playlist or just navigate with the data
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) {
-                      handlePlay(channel);
-                    } else {
-                      // Navigate with resume position
-                      setPlayerChannel({
-                        id: item.content_id,
-                        name: item.content_name,
-                        tvg_logo: item.content_logo,
-                        category_name: item.content_category,
-                        stream_url: '', // Will need to be resolved
-                      });
-                      setShowPlayerDialog(true);
-                    }
-                  }}
-                  onRemove={async (contentId: string) => {
-                    await removeContinueWatchingItem(contentId);
-                  }}
-                  isLoading={loadingContinueWatching}
-                />
+              {/* Show search results if searching */}
+              {isBackendSearchActive ? (
+                <div className="px-3 py-4 sm:p-6 lg:p-8">
+                  <h2 className="text-xl font-semibold mb-4">
+                    {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
+                  </h2>
+                  {isSearching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : filteredChannels.length > 0 ? (
+                    <TVContentGrid
+                      channels={filteredChannels}
+                      isFavorite={isFavorite}
+                      onPlay={handlePlay}
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">Nenhum resultado encontrado</p>
+                      <p className="text-sm text-muted-foreground/70 mt-1">
+                        Tente buscar por outro termo
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {featuredItems.length > 0 && (
+                    <TVHeroSection
+                      items={featuredItems}
+                      onPlay={(item) => {
+                        const channel = allChannels.find(ch => ch.id === item.id);
+                        if (channel) handlePlay(channel);
+                      }}
+                      onToggleFavorite={toggleFavorite}
+                      isFavorite={isFavorite}
+                    />
+                  )}
+                  
+                  <div className="pb-16 space-y-2">
+                    {/* Continue Watching - Smart Feature */}
+                    <ContinueWatchingRow
+                      items={continueWatchingItems}
+                      onPlay={(item: WatchProgress) => {
+                        // Try to find channel in playlist or just navigate with the data
+                        const channel = allChannels.find(ch => ch.id === item.content_id);
+                        if (channel) {
+                          handlePlay(channel);
+                        } else {
+                          // Navigate with resume position
+                          setPlayerChannel({
+                            id: item.content_id,
+                            name: item.content_name,
+                            tvg_logo: item.content_logo,
+                            category_name: item.content_category,
+                            stream_url: '', // Will need to be resolved
+                          });
+                          setShowPlayerDialog(true);
+                        }
+                      }}
+                      onRemove={async (contentId: string) => {
+                        await removeContinueWatchingItem(contentId);
+                      }}
+                      isLoading={loadingContinueWatching}
+                    />
 
-                {/* Top 10 - Smart Feature */}
-                <Top10Row
-                  items={trendingItems}
-                  title="Top 10 da Semana"
-                  onPlay={(item: TrendingItem) => {
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) {
-                      handlePlay(channel);
-                    }
-                  }}
-                  onInfo={(item: TrendingItem) => {
-                    // For now, just play the content
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) {
-                      handlePlay(channel);
-                    }
-                  }}
-                  isLoading={loadingTrending}
-                />
+                    {/* Top 10 - Smart Feature */}
+                    <Top10Row
+                      items={trendingItems}
+                      title="Top 10 da Semana"
+                      onPlay={(item: TrendingItem) => {
+                        const channel = allChannels.find(ch => ch.id === item.content_id);
+                        if (channel) {
+                          handlePlay(channel);
+                        }
+                      }}
+                      onInfo={(item: TrendingItem) => {
+                        // For now, just play the content
+                        const channel = allChannels.find(ch => ch.id === item.content_id);
+                        if (channel) {
+                          handlePlay(channel);
+                        }
+                      }}
+                      isLoading={loadingTrending}
+                    />
 
-                {/* Existing category content rows */}
-                {homeContent.map((category) => (
-                  <TVContentRow
-                    key={category.id}
-                    title={category.display_name}
-                    itemCount={category.channels.length}
-                  >
-                    {category.channels.map((channel) => (
-                      <TVContentCard
-                        key={channel.id}
-                        id={channel.id}
-                        name={channel.name}
-                        logo={channel.tvg_logo || undefined}
-                        category={category.display_name}
-                        isFavorite={isFavorite(channel.id)}
-                        onPlay={() => handlePlay(channel)}
-                        onToggleFavorite={() => toggleFavorite(channel.id)}
-                      />
+                    {/* Existing category content rows */}
+                    {homeContent.map((category) => (
+                      <TVContentRow
+                        key={category.id}
+                        title={category.display_name}
+                        itemCount={category.channels.length}
+                      >
+                        {category.channels.map((channel) => (
+                          <TVContentCard
+                            key={channel.id}
+                            id={channel.id}
+                            name={channel.name}
+                            logo={channel.tvg_logo || undefined}
+                            category={category.display_name}
+                            isFavorite={isFavorite(channel.id)}
+                            onPlay={() => handlePlay(channel)}
+                            onToggleFavorite={() => toggleFavorite(channel.id)}
+                          />
+                        ))}
+                      </TVContentRow>
                     ))}
-                  </TVContentRow>
-                ))}
-              </div>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -598,41 +688,113 @@ export default function AppPlayer() {
           {/* Live TV View - Special layout with EPG, zapping, PIP */}
           {activeTab === 'live' && (
             <div className="px-3 py-2 sm:p-4 lg:p-6 pb-20">
-              <LiveTVView
-                channels={categorizedContent.live.flatMap(cat => 
-                  cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
-                )}
-                currentChannel={currentChannel}
-                onChannelChange={changeChannel}
-                onPlay={handlePlay}
-                isFavorite={isFavorite}
-                onToggleFavorite={toggleFavorite}
-              />
+              {isBackendSearchActive ? (
+                <>
+                  <h2 className="text-xl font-semibold mb-4">
+                    {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
+                  </h2>
+                  {isSearching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : filteredChannels.length > 0 ? (
+                    <TVContentGrid
+                      channels={filteredChannels}
+                      isFavorite={isFavorite}
+                      onPlay={handlePlay}
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">Nenhum resultado encontrado</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <LiveTVView
+                  channels={categorizedContent.live.flatMap(cat => 
+                    cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))
+                  )}
+                  currentChannel={currentChannel}
+                  onChannelChange={changeChannel}
+                  onPlay={handlePlay}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={toggleFavorite}
+                />
+              )}
             </div>
           )}
 
           {/* Movies View - Enhanced with TMDB integration */}
           {activeTab === 'movies' && (
-            <MoviesView
-              categories={categorizedContent.movies}
-              onPlay={handlePlay}
-              isFavorite={isFavorite}
-              onToggleFavorite={toggleFavorite}
-              searchQuery={searchQuery}
-              sortBy={movieSortBy}
-            />
+            isBackendSearchActive ? (
+              <div className="px-3 py-4 sm:p-6 lg:p-8">
+                <h2 className="text-xl font-semibold mb-4">
+                  {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
+                </h2>
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredChannels.length > 0 ? (
+                  <TVContentGrid
+                    channels={filteredChannels}
+                    isFavorite={isFavorite}
+                    onPlay={handlePlay}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">Nenhum resultado encontrado</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <MoviesView
+                categories={categorizedContent.movies}
+                onPlay={handlePlay}
+                isFavorite={isFavorite}
+                onToggleFavorite={toggleFavorite}
+                searchQuery={searchQuery}
+                sortBy={movieSortBy}
+              />
+            )
           )}
 
           {/* Series View - Enhanced with TMDB integration */}
           {activeTab === 'series' && (
-            <SeriesView
-              categories={categorizedContent.series}
-              onPlay={handlePlay}
-              isFavorite={isFavorite}
-              onToggleFavorite={toggleFavorite}
-              searchQuery={searchQuery}
-              sortBy={seriesSortBy}
-            />
+            isBackendSearchActive ? (
+              <div className="px-3 py-4 sm:p-6 lg:p-8">
+                <h2 className="text-xl font-semibold mb-4">
+                  {isSearching ? 'Buscando...' : `Resultados para "${searchQuery}"`}
+                </h2>
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredChannels.length > 0 ? (
+                  <TVContentGrid
+                    channels={filteredChannels}
+                    isFavorite={isFavorite}
+                    onPlay={handlePlay}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">Nenhum resultado encontrado</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <SeriesView
+                categories={categorizedContent.series}
+                onPlay={handlePlay}
+                isFavorite={isFavorite}
+                onToggleFavorite={toggleFavorite}
+                searchQuery={searchQuery}
+                sortBy={seriesSortBy}
+              />
+            )
           )}
         </div>
       </main>

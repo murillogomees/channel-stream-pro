@@ -835,6 +835,69 @@ export function useIPTVPlayerClient() {
     if (idx > 0) setCurrentChannel(all[idx - 1]);
   }, [currentChannel, categories]);
 
+  // Backend search function
+  const searchBackend = useCallback(async (
+    query: string,
+    options?: { category?: string; limit?: number }
+  ): Promise<{ channels: any[]; total: number }> => {
+    if (!query || query.length < 2) {
+      return { channels: [], total: 0 };
+    }
+
+    const playlistKey = playlistKeyRef.current || 'lista-vip';
+    
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token || '';
+      
+      const params = new URLSearchParams({
+        q: query,
+        limit: String(options?.limit || 100),
+      });
+      
+      if (playlistKey) {
+        params.append('playlist', playlistKey);
+      }
+      if (options?.category) {
+        params.append('category', options.category);
+      }
+
+      const response = await fetch(
+        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/search?${params}`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('[Search] HTTP error:', response.status);
+        return { channels: [], total: 0 };
+      }
+
+      const data = await response.json();
+      
+      // Transform results to channel format
+      const channels = (data.entries || []).map((entry: any) => ({
+        id: entry.id,
+        name: entry.title,
+        stream_url: entry.stream_url,
+        tvg_logo: entry.tvg_logo,
+        tvg_id: entry.tvg_id,
+        category_id: entry.group_title || 'search',
+        category_name: entry.group_title || 'Resultado da busca',
+        order_position: 0,
+      }));
+
+      return {
+        channels,
+        total: data.total || channels.length,
+      };
+    } catch (err) {
+      console.error('[Search] Error:', err);
+      return { channels: [], total: 0 };
+    }
+  }, []);
+
   return {
     categories,
     currentChannel,
@@ -851,5 +914,6 @@ export function useIPTVPlayerClient() {
     previousChannel,
     refreshPlaylist: loadClientPlaylist,
     clearCacheAndReload,
+    searchBackend,
   };
 }
