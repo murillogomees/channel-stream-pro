@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Tv, ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import UniversalPlayer from '@/components/app/UniversalPlayer';
+import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
@@ -504,13 +504,16 @@ export default function AdminIPTVTest() {
         </div>
       </main>
 
-      {/* Universal Player - Fullscreen */}
+      {/* YouTube Style Player */}
       {showPlayerDialog && playerChannel && (
-        <UniversalPlayer
+        <YouTubeStylePlayer
           url={getStreamUrl(playerChannel)}
           title={playerChannel.name}
           logo={playerChannel.tvg_logo || undefined}
+          category={playerChannel.category_name || 'Geral'}
           autoplay
+          isFavorite={isFavorite(playerChannel.id)}
+          onToggleFavorite={() => toggleFavorite(playerChannel.id)}
           onBack={() => {
             setShowPlayerDialog(false);
             setPlayerChannel(null);
