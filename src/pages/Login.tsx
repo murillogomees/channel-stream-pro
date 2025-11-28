@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Loader2, Wifi, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Loader2, Wifi } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,13 +187,18 @@ export default function Login() {
         {/* Login Card */}
         <div className="w-full max-w-sm">
           <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
-            {/* Card Header */}
-            <div className="p-6 pb-2">
-              <h2 className="text-xl font-semibold text-center text-foreground">
-                Bem-vindo de volta
+            {/* Card Header with Logo */}
+            <div className="p-6 pb-2 flex flex-col items-center">
+              <img 
+                src="/logo.png" 
+                alt="IPTV LINK" 
+                className="w-20 h-20 object-contain mb-3"
+              />
+              <h2 className="text-xl font-bold text-center text-foreground">
+                IPTV LINK
               </h2>
               <p className="text-muted-foreground text-center text-sm mt-1">
-                Entre com suas credenciais
+                TV Online em Alta Definição
               </p>
             </div>
 
@@ -288,19 +293,6 @@ export default function Login() {
                 </div>
               </form>
 
-              {/* Back to site link */}
-              <div className="mt-4 text-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => navigate('/')}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar para o site
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -313,7 +305,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="mt-8 text-xs text-muted-foreground text-center">
-          © 2024 IPTV Link. Todos os direitos reservados.
+          © 2025 IPTV LINK. Todos os direitos reservados.
         </p>
       </div>
     </div>
