@@ -94,3 +94,45 @@ verify_jwt = true
 # Cron job for calculating trending content - public for cron access
 [functions.calculate-trending]
 verify_jwt = false
+
+# TMDB metadata fetching - public for client access
+[functions.fetch-tmdb]
+verify_jwt = false
+
+# Admin-only function for creating admin users
+[functions.create-admin-user]
+verify_jwt = true
+
+# Backup clients cron job
+[functions.backup-clients]
+verify_jwt = false
+
+# Check M3U health cron job
+[functions.check-m3u-health]
+verify_jwt = false
+
+# Notification queue processing
+[functions.process-notification-queue]
+verify_jwt = false
+
+[functions.process-notification-retry-queue]
+verify_jwt = false
+
+[functions.schedule-daily-notifications]
+verify_jwt = false
+
+# ==========================================
+# M3U SYNC SYSTEM
+# ==========================================
+
+# M3U Sync API - public for cron access with internal secret verification
+[functions.m3u-sync]
+verify_jwt = false
+
+# M3U Playlist serving - public for client access
+[functions.m3u-playlist]
+verify_jwt = false
+
+# M3U Cron sync - public for cron access with secret verification
+[functions.m3u-cron-sync]
+verify_jwt = false
