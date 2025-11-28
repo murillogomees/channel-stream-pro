@@ -30,3 +30,35 @@ export {
   type TechAdapterEvents,
   type TechAdapterConfig,
 } from './TechAdapter';
+
+export {
+  logger,
+  default as Logger,
+  type LogLevel,
+  type LogEntry,
+  type LogContext,
+  type LoggerConfig,
+} from './Logger';
+
+export {
+  deviceDetector,
+  default as DeviceDetector,
+  type Platform as DevicePlatform,
+  type DeviceCapabilities,
+  type DeviceInfo,
+  type InputMethod,
+} from './DeviceDetector';
+
+export {
+  qosMonitor,
+  default as QoSMonitor,
+  type QoSMetrics,
+  type QoSReport,
+} from './QoSMonitor';
+
+export {
+  remoteKeyMap,
+  default as RemoteKeyMap,
+  type RemoteAction,
+  type Platform as RemotePlatform,
+} from './RemoteKeyMap';
