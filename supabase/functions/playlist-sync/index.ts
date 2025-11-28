@@ -19,15 +19,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-// Configuration
+// Configuration - optimized for edge function timeouts
 const CONFIG = {
-  FETCH_TIMEOUT_MS: 30000,
+  FETCH_TIMEOUT_MS: 25000,
   MAX_REDIRECTS: 3,
-  MAX_ENTRIES: 100000,
-  BATCH_SIZE: 1000,
-  LOCK_TTL_MINUTES: 5,
-  MAX_RETRIES: 3,
-  RETRY_DELAY_MS: 1000,
+  MAX_ENTRIES: 15000, // Limit for edge function timeout (increase later with cron)
+  BATCH_SIZE: 2000,
+  LOCK_TTL_MINUTES: 3,
+  MAX_RETRIES: 2,
+  RETRY_DELAY_MS: 500,
 } as const;
 
 // ============================================================================
