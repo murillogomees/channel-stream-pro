@@ -40,10 +40,12 @@ export function AnimatedSplash({
       {/* Logo Animation */}
       
 
-      {/* App Name */}
-      <h1 className="text-3xl font-bold text-foreground mb-2 animate-fade-in">
-        IPTV Link
-      </h1>
+      {/* Logo */}
+      <img 
+        src="/logo.png" 
+        alt="IPTV LINK" 
+        className="w-40 h-20 object-contain mb-2 animate-fade-in" 
+      />
       <p className="text-muted-foreground text-sm mb-8">
         TV Online em HD e 4K
       </p>
