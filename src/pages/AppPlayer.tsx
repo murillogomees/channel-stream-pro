@@ -493,7 +493,7 @@ export default function AppPlayer() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar em toda playlist..."
+                placeholder="Buscar"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-[140px] sm:w-[200px] lg:w-[280px] pl-9 h-9 text-sm"
