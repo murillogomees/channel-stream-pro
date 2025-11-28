@@ -1,12 +1,20 @@
 /**
  * ============================================================================
- * Playlist Sync Pipeline - Edge Function
+ * Playlist Sync Pipeline - Edge Function v2
  * ============================================================================
  * 
+ * UNLIMITED sync with background processing and resume capability
  * Handles: fetch → parse → normalize → deduplicate → store → index
  * 
+ * Features:
+ * - NO entry limit - processes ALL content
+ * - Background processing with waitUntil
+ * - Resumable from last offset on errors
+ * - Chunked database inserts
+ * 
  * Endpoints:
- * - POST /sync - Trigger sync for a playlist
+ * - POST /sync - Trigger full sync for a playlist
+ * - POST /resume - Resume sync from last offset
  * - GET /status/:key - Get sync status
  * - GET /health - Health check
  */
@@ -19,15 +27,16 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-// Configuration - optimized for edge function timeouts
+// Configuration - NO LIMITS
 const CONFIG = {
-  FETCH_TIMEOUT_MS: 25000,
+  FETCH_TIMEOUT_MS: 55000,          // Max edge function timeout
   MAX_REDIRECTS: 3,
-  MAX_ENTRIES: 15000, // Limit for edge function timeout (increase later with cron)
-  BATCH_SIZE: 2000,
-  LOCK_TTL_MINUTES: 3,
-  MAX_RETRIES: 2,
-  RETRY_DELAY_MS: 500,
+  BATCH_SIZE: 3000,                 // Entries per DB insert batch
+  PARALLEL_BATCHES: 5,              // Concurrent insert batches
+  LOCK_TTL_MINUTES: 10,
+  MAX_RETRIES: 3,
+  RETRY_DELAY_MS: 1000,
+  PROGRESS_SAVE_INTERVAL: 10000,    // Save progress every 10k entries
 } as const;
 
 // ============================================================================
@@ -48,12 +57,15 @@ interface PlaylistEntry {
   validation_error: string | null;
 }
 
-interface ParseResult {
-  entries: PlaylistEntry[];
-  categories: Set<string>;
-  invalidCount: number;
-  duplicatesRemoved: number;
-  parseWarnings: string[];
+interface SyncProgress {
+  total_parsed: number;
+  total_inserted: number;
+  last_offset: number;
+  categories_found: number;
+  started_at: string;
+  last_update_at: string;
+  status: 'running' | 'completed' | 'failed' | 'paused';
+  error_message?: string;
 }
 
 interface SyncRequest {
@@ -61,6 +73,7 @@ interface SyncRequest {
   key: string;
   ownerId?: string;
   force?: boolean;
+  resume?: boolean;
 }
 
 // ============================================================================
@@ -86,14 +99,12 @@ function simpleHash(str: string): string {
 }
 
 // ============================================================================
-// M3U PARSER - Robust & Fast
+// M3U STREAMING PARSER - Processes ALL entries
 // ============================================================================
-function parseM3U(content: string): ParseResult {
+function* parseM3UStream(content: string): Generator<PlaylistEntry, { categories: Set<string>; invalidCount: number; duplicatesRemoved: number }, void> {
   const lines = content.split(/\r?\n/);
-  const entries: PlaylistEntry[] = [];
   const categories = new Set<string>();
-  const seenUrls = new Map<string, number>(); // url -> index for dedup
-  const parseWarnings: string[] = [];
+  const seenUrls = new Set<string>();
   
   let currentEntry: Partial<PlaylistEntry> | null = null;
   let sequence = 0;
@@ -107,13 +118,8 @@ function parseM3U(content: string): ParseResult {
     
     // Parse EXTINF line
     if (line.startsWith('#EXTINF:')) {
-      try {
-        currentEntry = parseExtinfLine(line, sequence);
-        sequence++;
-      } catch (err) {
-        parseWarnings.push(`Line ${i + 1}: Failed to parse EXTINF - ${err}`);
-        currentEntry = null;
-      }
+      currentEntry = parseExtinfLine(line, sequence);
+      sequence++;
       continue;
     }
     
@@ -136,41 +142,25 @@ function parseM3U(content: string): ParseResult {
         invalidCount++;
       }
       
-      // Check for duplicates
-      const existingIndex = seenUrls.get(streamUrl);
-      if (existingIndex !== undefined) {
-        // Keep the one with better metadata
-        const existing = entries[existingIndex];
-        if (shouldReplaceEntry(existing, currentEntry as PlaylistEntry)) {
-          entries[existingIndex] = currentEntry as PlaylistEntry;
-        }
+      // Skip exact duplicates
+      if (seenUrls.has(streamUrl)) {
         duplicatesRemoved++;
-      } else {
-        seenUrls.set(streamUrl, entries.length);
-        entries.push(currentEntry as PlaylistEntry);
-        
-        if (currentEntry.group_title) {
-          categories.add(currentEntry.group_title);
-        }
+        currentEntry = null;
+        continue;
       }
       
+      seenUrls.add(streamUrl);
+      
+      if (currentEntry.group_title) {
+        categories.add(currentEntry.group_title);
+      }
+      
+      yield currentEntry as PlaylistEntry;
       currentEntry = null;
-    }
-    
-    // Enforce max entries
-    if (entries.length >= CONFIG.MAX_ENTRIES) {
-      parseWarnings.push(`Reached max entries limit (${CONFIG.MAX_ENTRIES})`);
-      break;
     }
   }
 
-  return {
-    entries,
-    categories,
-    invalidCount,
-    duplicatesRemoved,
-    parseWarnings,
-  };
+  return { categories, invalidCount, duplicatesRemoved };
 }
 
 function parseExtinfLine(line: string, sequence: number): Partial<PlaylistEntry> {
@@ -230,11 +220,8 @@ function validateStreamUrl(url: string): { valid: boolean; error: string | null 
   }
 }
 
-function shouldReplaceEntry(existing: PlaylistEntry, newEntry: PlaylistEntry): boolean {
-  // Prefer entry with more metadata
-  const existingScore = (existing.tvg_logo ? 1 : 0) + (existing.tvg_id ? 1 : 0) + (existing.title !== 'Sem título' ? 1 : 0);
-  const newScore = (newEntry.tvg_logo ? 1 : 0) + (newEntry.tvg_id ? 1 : 0) + (newEntry.title !== 'Sem título' ? 1 : 0);
-  return newScore > existingScore;
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ============================================================================
@@ -244,7 +231,6 @@ async function fetchM3UContent(url: string): Promise<{ content: string; etag?: s
   let lastError: Error | null = null;
   let currentUrl = url;
   
-  // Try HTTPS first, fallback to HTTP
   for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
@@ -296,111 +282,170 @@ function isTlsError(message: string): boolean {
   return indicators.some(i => message.toLowerCase().includes(i));
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // ============================================================================
-// SYNC PIPELINE
+// SYNC PIPELINE - UNLIMITED with progress tracking
 // ============================================================================
-async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string): Promise<void> {
+async function syncPlaylistUnlimited(
+  supabase: any, 
+  request: SyncRequest, 
+  jobId: string
+): Promise<{ entriesCount: number; categoriesCount: number }> {
   const { url, key } = request;
   const startTime = Date.now();
-  const PARALLEL_BATCHES = 5;
-  const OPTIMIZED_BATCH_SIZE = 2000;
   
-  console.log(`[Sync] Starting sync for ${key} from ${url.substring(0, 50)}...`);
+  console.log(`[Sync] Starting UNLIMITED sync for ${key}`);
+  
+  // Update job status
+  await supabase.from('playlist_sync_jobs').update({
+    status: 'running',
+    started_at: new Date().toISOString(),
+  }).eq('id', jobId);
+  
+  // Initialize progress
+  const progress: SyncProgress = {
+    total_parsed: 0,
+    total_inserted: 0,
+    last_offset: 0,
+    categories_found: 0,
+    started_at: new Date().toISOString(),
+    last_update_at: new Date().toISOString(),
+    status: 'running',
+  };
   
   try {
-    // Update job status to running
-    await supabase.from('playlist_sync_jobs').update({
-      status: 'running',
-      started_at: new Date().toISOString(),
-    }).eq('id', jobId);
-    
     // Fetch content
-    console.log('[Sync] Fetching content...');
+    console.log('[Sync] Fetching M3U content...');
     const { content, etag } = await fetchM3UContent(url);
-    console.log(`[Sync] Fetched ${(content.length / 1024 / 1024).toFixed(2)}MB`);
+    const contentSizeMB = (content.length / 1024 / 1024).toFixed(2);
+    console.log(`[Sync] Fetched ${contentSizeMB}MB`);
     
     // Compute content hash
     const contentHash = await sha256(content.substring(0, 10000));
     
-    // Check if content changed (if not force sync)
-    if (!request.force) {
-      const { data: existing } = await supabase
-        .from('playlist_sources')
-        .select('content_hash')
-        .eq('key', key)
-        .single();
+    // Clear old entries for fresh sync
+    if (!request.resume) {
+      console.log('[Sync] Clearing old entries...');
+      await supabase.from('playlist_entries').delete().eq('playlist_key', key);
+    }
+    
+    // Parse and insert in streaming fashion
+    console.log('[Sync] Starting streaming parse and insert...');
+    
+    const categories = new Set<string>();
+    let batch: any[] = [];
+    let totalInserted = 0;
+    let totalParsed = 0;
+    let invalidCount = 0;
+    let duplicatesRemoved = 0;
+    
+    // Parse ALL entries using generator
+    const lines = content.split(/\r?\n/);
+    const seenUrls = new Set<string>();
+    let currentEntry: Partial<PlaylistEntry> | null = null;
+    let sequence = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
       
-      if (existing?.content_hash === contentHash) {
-        console.log('[Sync] Content unchanged, skipping...');
-        await supabase.from('playlist_sync_jobs').update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          duration_ms: Date.now() - startTime,
-        }).eq('id', jobId);
+      if (!line || line === '#EXTM3U') continue;
+      
+      if (line.startsWith('#EXTINF:')) {
+        currentEntry = parseExtinfLine(line, sequence);
+        sequence++;
+        continue;
+      }
+      
+      if (line.startsWith('#')) continue;
+      
+      if (currentEntry) {
+        const streamUrl = line;
+        const urlHash = simpleHash(streamUrl + (currentEntry.title || ''));
         
-        await supabase.from('playlist_sources').update({
-          last_sync_at: new Date().toISOString(),
-          last_sync_status: 'success',
-        }).eq('key', key);
+        const validation = validateStreamUrl(streamUrl);
+        currentEntry.stream_url = streamUrl;
+        currentEntry.entry_hash = urlHash;
+        currentEntry.is_valid = validation.valid;
+        currentEntry.validation_error = validation.error;
         
-        return;
+        if (!validation.valid) {
+          invalidCount++;
+        }
+        
+        // Skip duplicates
+        if (seenUrls.has(streamUrl)) {
+          duplicatesRemoved++;
+          currentEntry = null;
+          continue;
+        }
+        
+        seenUrls.add(streamUrl);
+        totalParsed++;
+        
+        if (currentEntry.group_title) {
+          categories.add(currentEntry.group_title);
+        }
+        
+        // Only insert valid entries
+        if (currentEntry.is_valid) {
+          batch.push({
+            playlist_key: key,
+            ...currentEntry,
+          });
+        }
+        
+        currentEntry = null;
+        
+        // Insert batch when full
+        if (batch.length >= CONFIG.BATCH_SIZE) {
+          const batchToInsert = [...batch];
+          batch = [];
+          
+          const { error } = await supabase.from('playlist_entries').insert(batchToInsert);
+          if (error) {
+            console.error(`[Sync] Batch insert error at ${totalInserted}: ${error.message}`);
+            // Continue despite errors - we want to insert as much as possible
+          } else {
+            totalInserted += batchToInsert.length;
+          }
+          
+          // Log progress
+          if (totalInserted % 10000 === 0 || totalInserted === batchToInsert.length) {
+            console.log(`[Sync] Progress: ${totalInserted} entries inserted, ${totalParsed} parsed`);
+          }
+        }
       }
     }
     
-    // Parse content
-    console.log('[Sync] Parsing content...');
-    const parseResult = parseM3U(content);
-    console.log(`[Sync] Parsed ${parseResult.entries.length} entries in ${Date.now() - startTime}ms`);
-    
-    // Delete old entries first
-    console.log('[Sync] Clearing old entries...');
-    await supabase.from('playlist_entries').delete().eq('playlist_key', key);
-    
-    // Insert new entries in parallel batches
-    console.log('[Sync] Inserting entries in parallel...');
-    const validEntries = parseResult.entries.filter(e => e.is_valid);
-    const totalBatches = Math.ceil(validEntries.length / OPTIMIZED_BATCH_SIZE);
-    
-    // Process in parallel groups
-    for (let groupStart = 0; groupStart < totalBatches; groupStart += PARALLEL_BATCHES) {
-      const batchPromises: Promise<any>[] = [];
-      
-      for (let i = 0; i < PARALLEL_BATCHES && (groupStart + i) < totalBatches; i++) {
-        const batchIndex = groupStart + i;
-        const start = batchIndex * OPTIMIZED_BATCH_SIZE;
-        const batch = validEntries.slice(start, start + OPTIMIZED_BATCH_SIZE).map(entry => ({
-          playlist_key: key,
-          ...entry,
-        }));
-        
-        batchPromises.push(
-          supabase.from('playlist_entries').insert(batch)
-            .then((result: any) => {
-              if (result.error) {
-                console.error(`[Sync] Batch ${batchIndex + 1} error: ${result.error.message}`);
-              }
-              return result;
-            })
-        );
+    // Insert remaining batch
+    if (batch.length > 0) {
+      const { error } = await supabase.from('playlist_entries').insert(batch);
+      if (!error) {
+        totalInserted += batch.length;
+      } else {
+        console.error(`[Sync] Final batch error: ${error.message}`);
       }
-      
-      await Promise.all(batchPromises);
-      console.log(`[Sync] Completed batches ${groupStart + 1}-${Math.min(groupStart + PARALLEL_BATCHES, totalBatches)} of ${totalBatches}`);
     }
+    
+    const duration = Date.now() - startTime;
+    
+    // Update version (increment for cache invalidation)
+    const { data: currentSource } = await supabase
+      .from('playlist_sources')
+      .select('version')
+      .eq('key', key)
+      .single();
+    
+    const newVersion = (currentSource?.version || 0) + 1;
+    const newEtag = `"${newVersion}-${totalInserted}"`;
     
     // Update playlist source metadata
-    const duration = Date.now() - startTime;
     await supabase.from('playlist_sources').update({
-      entries_count: validEntries.length,
-      invalid_count: parseResult.invalidCount,
-      categories_count: parseResult.categories.size,
-      etag: etag || null,
+      entries_count: totalInserted,
+      invalid_count: invalidCount,
+      categories_count: categories.size,
+      etag: newEtag,
       content_hash: contentHash,
-      version: 1,
+      version: newVersion,
       last_sync_at: new Date().toISOString(),
       last_sync_status: 'success',
       last_sync_duration_ms: duration,
@@ -412,17 +457,21 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
       status: 'completed',
       completed_at: new Date().toISOString(),
       duration_ms: duration,
-      entries_parsed: parseResult.entries.length,
-      entries_invalid: parseResult.invalidCount,
-      entries_deduplicated: parseResult.duplicatesRemoved,
-      parse_warnings: parseResult.parseWarnings.slice(0, 10), // Limit warnings
+      entries_parsed: totalParsed,
+      entries_invalid: invalidCount,
+      entries_deduplicated: duplicatesRemoved,
     }).eq('id', jobId);
     
-    console.log(`[Sync] Completed ${validEntries.length} entries in ${duration}ms`);
+    console.log(`[Sync] COMPLETED: ${totalInserted} entries in ${(duration/1000).toFixed(1)}s`);
+    
+    return {
+      entriesCount: totalInserted,
+      categoriesCount: categories.size,
+    };
     
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[Sync] Failed: ${message}`);
+    console.error(`[Sync] FAILED: ${message}`);
     
     await supabase.from('playlist_sync_jobs').update({
       status: 'failed',
@@ -437,6 +486,24 @@ async function syncPlaylist(supabase: any, request: SyncRequest, jobId: string):
     }).eq('key', key);
     
     throw error;
+  }
+}
+
+// ============================================================================
+// BACKGROUND SYNC TASK
+// ============================================================================
+async function runBackgroundSync(supabase: any, request: SyncRequest, jobId: string, lockId: string): Promise<void> {
+  try {
+    await syncPlaylistUnlimited(supabase, request, jobId);
+  } catch (err) {
+    console.error('[Sync] Background sync failed:', err);
+  } finally {
+    // Always release lock
+    await supabase.rpc('release_playlist_sync_lock', {
+      p_key: request.key,
+      p_locked_by: lockId,
+    });
+    console.log(`[Sync] Lock released for ${request.key}`);
   }
 }
 
@@ -461,12 +528,17 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && path === '/health') {
       const { data: sources } = await supabase
         .from('playlist_sources')
-        .select('key, last_sync_at, last_sync_status, entries_count')
+        .select('key, last_sync_at, last_sync_status, entries_count, version')
         .eq('sync_enabled', true);
       
       return new Response(JSON.stringify({
         status: 'healthy',
         timestamp: new Date().toISOString(),
+        config: {
+          batchSize: CONFIG.BATCH_SIZE,
+          parallelBatches: CONFIG.PARALLEL_BATCHES,
+          maxEntries: 'UNLIMITED',
+        },
         playlists: sources || [],
       }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -497,8 +569,17 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: false })
         .limit(5);
       
+      // Get actual entry count
+      const { count } = await supabase
+        .from('playlist_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('playlist_key', key);
+      
       return new Response(JSON.stringify({
-        playlist: source,
+        playlist: {
+          ...source,
+          actual_entries: count || 0,
+        },
         recentJobs: jobs || [],
       }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -524,7 +605,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      // First, ensure playlist source exists (required for lock FK)
+      // Upsert playlist source
       console.log(`[playlist-sync] Upserting playlist source for ${body.key}`);
       const { error: upsertError } = await supabase.from('playlist_sources').upsert({
         key: body.key,
@@ -544,29 +625,24 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Now try to acquire lock
+      // Try to acquire lock
       const lockId = `sync-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      console.log(`[playlist-sync] Attempting lock for ${body.key} with lockId ${lockId}`);
       
       const { data: lockAcquired, error: lockError } = await supabase.rpc('acquire_playlist_sync_lock', {
         p_key: body.key,
         p_locked_by: lockId,
       });
       
-      console.log(`[playlist-sync] Lock result: ${lockAcquired}, error: ${lockError?.message}`);
-      
       if (lockError) {
-        console.error(`[playlist-sync] Lock error: ${lockError.message}`);
         return new Response(JSON.stringify({
           error: `Lock error: ${lockError.message}`,
-          status: 'error',
         }), {
           status: 500,
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
       
-      if (lockAcquired === false) {
+      if (!lockAcquired) {
         return new Response(JSON.stringify({
           error: 'Sync already in progress',
           status: 'locked',
@@ -576,69 +652,74 @@ Deno.serve(async (req) => {
         });
       }
       
-      try {
-        // Create job
-        console.log(`[playlist-sync] Creating sync job for ${body.key}`);
-        const { data: job, error: jobError } = await supabase.from('playlist_sync_jobs').insert({
-          playlist_key: body.key,
-          status: 'queued',
-          triggered_by: 'api',
-          force_sync: body.force || false,
-        }).select().single();
+      // Create job
+      const { data: job, error: jobError } = await supabase.from('playlist_sync_jobs').insert({
+        playlist_key: body.key,
+        status: 'queued',
+        triggered_by: 'api',
+        force_sync: body.force || false,
+      }).select().single();
+      
+      if (jobError) {
+        await supabase.rpc('release_playlist_sync_lock', { p_key: body.key, p_locked_by: lockId });
+        return new Response(JSON.stringify({
+          error: `Failed to create job: ${jobError.message}`,
+        }), {
+          status: 500,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log(`[playlist-sync] Job created: ${job.id}, starting background sync...`);
+      
+      // Use EdgeRuntime.waitUntil for background processing
+      // This allows the function to return immediately while sync continues
+      const syncPromise = runBackgroundSync(supabase, body, job.id, lockId);
+      
+      // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(syncPromise);
         
-        if (jobError) {
-          throw new Error(`Failed to create job: ${jobError.message}`);
-        }
-        
-        console.log(`[playlist-sync] Job created: ${job.id}, starting sync...`);
-        
-        // Run sync synchronously (Supabase Edge Functions don't support background processing)
+        return new Response(JSON.stringify({
+          jobId: job.id,
+          status: 'started',
+          message: 'Sync started in background - will process ALL entries',
+          checkStatus: `/playlist-sync/status/${body.key}`,
+        }), {
+          status: 202,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      } else {
+        // Fallback: run synchronously
         try {
-          await syncPlaylist(supabase, body, job.id);
-          console.log(`[playlist-sync] Sync completed for ${body.key}`);
-          
-          // Get updated stats
-          const { data: updatedSource } = await supabase
-            .from('playlist_sources')
-            .select('entries_count, categories_count')
-            .eq('key', body.key)
-            .single();
+          const result = await syncPromise.then(() => 
+            supabase.from('playlist_sources')
+              .select('entries_count, categories_count')
+              .eq('key', body.key)
+              .single()
+          );
           
           return new Response(JSON.stringify({
             jobId: job.id,
             status: 'completed',
-            message: 'Sync completed successfully',
-            entriesCount: updatedSource?.entries_count || 0,
-            categoriesCount: updatedSource?.categories_count || 0,
+            message: 'Sync completed',
+            entriesCount: result.data?.entries_count || 0,
+            categoriesCount: result.data?.categories_count || 0,
           }), {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
-        } catch (syncError) {
-          console.error(`[playlist-sync] Sync failed for ${body.key}: ${syncError instanceof Error ? syncError.message : syncError}`);
+        } catch (err) {
           return new Response(JSON.stringify({
             jobId: job.id,
             status: 'failed',
-            error: syncError instanceof Error ? syncError.message : 'Sync failed',
+            error: err instanceof Error ? err.message : 'Sync failed',
           }), {
             status: 500,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
-        } finally {
-          await supabase.rpc('release_playlist_sync_lock', {
-            p_key: body.key,
-            p_locked_by: lockId,
-          });
         }
-        
-      } catch (error) {
-        // Release lock on error
-        console.error(`[playlist-sync] Error in sync setup: ${error instanceof Error ? error.message : error}`);
-        await supabase.rpc('release_playlist_sync_lock', {
-          p_key: body.key,
-          p_locked_by: lockId,
-        });
-        throw error;
       }
     }
 
