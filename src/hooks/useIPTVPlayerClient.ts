@@ -583,9 +583,10 @@ export function useIPTVPlayerClient() {
   }, [groupChannelsIntoCategories]);
 
   // Background loader for playlist-serve - LOADS ALL CONTENT WITHOUT LIMITS
+  // NEVER stops until ALL content is loaded - retries indefinitely on errors
   const loadPlaylistServeBackground = useCallback(async (
     playlistKey: string,
-    total: number,
+    serverTotal: number,
     initialChannels: any[],
     version: number
   ) => {
@@ -594,22 +595,45 @@ export function useIPTVPlayerClient() {
     
     let currentOffset = initialChannels.length;
     let consecutiveErrors = 0;
-    const maxConsecutiveErrors = 5;
+    let totalRetries = 0;
     const endpoint = `${CONFIG.PLAYLIST_SERVE_URL}/playlist/${playlistKey}`;
     
-    console.log(`[IPTV] Background loading from offset ${currentOffset}, total: ${total}`);
+    // Use server total or a minimum of 209000 (known playlist size)
+    const targetTotal = Math.max(serverTotal, 209000);
     
-    // Continue until ALL content is loaded
-    while (!controller.signal.aborted && currentOffset < total) {
-      if (consecutiveErrors >= maxConsecutiveErrors) {
-        console.log(`[IPTV] Too many consecutive errors, stopping at ${allChannelsRef.current.length}`);
+    console.log(`[IPTV] Background loading from offset ${currentOffset}, target: ${targetTotal}`);
+    
+    // NEVER stop until ALL content is loaded
+    while (!controller.signal.aborted) {
+      // Check if we've loaded everything
+      if (allChannelsRef.current.length >= targetTotal) {
+        console.log(`[IPTV] Reached target: ${allChannelsRef.current.length}/${targetTotal}`);
         break;
       }
       
-      const batchPromises: Promise<{ channels: any[]; offset: number; success: boolean }>[] = [];
+      // Also check if current offset is past the target (belt and suspenders)
+      if (currentOffset >= targetTotal) {
+        console.log(`[IPTV] Offset ${currentOffset} >= target ${targetTotal}`);
+        break;
+      }
       
-      // Calculate how many parallel batches we need
-      const remainingItems = total - currentOffset;
+      // On persistent errors, wait longer but NEVER give up
+      if (consecutiveErrors >= 10) {
+        console.log(`[IPTV] ${consecutiveErrors} errors, waiting 10s before retry...`);
+        await new Promise(r => setTimeout(r, 10000));
+        consecutiveErrors = 0; // Reset and try again
+        totalRetries++;
+        
+        // Log retry count but continue
+        if (totalRetries % 5 === 0) {
+          console.log(`[IPTV] Total retry cycles: ${totalRetries}, loaded: ${allChannelsRef.current.length}/${targetTotal}`);
+        }
+      }
+      
+      const batchPromises: Promise<{ channels: any[]; offset: number; success: boolean; hasMore: boolean }>[] = [];
+      
+      // Calculate remaining and batches needed
+      const remainingItems = targetTotal - currentOffset;
       const batchesToFetch = Math.min(
         CONFIG.PARALLEL_BATCHES,
         Math.ceil(remainingItems / CONFIG.BACKGROUND_BATCH_SIZE)
@@ -617,9 +641,9 @@ export function useIPTVPlayerClient() {
       
       for (let i = 0; i < batchesToFetch; i++) {
         const batchOffset = currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE);
-        if (batchOffset >= total) break;
+        if (batchOffset >= targetTotal) break;
         
-        const batchLimit = Math.min(CONFIG.BACKGROUND_BATCH_SIZE, total - batchOffset);
+        const batchLimit = Math.min(CONFIG.BACKGROUND_BATCH_SIZE, targetTotal - batchOffset);
         const params = new URLSearchParams({ 
           offset: String(batchOffset), 
           limit: String(batchLimit) 
@@ -631,19 +655,28 @@ export function useIPTVPlayerClient() {
             .then(data => ({ 
               channels: data.channels || [], 
               offset: batchOffset,
-              success: true 
+              success: true,
+              hasMore: data.hasMore !== false
             }))
-            .catch(() => ({ channels: [], offset: batchOffset, success: false }))
+            .catch(err => {
+              console.error(`[IPTV] Batch fetch error at offset ${batchOffset}:`, err.message);
+              return { channels: [], offset: batchOffset, success: false, hasMore: true };
+            })
         );
       }
 
-      if (batchPromises.length === 0) break;
+      if (batchPromises.length === 0) {
+        console.log('[IPTV] No batches to fetch, advancing offset');
+        currentOffset = allChannelsRef.current.length;
+        continue;
+      }
 
       const results = await Promise.all(batchPromises);
       results.sort((a, b) => a.offset - b.offset);
       
       let newCount = 0;
       let anyFailed = false;
+      let serverSaysNoMore = false;
       
       for (const result of results) {
         if (result.channels.length > 0) {
@@ -653,29 +686,41 @@ export function useIPTVPlayerClient() {
         } else if (!result.success) {
           anyFailed = true;
         }
+        
+        // Track if server says there's no more data
+        if (!result.hasMore && result.success) {
+          serverSaysNoMore = true;
+        }
       }
 
       if (newCount === 0) {
         if (anyFailed) {
           consecutiveErrors++;
-          console.log(`[IPTV] Batch failed, retry ${consecutiveErrors}/${maxConsecutiveErrors}`);
+          console.log(`[IPTV] Batch failed, error count: ${consecutiveErrors}`);
           await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS));
-          continue; // Don't advance offset, retry
+          continue; // Retry same offsets
+        } else if (serverSaysNoMore && allChannelsRef.current.length > 0) {
+          // Server says no more but we might have gotten everything
+          console.log(`[IPTV] Server says no more data. Loaded: ${allChannelsRef.current.length}`);
+          // Still check if we got close to target
+          if (allChannelsRef.current.length >= targetTotal * 0.95) {
+            break; // Within 5% of target, consider complete
+          }
+          // Otherwise keep trying different offsets
+          consecutiveErrors++;
         } else {
-          // Server returned empty but no error - we've loaded everything
-          console.log(`[IPTV] No more content at offset ${currentOffset}`);
-          break;
+          consecutiveErrors++;
         }
+      } else {
+        // Successfully loaded data, advance offset
+        currentOffset = allChannelsRef.current.length;
       }
-
-      // Advance offset based on actual data received
-      currentOffset = allChannelsRef.current.length;
       
       // Update UI without blocking
       updateUIInBackground(
         allChannelsRef.current,
-        total,
-        `Carregando: ${allChannelsRef.current.length.toLocaleString()}/${total.toLocaleString()}`
+        targetTotal,
+        `Carregando: ${allChannelsRef.current.length.toLocaleString()}/${targetTotal.toLocaleString()}`
       );
 
       // Small delay to prevent overwhelming the server
@@ -694,7 +739,7 @@ export function useIPTVPlayerClient() {
         setLoadingProgress('');
       });
       
-      console.log(`[IPTV] Loading complete: ${finalCount} channels (expected: ${total})`);
+      console.log(`[IPTV] Loading COMPLETE: ${finalCount} channels (target was: ${targetTotal})`);
     }
   }, [groupChannelsIntoCategories, updateUIInBackground]);
 
