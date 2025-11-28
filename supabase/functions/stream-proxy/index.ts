@@ -111,7 +111,10 @@ Deno.serve(async (req) => {
     const streamUrl = url.searchParams.get('url');
     const listId = url.searchParams.get('list');
 
+    console.log(`[StreamProxy] Request received: method=${req.method}, url=${streamUrl?.substring(0, 50)}...`);
+
     if (!streamUrl || !listId) {
+      console.log('[StreamProxy] Missing parameters');
       return new Response('Missing parameters', { 
         status: 400,
         headers: corsHeaders 
@@ -120,7 +123,10 @@ Deno.serve(async (req) => {
 
     // Verificar autenticação via Authorization header
     const authHeader = req.headers.get('authorization');
+    console.log(`[StreamProxy] Auth header present: ${!!authHeader}`);
+    
     if (!authHeader) {
+      console.log('[StreamProxy] No auth header');
       return new Response('Unauthorized - No auth token', { 
         status: 401,
         headers: corsHeaders 
@@ -136,7 +142,10 @@ Deno.serve(async (req) => {
 
     // Verificar usuário autenticado
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log(`[StreamProxy] User check: user=${user?.id}, error=${authError?.message}`);
+    
     if (authError || !user) {
+      console.log(`[StreamProxy] Auth failed: ${authError?.message || 'no user'}`);
       return new Response('Unauthorized - Invalid token', { 
         status: 401,
         headers: corsHeaders 

@@ -136,8 +136,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       return;
     }
     
-    // Store token in ref for HLS.js xhrSetup closure
-    const authToken = token;
+    console.log('[VideoPlayer] Auth token obtained:', token.substring(0, 20) + '...');
 
     // Set a timeout for loading - if it takes too long, show error
     loadTimeoutRef.current = window.setTimeout(() => {
@@ -154,7 +153,26 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     if (streamType === 'hls') {
       if (Hls.isSupported()) {
-        // Use HLS.js with optimized settings for IPTV streams via proxy
+        // Custom XHR loader class that adds auth header
+        class AuthXhrLoader extends Hls.DefaultConfig.loader {
+          constructor(config: any) {
+            super(config);
+          }
+          
+          load(context: any, config: any, callbacks: any) {
+            // Override the XHR setup to add auth header
+            const xhrSetup = config.xhrSetup;
+            config.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+              if (xhrSetup) {
+                xhrSetup(xhr, url);
+              }
+            };
+            super.load(context, config, callbacks);
+          }
+        }
+        
+        // Use HLS.js with custom loader
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -178,10 +196,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
           fragLoadingRetryDelay: 1000,
           manifestLoadingRetryDelay: 1000,
           levelLoadingRetryDelay: 1000,
-          xhrSetup: (xhr: XMLHttpRequest, xhrUrl: string) => {
-            // Add auth header for proxy requests
-            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
-          },
+          loader: AuthXhrLoader,
         });
 
         hlsRef.current = hls;
