@@ -33,13 +33,13 @@ export default defineConfig(({ mode }) => ({
         categories: ["entertainment", "video"],
         icons: [
           {
-            src: "logo.png",
+            src: "pwa-icon.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "logo.png",
+            src: "pwa-icon.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => ({
             short_name: "Player",
             description: "Abrir o player IPTV",
             url: "/app/player",
-            icons: [{ src: "logo.png", sizes: "192x192" }],
+            icons: [{ src: "pwa-icon.png", sizes: "192x192" }],
           },
         ],
       },
