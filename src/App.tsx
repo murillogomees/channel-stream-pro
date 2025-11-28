@@ -63,7 +63,7 @@ const App = () => (
           <Route path="/tutorial" element={<TutorialSmartOne />} />
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/install" element={<AppInstall />} />
+          <Route path="/install" element={<Navigate to="/app/install" replace />} />
           
           {/* Legacy routes - redirect to unified profile */}
           <Route path="/conta" element={<Navigate to="/app/profile" replace />} />
@@ -78,6 +78,7 @@ const App = () => (
               - /app/profile = Client profile/settings
               ======================================== */}
           <Route path="/app" element={<AppEntry />} />
+          <Route path="/app/install" element={<AppInstall />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />

@@ -121,7 +121,7 @@ const HeroSection = () => {
               className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
               onClick={() => {
                 trackEvent('Lead', { content_name: 'Hero CTA - Download App', content_category: 'button' });
-                window.location.href = '/install';
+                window.location.href = '/app/install';
               }}
             >
               <Download className="h-5 w-5 sm:h-6 sm:w-6" />
