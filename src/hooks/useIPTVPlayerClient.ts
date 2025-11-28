@@ -360,7 +360,191 @@ export function useIPTVPlayerClient() {
     }
   }, [groupChannelsIntoCategories]);
 
-  // Load playlist from CDN URL
+  // Load from new playlist-serve pipeline
+  const loadFromPlaylistServe = useCallback(async (playlistKey: string) => {
+    playlistKeyRef.current = playlistKey;
+    
+    try {
+      setLoadingProgress('Verificando cache...');
+      
+      // Check local cache first
+      const cached = await cache.get(playlistKey);
+      
+      if (cached && cached.channels.length > 0) {
+        console.log(`[IPTV] Cache hit: ${cached.channels.length} channels`);
+        
+        allChannelsRef.current = cached.channels;
+        setTotalChannels(cached.total);
+        setLoadedChannels(cached.channels.length);
+        setIsCached(true);
+        
+        const cats = groupChannelsIntoCategories(cached.channels);
+        setCategories(cats);
+        
+        if (cats.length > 0 && cats[0].channels.length > 0) {
+          setCurrentChannel(cats[0].channels[0]);
+        }
+        
+        setIsLoading(false);
+        setLoadingProgress('');
+        
+        // Continue loading if incomplete
+        if (!cached.complete && cached.channels.length < cached.total) {
+          setIsLoadingMore(true);
+          loadFromPlaylistServeBackground(playlistKey, cached.total, cached.channels, cached.version);
+        }
+        
+        return true;
+      }
+      
+      // No cache - fetch from playlist-serve
+      setLoadingProgress('Carregando canais...');
+      setIsCached(false);
+      
+      const endpoint = `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/playlist/${playlistKey}`;
+      const params = new URLSearchParams({ offset: '0', limit: String(CONFIG.INITIAL_BATCH_SIZE) });
+      
+      const response = await fetch(`${endpoint}?${params}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const data = await response.json();
+      
+      if (!data.channels || data.channels.length === 0) {
+        console.log('[IPTV] No channels in playlist-serve');
+        return false;
+      }
+      
+      setTotalChannels(data.total);
+      setLoadedChannels(data.channels.length);
+      allChannelsRef.current = data.channels;
+      
+      const cats = groupChannelsIntoCategories(data.channels);
+      setCategories(cats);
+      
+      if (cats.length > 0 && cats[0].channels.length > 0) {
+        setCurrentChannel(cats[0].channels[0]);
+      }
+      
+      setIsLoading(false);
+      
+      console.log(`[IPTV] First batch from playlist-serve: ${data.channels.length}/${data.total}`);
+      
+      // Save to cache
+      await cache.save({
+        key: playlistKey,
+        channels: data.channels,
+        version: data.version || 1,
+        cachedAt: Date.now(),
+        total: data.total,
+        complete: data.channels.length >= data.total,
+      });
+      
+      if (data.hasMore) {
+        setLoadingProgress(`Carregando: ${data.channels.length.toLocaleString()}/${data.total.toLocaleString()}`);
+        setIsLoadingMore(true);
+        loadFromPlaylistServeBackground(playlistKey, data.total, data.channels, data.version || 1);
+      } else {
+        setLoadingProgress('');
+      }
+      
+      return true;
+      
+    } catch (err: any) {
+      console.error('[IPTV] playlist-serve error:', err);
+      return false;
+    }
+  }, [groupChannelsIntoCategories]);
+
+  // Background loader for playlist-serve
+  const loadFromPlaylistServeBackground = useCallback(async (
+    playlistKey: string,
+    total: number,
+    initialChannels: any[],
+    version: number
+  ) => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    let currentOffset = initialChannels.length;
+    const endpoint = `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/playlist/${playlistKey}`;
+    
+    console.log(`[IPTV] Background loading ${total - currentOffset} remaining...`);
+    
+    while (currentOffset < total && !controller.signal.aborted) {
+      const batchPromises: Promise<{ channels: any[]; offset: number }>[] = [];
+      
+      for (let i = 0; i < CONFIG.PARALLEL_BATCHES && currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE) < total; i++) {
+        const batchOffset = currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE);
+        const params = new URLSearchParams({ 
+          offset: String(batchOffset), 
+          limit: String(CONFIG.BACKGROUND_BATCH_SIZE) 
+        });
+        
+        batchPromises.push(
+          fetch(`${endpoint}?${params}`, { signal: controller.signal })
+            .then(r => r.json())
+            .then(data => ({ channels: data.channels || [], offset: batchOffset }))
+            .catch(() => ({ channels: [], offset: batchOffset }))
+        );
+      }
+
+      if (batchPromises.length === 0) break;
+
+      const results = await Promise.all(batchPromises);
+      results.sort((a, b) => a.offset - b.offset);
+      
+      let newCount = 0;
+      for (const result of results) {
+        if (result.channels.length > 0) {
+          allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
+          newCount += result.channels.length;
+        }
+      }
+
+      if (newCount === 0) break;
+
+      currentOffset += CONFIG.PARALLEL_BATCHES * CONFIG.BACKGROUND_BATCH_SIZE;
+      
+      setLoadedChannels(allChannelsRef.current.length);
+      setLoadingProgress(`Carregando: ${allChannelsRef.current.length.toLocaleString()}/${total.toLocaleString()}`);
+      
+      const updatedCategories = groupChannelsIntoCategories(allChannelsRef.current);
+      setCategories(updatedCategories);
+
+      // Save to cache periodically
+      if (allChannelsRef.current.length % 10000 < CONFIG.BACKGROUND_BATCH_SIZE) {
+        await cache.save({
+          key: playlistKey,
+          channels: allChannelsRef.current,
+          version,
+          cachedAt: Date.now(),
+          total,
+          complete: false,
+        });
+      }
+    }
+
+    // Final save
+    if (!controller.signal.aborted && allChannelsRef.current.length > 0) {
+      await cache.save({
+        key: playlistKey,
+        channels: allChannelsRef.current,
+        version,
+        cachedAt: Date.now(),
+        total: allChannelsRef.current.length,
+        complete: true,
+      });
+      
+      setCategories(groupChannelsIntoCategories(allChannelsRef.current));
+      setLoadedChannels(allChannelsRef.current.length);
+      setIsLoadingMore(false);
+      setLoadingProgress('');
+      
+      console.log(`[IPTV] Complete: ${allChannelsRef.current.length} channels from playlist-serve`);
+    }
+  }, [groupChannelsIntoCategories]);
+
+  // Load playlist from CDN URL (legacy)
   const loadPlaylistFromCDN = useCallback(async (cdnUrl: string, playlistId: string) => {
     playlistKeyRef.current = playlistId;
     
@@ -545,7 +729,16 @@ export function useIPTVPlayerClient() {
         return;
       }
 
-      // Try custom list first
+      // Try new playlist-serve pipeline first (using default 'lista-vip')
+      console.log('[IPTV] Trying new playlist-serve pipeline...');
+      const usedNewPipeline = await loadFromPlaylistServe('lista-vip');
+      if (usedNewPipeline) {
+        setAssignedPlaylist({ id: 'lista-vip', name: 'Lista VIP', cdn_url: null });
+        setHasPlaylist(true);
+        return;
+      }
+
+      // Fallback: Try custom list
       const { data: customAssignment } = await supabase
         .from('client_m3u_custom_assignments')
         .select(`
@@ -603,7 +796,7 @@ export function useIPTVPlayerClient() {
       setIsLoading(false);
       setHasPlaylist(false);
     }
-  }, [loadPlaylistFromCDN, loadPlaylistFromDatabase]);
+  }, [loadFromPlaylistServe, loadPlaylistFromCDN, loadPlaylistFromDatabase]);
 
   // Clear cache and reload
   const clearCacheAndReload = useCallback(async () => {
