@@ -2,7 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
 };
 
 Deno.serve(async (req) => {
@@ -48,30 +50,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Buscar perfil do usuário para verificar se é admin
+    // Service client for queries
     const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: userRoles } = await supabaseService
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
+    // Run role check and client check in parallel for speed
+    const [rolesResult, clienteResult] = await Promise.all([
+      supabaseService
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id),
+      supabaseService
+        .from('clientes')
+        .select('id, cliente_ativo, data_vencimento')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    ]);
 
-    const roles = userRoles?.map(r => r.role) || [];
+    const roles = rolesResult.data?.map(r => r.role) || [];
     const isAdmin = roles.includes('admin') || roles.includes('super_admin');
 
     // Se não for admin, verificar cliente e assinatura
     if (!isAdmin) {
-      const { data: cliente, error: clientError } = await supabaseService
-        .from('clientes')
-        .select('id, cliente_ativo, data_vencimento')
-        .eq('user_id', user.id)
-        .single();
-
-      if (clientError || !cliente) {
-        console.error('Cliente não encontrado:', clientError);
+      const cliente = clienteResult.data;
+      
+      if (!cliente) {
+        console.error('Cliente não encontrado');
         return new Response('Unauthorized - No client found', { 
           status: 401,
           headers: corsHeaders 
@@ -95,7 +101,7 @@ Deno.serve(async (req) => {
         .select('id')
         .eq('cliente_id', cliente.id)
         .eq('custom_list_id', listId)
-        .single();
+        .maybeSingle();
 
       if (!assignment) {
         return new Response('Forbidden - No access to this playlist', { 
@@ -103,77 +109,105 @@ Deno.serve(async (req) => {
           headers: corsHeaders 
         });
       }
-    } else {
-      console.log(`Admin access granted for user ${user.id}`);
     }
 
     // Decodificar a URL do stream
     const decodedStreamUrl = decodeURIComponent(streamUrl);
+    console.log(`[StreamProxy] User ${user.id} accessing stream`);
 
-    // Fazer proxy do stream
-    console.log(`Proxying stream for user ${user.id}: ${decodedStreamUrl}`);
-
+    // Preparar headers para o upstream
     const upstreamHeaders = new Headers();
-    // Preservar alguns headers importantes do request original
-    const clientHeadersToForward = ['User-Agent', 'Range', 'Accept', 'Accept-Encoding', 'Accept-Language', 'Origin', 'Referer'];
-    clientHeadersToForward.forEach((h) => {
-      const value = req.headers.get(h.toLowerCase()) || req.headers.get(h);
-      if (value) upstreamHeaders.set(h, value);
-    });
-    // Garante um User-Agent "de navegador" se não vier do client
-    if (!upstreamHeaders.has('User-Agent')) {
-      upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    
+    // Forward Range header for seeking support
+    const rangeHeader = req.headers.get('Range');
+    if (rangeHeader) {
+      upstreamHeaders.set('Range', rangeHeader);
     }
+    
+    // Set a proper User-Agent
+    upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    upstreamHeaders.set('Accept', '*/*');
+    upstreamHeaders.set('Accept-Language', 'en-US,en;q=0.9');
+    upstreamHeaders.set('Connection', 'keep-alive');
 
-    const streamResponse = await fetch(decodedStreamUrl, {
-      headers: upstreamHeaders,
-    });
+    // Fazer proxy do stream com timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
 
-    if (!streamResponse.ok) {
-      console.error(`Stream fetch failed: ${streamResponse.status}`);
-      return new Response('Stream unavailable', { 
-        status: 502,
-        headers: corsHeaders 
+    try {
+      const streamResponse = await fetch(decodedStreamUrl, {
+        headers: upstreamHeaders,
+        signal: controller.signal,
       });
-    }
+      clearTimeout(timeoutId);
 
-    // Retransmitir o stream com headers apropriados + CDN optimization
-    const headers = new Headers(corsHeaders);
-    headers.set('Content-Type', streamResponse.headers.get('Content-Type') || 'video/mp2t');
-    headers.set('Connection', 'keep-alive');
-    
-    // Cache headers otimizados para CDN (Cloudflare)
-    if (decodedStreamUrl.includes('.m3u8')) {
-      // HLS manifests: cache curto (atualiza frequentemente)
-      headers.set('Cache-Control', 'public, max-age=10, s-maxage=30');
-      headers.set('CDN-Cache-Control', 'public, max-age=30');
-    } else if (decodedStreamUrl.includes('.ts')) {
-      // Segmentos de vídeo: cache longo (imutáveis)
-      headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, immutable');
-      headers.set('CDN-Cache-Control', 'public, max-age=86400');
-    } else {
-      // Outros conteúdos: cache moderado
-      headers.set('Cache-Control', 'public, max-age=60, s-maxage=300');
-      headers.set('CDN-Cache-Control', 'public, max-age=300');
-    }
-    
-    // Headers para Cloudflare
-    headers.set('Cloudflare-CDN-Cache-Control', 'max-age=31536000');
-    
-    // Manter headers importantes do stream original
-    const keepHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
-    keepHeaders.forEach(header => {
-      const value = streamResponse.headers.get(header);
-      if (value) headers.set(header, value);
-    });
+      if (!streamResponse.ok) {
+        console.error(`[StreamProxy] Stream fetch failed: ${streamResponse.status}`);
+        return new Response('Stream unavailable', { 
+          status: 502,
+          headers: corsHeaders 
+        });
+      }
 
-    return new Response(streamResponse.body, {
-      status: streamResponse.status,
-      headers,
-    });
+      // Build response headers
+      const headers = new Headers(corsHeaders);
+      
+      // Get content type from response or infer from URL
+      let contentType = streamResponse.headers.get('Content-Type');
+      if (!contentType || contentType === 'application/octet-stream') {
+        if (decodedStreamUrl.includes('.m3u8')) {
+          contentType = 'application/vnd.apple.mpegurl';
+        } else if (decodedStreamUrl.includes('.ts')) {
+          contentType = 'video/mp2t';
+        } else if (decodedStreamUrl.includes('.mp4')) {
+          contentType = 'video/mp4';
+        } else {
+          contentType = 'video/mp2t';
+        }
+      }
+      headers.set('Content-Type', contentType);
+      
+      // Cache headers for CDN optimization
+      if (decodedStreamUrl.includes('.m3u8')) {
+        // HLS manifests: very short cache (live content updates frequently)
+        headers.set('Cache-Control', 'public, max-age=2, s-maxage=5');
+      } else if (decodedStreamUrl.includes('.ts')) {
+        // Video segments: longer cache (immutable content)
+        headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, immutable');
+      } else {
+        headers.set('Cache-Control', 'public, max-age=30, s-maxage=120');
+      }
+      
+      // Keep important headers from upstream
+      const keepHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
+      keepHeaders.forEach(header => {
+        const value = streamResponse.headers.get(header);
+        if (value) headers.set(header, value);
+      });
+
+      // Enable range requests if not already set
+      if (!headers.has('Accept-Ranges')) {
+        headers.set('Accept-Ranges', 'bytes');
+      }
+
+      return new Response(streamResponse.body, {
+        status: streamResponse.status,
+        headers,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('[StreamProxy] Request timeout');
+        return new Response('Stream timeout', { 
+          status: 504,
+          headers: corsHeaders 
+        });
+      }
+      throw fetchError;
+    }
 
   } catch (error) {
-    console.error('Stream proxy error:', error);
+    console.error('[StreamProxy] Error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

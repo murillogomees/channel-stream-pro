@@ -246,12 +246,13 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPlayerDialog]);
 
-  // Build stream URL - use direct URL for admin testing (faster)
+  // Build stream URL with proxy (required for CORS bypass in browsers)
   const getStreamUrl = useCallback((channel: any) => {
-    if (!channel) return '';
-    // Direct access for admin testing - no proxy overhead
-    return channel.stream_url;
-  }, []);
+    if (!channel || !customListId) return '';
+    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
+    const encodedUrl = encodeURIComponent(channel.stream_url);
+    return `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
+  }, [customListId]);
 
   // Handle play
   const handlePlay = (channel: any) => {
@@ -503,7 +504,6 @@ export default function AdminIPTVTest() {
                 title={playerChannel.name}
                 logo={playerChannel.tvg_logo || undefined}
                 className="w-full h-full"
-                directAccess
               />
 
               {/* Close Button */}
