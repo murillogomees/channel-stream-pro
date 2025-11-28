@@ -6,9 +6,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
-  SkipBack, SkipForward, Settings, X, Tv, Radio, Film,
-  Clock, Signal, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp,
-  Heart, Share2, Info, AlertCircle, CheckCircle2
+  SkipBack, SkipForward, X, Radio, Film,
+  Signal, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp,
+  Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -19,6 +19,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
+
+interface ContentMetadata {
+  description?: string;
+  tmdb_rating?: number;
+  imdb_rating?: number;
+  cast_members?: Array<{ name: string; character?: string; profile_url?: string }>;
+  genres?: string[];
+  year?: number;
+  director?: string;
+}
 
 interface YouTubeStylePlayerProps {
   url: string;
@@ -37,6 +47,8 @@ interface YouTubeStylePlayerProps {
   onPlaybackStart?: () => void;
   onPlaybackComplete?: () => void;
   initialTime?: number;
+  // Content metadata
+  metadata?: ContentMetadata;
 }
 
 // Stream type detection
@@ -72,6 +84,7 @@ export default function YouTubeStylePlayer({
   onPlaybackStart,
   onPlaybackComplete,
   initialTime = 0,
+  metadata,
 }: YouTubeStylePlayerProps) {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -650,9 +663,8 @@ export default function YouTubeStylePlayer({
                 title={title}
                 category={category}
                 streamInfo={streamInfo}
-                streamStats={streamStats}
                 connectionStatus={connectionStatus}
-                url={originalUrl}
+                metadata={metadata}
               />
             </ScrollArea>
           )}
@@ -667,9 +679,8 @@ export default function YouTubeStylePlayer({
                 category={category}
                 logo={logo}
                 streamInfo={streamInfo}
-                streamStats={streamStats}
                 connectionStatus={connectionStatus}
-                url={originalUrl}
+                metadata={metadata}
               />
             </div>
           </ScrollArea>
@@ -685,9 +696,8 @@ interface StreamDetailsPanelProps {
   category: string;
   logo?: string;
   streamInfo: ReturnType<typeof detectStreamType>;
-  streamStats: { bitrate: number; resolution: string; codec: string; fps: number };
   connectionStatus: 'connected' | 'connecting' | 'error';
-  url: string;
+  metadata?: ContentMetadata;
 }
 
 function StreamDetailsPanel({ 
@@ -695,11 +705,10 @@ function StreamDetailsPanel({
   category, 
   logo,
   streamInfo, 
-  streamStats, 
   connectionStatus,
-  url 
+  metadata
 }: StreamDetailsPanelProps) {
-  const [showFullUrl, setShowFullUrl] = useState(false);
+  const rating = metadata?.tmdb_rating || metadata?.imdb_rating;
 
   return (
     <div className="space-y-4">
@@ -717,7 +726,21 @@ function StreamDetailsPanel({
             )}
             <div className="flex-1 min-w-0">
               <CardTitle className="text-lg line-clamp-2">{title}</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">{category}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm text-muted-foreground">{category}</p>
+                {metadata?.year && (
+                  <span className="text-sm text-muted-foreground">• {metadata.year}</span>
+                )}
+              </div>
+              {metadata?.genres && metadata.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {metadata.genres.slice(0, 3).map((genre) => (
+                    <Badge key={genre} variant="secondary" className="text-xs">
+                      {genre}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -755,118 +778,124 @@ function StreamDetailsPanel({
         </CardContent>
       </Card>
 
-      {/* Stream Info */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Tv className="w-4 h-4" />
-            Informações do Stream
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="space-y-1">
-              <p className="text-muted-foreground">Tipo</p>
-              <Badge variant="outline">{streamInfo.type}</Badge>
-            </div>
-            <div className="space-y-1">
-              <p className="text-muted-foreground">Modo</p>
-              <Badge variant={streamInfo.isLive ? "destructive" : "secondary"}>
-                {streamInfo.isLive ? "Ao Vivo" : "VOD"}
-              </Badge>
-            </div>
-            {streamStats.resolution && (
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Resolução</p>
-                <p className="font-medium">{streamStats.resolution}</p>
+      {/* Rating */}
+      {rating && rating > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Star className="w-4 h-4" />
+              Avaliação
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={cn(
+                      "w-5 h-5",
+                      i < Math.round(rating / 2)
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "text-muted-foreground/30"
+                    )}
+                  />
+                ))}
               </div>
-            )}
-            {streamStats.bitrate > 0 && (
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Bitrate</p>
-                <p className="font-medium">{streamStats.bitrate} kbps</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <span className="text-lg font-bold">{rating.toFixed(1)}</span>
+              <span className="text-sm text-muted-foreground">/10</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Technical Details */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Detalhes Técnicos
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Protocolo</span>
-              <span className="font-medium">{streamInfo.isHls ? 'HLS' : streamInfo.isLive ? 'MPEG-TS' : 'HTTP Progressive'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Player</span>
-              <span className="font-medium">
-                {streamInfo.isLive ? 'mpegts.js' : streamInfo.isHls ? 'hls.js' : 'Native'}
-              </span>
-            </div>
-            <Separator />
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">URL do Stream</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 px-2 text-xs"
-                  onClick={() => setShowFullUrl(!showFullUrl)}
-                >
-                  {showFullUrl ? 'Ocultar' : 'Mostrar'}
-                </Button>
-              </div>
-              {showFullUrl && (
-                <code className="block text-xs bg-muted p-2 rounded-md break-all text-muted-foreground">
-                  {url}
-                </code>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Synopsis */}
+      {metadata?.description && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Sinopse
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {metadata.description}
+            </p>
+            {metadata.director && (
+              <p className="text-sm mt-3">
+                <span className="text-muted-foreground">Diretor: </span>
+                <span className="font-medium">{metadata.director}</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Keyboard Shortcuts */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Atalhos de Teclado
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center gap-2">
-              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Espaço</kbd>
-              <span className="text-muted-foreground">Play/Pause</span>
+      {/* Cast */}
+      {metadata?.cast_members && metadata.cast_members.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Elenco
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {metadata.cast_members.slice(0, 6).map((actor, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  {actor.profile_url ? (
+                    <img
+                      src={actor.profile_url}
+                      alt={actor.name}
+                      className="w-10 h-10 rounded-full object-cover bg-muted"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className={cn(
+                      "w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium",
+                      actor.profile_url && "hidden"
+                    )}
+                  >
+                    {actor.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{actor.name}</p>
+                    {actor.character && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {actor.character}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">F</kbd>
-              <span className="text-muted-foreground">Tela cheia</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No metadata fallback */}
+      {!metadata?.description && !rating && (!metadata?.cast_members || metadata.cast_members.length === 0) && (
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-center text-muted-foreground">
+              <Film className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Informações do conteúdo não disponíveis</p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Badge variant="outline">{streamInfo.type}</Badge>
+                <Badge variant={streamInfo.isLive ? "destructive" : "secondary"}>
+                  {streamInfo.isLive ? "Ao Vivo" : "VOD"}
+                </Badge>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">M</kbd>
-              <span className="text-muted-foreground">Mudo</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">ESC</kbd>
-              <span className="text-muted-foreground">Sair</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">← →</kbd>
-              <span className="text-muted-foreground">±10s</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
