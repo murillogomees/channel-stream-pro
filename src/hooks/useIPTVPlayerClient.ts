@@ -373,7 +373,7 @@ export function useIPTVPlayerClient() {
       updateUIInBackground(
         allChannelsRef.current, 
         actualTotal,
-        `Carregando: ${allChannelsRef.current.length.toLocaleString()} canais`
+        `Sincronizando: ${allChannelsRef.current.length.toLocaleString()} canais`
       );
 
       // Save to cache every 15k channels
@@ -423,7 +423,7 @@ export function useIPTVPlayerClient() {
     playlistUrlRef.current = url;
     
     try {
-      setLoadingProgress('Verificando cache...');
+      setLoadingProgress('Sincronizando...');
       
       // Check local cache first
       const cached = await cache.get(playlistId);
@@ -458,7 +458,7 @@ export function useIPTVPlayerClient() {
       }
       
       // No cache - fetch initial batch
-      setLoadingProgress('Carregando canais...');
+      setLoadingProgress('Sincronizando canais...');
       setIsCached(false);
       
       const controller = new AbortController();
