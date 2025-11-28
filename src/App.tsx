@@ -36,7 +36,6 @@ const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
-const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
@@ -46,7 +45,6 @@ const AppProfile = lazy(() => import("./pages/app/AppProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const TVPlayer = lazy(() => import("./pages/TVPlayer"));
-const PlayerHome = lazy(() => import("./pages/PlayerHome"));
 
 const App = () => (
   <AuthProvider>
@@ -67,23 +65,25 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/install" element={<AppInstall />} />
           
-          <Route path="/conta" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
-          <Route path="/cliente/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
+          {/* Legacy routes - redirect to unified profile */}
+          <Route path="/conta" element={<Navigate to="/app/profile" replace />} />
+          <Route path="/cliente/account" element={<Navigate to="/app/profile" replace />} />
           
           {/* ========================================
               IPTV App Routes - Standalone Mobile/TV App
               These are the ONLY pages in the native app:
               - /app = Entry point with splash
               - /app/login = Client login
-              - /app/player = IPTV Player
+              - /app/player = IPTV Player (unified home + content)
               - /app/profile = Client profile/settings
               ======================================== */}
           <Route path="/app" element={<AppEntry />} />
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
-          <Route path="/app/home" element={<ProtectedRoute><PlayerHome /></ProtectedRoute>} />
           <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
-          <Route path="/app/account" element={<ProtectedRoute><ClienteAccount /></ProtectedRoute>} />
+          {/* Legacy app routes - redirect to unified pages */}
+          <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
+          <Route path="/app/account" element={<Navigate to="/app/profile" replace />} />
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
           
