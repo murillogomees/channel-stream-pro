@@ -260,13 +260,16 @@ export default function AppPlayer() {
   useFocusManagerInit();
 
   // Handle back button from remote/TV
+  // For clients: only close player, don't navigate away
+  // For admins: allow navigation back to dashboard
   useBackHandler(() => {
     if (showPlayerDialog) {
       setShowPlayerDialog(false);
       setPlayerChannel(null);
-    } else {
-      navigate(isAdmin ? '/dashboard' : '/app/profile');
+    } else if (isAdmin) {
+      navigate('/dashboard');
     }
+    // For clients, do nothing - they stay on the player page
   }, true);
 
   // Use StreamService for proxy URLs
@@ -308,9 +311,11 @@ export default function AppPlayer() {
           <p className="text-muted-foreground mb-8">
             Entre em contato com o suporte para ativar sua playlist IPTV.
           </p>
-          <Button size="lg" onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}>
-            {isAdmin ? 'Voltar ao Dashboard' : 'Ver Meu Perfil'}
-          </Button>
+          {isAdmin && (
+            <Button size="lg" onClick={() => navigate('/dashboard')}>
+              Voltar ao Dashboard
+            </Button>
+          )}
         </Card>
       </div>
     );
@@ -331,7 +336,7 @@ export default function AppPlayer() {
       <TVNavRail
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSettings={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
+        onSettings={isAdmin ? () => navigate('/dashboard') : undefined}
       />
 
       {/* Main Content Area */}
@@ -339,14 +344,16 @@ export default function AppPlayer() {
         {/* Top Bar */}
         <header className="fixed top-0 right-0 left-0 md:left-[72px] lg:left-[88px] h-14 sm:h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
-              className="flex-shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/dashboard')}
+                className="flex-shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
             
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <h1 className="text-base sm:text-lg font-semibold truncate">{tabTitle}</h1>
@@ -403,15 +410,17 @@ export default function AppPlayer() {
               </div>
             )}
 
-            {/* Settings button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(isAdmin ? '/dashboard' : '/app/profile')}
-              className="flex-shrink-0"
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
+            {/* Settings button - only for admins */}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/dashboard')}
+                className="flex-shrink-0"
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+            )}
           </div>
         </header>
 
