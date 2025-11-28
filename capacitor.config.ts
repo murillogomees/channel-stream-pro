@@ -1,29 +1,55 @@
 import { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "app.lovable.a6d041f19e9649e8bc86f2d4dd4bc0b2",
-  appName: "IPTV LINK PLAYER",
+  appId: "com.iptvlink.app",
+  appName: "IPTV Link",
   webDir: "dist",
   server: {
+    // Para desenvolvimento - REMOVER EM PRODUÇÃO
     url: "https://a6d041f1-9e96-49e8-bc86-f2d4dd4bc0b2.lovableproject.com?forceHideBadge=true",
     cleartext: true,
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 3000,
-      launchAutoHide: true,
-      backgroundColor: "#1a1a1a",
+      launchShowDuration: 2500,
+      launchAutoHide: false,
+      backgroundColor: "#0A0A0A",
+      showSpinner: false,
       androidSplashResourceName: "splash",
       androidScaleType: "CENTER_CROP",
-      showSpinner: true,
-      androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small",
-      spinnerColor: "#4ADE80",
       splashFullScreen: true,
       splashImmersive: true,
       layoutName: "launch_screen",
-      useDialog: true,
+      useDialog: false,
     },
+    StatusBar: {
+      style: "DARK",
+      backgroundColor: "#0A0A0A",
+    },
+    Keyboard: {
+      resize: "body",
+      resizeOnFullScreen: true,
+    },
+    ScreenOrientation: {
+      // Permitir rotação no player
+    },
+  },
+  android: {
+    allowMixedContent: true,
+    captureInput: true,
+    webContentsDebuggingEnabled: false,
+    backgroundColor: "#0A0A0A",
+    buildOptions: {
+      keystorePath: undefined,
+      keystoreAlias: undefined,
+    },
+  },
+  ios: {
+    contentInset: "automatic",
+    allowsLinkPreview: false,
+    scrollEnabled: true,
+    backgroundColor: "#0A0A0A",
+    preferredContentMode: "mobile",
   },
 };
 

@@ -1,10 +1,32 @@
 import { createRoot } from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
 
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
+
+// Inicialização de plugins Capacitor para plataformas nativas
+const initCapacitor = async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { StatusBar, Style } = await import("@capacitor/status-bar");
+      const { ScreenOrientation } = await import("@capacitor/screen-orientation");
+      
+      // Configurar status bar
+      await StatusBar.setStyle({ style: Style.Dark });
+      await StatusBar.setBackgroundColor({ color: "#0A0A0A" });
+      
+      // Permitir todas as orientações inicialmente
+      await ScreenOrientation.unlock();
+      
+      console.log("Capacitor initialized successfully");
+    } catch (error) {
+      console.log("Capacitor plugin initialization:", error);
+    }
+  }
+};
 
 // Suprimir erros de WebSocket do Realtime para evitar impacto no Lighthouse/SEO
 const originalConsoleError = console.error;
@@ -40,9 +62,12 @@ console.warn = (...args: any[]) => {
   originalConsoleWarn.apply(console, args);
 };
 
-createRoot(document.getElementById("root")!).render(
-  <App />
-);
+// Inicializar Capacitor antes de renderizar
+initCapacitor().then(() => {
+  createRoot(document.getElementById("root")!).render(
+    <App />
+  );
+});
 
 // Register service worker for PWA - only in production, defer to idle
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
