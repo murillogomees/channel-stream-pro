@@ -38,6 +38,9 @@ export default function AdminIPTVTest() {
     loadingProgress,
     customListId,
     availableLists,
+    totalChannels,
+    loadedChannels,
+    isLoadingMore,
     changeChannel,
     nextChannel,
     previousChannel,
@@ -327,7 +330,7 @@ export default function AdminIPTVTest() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold">{tabTitle}</h1>
               {/* Content count */}
               <span className="text-sm text-muted-foreground">
@@ -337,6 +340,13 @@ export default function AdminIPTVTest() {
                 {activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
                 {activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
               </span>
+              {/* Background loading indicator */}
+              {isLoadingMore && (
+                <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>{loadingProgress}</span>
+                </div>
+              )}
             </div>
           </div>
 
