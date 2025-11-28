@@ -55,10 +55,14 @@ interface ParseResult {
 // =============================================================================
 
 /**
- * Parse M3U content em streaming para evitar problemas de memória
- * Suporta arquivos com 200k+ canais
+ * Parse M3U content em streaming com early termination
+ * Para de parsear assim que tiver canais suficientes (offset + limit)
+ * Isso evita parsear 200k+ canais quando só precisamos de 300
  */
-async function parseM3UStream(response: Response): Promise<Channel[]> {
+async function parseM3UStream(
+  response: Response, 
+  targetCount: number = Infinity
+): Promise<{ channels: Channel[]; reachedEnd: boolean }> {
   const reader = response.body?.getReader();
   if (!reader) {
     throw new Error('Stream not available');
@@ -70,6 +74,7 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
   let buffer = '';
   let currentChannel: Partial<Channel> | null = null;
   let channelIndex = 0;
+  let reachedEnd = true;
 
   try {
     while (true) {
@@ -104,6 +109,13 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
           // Channel complete - add to list
           if (currentChannel.name && currentChannel.stream_url) {
             channels.push(currentChannel as Channel);
+            
+            // Early termination: stop if we have enough channels
+            if (channels.length >= targetCount) {
+              console.log(`[M3U] Early termination at ${channels.length} channels`);
+              reachedEnd = false;
+              return { channels, reachedEnd };
+            }
           }
           
           currentChannel = null;
@@ -123,7 +135,7 @@ async function parseM3UStream(response: Response): Promise<Channel[]> {
     reader.releaseLock();
   }
 
-  return channels;
+  return { channels, reachedEnd };
 }
 
 /**
@@ -266,22 +278,27 @@ Deno.serve(async (req) => {
       throw new Error(`M3U fetch failed: ${response.status} ${response.statusText}`);
     }
 
-    console.log('[M3U] Parsing stream...');
+    // Calculate how many channels we need to parse (offset + limit)
+    const targetCount = offset + effectiveLimit;
+    
+    console.log(`[M3U] Parsing stream (target: ${targetCount} channels)...`);
 
-    // Parse em streaming
-    const allChannels = await parseM3UStream(response);
+    // Parse em streaming with early termination
+    const { channels: parsedChannels, reachedEnd } = await parseM3UStream(response, targetCount);
 
-    console.log(`[M3U] Parsed ${allChannels.length} channels total`);
+    console.log(`[M3U] Parsed ${parsedChannels.length} channels`);
 
-    // Aplicar paginação
-    const paginatedChannels = allChannels.slice(offset, offset + effectiveLimit);
-    const hasMore = offset + effectiveLimit < allChannels.length;
+    // Aplicar paginação (slice from offset)
+    const paginatedChannels = parsedChannels.slice(offset);
+    
+    // hasMore is true if we hit early termination OR if there are more channels after our slice
+    const hasMore = !reachedEnd || parsedChannels.length > offset + effectiveLimit;
 
-    console.log(`[M3U] Returning ${paginatedChannels.length} channels (${offset} to ${offset + paginatedChannels.length})`);
+    console.log(`[M3U] Returning ${paginatedChannels.length} channels (offset: ${offset})`);
 
     const result: ParseResult = {
       channels: paginatedChannels,
-      total: allChannels.length,
+      total: reachedEnd ? parsedChannels.length : -1, // -1 indicates unknown total (early termination)
       offset,
       limit: effectiveLimit,
       hasMore,
