@@ -2,7 +2,7 @@ import { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.iptvlink.player",
-  appName: "IPTV Link",
+  appName: "IPTV LINK PLAYER",
   webDir: "dist",
   server: {
     // Entry point do app nativo - apenas as páginas do IPTV
