@@ -105,15 +105,20 @@ class StreamService {
 
   /**
    * Retorna URL pronta para o player (com proxy se necessário)
+   * Aceita Channel ou string diretamente
    */
-  getPlayableUrl(channel: Channel): string {
-    if (!channel?.stream_url) return '';
+  getPlayableUrl(channelOrUrl: Channel | string): string {
+    const streamUrl = typeof channelOrUrl === 'string' 
+      ? channelOrUrl 
+      : channelOrUrl?.stream_url;
+      
+    if (!streamUrl) return '';
     
-    if (this.needsProxy(channel.stream_url)) {
-      return this.getProxyUrl(channel.stream_url);
+    if (this.needsProxy(streamUrl)) {
+      return this.getProxyUrl(streamUrl);
     }
     
-    return channel.stream_url;
+    return streamUrl;
   }
 
   // ===========================================================================
