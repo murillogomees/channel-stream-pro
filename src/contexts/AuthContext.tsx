@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [session, fetchUserData]);
 
   /**
-   * Logout (limpa cache)
+   * Logout (limpa cache e remember me)
    */
   const signOut = useCallback(async () => {
     // Registrar logout antes de fazer signOut
@@ -134,12 +134,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     cacheRef.current = null; // Limpar cache
+    localStorage.removeItem('iptv_remember_me'); // Limpar remember me
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
   }, [user]);
 
   useEffect(() => {
+    const REMEMBER_ME_KEY = 'iptv_remember_me';
+    
     // Timeout de segurança para evitar loading infinito
     const safetyTimeout = setTimeout(() => {
       if (loading) {
@@ -148,11 +151,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }, 5000);
 
+    // Verificar se "continuar conectado" expirou
+    const checkRememberMe = () => {
+      const stored = localStorage.getItem(REMEMBER_ME_KEY);
+      if (stored) {
+        try {
+          const { expires } = JSON.parse(stored);
+          if (Date.now() > expires) {
+            console.log('[AuthContext] Remember me expirado, fazendo logout...');
+            localStorage.removeItem(REMEMBER_ME_KEY);
+            supabase.auth.signOut();
+            return true; // Session expired
+          }
+        } catch {
+          localStorage.removeItem(REMEMBER_ME_KEY);
+        }
+      }
+      return false;
+    };
+
     // Configurar listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
         // Usar setTimeout para evitar deadlock
         setTimeout(() => {
+          // Se não tem remember me e está logado, verificar se deve sair
+          if (currentSession && !localStorage.getItem(REMEMBER_ME_KEY)) {
+            // Usuário não marcou "continuar conectado" - sessão normal
+          }
           updateAuthState(currentSession);
         }, 0);
       }
@@ -161,6 +187,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Verificar sessão inicial
     supabase.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
+        // Verificar remember me antes de carregar sessão
+        if (currentSession && checkRememberMe()) {
+          return; // Don't update auth state, logout in progress
+        }
         updateAuthState(currentSession);
       })
       .catch((error) => {

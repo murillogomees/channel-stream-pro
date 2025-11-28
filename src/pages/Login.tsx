@@ -15,10 +15,14 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { z } from 'zod';
+
+const REMEMBER_ME_KEY = 'iptv_remember_me';
+const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -35,6 +39,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(() => {
+    const stored = localStorage.getItem(REMEMBER_ME_KEY);
+    return stored ? Date.now() < JSON.parse(stored).expires : false;
+  });
 
   // Auto-redirect if already authenticated
   useEffect(() => {
@@ -117,6 +125,16 @@ export default function Login() {
       if (data.user) {
         console.log('[Login] Login bem-sucedido:', data.user.id);
         toast.success('Login realizado com sucesso!');
+        
+        // Save remember me preference
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({
+            expires: Date.now() + REMEMBER_ME_DURATION,
+            userId: data.user.id
+          }));
+        } else {
+          localStorage.removeItem(REMEMBER_ME_KEY);
+        }
         
         // Force user refresh to load roles
         console.log('[Login] Forçando refresh do usuário...');
@@ -350,6 +368,27 @@ export default function Login() {
                       )}
                     </motion.button>
                   </div>
+                </motion.div>
+
+                {/* Remember Me Checkbox */}
+                <motion.div
+                  className="flex items-center space-x-2"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.65 }}
+                >
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm font-normal text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  >
+                    Continuar conectado por 30 dias
+                  </Label>
                 </motion.div>
 
                 {/* Submit Button */}
