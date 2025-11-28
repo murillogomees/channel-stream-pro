@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, CheckCircle, Tv } from "lucide-react";
+import { Download, CheckCircle, Tv } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
 // Logo otimizado para performance (transparente)
 import logoWhite from "@/assets/logo-white.png";
@@ -120,12 +120,12 @@ const HeroSection = () => {
               size="lg" 
               className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
               onClick={() => {
-                trackEvent('Contact', { content_name: 'Hero CTA - WhatsApp', content_category: 'button' });
-                window.location.href = `https://wa.me/${settings.whatsapp_number}?text=${encodeURIComponent(settings.whatsapp_message)}`;
+                trackEvent('Lead', { content_name: 'Hero CTA - Download App', content_category: 'button' });
+                window.location.href = '/install';
               }}
             >
-              <Play className="h-5 w-5 sm:h-6 sm:w-6" />
-              {settings.cta_secondary_text}
+              <Download className="h-5 w-5 sm:h-6 sm:w-6" />
+              Faça o download do app agora!
             </Button>
           </div>
 
