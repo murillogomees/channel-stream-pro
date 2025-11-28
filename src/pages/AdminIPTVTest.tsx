@@ -22,6 +22,8 @@ import { TVContentCard } from '@/components/iptv/TVContentCard';
 import { TVCategoryFilter } from '@/components/iptv/TVCategoryFilter';
 import { TVContentGrid } from '@/components/iptv/TVContentGrid';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { streamService } from '@/modules/player/services/StreamService';
+import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 
 export default function AdminIPTVTest() {
   const navigate = useNavigate();
@@ -243,11 +245,23 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPlayerDialog]);
 
-  // Use proxy to bypass Mixed Content (HTTP streams on HTTPS page)
+  // Initialize FocusManager for TV navigation
+  useFocusManagerInit();
+
+  // Handle back button from remote/TV
+  useBackHandler(() => {
+    if (showPlayerDialog) {
+      setShowPlayerDialog(false);
+      setPlayerChannel(null);
+    } else {
+      navigate('/dashboard');
+    }
+  }, true);
+
+  // Use StreamService for proxy URLs
   const getStreamUrl = useCallback((channel: any) => {
-    if (!channel) return '';
-    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
-    return `${proxyUrl}?url=${encodeURIComponent(channel.stream_url)}`;
+    if (!channel?.stream_url) return '';
+    return streamService.getPlayableUrl(channel);
   }, []);
 
   // Handle play
