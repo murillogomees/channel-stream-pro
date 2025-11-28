@@ -11,6 +11,7 @@ interface CreateUserRequest {
   password: string;
   nome: string;
   telefone?: string;
+  role?: 'admin' | 'client'; // Tipo de usuário a ser criado
 }
 
 Deno.serve(async (req) => {
@@ -60,38 +61,50 @@ Deno.serve(async (req) => {
 
     console.log('Authenticated user in create-admin-user:', user.id);
 
-    // Check if user is super_admin
-    const { data: roleData, error: rolesError } = await anonClient
+    // Get request body
+    const body: CreateUserRequest = await req.json();
+    const { email, password, nome, telefone, role = 'client' } = body;
+
+    if (!email || !password || !nome) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: email, password, nome' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check user permissions based on what they're trying to create
+    const { data: userRoles, error: rolesError } = await anonClient
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'super_admin')
-      .maybeSingle();
+      .eq('user_id', user.id);
 
     if (rolesError) {
       console.error('Role check error in create-admin-user:', rolesError);
       return new Response(
-        JSON.stringify({ error: 'Failed to verify super_admin role' }),
+        JSON.stringify({ error: 'Failed to verify permissions' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!roleData) {
-      console.log('User is not super_admin:', user.id);
+    const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+    const isAdmin = userRoles?.some(r => r.role === 'admin') || isSuperAdmin;
+
+    // Permission check:
+    // - super_admin can create any type of user
+    // - admin can only create client users
+    if (role === 'admin' && !isSuperAdmin) {
+      console.log('User is not super_admin, cannot create admin users:', user.id);
       return new Response(
         JSON.stringify({ error: 'Forbidden: Only super admins can create admin users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get request body
-    const body: CreateUserRequest = await req.json();
-    const { email, password, nome, telefone } = body;
-
-    if (!email || !password || !nome) {
+    if (role === 'client' && !isAdmin) {
+      console.log('User is not admin, cannot create client users:', user.id);
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: email, password, nome' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Forbidden: Only admins can create client users' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -124,25 +137,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Assign admin role to the new user
-    const { error: roleError } = await serviceClient
-      .from('user_roles')
-      .insert({
-        user_id: newUser.user.id,
-        role: 'admin',
-      });
+    // Note: The trigger handle_new_user_role already assigns 'client' role automatically
+    // For admin users, we need to explicitly add the admin role
+    if (role === 'admin') {
+      const { error: roleError } = await serviceClient
+        .from('user_roles')
+        .insert({
+          user_id: newUser.user.id,
+          role: 'admin',
+        });
 
-    if (roleError) {
-      console.error('Error assigning admin role in create-admin-user:', roleError);
-      return new Response(
-        JSON.stringify({
-          error: 'User created but failed to assign admin role',
-          details: roleError.message,
-          userId: newUser.user.id,
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (roleError) {
+        console.error('Error assigning admin role in create-admin-user:', roleError);
+        return new Response(
+          JSON.stringify({
+            error: 'User created but failed to assign admin role',
+            details: roleError.message,
+            userId: newUser.user.id,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
+
+    console.log(`User created successfully: ${newUser.user.id} with role: ${role}`);
 
     return new Response(
       JSON.stringify({
@@ -151,6 +169,7 @@ Deno.serve(async (req) => {
           id: newUser.user.id,
           email: newUser.user.email,
           nome,
+          role,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

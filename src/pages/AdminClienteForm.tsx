@@ -25,7 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { M3UListSelector } from '@/components/admin/M3UListSelector';
 import { M3UListPreview } from '@/components/admin/M3UListPreview';
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DatePicker } from '@/components/ui/date-picker';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -46,7 +46,10 @@ const clienteSchema = z.object({
   email: z.string()
     .trim()
     .email('Email inválido')
-    .max(255, 'Email muito longo')
+    .max(255, 'Email muito longo'),
+  senha: z.string()
+    .min(6, 'Senha deve ter no mínimo 6 caracteres')
+    .max(100, 'Senha muito longa')
     .optional()
     .or(z.literal('')),
   situacao: z.enum(['Testando', 'Ativo', 'Devendo', 'Inativo', 'Lead']),
@@ -99,6 +102,8 @@ export default function AdminClienteForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);
   const [allM3ULists, setAllM3ULists] = useState<any[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [hasExistingAuthUser, setHasExistingAuthUser] = useState(false);
 
   const {
     register,
@@ -170,6 +175,12 @@ export default function AdminClienteForm() {
 
             if (m3uAssignments) {
               setSelectedM3ULists(m3uAssignments.map(a => a.m3u_list_id));
+            }
+
+            // Verificar se cliente já tem usuário de autenticação
+            if (data.user_id) {
+              setHasExistingAuthUser(true);
+              console.log('Cliente já possui conta de acesso:', data.user_id);
             }
           }
         } catch (error) {
@@ -273,6 +284,16 @@ export default function AdminClienteForm() {
     // Prevenir múltiplos submits
     if (isSubmitting) {
       console.log('Já está processando um submit, ignorando...');
+      return;
+    }
+
+    // Validar senha obrigatória para novos clientes
+    if (!id && data.email && !data.senha) {
+      toast({
+        title: 'Senha obrigatória',
+        description: 'Para criar uma conta de acesso, informe a senha do cliente.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -408,8 +429,48 @@ export default function AdminClienteForm() {
     } else {
       // Insert new client directly into Supabase
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) throw new Error('User not authenticated');
+
+        let authUserId: string | null = null;
+
+        // Se tem email e senha, criar usuário de autenticação para o cliente
+        if (clienteData.email && data.senha) {
+          console.log('Criando usuário de autenticação para o cliente...');
+          
+          // Usar a edge function para criar o usuário (admin pode criar usuários)
+          const { data: createUserResult, error: createUserError } = await supabase.functions.invoke('create-admin-user', {
+            body: {
+              email: clienteData.email,
+              password: data.senha,
+              nome: clienteData.nome,
+              telefone: clienteData.telefone,
+              role: 'client' // Sempre cliente
+            }
+          });
+
+          if (createUserError) {
+            console.error('Erro ao criar usuário:', createUserError);
+            // Se o erro for de usuário já existente, tentar buscar o ID
+            if (createUserError.message?.includes('already registered') || createUserError.message?.includes('already exists')) {
+              toast({
+                title: 'Aviso',
+                description: 'Este email já está registrado. O cliente será criado sem conta de acesso.',
+                variant: 'default',
+              });
+            } else {
+              throw new Error(`Erro ao criar conta de acesso: ${createUserError.message}`);
+            }
+          } else if (createUserResult?.user?.id) {
+            authUserId = createUserResult.user.id;
+            console.log('Usuário de autenticação criado:', authUserId);
+            
+            toast({
+              title: 'Conta de acesso criada',
+              description: `Login: ${clienteData.email}`,
+            });
+          }
+        }
 
         const { data: newClientData, error: insertError } = await supabase
           .from('clientes')
@@ -430,7 +491,8 @@ export default function AdminClienteForm() {
             origem_cadastro: clienteData.origemCadastro || null,
             dispositivo_contratado: clienteData.dispositivoContratado || null,
             data_cadastro: new Date().toISOString(),
-            data_ultima_edicao: new Date().toISOString()
+            data_ultima_edicao: new Date().toISOString(),
+            user_id: authUserId // Vincular ao usuário de autenticação se criado
           })
           .select()
           .single();
@@ -440,20 +502,22 @@ export default function AdminClienteForm() {
 
           clientId = newClientData.id;
           
-          console.log('Cliente criado com sucesso:', clientId);
+          console.log('Cliente criado com sucesso:', clientId, authUserId ? '(com conta de acesso)' : '(sem conta de acesso)');
 
           // Registrar atividade de criação
           await activityLogService.logActivity(
             'client_created',
-            `Novo cliente ${clienteData.nome} foi cadastrado`,
+            `Novo cliente ${clienteData.nome} foi cadastrado${authUserId ? ' com conta de acesso' : ''}`,
             'cliente',
             clientId,
-            { nome: clienteData.nome, telefone: clienteData.telefone, plano: clienteData.plano }
+            { nome: clienteData.nome, telefone: clienteData.telefone, plano: clienteData.plano, hasAuthUser: !!authUserId }
           );
 
           toast({
             title: 'Cliente cadastrado',
-            description: 'O novo cliente foi adicionado com sucesso.',
+            description: authUserId 
+              ? `Cliente criado com acesso ao sistema. Login: ${clienteData.email}`
+              : 'O novo cliente foi adicionado com sucesso.',
           });
 
         // Save M3U list assignments for new clients
@@ -462,7 +526,7 @@ export default function AdminClienteForm() {
             const newAssignments = selectedM3ULists.map(listId => ({
               client_id: clientId,
               m3u_list_id: listId,
-              assigned_by: user?.id,
+              assigned_by: currentUser?.id,
               is_active: true,
             }));
 
@@ -662,9 +726,48 @@ export default function AdminClienteForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" {...register('email')} />
+                  <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+                  <Input id="email" type="email" {...register('email')} placeholder="cliente@email.com" />
+                  {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                  {hasExistingAuthUser ? (
+                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <UserPlus className="h-3 w-3" />
+                      Cliente já possui conta de acesso ao sistema
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Este email será usado para login do cliente</p>
+                  )}
                 </div>
+
+                {/* Campo de senha - apenas para novos clientes ou se não tem auth user */}
+                {(!id || !hasExistingAuthUser) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="senha">
+                      Senha de Acesso {!id && <span className="text-destructive">*</span>}
+                    </Label>
+                    <div className="relative">
+                      <Input 
+                        id="senha" 
+                        type={showPassword ? 'text' : 'password'}
+                        {...register('senha')} 
+                        placeholder="Mínimo 6 caracteres"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {errors.senha && <p className="text-sm text-destructive">{errors.senha.message}</p>}
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <UserPlus className="h-3 w-3" />
+                      {id ? 'Criar conta de acesso para este cliente' : 'Senha para o cliente acessar o app/sistema'}
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone</Label>
