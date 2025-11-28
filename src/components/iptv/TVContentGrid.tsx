@@ -50,38 +50,42 @@ export function TVContentGrid({
 
   if (channels.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
+      <div className="flex items-center justify-center min-h-[40vh] px-4 lg:px-8">
         <p className="text-muted-foreground">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className={cn("space-y-6", className)}>
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground">
-        Mostrando {visibleChannels.length} de {channels.length.toLocaleString()} itens
+    <section className={cn("py-4 lg:py-6", className)}>
+      {/* Results count - matching TVContentRow header padding */}
+      <div className="px-4 lg:px-8 mb-3 lg:mb-4">
+        <p className="text-sm text-muted-foreground">
+          Mostrando {visibleChannels.length} de {channels.length.toLocaleString()} itens
+        </p>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 lg:gap-4">
-        {visibleChannels.map((channel) => (
-          <TVContentCard
-            key={channel.id}
-            id={channel.id}
-            name={channel.name}
-            logo={channel.tvg_logo}
-            category={channel.category_name}
-            isFavorite={isFavorite(channel.id)}
-            onPlay={() => onPlay(channel)}
-            onToggleFavorite={() => onToggleFavorite(channel.id)}
-          />
-        ))}
+      {/* Grid - matching TVContentRow content padding */}
+      <div className="px-4 lg:px-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 lg:gap-4">
+          {visibleChannels.map((channel) => (
+            <TVContentCard
+              key={channel.id}
+              id={channel.id}
+              name={channel.name}
+              logo={channel.tvg_logo}
+              category={channel.category_name}
+              isFavorite={isFavorite(channel.id)}
+              onPlay={() => onPlay(channel)}
+              onToggleFavorite={() => onToggleFavorite(channel.id)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Load More Button */}
       {hasMore && (
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center pt-6 px-4 lg:px-8">
           <Button 
             variant="outline" 
             size="lg"
@@ -93,6 +97,6 @@ export function TVContentGrid({
           </Button>
         </div>
       )}
-    </div>
+    </section>
   );
 }
