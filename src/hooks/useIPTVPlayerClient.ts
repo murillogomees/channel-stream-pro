@@ -30,8 +30,10 @@ interface AssignedPlaylist {
 // Optimized batch settings - sequential to avoid server overload
 const INITIAL_BATCH_SIZE = 2000;
 const BACKGROUND_BATCH_SIZE = 3000;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
+const MAX_CACHE_RETRIES = 30; // More retries when server is building cache
 const RETRY_DELAY_MS = 2000;
+const CACHE_RETRY_DELAY_MS = 3000;
 
 export function useIPTVPlayerClient() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -90,8 +92,9 @@ export function useIPTVPlayerClient() {
     limit: number, 
     token: string,
     signal: AbortSignal,
-    retryCount = 0
-  ): Promise<{ channels: any[]; total: number; hasMore: boolean; retryAfter?: number }> => {
+    retryCount = 0,
+    cacheRetryCount = 0
+  ): Promise<{ channels: any[]; total: number; hasMore: boolean; retryAfter?: number; partial?: boolean }> => {
     const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url';
     
     const response = await fetch(proxyUrl, {
@@ -108,7 +111,7 @@ export function useIPTVPlayerClient() {
     if (response.status >= 500 && retryCount < MAX_RETRIES) {
       console.log(`[IPTV Client] Server error ${response.status}, retrying in ${RETRY_DELAY_MS}ms...`);
       await delay(RETRY_DELAY_MS * (retryCount + 1));
-      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount + 1);
+      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount + 1, cacheRetryCount);
     }
 
     if (!response.ok) {
@@ -118,11 +121,11 @@ export function useIPTVPlayerClient() {
 
     const data = await response.json();
     
-    // Handle retryAfter from server (cache not ready)
-    if (data.retryAfter && data.channels.length === 0 && retryCount < MAX_RETRIES) {
-      console.log(`[IPTV Client] Server cache building, retrying in ${data.retryAfter}s...`);
+    // Handle retryAfter from server (cache not ready) - use separate counter with higher limit
+    if (data.partial && data.retryAfter && data.channels.length === 0 && cacheRetryCount < MAX_CACHE_RETRIES) {
+      console.log(`[IPTV Client] Server cache building (attempt ${cacheRetryCount + 1}/${MAX_CACHE_RETRIES}), waiting ${data.retryAfter}s...`);
       await delay(data.retryAfter * 1000);
-      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount + 1);
+      return fetchBatch(fileUrl, offset, limit, token, signal, retryCount, cacheRetryCount + 1);
     }
 
     return data;
@@ -150,6 +153,7 @@ export function useIPTVPlayerClient() {
     
     let currentOffset = startOffset;
     let loadedCount = initialChannels.length;
+    let consecutiveEmptyResponses = 0;
     let consecutiveErrors = 0;
     
     while (currentOffset < total && !controller.signal.aborted) {
@@ -168,6 +172,7 @@ export function useIPTVPlayerClient() {
           allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
           loadedCount += result.channels.length;
           currentOffset += result.channels.length;
+          consecutiveEmptyResponses = 0;
           consecutiveErrors = 0;
           
           setLoadedChannels(loadedCount);
@@ -176,13 +181,17 @@ export function useIPTVPlayerClient() {
           // Update UI every few batches
           const updatedCategories = groupChannelsIntoCategories(allChannelsRef.current);
           setCategories(updatedCategories);
-        } else if (result.retryAfter) {
-          // Server asked us to wait
-          console.log(`[IPTV Client] Server requested retry, waiting...`);
-          await delay(result.retryAfter * 1000);
         } else {
-          // Empty response without retry - might be at the end
-          currentOffset += batchLimit;
+          consecutiveEmptyResponses++;
+          
+          // If we've exhausted cache retries in fetchBatch and still getting empty responses
+          if (consecutiveEmptyResponses >= 5) {
+            console.log('[IPTV Client] Too many empty responses, assuming end of data');
+            break;
+          }
+          
+          // Small delay before trying next offset
+          await delay(CACHE_RETRY_DELAY_MS);
         }
 
         if (!result.hasMore) {
@@ -196,13 +205,13 @@ export function useIPTVPlayerClient() {
         consecutiveErrors++;
         console.error(`[IPTV Client] Batch error (${consecutiveErrors}):`, error);
         
-        if (consecutiveErrors >= 3) {
+        if (consecutiveErrors >= 5) {
           console.error('[IPTV Client] Too many consecutive errors, stopping');
           break;
         }
         
-        // Wait before retrying
-        await delay(2000);
+        // Exponential backoff
+        await delay(RETRY_DELAY_MS * Math.pow(2, consecutiveErrors - 1));
       }
     }
 
