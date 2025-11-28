@@ -390,14 +390,14 @@ export default function AppPlayer() {
     setShowPlayerDialog(true);
   };
 
-  // Loading state
-  if (playerLoading || favoritesLoading) {
+  // Loading state - only show if no content at all
+  if ((playerLoading || favoritesLoading) && categories.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-16 h-16 animate-spin mx-auto mb-6 text-primary" />
           <p className="text-xl font-medium text-foreground mb-2">
-            Carregando conteúdo
+            Sincronizando conteúdo
           </p>
           <p className="text-muted-foreground">
             {loadingProgress || 'Preparando sua experiência...'}
