@@ -13,8 +13,8 @@ interface ImportPayload {
   customListId: string;
 }
 
-// Smaller batch sizes to reduce memory
-const DB_BATCH_SIZE = 200;
+const DB_BATCH_SIZE = 100;
+const MAX_CHANNELS = 50000; // Limit to prevent memory issues
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
 
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Update session status immediately
+    // Update session status
     await supabase
       .from('m3u_import_sessions')
       .update({ status: 'processing' })
@@ -40,12 +40,12 @@ Deno.serve(async (req) => {
     // Start background processing
     EdgeRuntime.waitUntil(processInBackground(payload, supabase));
 
-    // Return immediately
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Processamento iniciado em segundo plano',
-        sessionId: payload.sessionId
+        message: 'Processamento iniciado',
+        sessionId: payload.sessionId,
+        maxChannels: MAX_CHANNELS
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -61,13 +61,13 @@ Deno.serve(async (req) => {
 
 async function processInBackground(payload: ImportPayload, supabase: any) {
   try {
-    console.log('[ProcessM3U-BG] Iniciando background:', payload.sessionId);
+    console.log('[ProcessM3U-BG] Iniciando:', payload.sessionId);
     
-    // For URL sources, stream the content
     if (payload.sourceType === 'url' && payload.sourceUrl) {
-      await processFromUrl(payload, supabase);
+      await processFromUrlStreaming(payload, supabase);
     } else if (payload.sourceContent) {
-      await processFromContent(payload.sourceContent, payload, supabase);
+      // For pasted content, process directly (usually smaller)
+      await processSmallContent(payload.sourceContent, payload, supabase);
     }
     
   } catch (error: any) {
@@ -83,11 +83,11 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
   }
 }
 
-async function processFromUrl(payload: ImportPayload, supabase: any) {
-  console.log('[ProcessM3U-BG] Baixando:', payload.sourceUrl);
+async function processFromUrlStreaming(payload: ImportPayload, supabase: any) {
+  console.log('[ProcessM3U-BG] Streaming:', payload.sourceUrl);
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
   
   try {
     const response = await fetch(payload.sourceUrl!, { 
@@ -96,94 +96,202 @@ async function processFromUrl(payload: ImportPayload, supabase: any) {
     });
     clearTimeout(timeoutId);
     
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       throw new Error(`HTTP ${response.status}`);
     }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     
-    // Read as text but process line by line efficiently
-    const text = await response.text();
-    await processFromContent(text, payload, supabase);
+    const categorySet = new Set<string>();
+    let currentChannel: any = null;
+    let lineBuffer = '';
+    let processedCount = 0;
+    let batch: any[] = [];
+    
+    // First pass: Read entire stream to get categories (lightweight)
+    let fullContent = '';
+    let totalSize = 0;
+    const MAX_SIZE = 30 * 1024 * 1024; // 30MB limit
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      totalSize += chunk.length;
+      
+      if (totalSize > MAX_SIZE) {
+        console.log('[ProcessM3U-BG] Arquivo muito grande, limitando...');
+        fullContent += chunk;
+        break;
+      }
+      
+      fullContent += chunk;
+      
+      // Extract categories as we go
+      const groupMatches = chunk.matchAll(/group-title="([^"]*)"/g);
+      for (const match of groupMatches) {
+        categorySet.add(match[1] || 'Sem Categoria');
+      }
+    }
+    
+    console.log(`[ProcessM3U-BG] Baixado: ${(totalSize / 1024 / 1024).toFixed(2)}MB, ${categorySet.size} categorias`);
+    
+    // Create categories
+    const categories = Array.from(categorySet);
+    const categoryMap = new Map<string, string>();
+    
+    for (let i = 0; i < categories.length; i++) {
+      const { data } = await supabase
+        .from('m3u_categories')
+        .insert({
+          custom_list_id: payload.customListId,
+          name: categories[i],
+          display_name: categories[i],
+          order_position: i,
+        })
+        .select('id')
+        .single();
+      
+      if (data) categoryMap.set(categories[i], data.id);
+    }
+    
+    const defaultCategoryId = categoryMap.values().next().value;
+    
+    // Second pass: Process channels line by line
+    const lines = fullContent.split('\n');
+    fullContent = ''; // Free memory
+    
+    for (let i = 0; i < lines.length && processedCount < MAX_CHANNELS; i++) {
+      const line = lines[i].trim();
+      
+      if (line.startsWith('#EXTINF:')) {
+        const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
+        const tvgNameMatch = line.match(/tvg-name="([^"]*)"/);
+        const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
+        const groupMatch = line.match(/group-title="([^"]*)"/);
+        const nameMatch = line.match(/,(.+)$/);
+        
+        currentChannel = {
+          tvgId: tvgIdMatch?.[1] || null,
+          tvgName: tvgNameMatch?.[1] || null,
+          tvgLogo: tvgLogoMatch?.[1] || null,
+          groupTitle: groupMatch?.[1] || 'Sem Categoria',
+          name: nameMatch?.[1]?.trim() || 'Canal Sem Nome',
+        };
+      } else if (line && !line.startsWith('#') && currentChannel) {
+        const categoryId = categoryMap.get(currentChannel.groupTitle) || defaultCategoryId;
+        
+        batch.push({
+          category_id: categoryId,
+          name: currentChannel.name,
+          stream_url: line,
+          tvg_id: currentChannel.tvgId,
+          tvg_name: currentChannel.tvgName,
+          tvg_logo: currentChannel.tvgLogo,
+          group_title: currentChannel.groupTitle,
+          order_position: processedCount,
+        });
+        
+        processedCount++;
+        currentChannel = null;
+
+        if (batch.length >= DB_BATCH_SIZE) {
+          await supabase.from('m3u_channels').insert(batch);
+          batch = [];
+
+          if (processedCount % 500 === 0) {
+            await supabase
+              .from('m3u_import_sessions')
+              .update({ processed_channels: processedCount })
+              .eq('id', payload.sessionId);
+            console.log(`[ProcessM3U-BG] Progresso: ${processedCount}`);
+          }
+        }
+      }
+    }
+
+    // Insert remaining
+    if (batch.length > 0) {
+      await supabase.from('m3u_channels').insert(batch);
+    }
+
+    // Complete
+    const wasLimited = processedCount >= MAX_CHANNELS;
+    await supabase
+      .from('m3u_import_sessions')
+      .update({ 
+        status: 'completed',
+        processed_channels: processedCount,
+        total_channels: processedCount,
+        completed_at: new Date().toISOString(),
+        error_message: wasLimited ? `Limitado a ${MAX_CHANNELS} canais` : null,
+      })
+      .eq('id', payload.sessionId);
+
+    await supabase
+      .from('m3u_custom_lists')
+      .update({
+        total_channels: processedCount,
+        total_categories: categories.length,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', payload.customListId);
+
+    console.log(`[ProcessM3U-BG] ✅ Concluído: ${processedCount} canais, ${categories.length} categorias`);
     
   } catch (fetchError: any) {
     clearTimeout(timeoutId);
-    throw new Error(`Falha ao baixar: ${fetchError.message}`);
+    throw new Error(`Falha: ${fetchError.message}`);
   }
 }
 
-async function processFromContent(content: string, payload: ImportPayload, supabase: any) {
-  console.log('[ProcessM3U-BG] Processando conteúdo...');
-  
-  // First pass: extract categories (minimal memory)
+async function processSmallContent(content: string, payload: ImportPayload, supabase: any) {
+  // For pasted content (usually small)
   const categorySet = new Set<string>();
-  let estimatedChannels = 0;
+  const lines = content.split('\n');
   
-  let pos = 0;
-  while (pos < content.length) {
-    const lineEnd = content.indexOf('\n', pos);
-    const line = lineEnd === -1 
-      ? content.substring(pos).trim()
-      : content.substring(pos, lineEnd).trim();
-    
+  // Extract categories
+  for (const line of lines) {
     if (line.startsWith('#EXTINF:')) {
-      estimatedChannels++;
       const groupMatch = line.match(/group-title="([^"]*)"/);
       categorySet.add(groupMatch?.[1] || 'Sem Categoria');
     }
-    
-    if (lineEnd === -1) break;
-    pos = lineEnd + 1;
   }
   
   const categories = Array.from(categorySet);
-  console.log(`[ProcessM3U-BG] ${estimatedChannels} canais, ${categories.length} categorias`);
-
-  // Update session with total estimate
-  await supabase
-    .from('m3u_import_sessions')
-    .update({ 
-      total_channels: estimatedChannels,
-      metadata: { categoriesCount: categories.length }
-    })
-    .eq('id', payload.sessionId);
-
-  // Create categories
   const categoryMap = new Map<string, string>();
+  
   for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i];
     const { data } = await supabase
       .from('m3u_categories')
       .insert({
         custom_list_id: payload.customListId,
-        name: cat,
-        display_name: cat,
+        name: categories[i],
+        display_name: categories[i],
         order_position: i,
       })
       .select('id')
       .single();
     
-    if (data) categoryMap.set(cat, data.id);
+    if (data) categoryMap.set(categories[i], data.id);
   }
-
+  
   const defaultCategoryId = categoryMap.values().next().value;
-  
-  // Second pass: process channels in batches
-  let batch: any[] = [];
-  let processedCount = 0;
   let currentChannel: any = null;
+  let processedCount = 0;
+  let batch: any[] = [];
   
-  pos = 0;
-  while (pos < content.length) {
-    const lineEnd = content.indexOf('\n', pos);
-    const line = lineEnd === -1 
-      ? content.substring(pos).trim()
-      : content.substring(pos, lineEnd).trim();
+  for (const line of lines) {
+    const trimmed = line.trim();
     
-    if (line.startsWith('#EXTINF:')) {
-      const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
-      const tvgNameMatch = line.match(/tvg-name="([^"]*)"/);
-      const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
-      const groupMatch = line.match(/group-title="([^"]*)"/);
-      const nameMatch = line.match(/,(.+)$/);
+    if (trimmed.startsWith('#EXTINF:')) {
+      const tvgIdMatch = trimmed.match(/tvg-id="([^"]*)"/);
+      const tvgNameMatch = trimmed.match(/tvg-name="([^"]*)"/);
+      const tvgLogoMatch = trimmed.match(/tvg-logo="([^"]*)"/);
+      const groupMatch = trimmed.match(/group-title="([^"]*)"/);
+      const nameMatch = trimmed.match(/,(.+)$/);
       
       currentChannel = {
         tvgId: tvgIdMatch?.[1] || null,
@@ -192,13 +300,11 @@ async function processFromContent(content: string, payload: ImportPayload, supab
         groupTitle: groupMatch?.[1] || 'Sem Categoria',
         name: nameMatch?.[1]?.trim() || 'Canal Sem Nome',
       };
-    } else if (line && !line.startsWith('#') && currentChannel) {
-      const categoryId = categoryMap.get(currentChannel.groupTitle) || defaultCategoryId;
-      
+    } else if (trimmed && !trimmed.startsWith('#') && currentChannel) {
       batch.push({
-        category_id: categoryId,
+        category_id: categoryMap.get(currentChannel.groupTitle) || defaultCategoryId,
         name: currentChannel.name,
-        stream_url: line,
+        stream_url: trimmed,
         tvg_id: currentChannel.tvgId,
         tvg_name: currentChannel.tvgName,
         tvg_logo: currentChannel.tvgLogo,
@@ -209,32 +315,17 @@ async function processFromContent(content: string, payload: ImportPayload, supab
       processedCount++;
       currentChannel = null;
 
-      // Insert when batch is full
       if (batch.length >= DB_BATCH_SIZE) {
         await supabase.from('m3u_channels').insert(batch);
         batch = [];
-
-        // Update progress periodically
-        if (processedCount % 1000 === 0) {
-          await supabase
-            .from('m3u_import_sessions')
-            .update({ processed_channels: processedCount })
-            .eq('id', payload.sessionId);
-          console.log(`[ProcessM3U-BG] Progresso: ${processedCount}/${estimatedChannels}`);
-        }
       }
     }
-    
-    if (lineEnd === -1) break;
-    pos = lineEnd + 1;
   }
 
-  // Insert remaining
   if (batch.length > 0) {
     await supabase.from('m3u_channels').insert(batch);
   }
 
-  // Complete session
   await supabase
     .from('m3u_import_sessions')
     .update({ 
@@ -245,15 +336,13 @@ async function processFromContent(content: string, payload: ImportPayload, supab
     })
     .eq('id', payload.sessionId);
 
-  // Update custom list
   await supabase
     .from('m3u_custom_lists')
     .update({
       total_channels: processedCount,
       total_categories: categories.length,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', payload.customListId);
 
-  console.log(`[ProcessM3U-BG] ✅ Concluído: ${processedCount} canais`);
+  console.log(`[ProcessM3U-BG] ✅ Concluído (paste): ${processedCount} canais`);
 }
