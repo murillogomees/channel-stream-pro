@@ -1,13 +1,13 @@
 /**
  * ============================================================================
- * Playlist Serve - Edge Function
+ * Playlist Serve - Edge Function v2
  * ============================================================================
  * 
- * Serves playlist data with ETag support and efficient pagination
+ * Serves playlist data with ETag support and unlimited pagination
  * 
  * Endpoints:
  * - GET /playlists - List all playlists
- * - GET /playlist/:key - Get playlist entries with pagination
+ * - GET /playlist/:key - Get playlist entries with pagination (NO LIMITS)
  * - GET /playlist/:key/categories - Get categories
  * - GET /search - Search entries
  */
@@ -21,8 +21,8 @@ const CORS_HEADERS = {
 };
 
 const CONFIG = {
-  DEFAULT_LIMIT: 500,
-  MAX_LIMIT: 5000,
+  DEFAULT_LIMIT: 5000,
+  MAX_LIMIT: 50000, // Allow very large batches for full loading
   CACHE_MAX_AGE: 300, // 5 minutes
 };
 
@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
       const key = path.split('/')[2];
       const params = url.searchParams;
       
+      // Allow unlimited loading - just cap at MAX_LIMIT per request
       const limit = Math.min(
         parseInt(params.get('limit') || String(CONFIG.DEFAULT_LIMIT)),
         CONFIG.MAX_LIMIT
@@ -119,11 +120,15 @@ Deno.serve(async (req) => {
         .single();
       
       if (playlistError || !playlist) {
-        return new Response(JSON.stringify({ error: 'Playlist not found' }), {
+        console.log(`[playlist-serve] Playlist not found: ${key}`);
+        return new Response(JSON.stringify({ error: 'Playlist not found', key }), {
           status: 404,
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
+      
+      const totalEntries = playlist.entries_count || 0;
+      console.log(`[playlist-serve] Loading ${key}: offset=${offset}, limit=${limit}, total=${totalEntries}`);
       
       // Generate ETag based on version and offset
       const serverEtag = `"${playlist.version}-${offset}-${limit}-${category || 'all'}"`;
@@ -170,11 +175,13 @@ Deno.serve(async (req) => {
         sequence: offset + idx,
       }));
       
-      const hasMore = offset + channels.length < playlist.entries_count;
+      const hasMore = offset + channels.length < totalEntries;
+      
+      console.log(`[playlist-serve] Returning ${channels.length} channels, hasMore=${hasMore}`);
       
       return new Response(JSON.stringify({
         channels,
-        total: playlist.entries_count,
+        total: totalEntries,
         offset,
         limit,
         hasMore,
@@ -205,18 +212,63 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { data: results, error } = await supabase.rpc('search_playlist_entries', {
-        p_query: query,
-        p_playlist_key: playlistKey || null,
-        p_group_title: category || null,
-        p_limit: limit,
-      });
+      // Try RPC first, fallback to direct search
+      try {
+        const { data: results, error } = await supabase.rpc('search_playlist_entries', {
+          p_query: query,
+          p_playlist_key: playlistKey || null,
+          p_group_title: category || null,
+          p_limit: limit,
+        });
+        
+        if (!error && results) {
+          return new Response(JSON.stringify({
+            results: results || [],
+            count: results?.length || 0,
+            query,
+          }), {
+            headers: {
+              ...CORS_HEADERS,
+              'Content-Type': 'application/json',
+            },
+          });
+        }
+      } catch {
+        // RPC not available, fall through to direct search
+      }
       
-      if (error) throw error;
+      // Direct search fallback
+      let searchQuery = supabase
+        .from('playlist_entries')
+        .select('entry_hash, title, stream_url, group_title, tvg_id, tvg_name, tvg_logo')
+        .eq('is_valid', true)
+        .ilike('title', `%${query}%`)
+        .limit(limit);
+      
+      if (playlistKey) {
+        searchQuery = searchQuery.eq('playlist_key', playlistKey);
+      }
+      if (category) {
+        searchQuery = searchQuery.eq('group_title', category);
+      }
+      
+      const { data: directResults, error: directError } = await searchQuery;
+      
+      if (directError) throw directError;
+      
+      const formattedResults = (directResults || []).map(e => ({
+        id: e.entry_hash,
+        title: e.title,
+        stream_url: e.stream_url,
+        group_title: e.group_title,
+        tvg_id: e.tvg_id,
+        tvg_name: e.tvg_name,
+        tvg_logo: e.tvg_logo,
+      }));
       
       return new Response(JSON.stringify({
-        results: results || [],
-        count: results?.length || 0,
+        results: formattedResults,
+        count: formattedResults.length,
         query,
       }), {
         headers: {

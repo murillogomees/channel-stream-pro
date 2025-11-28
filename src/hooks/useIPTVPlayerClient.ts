@@ -48,17 +48,18 @@ interface CachedPlaylist {
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-  INITIAL_BATCH_SIZE: 3000,
-  BACKGROUND_BATCH_SIZE: 3000,
+  INITIAL_BATCH_SIZE: 5000,       // Larger initial batch from playlist-serve
+  BACKGROUND_BATCH_SIZE: 10000,   // Larger batches for background loading
   PARALLEL_BATCHES: 4,
   MAX_RETRIES: 5,
-  MAX_CONSECUTIVE_ERRORS: 10, // Only stop on actual errors, not retry requests
+  MAX_CONSECUTIVE_ERRORS: 10,
   CACHE_TTL_MS: 2 * 60 * 60 * 1000, // 2 hours
-  DB_NAME: 'iptv_playlist_v4',
+  DB_NAME: 'iptv_playlist_v5',       // New version for playlist-serve data
   DB_VERSION: 1,
   STORE_NAME: 'playlists',
-  BATCH_DELAY_MS: 200, // Delay between batch groups
-  RETRY_DELAY_MS: 2000, // Delay when server requests retry
+  BATCH_DELAY_MS: 100,              // Faster batching
+  RETRY_DELAY_MS: 2000,
+  PLAYLIST_SERVE_URL: 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve',
 };
 
 // ============================================================================
@@ -520,14 +521,14 @@ export function useIPTVPlayerClient() {
     }
   }, [groupChannelsIntoCategories, loadAllChannelsBackground]);
 
-  // Load from playlist-serve (new pipeline)
+  // Load from playlist-serve (PRIMARY method - loads ALL content)
   const loadFromPlaylistServe = useCallback(async (playlistKey: string) => {
     playlistKeyRef.current = playlistKey;
     
     try {
-      setLoadingProgress('Verificando playlist...');
+      setLoadingProgress('Carregando playlist...');
       
-      const endpoint = `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/playlist/${playlistKey}`;
+      const endpoint = `${CONFIG.PLAYLIST_SERVE_URL}/playlist/${playlistKey}`;
       const params = new URLSearchParams({ offset: '0', limit: String(CONFIG.INITIAL_BATCH_SIZE) });
       
       const response = await fetch(`${endpoint}?${params}`);
@@ -543,10 +544,11 @@ export function useIPTVPlayerClient() {
         return false;
       }
       
-      console.log(`[IPTV] playlist-serve has ${data.total} entries`);
+      const total = data.total || data.channels.length;
+      console.log(`[IPTV] playlist-serve: ${data.channels.length}/${total} entries loaded`);
       
-      // If playlist-serve has data, use it
-      setTotalChannels(data.total);
+      // Set initial data
+      setTotalChannels(total);
       setLoadedChannels(data.channels.length);
       allChannelsRef.current = data.channels;
       
@@ -557,17 +559,17 @@ export function useIPTVPlayerClient() {
         setCurrentChannel(cats[0].channels[0]);
       }
       
-      setAssignedPlaylist({ id: playlistKey, name: 'Lista VIP', cdn_url: null });
+      setAssignedPlaylist({ id: playlistKey, name: data.name || 'Lista VIP', cdn_url: null });
       setHasPlaylist(true);
       setIsLoading(false);
       
-      // Continue loading in background if needed
-      if (data.hasMore) {
+      // ALWAYS continue loading until ALL content is loaded
+      if (data.hasMore || data.channels.length < total) {
         setIsLoadingMore(true);
-        setLoadingProgress(`Carregando: ${data.channels.length.toLocaleString()}/${data.total.toLocaleString()}`);
+        setLoadingProgress(`Carregando: ${data.channels.length.toLocaleString()}/${total.toLocaleString()}`);
         
-        // Background load remaining from playlist-serve
-        loadPlaylistServeBackground(playlistKey, data.total, data.channels, data.version || 1);
+        // Background load ALL remaining content
+        loadPlaylistServeBackground(playlistKey, total, data.channels, data.version || 1);
       } else {
         setLoadingProgress('');
       }
@@ -580,7 +582,7 @@ export function useIPTVPlayerClient() {
     }
   }, [groupChannelsIntoCategories]);
 
-  // Background loader for playlist-serve
+  // Background loader for playlist-serve - LOADS ALL CONTENT WITHOUT LIMITS
   const loadPlaylistServeBackground = useCallback(async (
     playlistKey: string,
     total: number,
@@ -591,23 +593,47 @@ export function useIPTVPlayerClient() {
     abortControllerRef.current = controller;
     
     let currentOffset = initialChannels.length;
-    const endpoint = `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/playlist/${playlistKey}`;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
+    const endpoint = `${CONFIG.PLAYLIST_SERVE_URL}/playlist/${playlistKey}`;
     
-    while (currentOffset < total && !controller.signal.aborted) {
-      const batchPromises: Promise<{ channels: any[]; offset: number }>[] = [];
+    console.log(`[IPTV] Background loading from offset ${currentOffset}, total: ${total}`);
+    
+    // Continue until ALL content is loaded
+    while (!controller.signal.aborted && currentOffset < total) {
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        console.log(`[IPTV] Too many consecutive errors, stopping at ${allChannelsRef.current.length}`);
+        break;
+      }
       
-      for (let i = 0; i < CONFIG.PARALLEL_BATCHES && currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE) < total; i++) {
+      const batchPromises: Promise<{ channels: any[]; offset: number; success: boolean }>[] = [];
+      
+      // Calculate how many parallel batches we need
+      const remainingItems = total - currentOffset;
+      const batchesToFetch = Math.min(
+        CONFIG.PARALLEL_BATCHES,
+        Math.ceil(remainingItems / CONFIG.BACKGROUND_BATCH_SIZE)
+      );
+      
+      for (let i = 0; i < batchesToFetch; i++) {
         const batchOffset = currentOffset + (i * CONFIG.BACKGROUND_BATCH_SIZE);
+        if (batchOffset >= total) break;
+        
+        const batchLimit = Math.min(CONFIG.BACKGROUND_BATCH_SIZE, total - batchOffset);
         const params = new URLSearchParams({ 
           offset: String(batchOffset), 
-          limit: String(CONFIG.BACKGROUND_BATCH_SIZE) 
+          limit: String(batchLimit) 
         });
         
         batchPromises.push(
           fetch(`${endpoint}?${params}`, { signal: controller.signal })
             .then(r => r.json())
-            .then(data => ({ channels: data.channels || [], offset: batchOffset }))
-            .catch(() => ({ channels: [], offset: batchOffset }))
+            .then(data => ({ 
+              channels: data.channels || [], 
+              offset: batchOffset,
+              success: true 
+            }))
+            .catch(() => ({ channels: [], offset: batchOffset, success: false }))
         );
       }
 
@@ -617,36 +643,58 @@ export function useIPTVPlayerClient() {
       results.sort((a, b) => a.offset - b.offset);
       
       let newCount = 0;
+      let anyFailed = false;
+      
       for (const result of results) {
         if (result.channels.length > 0) {
           allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
           newCount += result.channels.length;
+          consecutiveErrors = 0; // Reset on success
+        } else if (!result.success) {
+          anyFailed = true;
         }
       }
 
-      if (newCount === 0) break;
+      if (newCount === 0) {
+        if (anyFailed) {
+          consecutiveErrors++;
+          console.log(`[IPTV] Batch failed, retry ${consecutiveErrors}/${maxConsecutiveErrors}`);
+          await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS));
+          continue; // Don't advance offset, retry
+        } else {
+          // Server returned empty but no error - we've loaded everything
+          console.log(`[IPTV] No more content at offset ${currentOffset}`);
+          break;
+        }
+      }
 
-      currentOffset += CONFIG.PARALLEL_BATCHES * CONFIG.BACKGROUND_BATCH_SIZE;
+      // Advance offset based on actual data received
+      currentOffset = allChannelsRef.current.length;
       
+      // Update UI without blocking
       updateUIInBackground(
         allChannelsRef.current,
         total,
         `Carregando: ${allChannelsRef.current.length.toLocaleString()}/${total.toLocaleString()}`
       );
 
+      // Small delay to prevent overwhelming the server
       await new Promise(r => setTimeout(r, CONFIG.BATCH_DELAY_MS));
     }
 
     // Final update
     if (!controller.signal.aborted && allChannelsRef.current.length > 0) {
+      const finalCount = allChannelsRef.current.length;
+      
       startTransition(() => {
         setCategories(groupChannelsIntoCategories(allChannelsRef.current));
-        setLoadedChannels(allChannelsRef.current.length);
+        setTotalChannels(finalCount);
+        setLoadedChannels(finalCount);
         setIsLoadingMore(false);
         setLoadingProgress('');
       });
       
-      console.log(`[IPTV] playlist-serve complete: ${allChannelsRef.current.length} channels`);
+      console.log(`[IPTV] Loading complete: ${finalCount} channels (expected: ${total})`);
     }
   }, [groupChannelsIntoCategories, updateUIInBackground]);
 
@@ -719,7 +767,7 @@ export function useIPTVPlayerClient() {
     }
   }, []);
 
-  // Main loader - prioritizes user's assigned playlist
+  // Main loader - prioritizes playlist-serve for complete content loading
   const loadClientPlaylist = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -749,7 +797,12 @@ export function useIPTVPlayerClient() {
         return;
       }
 
-      // 1. Try traditional M3U list first (most common case)
+      // 1. Try playlist-serve FIRST (preferred - loads ALL content efficiently)
+      console.log('[IPTV] Trying playlist-serve (primary source)...');
+      const usedPlaylistServe = await loadFromPlaylistServe('lista-vip');
+      if (usedPlaylistServe) return;
+
+      // 2. Fallback: Try traditional M3U list
       const { data: traditionalAssignment } = await supabase
         .from('client_m3u_lists')
         .select(`
@@ -765,13 +818,13 @@ export function useIPTVPlayerClient() {
         const list = traditionalAssignment.m3u_lists as any;
         
         if (list.status === 'active' && list.file_url) {
-          console.log(`[IPTV] Found assigned M3U list: ${list.name}`);
+          console.log(`[IPTV] Fallback to M3U list: ${list.name}`);
           const success = await loadPlaylistFromURL(list.file_url, list.id, list.name);
           if (success) return;
         }
       }
 
-      // 2. Try custom list
+      // 3. Fallback: Try custom list
       const { data: customAssignment } = await supabase
         .from('client_m3u_custom_assignments')
         .select(`
@@ -785,7 +838,7 @@ export function useIPTVPlayerClient() {
         const list = customAssignment.m3u_custom_lists as any;
         
         if (list.status === 'active') {
-          console.log(`[IPTV] Found custom list: ${list.name}`);
+          console.log(`[IPTV] Fallback to custom list: ${list.name}`);
           setAssignedPlaylist({ id: list.id, name: list.name, cdn_url: list.cdn_url });
           setHasPlaylist(true);
 
@@ -798,11 +851,6 @@ export function useIPTVPlayerClient() {
           }
         }
       }
-
-      // 3. Try playlist-serve pipeline as fallback
-      console.log('[IPTV] Trying playlist-serve pipeline...');
-      const usedNewPipeline = await loadFromPlaylistServe('lista-vip');
-      if (usedNewPipeline) return;
 
       setIsLoading(false);
       setHasPlaylist(false);
@@ -879,7 +927,7 @@ export function useIPTVPlayerClient() {
       }
 
       const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/search?${params}`,
+        `${CONFIG.PLAYLIST_SERVE_URL}/search?${params}`,
         {
           headers: { 'Authorization': `Bearer ${token}` },
         }
