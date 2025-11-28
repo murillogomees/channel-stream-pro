@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useHomepageContent, HomepageFAQ } from "@/hooks/useHomepageContent";
 import { Save, Plus, Edit, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -132,7 +133,7 @@ export default function AdminHomepageEditor() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
         <PageHeader title="Editor da Homepage" description="Edite os textos e elementos da página inicial" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -140,7 +141,7 @@ export default function AdminHomepageEditor() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
       <PageHeader 
         title="Editor da Homepage" 
         description="Edite os textos e elementos da página inicial sem mexer no código" 
@@ -156,13 +157,16 @@ export default function AdminHomepageEditor() {
       </div>
 
       <Tabs defaultValue="hero" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="hero">Hero</TabsTrigger>
-          <TabsTrigger value="plans">Planos</TabsTrigger>
-          <TabsTrigger value="faqs">FAQs</TabsTrigger>
-          <TabsTrigger value="contact">Contato</TabsTrigger>
-          <TabsTrigger value="footer">Rodapé</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex h-auto min-w-full p-1">
+            <TabsTrigger value="hero" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Hero</TabsTrigger>
+            <TabsTrigger value="plans" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Planos</TabsTrigger>
+            <TabsTrigger value="faqs" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">FAQs</TabsTrigger>
+            <TabsTrigger value="contact" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Contato</TabsTrigger>
+            <TabsTrigger value="footer" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Rodapé</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" className="invisible" />
+        </ScrollArea>
 
         {/* HERO SECTION */}
         <TabsContent value="hero">

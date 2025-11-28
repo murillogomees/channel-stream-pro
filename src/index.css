@@ -316,6 +316,11 @@
     display: none;
   }
 
+  /* Admin page responsive container */
+  .admin-container {
+    @apply container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden;
+  }
+
   /* Content visibility for below-fold performance */
   .content-auto {
     content-visibility: auto;

@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminSecurityAlerts from "./AdminSecurityAlerts";
 import AdminSecurityMonitor from "./AdminSecurityMonitor";
 import AdminSecurityAnalytics from "./AdminSecurityAnalytics";
@@ -11,23 +12,26 @@ import Admin2FASettings from "./Admin2FASettings";
 
 export default function AdminSecurity() {
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
       <PageHeader
         title="Centro de Segurança"
         description="Monitoramento, alertas e configurações de segurança"
       />
 
       <Tabs defaultValue="alerts" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
-          <TabsTrigger value="alerts">Alertas</TabsTrigger>
-          <TabsTrigger value="monitor">Monitor</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="escalation">Escalação</TabsTrigger>
-          <TabsTrigger value="logins">Logins</TabsTrigger>
-          <TabsTrigger value="ip-block">IP Block</TabsTrigger>
-          <TabsTrigger value="whitelist">Whitelist</TabsTrigger>
-          <TabsTrigger value="2fa">2FA</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex h-auto min-w-full p-1">
+            <TabsTrigger value="alerts" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Alertas</TabsTrigger>
+            <TabsTrigger value="monitor" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Monitor</TabsTrigger>
+            <TabsTrigger value="analytics" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Analytics</TabsTrigger>
+            <TabsTrigger value="escalation" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Escalação</TabsTrigger>
+            <TabsTrigger value="logins" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Logins</TabsTrigger>
+            <TabsTrigger value="ip-block" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">IP Block</TabsTrigger>
+            <TabsTrigger value="whitelist" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Whitelist</TabsTrigger>
+            <TabsTrigger value="2fa" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">2FA</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" className="invisible" />
+        </ScrollArea>
 
         <TabsContent value="alerts" className="space-y-4">
           <AdminSecurityAlerts />

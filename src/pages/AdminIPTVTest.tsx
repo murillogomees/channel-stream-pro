@@ -324,23 +324,23 @@ export default function AdminIPTVTest() {
       />
 
       {/* Main Content Area */}
-      <main className="ml-[72px] lg:ml-[88px]">
+      <main className="md:ml-[72px] lg:ml-[88px]">
         {/* Top Bar */}
-        <header className="fixed top-0 right-0 left-[72px] lg:left-[88px] h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-4">
+        <header className="fixed top-0 right-0 left-0 md:left-[72px] lg:left-[88px] h-14 sm:h-16 bg-background/80 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate('/dashboard')}
-              className="lg:hidden"
+              className="flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
             
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold">{tabTitle}</h1>
-              {/* Content count */}
-              <span className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <h1 className="text-base sm:text-lg font-semibold truncate">{tabTitle}</h1>
+              {/* Content count - hide on very small screens */}
+              <span className="hidden sm:inline text-sm text-muted-foreground flex-shrink-0">
                 {activeTab === 'home' && `${allChannels.length.toLocaleString()} itens`}
                 {activeTab === 'live' && `${counts.live.toLocaleString()} canais`}
                 {activeTab === 'movies' && `${counts.movies.toLocaleString()} filmes`}
@@ -349,7 +349,7 @@ export default function AdminIPTVTest() {
               </span>
               {/* Background loading indicator */}
               {isLoadingMore && (
-                <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-primary animate-pulse flex-shrink-0">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   <span>{loadingProgress}</span>
                 </div>
@@ -357,21 +357,21 @@ export default function AdminIPTVTest() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Search - now visible on all tabs */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Search - responsive width */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-[180px] lg:w-[240px] pl-9 h-9"
+                className="w-[120px] sm:w-[180px] lg:w-[240px] pl-9 h-9 text-sm"
               />
             </div>
 
-            {/* Playlist Selector */}
+            {/* Playlist Selector - hide on mobile */}
             <Select value={customListId || undefined} onValueChange={selectList}>
-              <SelectTrigger className="w-[140px] lg:w-[180px] h-9">
+              <SelectTrigger className="hidden sm:flex w-[140px] lg:w-[180px] h-9">
                 <SelectValue placeholder="Playlist" />
               </SelectTrigger>
               <SelectContent>
@@ -386,7 +386,7 @@ export default function AdminIPTVTest() {
         </header>
 
         {/* Content */}
-        <div className="pt-16">
+        <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
           {/* Home View */}
           {activeTab === 'home' && (
             <>
