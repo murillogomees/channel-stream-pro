@@ -28,10 +28,10 @@ interface M3UList {
   file_url?: string;
 }
 
-// Optimized batch settings
-const INITIAL_BATCH_SIZE = 2000;   // First batch for quick display
-const BACKGROUND_BATCH_SIZE = 5000; // Larger batches for background loading
-const PARALLEL_REQUESTS = 3;        // Number of parallel requests
+// Optimized batch settings - smaller for faster initial load
+const INITIAL_BATCH_SIZE = 500;     // Small first batch for instant display
+const BACKGROUND_BATCH_SIZE = 3000; // Background loading
+const PARALLEL_REQUESTS = 2;        // Parallel requests
 
 export function useIPTVPlayerAdmin(selectedListId?: string) {
   const [categories, setCategories] = useState<Category[]>([]);
