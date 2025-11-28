@@ -132,7 +132,7 @@ const AdminDashboard = () => {
               <div>
                 <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Bem-vindo de volta, {user?.email?.split('@')[0] || 'Admin'}
+                  Bem-vindo, {user?.email?.split('@')[0] || 'Admin'}
                 </p>
               </div>
             </div>
