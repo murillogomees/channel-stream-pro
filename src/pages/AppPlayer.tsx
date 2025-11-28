@@ -473,7 +473,7 @@ export default function AppPlayer() {
         </header>
 
         {/* Content */}
-        <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
+        <div className="pt-14 sm:pt-16 pb-24 md:pb-4">
           {/* Home View */}
           {activeTab === 'home' && (
             <>
