@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => ({
         display: "standalone",
         orientation: "portrait",
         start_url: "/app",
-        scope: "/",
+        scope: "/app",
         categories: ["entertainment", "video"],
         icons: [
           {
