@@ -2556,6 +2556,74 @@ export type Database = {
           },
         ]
       }
+      playlist_entries: {
+        Row: {
+          created_at: string | null
+          duration: number | null
+          entry_hash: string
+          group_title: string | null
+          id: string
+          is_valid: boolean | null
+          playlist_key: string
+          search_vector: unknown
+          sequence: number | null
+          stream_url: string
+          title: string
+          tvg_id: string | null
+          tvg_language: string | null
+          tvg_logo: string | null
+          tvg_name: string | null
+          updated_at: string | null
+          validation_error: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration?: number | null
+          entry_hash: string
+          group_title?: string | null
+          id?: string
+          is_valid?: boolean | null
+          playlist_key: string
+          search_vector?: unknown
+          sequence?: number | null
+          stream_url: string
+          title: string
+          tvg_id?: string | null
+          tvg_language?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+          validation_error?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration?: number | null
+          entry_hash?: string
+          group_title?: string | null
+          id?: string
+          is_valid?: boolean | null
+          playlist_key?: string
+          search_vector?: unknown
+          sequence?: number | null
+          stream_url?: string
+          title?: string
+          tvg_id?: string | null
+          tvg_language?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+          validation_error?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_entries_playlist_key_fkey"
+            columns: ["playlist_key"]
+            isOneToOne: false
+            referencedRelation: "playlist_sources"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       playlist_health_checks: {
         Row: {
           client_id: string | null
@@ -2610,6 +2678,184 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_expiration_summary"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_sources: {
+        Row: {
+          categories_count: number | null
+          content_hash: string | null
+          created_at: string | null
+          created_by: string | null
+          entries_count: number | null
+          etag: string | null
+          file_size_bytes: number | null
+          id: string
+          invalid_count: number | null
+          key: string
+          last_sync_at: string | null
+          last_sync_duration_ms: number | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          name: string
+          owner_id: string | null
+          source_url: string
+          storage_path_gz: string | null
+          storage_path_json: string | null
+          storage_path_m3u: string | null
+          sync_enabled: boolean | null
+          sync_interval_minutes: number | null
+          trimmed_count: number | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          categories_count?: number | null
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          entries_count?: number | null
+          etag?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_count?: number | null
+          key: string
+          last_sync_at?: string | null
+          last_sync_duration_ms?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          name: string
+          owner_id?: string | null
+          source_url: string
+          storage_path_gz?: string | null
+          storage_path_json?: string | null
+          storage_path_m3u?: string | null
+          sync_enabled?: boolean | null
+          sync_interval_minutes?: number | null
+          trimmed_count?: number | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          categories_count?: number | null
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          entries_count?: number | null
+          etag?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          invalid_count?: number | null
+          key?: string
+          last_sync_at?: string | null
+          last_sync_duration_ms?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          name?: string
+          owner_id?: string | null
+          source_url?: string
+          storage_path_gz?: string | null
+          storage_path_json?: string | null
+          storage_path_m3u?: string | null
+          sync_enabled?: boolean | null
+          sync_interval_minutes?: number | null
+          trimmed_count?: number | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      playlist_sync_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          duration_ms: number | null
+          entries_deduplicated: number | null
+          entries_invalid: number | null
+          entries_parsed: number | null
+          error_message: string | null
+          error_stack: string | null
+          force_sync: boolean | null
+          id: string
+          parse_warnings: Json | null
+          playlist_key: string
+          retry_count: number | null
+          started_at: string | null
+          status: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          entries_deduplicated?: number | null
+          entries_invalid?: number | null
+          entries_parsed?: number | null
+          error_message?: string | null
+          error_stack?: string | null
+          force_sync?: boolean | null
+          id?: string
+          parse_warnings?: Json | null
+          playlist_key: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          entries_deduplicated?: number | null
+          entries_invalid?: number | null
+          entries_parsed?: number | null
+          error_message?: string | null
+          error_stack?: string | null
+          force_sync?: boolean | null
+          id?: string
+          parse_warnings?: Json | null
+          playlist_key?: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_sync_jobs_playlist_key_fkey"
+            columns: ["playlist_key"]
+            isOneToOne: false
+            referencedRelation: "playlist_sources"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      playlist_sync_locks: {
+        Row: {
+          expires_at: string | null
+          locked_at: string | null
+          locked_by: string | null
+          playlist_key: string
+        }
+        Insert: {
+          expires_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          playlist_key: string
+        }
+        Update: {
+          expires_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          playlist_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_sync_locks_playlist_key_fkey"
+            columns: ["playlist_key"]
+            isOneToOne: true
+            referencedRelation: "playlist_sources"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -3727,6 +3973,10 @@ export type Database = {
       }
     }
     Functions: {
+      acquire_playlist_sync_lock: {
+        Args: { p_key: string; p_locked_by: string }
+        Returns: boolean
+      }
       check_and_block_ip: {
         Args: {
           _event_type: string
@@ -3942,6 +4192,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      release_playlist_sync_lock: {
+        Args: { p_key: string; p_locked_by: string }
+        Returns: boolean
+      }
       save_monthly_leaderboard: { Args: never; Returns: undefined }
       search_m3u_entries: {
         Args: {
@@ -3954,6 +4208,23 @@ export type Database = {
           id: string
           score: number
           source_name: string
+          stream_url: string
+          title: string
+          tvg_logo: string
+        }[]
+      }
+      search_playlist_entries: {
+        Args: {
+          p_group_title?: string
+          p_limit?: number
+          p_playlist_key?: string
+          p_query: string
+        }
+        Returns: {
+          group_title: string
+          id: string
+          playlist_key: string
+          rank: number
           stream_url: string
           title: string
           tvg_logo: string
