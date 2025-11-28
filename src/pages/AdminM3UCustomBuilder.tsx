@@ -34,6 +34,7 @@ export default function AdminM3UCustomBuilder() {
     pauseImport,
     resumeImport,
     cancelImport,
+    resetImport,
   } = useM3UImport();
   
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
@@ -77,12 +78,16 @@ export default function AdminM3UCustomBuilder() {
   const selectedList = lists.find(l => l.id === selectedListId);
   const selectedCategory = categories.find(c => c.id === selectedCategoryId);
 
-  // Fechar diálogo quando importação completar
+  // Atualizar UI quando importação completar
   useEffect(() => {
     if (importSession?.status === 'completed') {
-      setIsImportDialogOpen(false);
+      // Refresh data but keep dialog open to show success
       refreshCategories();
       refreshChannels();
+      refreshLists();
+      // Clear form after successful import
+      setImportUrl('');
+      setImportContent('');
     }
   }, [importSession?.status]);
 
@@ -183,15 +188,12 @@ export default function AdminM3UCustomBuilder() {
         setIsImportDialogOpen(false);
       } else {
         // Primeira importação - prosseguir diretamente
+        // NÃO limpar o formulário aqui - esperar a importação completar
         if (method === 'url') {
           await startUrlImport(selectedListId, importData);
         } else {
           await startPasteImport(selectedListId, importData);
         }
-        
-        // Resetar formulário
-        setImportUrl('');
-        setImportContent('');
       }
     } catch (error: any) {
       toast({
@@ -241,8 +243,7 @@ export default function AdminM3UCustomBuilder() {
 
       setConflictDialogOpen(false);
       setPendingImport(null);
-      setImportUrl('');
-      setImportContent('');
+      // NÃO limpar o formulário aqui - esperar a importação completar
     } catch (error: any) {
       toast({
         title: "Erro ao resolver conflito",

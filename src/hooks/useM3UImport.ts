@@ -6,130 +6,205 @@ import { toast } from 'sonner';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 const BATCH_SIZE = 100;
-// No channel limit for browser-side processing
 
 export function useM3UImport() {
   const [session, setSession] = useState<ImportSession | null>(null);
   const [progress, setProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<RealtimeChannel | null>(null);
+  const subscriptionRef = useRef<RealtimeChannel | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
+  // Update progress when session changes
   useEffect(() => {
     if (session && session.totalChannels > 0) {
       const percent = (session.processedChannels / session.totalChannels) * 100;
       setProgress(Math.min(100, Math.max(0, percent)));
+    } else if (session && session.status === 'processing') {
+      // Edge function may not have set totalChannels yet, show indeterminate progress
+      setProgress(session.processedChannels > 0 ? 5 : 0);
     }
   }, [session]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+      cleanup();
     };
-  }, [subscription]);
+  }, []);
 
-  /**
-   * Start URL import (uses edge function)
-   */
-  // Polling fallback to update session status
-  const pollSessionStatus = useCallback((sessionId: string) => {
+  const cleanup = useCallback(() => {
+    if (subscriptionRef.current) {
+      subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // Fetch session directly from database
+  const fetchSessionFromDb = useCallback(async (sessionId: string): Promise<ImportSession | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('m3u_import_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        customListId: data.custom_list_id,
+        totalChannels: data.total_channels || 0,
+        processedChannels: data.processed_channels || 0,
+        status: data.status as ImportSession['status'],
+        errorMessage: data.error_message,
+        sourceType: data.source_type as ImportSession['sourceType'],
+        sourceUrl: data.source_url,
+        sourceHash: data.source_hash,
+        batchSize: data.batch_size,
+        currentBatch: data.current_batch,
+        metadata: data.metadata,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        completedAt: data.completed_at,
+      };
+    } catch (err) {
+      console.error('[useM3UImport] Error fetching session:', err);
+      return null;
+    }
+  }, []);
+
+  // Polling mechanism - more reliable than realtime for this use case
+  const startPolling = useCallback((sessionId: string) => {
     // Clear any existing poll
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
 
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const sessionData = await m3uImportService.getSession(sessionId);
-        if (!sessionData) {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          return;
-        }
+    sessionIdRef.current = sessionId;
+    console.log('[useM3UImport] Starting polling for session:', sessionId);
 
+    // Immediate first fetch
+    fetchSessionFromDb(sessionId).then((sessionData) => {
+      if (sessionData) {
+        console.log('[useM3UImport] Initial fetch:', sessionData.status, sessionData.processedChannels);
         setSession(sessionData);
-
-        if (sessionData.status === 'completed') {
-          toast.success(`Importação concluída! ${sessionData.processedChannels} canais importados.`);
-          setIsImporting(false);
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        } else if (sessionData.status === 'failed') {
-          toast.error(`Falha na importação: ${sessionData.errorMessage}`);
-          setError(sessionData.errorMessage || 'Erro desconhecido');
-          setIsImporting(false);
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        }
-      } catch (err) {
-        console.error('Error polling session:', err);
       }
-    }, 2000); // Poll every 2 seconds
-  }, []);
+    });
 
+    pollIntervalRef.current = setInterval(async () => {
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        return;
+      }
+
+      const sessionData = await fetchSessionFromDb(currentSessionId);
+      
+      if (!sessionData) {
+        console.warn('[useM3UImport] Session not found:', currentSessionId);
+        return;
+      }
+
+      console.log('[useM3UImport] Poll update:', sessionData.status, sessionData.processedChannels, '/', sessionData.totalChannels);
+      setSession(sessionData);
+
+      if (sessionData.status === 'completed') {
+        toast.success(`Importação concluída! ${sessionData.processedChannels} canais importados.`);
+        setIsImporting(false);
+        cleanup();
+      } else if (sessionData.status === 'failed') {
+        toast.error(`Falha na importação: ${sessionData.errorMessage || 'Erro desconhecido'}`);
+        setError(sessionData.errorMessage || 'Erro desconhecido');
+        setIsImporting(false);
+        cleanup();
+      }
+    }, 1500); // Poll every 1.5 seconds for faster updates
+  }, [fetchSessionFromDb, cleanup]);
+
+  /**
+   * Start URL import (uses edge function)
+   */
   const startUrlImport = useCallback(
     async (customListId: string, sourceUrl: string) => {
       try {
+        cleanup();
         setIsImporting(true);
         setError(null);
         setProgress(0);
+        setSession(null);
 
+        console.log('[useM3UImport] Creating session for URL import:', sourceUrl);
+        
         const newSession = await m3uImportService.createSession(customListId, 'url', sourceUrl);
+        console.log('[useM3UImport] Session created:', newSession.id);
         setSession(newSession);
 
-        // Start polling immediately as fallback
-        pollSessionStatus(newSession.id);
+        // Start polling immediately
+        startPolling(newSession.id);
 
-        // Also set up realtime subscription
-        const sub = m3uImportService.subscribeToProgress(
-          newSession.id,
-          (updatedSession: any) => {
-            const mapped: ImportSession = {
-              id: updatedSession.id,
-              customListId: updatedSession.custom_list_id,
-              totalChannels: updatedSession.total_channels || 0,
-              processedChannels: updatedSession.processed_channels || 0,
-              status: updatedSession.status,
-              errorMessage: updatedSession.error_message,
-              sourceType: updatedSession.source_type,
-              sourceUrl: updatedSession.source_url,
-              sourceHash: updatedSession.source_hash,
-              batchSize: updatedSession.batch_size,
-              currentBatch: updatedSession.current_batch,
-              metadata: updatedSession.metadata,
-              createdAt: updatedSession.created_at,
-              updatedAt: updatedSession.updated_at,
-              completedAt: updatedSession.completed_at,
-            };
-            setSession(mapped);
-            
-            if (mapped.status === 'completed') {
-              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-              toast.success(`Importação concluída! ${mapped.processedChannels} canais importados.`);
-              setIsImporting(false);
-            } else if (mapped.status === 'failed') {
-              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-              toast.error(`Falha na importação: ${mapped.errorMessage}`);
-              setError(mapped.errorMessage || 'Erro desconhecido');
-              setIsImporting(false);
+        // Also set up realtime subscription as backup
+        const sub = supabase
+          .channel(`import-progress-${newSession.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'm3u_import_sessions',
+              filter: `id=eq.${newSession.id}`,
+            },
+            (payload: any) => {
+              console.log('[useM3UImport] Realtime update:', payload.new?.status);
+              const data = payload.new;
+              if (data) {
+                const mapped: ImportSession = {
+                  id: data.id,
+                  customListId: data.custom_list_id,
+                  totalChannels: data.total_channels || 0,
+                  processedChannels: data.processed_channels || 0,
+                  status: data.status,
+                  errorMessage: data.error_message,
+                  sourceType: data.source_type,
+                  sourceUrl: data.source_url,
+                  sourceHash: data.source_hash,
+                  batchSize: data.batch_size,
+                  currentBatch: data.current_batch,
+                  metadata: data.metadata,
+                  createdAt: data.created_at,
+                  updatedAt: data.updated_at,
+                  completedAt: data.completed_at,
+                };
+                setSession(mapped);
+              }
             }
-          }
-        );
-        setSubscription(sub);
+          )
+          .subscribe();
+        
+        subscriptionRef.current = sub;
 
+        // Call edge function to start processing
+        console.log('[useM3UImport] Invoking edge function...');
         await m3uImportService.startImport(newSession.id, 'url', customListId, sourceUrl);
+        
         toast.success('Importação iniciada! Acompanhe o progresso abaixo.');
+        
+        return newSession;
       } catch (err: any) {
-        console.error('Erro ao iniciar importação:', err);
+        console.error('[useM3UImport] Error starting URL import:', err);
         setError(err.message);
         toast.error(`Erro ao iniciar importação: ${err.message}`);
         setIsImporting(false);
+        cleanup();
+        throw err;
       }
     },
-    [pollSessionStatus]
+    [startPolling, cleanup]
   );
 
   /**
@@ -138,8 +213,10 @@ export function useM3UImport() {
   const startPasteImport = useCallback(
     async (customListId: string, content: string) => {
       try {
+        cleanup();
         setIsImporting(true);
         setError(null);
+        setProgress(0);
 
         // Create session locally
         const { data: sessionData, error: sessionError } = await supabase
@@ -218,7 +295,6 @@ export function useM3UImport() {
         const channelBatch: any[] = [];
 
         for (const channel of parseResult.channels) {
-
           const categoryId = categoryMap.get(channel.group) || defaultCategoryId;
 
           channelBatch.push({
@@ -302,7 +378,7 @@ export function useM3UImport() {
         }
       }
     },
-    [session?.id]
+    [session?.id, cleanup]
   );
 
   const pauseImport = useCallback(async () => {
@@ -319,11 +395,13 @@ export function useM3UImport() {
     if (!session) return;
     try {
       await m3uImportService.resumeImport(session.id);
+      // Restart polling
+      startPolling(session.id);
       toast.info('Importação retomada');
     } catch (err: any) {
       toast.error(`Erro ao retomar: ${err.message}`);
     }
-  }, [session]);
+  }, [session, startPolling]);
 
   const cancelImport = useCallback(async () => {
     if (!session) return;
@@ -331,10 +409,20 @@ export function useM3UImport() {
       await m3uImportService.cancelImport(session.id);
       toast.info('Importação cancelada');
       setIsImporting(false);
+      cleanup();
     } catch (err: any) {
       toast.error(`Erro ao cancelar: ${err.message}`);
     }
-  }, [session]);
+  }, [session, cleanup]);
+
+  const resetImport = useCallback(() => {
+    cleanup();
+    setSession(null);
+    setProgress(0);
+    setIsImporting(false);
+    setError(null);
+    sessionIdRef.current = null;
+  }, [cleanup]);
 
   return {
     session,
@@ -346,5 +434,6 @@ export function useM3UImport() {
     pauseImport,
     resumeImport,
     cancelImport,
+    resetImport,
   };
 }
