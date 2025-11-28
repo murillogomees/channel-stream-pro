@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, X, Tv, Film, Clapperboard, ArrowLeft, Search } from 'lucide-react';
+import { Loader2, Tv, ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { VideoPlayer } from '@/components/app/VideoPlayer';
+import UniversalPlayer from '@/components/app/UniversalPlayer';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { Card } from '@/components/ui/card';
@@ -14,12 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { TVNavRail } from '@/components/iptv/TVNavRail';
 import { TVHeroSection } from '@/components/iptv/TVHeroSection';
@@ -496,59 +490,22 @@ export default function AdminIPTVTest() {
         </div>
       </main>
 
-      {/* Video Player Dialog */}
-      <Dialog open={showPlayerDialog} onOpenChange={setShowPlayerDialog}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] h-full p-0 bg-black border-0 rounded-xl overflow-hidden">
-          <DialogTitle className="sr-only">
-            {playerChannel?.name || 'Player'}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Reproduzindo {playerChannel?.name}
-          </DialogDescription>
-          
-          {playerChannel && (
-            <div className="relative w-full h-full">
-              <VideoPlayer
-                url={getStreamUrl(playerChannel)}
-                title={playerChannel.name}
-                logo={playerChannel.tvg_logo || undefined}
-                className="w-full h-full"
-              />
-
-              {/* Close Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full z-20 h-12 w-12"
-                onClick={() => {
-                  setShowPlayerDialog(false);
-                  setPlayerChannel(null);
-                }}
-              >
-                <X className="w-6 h-6" />
-              </Button>
-
-              {/* Bottom Info */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6 lg:p-8 z-10">
-                <h2 className="text-2xl lg:text-3xl font-bold mb-2">{playerChannel.name}</h2>
-                {playerChannel.category_name && (
-                  <p className="text-muted-foreground mb-4">
-                    {playerChannel.category_name}
-                  </p>
-                )}
-                <Button
-                  variant={isFavorite(playerChannel.id) ? 'default' : 'outline'}
-                  size="lg"
-                  onClick={() => toggleFavorite(playerChannel.id)}
-                  className="gap-2"
-                >
-                  {isFavorite(playerChannel.id) ? '❤️ Favoritado' : '🤍 Adicionar aos favoritos'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Universal Player - Fullscreen */}
+      {showPlayerDialog && playerChannel && (
+        <UniversalPlayer
+          url={getStreamUrl(playerChannel)}
+          title={playerChannel.name}
+          logo={playerChannel.tvg_logo || undefined}
+          autoplay
+          onBack={() => {
+            setShowPlayerDialog(false);
+            setPlayerChannel(null);
+          }}
+          onError={(error) => {
+            console.error('[IPTV] Player error:', error);
+          }}
+        />
+      )}
     </div>
   );
 }
