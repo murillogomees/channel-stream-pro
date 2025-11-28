@@ -5,8 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-const BATCH_SIZE = 50;
-const MAX_CHANNELS = 20000;
+const BATCH_SIZE = 100;
+// No channel limit for browser-side processing
 
 export function useM3UImport() {
   const [session, setSession] = useState<ImportSession | null>(null);
@@ -129,9 +129,9 @@ export function useM3UImport() {
 
         // Parse M3U content locally
         toast.info('Analisando conteúdo M3U...');
-        const parseResult = parseM3U(content, { maxChannels: MAX_CHANNELS });
+        const parseResult = parseM3U(content);
         
-        const totalChannels = Math.min(parseResult.totalChannels, MAX_CHANNELS);
+        const totalChannels = parseResult.totalChannels;
         
         // Update session with total
         await supabase
@@ -174,7 +174,6 @@ export function useM3UImport() {
         const channelBatch: any[] = [];
 
         for (const channel of parseResult.channels) {
-          if (processedCount >= MAX_CHANNELS) break;
 
           const categoryId = categoryMap.get(channel.group) || defaultCategoryId;
 
@@ -211,7 +210,6 @@ export function useM3UImport() {
         }
 
         // Mark complete
-        const wasLimited = processedCount >= MAX_CHANNELS;
         await supabase
           .from('m3u_import_sessions')
           .update({
@@ -219,7 +217,6 @@ export function useM3UImport() {
             processed_channels: processedCount,
             total_channels: processedCount,
             completed_at: new Date().toISOString(),
-            error_message: wasLimited ? `Limitado a ${MAX_CHANNELS} canais` : null,
           })
           .eq('id', sessionData.id);
 

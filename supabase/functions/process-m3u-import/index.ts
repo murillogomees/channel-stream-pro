@@ -13,9 +13,9 @@ interface ImportPayload {
   customListId: string;
 }
 
-const DB_BATCH_SIZE = 25;
-const MAX_CHANNELS = 10000;
-const MAX_SIZE = 3 * 1024 * 1024; // 3MB limit - reduced for memory safety
+const DB_BATCH_SIZE = 50;
+const MAX_CHANNELS = 100000; // 100k channels max
+const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
 
