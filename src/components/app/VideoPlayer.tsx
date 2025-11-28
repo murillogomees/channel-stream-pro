@@ -15,43 +15,16 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const loadTimeoutRef = useRef<number | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
+  const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
-  // Detect stream type from URL
-  const getStreamType = useCallback((streamUrl: string): 'hls' | 'direct' => {
-    try {
-      const parsed = new URL(streamUrl);
-      const originalUrl = parsed.searchParams.get('url');
-      const urlToCheck = originalUrl ? decodeURIComponent(originalUrl) : streamUrl;
-      
-      if (urlToCheck.includes('.m3u8') || urlToCheck.includes('application/x-mpegURL')) {
-        return 'hls';
-      }
-    } catch {
-      // Fallback check
-      if (url.includes('.m3u8')) {
-        return 'hls';
-      }
-    }
-    return 'hls'; // Default to HLS as most IPTV streams are HLS
-  }, [url]);
-
-  // Cleanup function
   const cleanup = useCallback(() => {
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = null;
-    }
     if (hlsRef.current) {
-      console.log('[VideoPlayer] Destroying HLS instance');
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
@@ -62,26 +35,21 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     }
   }, []);
 
-  // Try to play with fallbacks
   const attemptPlay = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
 
     try {
-      // First try muted autoplay (most compatible)
       video.muted = true;
       setIsMuted(true);
       await video.play();
-      console.log('[VideoPlayer] Muted autoplay succeeded');
       setNeedsManualPlay(false);
-    } catch (err) {
-      console.log('[VideoPlayer] Autoplay failed, waiting for user interaction:', err);
+    } catch {
       setNeedsManualPlay(true);
       setIsLoading(false);
     }
   }, []);
 
-  // Manual play handler
   const handleManualPlay = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -93,16 +61,13 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       setIsMuted(false);
       await video.play();
       setIsLoading(false);
-    } catch (err) {
-      console.error('[VideoPlayer] Manual play failed:', err);
-      // Try muted as last resort
+    } catch {
       try {
         video.muted = true;
         setIsMuted(true);
         await video.play();
         setIsLoading(false);
-      } catch (err2) {
-        console.error('[VideoPlayer] Even muted play failed:', err2);
+      } catch {
         setHasError(true);
         setErrorMessage('Não foi possível iniciar a reprodução');
         setIsLoading(false);
@@ -110,12 +75,11 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     }
   }, []);
 
-  // Initialize player
-  const initPlayer = useCallback(async () => {
+  const initPlayer = useCallback(() => {
     const video = videoRef.current;
     if (!video || !url) return;
 
-    console.log('[VideoPlayer] Initializing with URL:', url);
+    console.log('[VideoPlayer] Initializing:', url.substring(0, 80));
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -123,216 +87,140 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     cleanup();
 
-    // Set a timeout for loading - if it takes too long, show error
-    loadTimeoutRef.current = window.setTimeout(() => {
-      if (isLoading && !hasError) {
-        console.log('[VideoPlayer] Load timeout reached');
-        setHasError(true);
-        setErrorMessage('Tempo limite excedido. Stream pode estar indisponível.');
+    if (Hls.isSupported()) {
+      // HLS.js with very aggressive recovery settings
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        // Buffer settings
+        backBufferLength: 60,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 100 * 1000 * 1000,
+        maxBufferHole: 2,
+        // ABR settings
+        startLevel: -1,
+        abrEwmaDefaultEstimate: 500000,
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.5,
+        capLevelToPlayerSize: true,
+        // Very aggressive timeout and retry settings
+        fragLoadingTimeOut: 60000,
+        manifestLoadingTimeOut: 30000,
+        levelLoadingTimeOut: 30000,
+        fragLoadingMaxRetry: 10,
+        manifestLoadingMaxRetry: 6,
+        levelLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 500,
+        manifestLoadingRetryDelay: 500,
+        levelLoadingRetryDelay: 500,
+        fragLoadingMaxRetryTimeout: 30000,
+        manifestLoadingMaxRetryTimeout: 30000,
+        levelLoadingMaxRetryTimeout: 30000,
+        // Streaming settings
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        liveDurationInfinity: true,
+        // Error recovery
+        appendErrorMaxRetry: 5,
+        debug: false,
+      });
+
+      hlsRef.current = hls;
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[VideoPlayer] Manifest loaded');
         setIsLoading(false);
-      }
-    }, 30000); // 30 second timeout
+        attemptPlay();
+      });
 
-    const streamType = getStreamType(url);
-    console.log('[VideoPlayer] Stream type:', streamType, 'HLS.js supported:', Hls.isSupported());
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        // Successfully loaded a fragment - we're good
+        if (isLoading) setIsLoading(false);
+      });
 
-    if (streamType === 'hls') {
-      if (Hls.isSupported()) {
-        // Use HLS.js with optimized settings for IPTV streams
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 30,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          maxBufferSize: 60 * 1000 * 1000,
-          maxBufferHole: 0.5,
-          startLevel: -1,
-          abrEwmaDefaultEstimate: 1000000,
-          abrBandWidthFactor: 0.95,
-          abrBandWidthUpFactor: 0.7,
-          capLevelToPlayerSize: true,
-          debug: false,
-          fragLoadingTimeOut: 20000,
-          manifestLoadingTimeOut: 15000,
-          levelLoadingTimeOut: 15000,
-          fragLoadingMaxRetry: 4,
-          manifestLoadingMaxRetry: 3,
-          levelLoadingMaxRetry: 3,
-          fragLoadingRetryDelay: 1000,
-          manifestLoadingRetryDelay: 1000,
-          levelLoadingRetryDelay: 1000,
-        });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        // Only handle fatal errors that can't be recovered
+        if (!data.fatal) {
+          // Non-fatal: let HLS.js handle it with its retry logic
+          console.log('[VideoPlayer] Non-fatal error, auto-recovering:', data.details);
+          return;
+        }
 
-        hlsRef.current = hls;
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('[VideoPlayer] HLS manifest parsed');
-          // Clear timeout on successful manifest parse
-          if (loadTimeoutRef.current) {
-            clearTimeout(loadTimeoutRef.current);
-            loadTimeoutRef.current = null;
-          }
-          setIsLoading(false);
-          attemptPlay();
-        });
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error('[VideoPlayer] HLS error:', data);
-          
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log('[VideoPlayer] Network error, trying to recover...');
-                if (retryCount < 5) { // Increased retries for external streams
-                  setTimeout(() => {
-                    hls.startLoad();
-                    setRetryCount(prev => prev + 1);
-                  }, 1000 * (retryCount + 1)); // Exponential backoff
-                } else {
-                  setHasError(true);
-                  setErrorMessage('Erro de rede. Verifique sua conexão ou tente outro canal.');
-                  setIsLoading(false);
-                }
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log('[VideoPlayer] Media error, trying to recover...');
-                hls.recoverMediaError();
-                break;
-              default:
-                // Try one more thing: swap audio codec
-                if (data.details === 'bufferStalledError') {
-                  console.log('[VideoPlayer] Buffer stalled, trying to recover...');
-                  hls.recoverMediaError();
-                } else {
-                  setHasError(true);
-                  setErrorMessage('Canal indisponível. Tente novamente mais tarde.');
-                  setIsLoading(false);
-                  onError?.('Canal indisponível');
-                }
-                break;
-            }
-          }
-        });
-
-        hls.on(Hls.Events.FRAG_LOADED, () => {
-          // Reset retry count on successful load
-          if (retryCount > 0) {
-            setRetryCount(0);
-          }
-        });
-
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Native HLS support (Safari, iOS)
-        console.log('[VideoPlayer] Using native HLS support');
-        video.src = url;
+        console.error('[VideoPlayer] Fatal error:', data.type, data.details);
         
-        video.addEventListener('loadedmetadata', () => {
-          console.log('[VideoPlayer] Native HLS metadata loaded');
-          setIsLoading(false);
-          attemptPlay();
-        }, { once: true });
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            // Try to recover from network errors
+            console.log('[VideoPlayer] Attempting network recovery...');
+            hls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            console.log('[VideoPlayer] Attempting media recovery...');
+            hls.recoverMediaError();
+            break;
+          default:
+            setHasError(true);
+            setErrorMessage('Stream indisponível. Este servidor pode não suportar reprodução via web.');
+            setIsLoading(false);
+            onError?.('Stream indisponível');
+            break;
+        }
+      });
 
-        video.addEventListener('error', (e) => {
-          console.error('[VideoPlayer] Native HLS error:', video.error);
-          setHasError(true);
-          setErrorMessage('Erro ao carregar stream');
-          setIsLoading(false);
-        }, { once: true });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS (Safari/iOS)
+      video.src = url;
+      
+      video.addEventListener('loadedmetadata', () => {
+        setIsLoading(false);
+        attemptPlay();
+      }, { once: true });
 
-        video.load();
-      } else {
-        // Fallback: try direct load anyway
-        console.log('[VideoPlayer] No HLS support, trying direct load');
-        video.src = url;
-        video.load();
-      }
+      video.addEventListener('error', () => {
+        setHasError(true);
+        setErrorMessage('Erro ao carregar stream');
+        setIsLoading(false);
+      }, { once: true });
+
+      video.load();
     } else {
-      // Direct video source
-      console.log('[VideoPlayer] Loading direct video source');
       video.src = url;
       video.load();
     }
-  }, [url, cleanup, getStreamType, attemptPlay, onError, retryCount]);
+  }, [url, cleanup, attemptPlay, onError, isLoading]);
 
-  // Initialize on URL change
   useEffect(() => {
     initPlayer();
     return cleanup;
   }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Video event handlers
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
+    const handlePlaying = () => {
+      setIsLoading(false);
+      setNeedsManualPlay(false);
+    };
+
     const handleCanPlay = () => {
-      console.log('[VideoPlayer] Can play');
       if (!hlsRef.current) {
-        // Only handle for non-HLS (HLS handles this via MANIFEST_PARSED)
         setIsLoading(false);
         attemptPlay();
       }
     };
 
-    const handleWaiting = () => {
-      console.log('[VideoPlayer] Waiting/buffering');
-    };
-
-    const handlePlaying = () => {
-      console.log('[VideoPlayer] Playing');
-      // Clear timeout when video starts playing
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
-      }
-      setIsLoading(false);
-      setNeedsManualPlay(false);
-    };
-
-    const handleError = () => {
-      if (hlsRef.current) return; // HLS.js handles its own errors
-      
-      console.error('[VideoPlayer] Video error:', video.error);
-      setIsLoading(false);
-      setHasError(true);
-      
-      let errorMsg = 'Erro ao carregar o canal';
-      if (video.error) {
-        switch (video.error.code) {
-          case MediaError.MEDIA_ERR_NETWORK:
-            errorMsg = 'Erro de conexão';
-            break;
-          case MediaError.MEDIA_ERR_DECODE:
-            errorMsg = 'Erro ao decodificar';
-            break;
-          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            errorMsg = 'Formato não suportado';
-            break;
-          case MediaError.MEDIA_ERR_ABORTED:
-            errorMsg = 'Reprodução cancelada';
-            break;
-        }
-      }
-      
-      setErrorMessage(errorMsg);
-      onError?.(errorMsg);
-    };
-
     video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('waiting', handleWaiting);
     video.addEventListener('playing', handlePlaying);
-    video.addEventListener('error', handleError);
 
     return () => {
       video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('playing', handlePlaying);
-      video.removeEventListener('error', handleError);
     };
-  }, [attemptPlay, onError]);
+  }, [attemptPlay]);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -359,7 +247,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   };
 
   const handleRetry = () => {
-    setRetryCount(0);
     initPlayer();
   };
 
@@ -368,7 +255,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       ref={containerRef}
       className={`relative bg-black aspect-video overflow-hidden ${className}`}
     >
-      {/* Channel Info Overlay */}
+      {/* Channel Info */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
         <div className="flex items-center gap-3">
           {logo && (
@@ -385,7 +272,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         </div>
       </div>
 
-      {/* Video Element - no src attribute, set programmatically */}
       <video
         ref={videoRef}
         autoPlay
@@ -395,42 +281,33 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         crossOrigin="anonymous"
       />
 
-      {/* Loading State */}
+      {/* Loading */}
       {isLoading && !hasError && !needsManualPlay && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-white text-sm">Carregando stream...</p>
+          <p className="text-white text-sm">Carregando...</p>
         </div>
       )}
 
-      {/* Manual Play Required State */}
+      {/* Manual Play */}
       {needsManualPlay && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4">
-          <Button
-            onClick={handleManualPlay}
-            size="lg"
-            className="gap-2 rounded-full w-20 h-20"
-          >
+          <Button onClick={handleManualPlay} size="lg" className="gap-2 rounded-full w-20 h-20">
             <Play className="w-10 h-10" />
           </Button>
           <p className="text-white text-sm">Toque para reproduzir</p>
         </div>
       )}
 
-      {/* Error State */}
+      {/* Error */}
       {hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white gap-4 p-4">
           <AlertCircle className="w-16 h-16 text-destructive" />
           <p className="text-xl text-center">{errorMessage}</p>
           <p className="text-sm text-muted-foreground text-center max-w-md">
-            Alguns canais podem não ser compatíveis com reprodução via navegador. 
-            Para melhor experiência, use o app SmartOne.
+            Para melhor experiência com IPTV, use o aplicativo SmartOne.
           </p>
-          <Button
-            onClick={handleRetry}
-            variant="secondary"
-            className="mt-4 gap-2"
-          >
+          <Button onClick={handleRetry} variant="secondary" className="mt-4 gap-2">
             <RefreshCw className="w-4 h-4" />
             Tentar Novamente
           </Button>
@@ -441,23 +318,10 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       {!hasError && !needsManualPlay && (
         <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
           <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleMute}
-                className="text-white hover:bg-white/20"
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </Button>
-            </div>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="text-white hover:bg-white/20"
-            >
+            <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white hover:bg-white/20">
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-white/20">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </Button>
           </div>
