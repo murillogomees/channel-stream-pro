@@ -10,7 +10,7 @@ import {
   Plug, UserCog, ArrowLeft, Tv, Play, Download,
   FileText, History, MessageSquare, Send, Cog,
   ListVideo, Hammer, Database, UserPlus, BookOpen,
-  Sparkles
+  Sparkles, LayoutDashboard, CreditCard, PanelTop
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -345,6 +345,32 @@ const AdminDashboard = () => {
               icon={<BarChart3 className="h-5 w-5" />}
               path="/admin/analytics"
               badge="Consolidado"
+            />
+          </div>
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Gestão do Site */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <PanelTop className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Gestão do Site</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              title="Editor da Homepage"
+              description="Edite textos e elementos da página inicial"
+              icon={<LayoutDashboard className="h-5 w-5" />}
+              path="/dashboard/homepage"
+              isNew
+            />
+            <NavCard
+              title="Gestão de Planos"
+              description="Crie e gerencie os planos de assinatura"
+              icon={<CreditCard className="h-5 w-5" />}
+              path="/dashboard/plans"
+              isNew
             />
           </div>
         </section>
