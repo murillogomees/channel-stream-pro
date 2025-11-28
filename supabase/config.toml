@@ -1,5 +1,11 @@
 project_id = "sdvyxdghxqmntyoweqbd"
 
+[functions.playlist-sync]
+verify_jwt = false
+
+[functions.playlist-serve]
+verify_jwt = false
+
 # Admin-only function for listing users - requires authentication
 [functions.list-users]
 verify_jwt = true
