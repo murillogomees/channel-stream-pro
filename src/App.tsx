@@ -41,6 +41,7 @@ const ClienteAccount = lazy(() => import("./pages/ClienteAccount"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
+const TVPlayer = lazy(() => import("./pages/TVPlayer"));
 
 const App = () => (
   <AuthProvider>
@@ -66,6 +67,7 @@ const App = () => (
           
           {/* IPTV App Routes */}
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
+          <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
           
           <Route path="/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
