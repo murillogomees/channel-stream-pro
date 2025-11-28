@@ -37,7 +37,7 @@ export function TVNavRail({
                 key={item.id}
                 onClick={() => onTabChange(item.id as typeof activeTab)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-200",
+                  "flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-200",
                   "focus:outline-none focus:ring-2 focus:ring-primary/50",
                   isActive 
                     ? "text-primary" 
@@ -57,7 +57,7 @@ export function TVNavRail({
                   )}
                 </div>
                 <span className={cn(
-                  "text-[10px] font-medium truncate max-w-[60px]",
+                  "text-[10px] font-medium truncate max-w-[50px]",
                   isActive && "font-semibold"
                 )}>
                   {item.label}
@@ -65,6 +65,25 @@ export function TVNavRail({
               </button>
             );
           })}
+          
+          {/* Settings Button */}
+          {onSettings && (
+            <button
+              onClick={onSettings}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-200",
+                "focus:outline-none focus:ring-2 focus:ring-primary/50",
+                "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="p-1.5 rounded-lg transition-all">
+                <Settings className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] font-medium truncate max-w-[50px]">
+                Perfil
+              </span>
+            </button>
+          )}
         </div>
       </nav>
 

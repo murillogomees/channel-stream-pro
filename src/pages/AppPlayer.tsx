@@ -356,7 +356,7 @@ export default function AppPlayer() {
       <TVNavRail
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSettings={isAdmin ? () => navigate('/dashboard') : undefined}
+        onSettings={() => navigate(isAdmin ? '/dashboard' : '/app/account')}
       />
 
       {/* Main Content Area */}
