@@ -14,10 +14,10 @@
 
 @layer base {
   :root {
-    --background: 0 0% 96%;
-    --foreground: 0 0% 9%;
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 9%;
+    --background: 0 0% 21.1765%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 0%;
+    --card-foreground: 0 0% 100%;
     --popover: 0 0% 89%;
     --popover-foreground: 0 0% 9%;
     --primary: 161 93% 30%;
@@ -54,17 +54,17 @@
     --font-sans: Roboto, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
     --font-serif: "Crimson Pro", ui-serif, Georgia, Cambria, Times New Roman, Times, serif;
     --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-    --radius: 0.75rem;
+    --radius: 1rem;
     --gradient-primary: linear-gradient(135deg, hsl(142 76% 28%), hsl(142 76% 45%));
     --gradient-accent: linear-gradient(135deg, hsl(210 100% 50%), hsl(220 100% 60%));
     --gradient-hero: linear-gradient(135deg, hsl(220 10% 96%) 0%, hsl(220 10% 98%) 50%, hsl(220 10% 96%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 10% 98%));
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0px 1px 1.5px 0px hsl(0, 0%, 0%);
-    --shadow: 0px 1px 3px 0px hsl(0, 0%, 0%);
-    --shadow-md: 0px 1px 4.5px 0px hsl(0, 0%, 0%);
-    --shadow-lg: 0px 1px 7.5px 0px hsl(0, 0%, 0%);
+    --shadow-sm: -7px 1px 17.25px -4px hsl(0, 0%, 0%);
+    --shadow: -7px 1px 34.5px -4px hsl(0, 0%, 0%);
+    --shadow-md: -7px 1px 51.75px -4px hsl(0, 0%, 0%);
+    --shadow-lg: -7px 1px 86.25px -4px hsl(0, 0%, 0%);
     --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
     --shadow-glow: 0 0 40px hsl(142 76% 28% / 0.2);
@@ -125,15 +125,15 @@
     --shadow-elevated: 0 10px 40px -10px hsl(220 13% 0% / 0.8), 0 0 0 1px hsl(220 13% 28% / 0.5);
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0px 1px 1.5px 0px hsl(0, 0%, 0%);
-    --shadow: 0px 1px 3px 0px hsl(0, 0%, 0%);
-    --shadow-md: 0px 1px 4.5px 0px hsl(0, 0%, 0%);
-    --shadow-lg: 0px 1px 7.5px 0px hsl(0, 0%, 0%);
+    --shadow-sm: -7px 1px 17.25px -4px hsl(0, 0%, 0%);
+    --shadow: -7px 1px 34.5px -4px hsl(0, 0%, 0%);
+    --shadow-md: -7px 1px 51.75px -4px hsl(0, 0%, 0%);
+    --shadow-lg: -7px 1px 86.25px -4px hsl(0, 0%, 0%);
     --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
     --font-sans: Roboto, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
     --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-    --radius: 0.75rem;
+    --radius: 1rem;
   }
 
   /* Tema Sepia */
