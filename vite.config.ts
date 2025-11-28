@@ -82,8 +82,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Sem manualChunks - deixar Vite gerenciar automaticamente
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 1000,
     assetsInlineLimit: 4096,
     cssCodeSplit: true,
     minify: 'terser',
@@ -91,6 +90,7 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true,
         drop_debugger: true,
+        passes: 2,
       },
       mangle: {
         safari10: true,
@@ -98,5 +98,22 @@ export default defineConfig(({ mode }) => ({
     },
     reportCompressedSize: false,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Manual chunks for better caching
+        manualChunks: {
+          // Vendor chunks - rarely change
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'],
+          'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge', 'class-variance-authority'],
+          // Supabase in its own chunk
+          'vendor-supabase': ['@supabase/supabase-js'],
+        },
+        // Optimize chunk file names
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
   },
 }));
