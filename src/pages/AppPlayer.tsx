@@ -76,15 +76,11 @@ export default function AppPlayer() {
 
   const allFilteredChannels = filteredCategories.flatMap(cat => cat.channels);
 
-  // Build stream URL with proxy
+  // Use direct stream URL
   const getStreamUrl = useCallback((channel: typeof currentChannel) => {
-    if (!channel || !customListId) return '';
-    
-    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
-    const encodedUrl = encodeURIComponent(channel.stream_url);
-    
-    return `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
-  }, [customListId]);
+    if (!channel) return '';
+    return channel.stream_url;
+  }, []);
 
   if (playerLoading || favoritesLoading) {
     return (

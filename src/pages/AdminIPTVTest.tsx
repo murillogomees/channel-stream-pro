@@ -249,13 +249,11 @@ export default function AdminIPTVTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPlayerDialog]);
 
-  // Build stream URL with proxy (required for CORS bypass in browsers)
+  // Use direct stream URL
   const getStreamUrl = useCallback((channel: any) => {
-    if (!channel || !customListId) return '';
-    const proxyUrl = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/stream-proxy';
-    const encodedUrl = encodeURIComponent(channel.stream_url);
-    return `${proxyUrl}?url=${encodedUrl}&list=${customListId}`;
-  }, [customListId]);
+    if (!channel) return '';
+    return channel.stream_url;
+  }, []);
 
   // Handle play
   const handlePlay = (channel: any) => {
