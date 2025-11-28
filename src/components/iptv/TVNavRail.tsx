@@ -5,11 +5,6 @@ import { Button } from '@/components/ui/button';
 interface TVNavRailProps {
   activeTab: 'home' | 'live' | 'movies' | 'series' | 'favorites';
   onTabChange: (tab: 'home' | 'live' | 'movies' | 'series' | 'favorites') => void;
-  counts?: {
-    live: number;
-    movies: number;
-    series: number;
-  };
   onSearch?: () => void;
   onSettings?: () => void;
 }
@@ -25,7 +20,6 @@ const navItems = [
 export function TVNavRail({
   activeTab,
   onTabChange,
-  counts,
   onSearch,
   onSettings,
 }: TVNavRailProps) {
@@ -43,9 +37,6 @@ export function TVNavRail({
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          const count = item.id === 'live' ? counts?.live :
-                       item.id === 'movies' ? counts?.movies :
-                       item.id === 'series' ? counts?.series : undefined;
           
           return (
             <button
@@ -67,13 +58,6 @@ export function TVNavRail({
                 isActive ? "bg-primary text-primary-foreground" : "text-sidebar-foreground group-hover:bg-sidebar-primary/10"
               )}>
                 <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
-                
-                {/* Count Badge */}
-                {count !== undefined && count > 0 && !isActive && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] text-[10px] font-bold bg-primary text-primary-foreground rounded-full flex items-center justify-center px-1">
-                    {count > 999 ? '999+' : count}
-                  </span>
-                )}
               </div>
               
               <span className={cn(

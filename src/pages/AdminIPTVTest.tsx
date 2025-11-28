@@ -182,39 +182,54 @@ export default function AdminIPTVTest() {
     return channels;
   }, [activeTab, categorizedContent, selectedCategory, searchQuery, allChannels, isFavorite]);
 
-  // Home content (simplified)
+  // Home content (simplified) - with search filtering
   const homeContent = useMemo(() => {
     const sections = [];
     
+    const filterChannels = (channels: any[]) => {
+      if (!searchQuery) return channels.slice(0, 20);
+      const query = searchQuery.toLowerCase();
+      return channels.filter(ch => ch.name.toLowerCase().includes(query)).slice(0, 20);
+    };
+    
     if (categorizedContent.live.length > 0) {
       const liveSection = categorizedContent.live[0];
-      sections.push({
-        ...liveSection,
-        display_name: `📺 ${liveSection.display_name}`,
-        channels: liveSection.channels.slice(0, 20),
-      });
+      const filteredLive = filterChannels(liveSection.channels);
+      if (filteredLive.length > 0 || !searchQuery) {
+        sections.push({
+          ...liveSection,
+          display_name: `📺 ${liveSection.display_name}`,
+          channels: filteredLive,
+        });
+      }
     }
     
     if (categorizedContent.movies.length > 0) {
       const movieSection = categorizedContent.movies[0];
-      sections.push({
-        ...movieSection,
-        display_name: `🎬 ${movieSection.display_name}`,
-        channels: movieSection.channels.slice(0, 20),
-      });
+      const filteredMovies = filterChannels(movieSection.channels);
+      if (filteredMovies.length > 0 || !searchQuery) {
+        sections.push({
+          ...movieSection,
+          display_name: `🎬 ${movieSection.display_name}`,
+          channels: filteredMovies,
+        });
+      }
     }
     
     if (categorizedContent.series.length > 0) {
       const seriesSection = categorizedContent.series[0];
-      sections.push({
-        ...seriesSection,
-        display_name: `📺 ${seriesSection.display_name}`,
-        channels: seriesSection.channels.slice(0, 20),
-      });
+      const filteredSeries = filterChannels(seriesSection.channels);
+      if (filteredSeries.length > 0 || !searchQuery) {
+        sections.push({
+          ...seriesSection,
+          display_name: `📺 ${seriesSection.display_name}`,
+          channels: filteredSeries,
+        });
+      }
     }
     
     return sections;
-  }, [categorizedContent]);
+  }, [categorizedContent, searchQuery]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -295,7 +310,6 @@ export default function AdminIPTVTest() {
       <TVNavRail
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        counts={counts}
         onSettings={() => navigate('/dashboard')}
       />
 
@@ -313,22 +327,30 @@ export default function AdminIPTVTest() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             
-            <h1 className="text-lg font-semibold">{tabTitle}</h1>
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-lg font-semibold">{tabTitle}</h1>
+              {/* Content count */}
+              <span className="text-sm text-muted-foreground">
+                {activeTab === 'home' && `${allChannels.length.toLocaleString()} itens`}
+                {activeTab === 'live' && `${counts.live.toLocaleString()} canais`}
+                {activeTab === 'movies' && `${counts.movies.toLocaleString()} filmes`}
+                {activeTab === 'series' && `${counts.series.toLocaleString()} séries`}
+                {activeTab === 'favorites' && `${allChannels.filter(ch => isFavorite(ch.id)).length.toLocaleString()} favoritos`}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search */}
-            {activeTab !== 'home' && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-[180px] lg:w-[240px] pl-9 h-9"
-                />
-              </div>
-            )}
+            {/* Search - now visible on all tabs */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-[180px] lg:w-[240px] pl-9 h-9"
+              />
+            </div>
 
             {/* Playlist Selector */}
             <Select value={customListId || undefined} onValueChange={selectList}>
