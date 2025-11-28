@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import Hls from 'hls.js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,12 +10,15 @@ interface VideoPlayerProps {
   logo?: string;
   onError?: (error: string) => void;
   className?: string;
+  /** Skip proxy and use direct URL (for admins/testing) */
+  directAccess?: boolean;
 }
 
-export function VideoPlayer({ url, title, logo, onError, className = '' }: VideoPlayerProps) {
+export function VideoPlayer({ url, title, logo, onError, className = '', directAccess = false }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadTimeoutRef = useRef<number | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
@@ -47,6 +49,10 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
     if (hlsRef.current) {
       console.log('[VideoPlayer] Destroying HLS instance');
       hlsRef.current.destroy();
@@ -112,7 +118,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     const video = videoRef.current;
     if (!video || !url) return;
 
-    console.log('[VideoPlayer] Initializing with URL:', url);
+    console.log('[VideoPlayer] Initializing with URL:', url, 'directAccess:', directAccess);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -120,27 +126,48 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     cleanup();
 
+    // Set a timeout for loading - if it takes too long, show error
+    loadTimeoutRef.current = window.setTimeout(() => {
+      if (isLoading && !hasError) {
+        console.log('[VideoPlayer] Load timeout reached');
+        setHasError(true);
+        setErrorMessage('Tempo limite excedido. Stream pode estar indisponível.');
+        setIsLoading(false);
+      }
+    }, 15000); // 15 second timeout
+
     const streamType = getStreamType(url);
     console.log('[VideoPlayer] Stream type:', streamType, 'HLS.js supported:', Hls.isSupported());
 
-    // Get auth token
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || '';
+    // Get auth token only if not direct access
+    let token = '';
+    if (!directAccess) {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || '';
+    }
 
     if (streamType === 'hls') {
       if (Hls.isSupported()) {
-        // Use HLS.js for browsers that support it
+        // Use HLS.js with optimized settings for fast start
         const hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 90,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          startLevel: -1, // Auto quality
+          lowLatencyMode: true, // Enable low latency mode for faster start
+          backBufferLength: 30, // Reduced from 90
+          maxBufferLength: 10, // Reduced from 30 - start playing faster
+          maxMaxBufferLength: 30, // Reduced from 60
+          maxBufferSize: 30 * 1000 * 1000, // 30MB max buffer
+          maxBufferHole: 0.5, // Allow small gaps
+          startLevel: 0, // Start with lowest quality for fast start, then auto-switch
+          abrEwmaDefaultEstimate: 500000, // 500kbps initial estimate
+          abrBandWidthFactor: 0.95,
+          abrBandWidthUpFactor: 0.7,
           capLevelToPlayerSize: true,
           debug: false,
+          fragLoadingTimeOut: 10000, // 10 second fragment timeout
+          manifestLoadingTimeOut: 8000, // 8 second manifest timeout
+          levelLoadingTimeOut: 8000,
           xhrSetup: (xhr, xhrUrl) => {
-            if (token) {
+            if (token && !directAccess) {
               xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
           },
@@ -152,6 +179,11 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('[VideoPlayer] HLS manifest parsed');
+          // Clear timeout on successful manifest parse
+          if (loadTimeoutRef.current) {
+            clearTimeout(loadTimeoutRef.current);
+            loadTimeoutRef.current = null;
+          }
           setIsLoading(false);
           attemptPlay();
         });
@@ -252,6 +284,11 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     const handlePlaying = () => {
       console.log('[VideoPlayer] Playing');
+      // Clear timeout when video starts playing
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
       setIsLoading(false);
       setNeedsManualPlay(false);
     };
