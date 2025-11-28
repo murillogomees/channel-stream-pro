@@ -158,12 +158,38 @@ export default function AppPlayer() {
     return { live, movies, series };
   }, [categories]);
 
-  // Content counts
-  const counts = useMemo(() => ({
-    live: categorizedContent.live.reduce((acc, cat) => acc + cat.channels.length, 0),
-    movies: categorizedContent.movies.reduce((acc, cat) => acc + cat.channels.length, 0),
-    series: categorizedContent.series.reduce((acc, cat) => acc + cat.channels.length, 0),
-  }), [categorizedContent]);
+  // Content counts - series counts unique series names, not episodes
+  const counts = useMemo(() => {
+    // Helper to extract series name from episode
+    const extractSeriesName = (name: string): string => {
+      return name
+        .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
+        .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
+        .replace(/\s*-\s*Temporada\s*\d+.*/gi, '')
+        .replace(/\s*Temporada\s*\d+.*/gi, '')
+        .replace(/\s*Season\s*\d+.*/gi, '')
+        .replace(/\s*T\d+\s*E?\d*.*/gi, '')
+        .replace(/\s*Ep[is]*[óo]*d?i?o?\s*\d+.*/gi, '')
+        .replace(/\s*\(\d{4}\)/g, '')
+        .replace(/\s*\[.*?\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    // Count unique series by grouping episodes
+    const uniqueSeriesNames = new Set<string>();
+    categorizedContent.series.forEach(cat => {
+      cat.channels.forEach(ch => {
+        uniqueSeriesNames.add(extractSeriesName(ch.name));
+      });
+    });
+
+    return {
+      live: categorizedContent.live.reduce((acc, cat) => acc + cat.channels.length, 0),
+      movies: categorizedContent.movies.reduce((acc, cat) => acc + cat.channels.length, 0),
+      series: uniqueSeriesNames.size, // Count unique series, not episodes
+    };
+  }, [categorizedContent]);
 
   // Get all channels for search and favorites
   const allChannels = useMemo(() => 
