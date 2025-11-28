@@ -18,6 +18,16 @@ function getBaseUrl(url: string): string {
   }
 }
 
+// Get origin (protocol + host) from URL
+function getOrigin(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return `${urlObj.protocol}//${urlObj.host}`;
+  } catch {
+    return '';
+  }
+}
+
 // Rewrite URLs in HLS manifest to go through proxy
 function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
   const lines = content.split('\n');
@@ -107,7 +117,9 @@ Deno.serve(async (req) => {
     const decodedStreamUrl = decodeURIComponent(streamUrl);
     console.log(`[StreamProxy] Proxying: ${decodedStreamUrl.substring(0, 80)}...`);
 
-    // Prepare headers for upstream
+    const origin = getOrigin(decodedStreamUrl);
+
+    // Prepare headers for upstream - mimic a real browser/player request
     const upstreamHeaders = new Headers();
     
     const rangeHeader = req.headers.get('Range');
@@ -115,8 +127,20 @@ Deno.serve(async (req) => {
       upstreamHeaders.set('Range', rangeHeader);
     }
     
-    upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    // Set headers to mimic real player/browser request
+    upstreamHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     upstreamHeaders.set('Accept', '*/*');
+    upstreamHeaders.set('Accept-Language', 'en-US,en;q=0.9');
+    upstreamHeaders.set('Accept-Encoding', 'identity'); // Don't compress, we need to stream
+    
+    // Critical: Set Referer and Origin to the IPTV server itself
+    if (origin) {
+      upstreamHeaders.set('Referer', origin + '/');
+      upstreamHeaders.set('Origin', origin);
+    }
+    
+    // Connection keep-alive for streaming
+    upstreamHeaders.set('Connection', 'keep-alive');
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -130,7 +154,7 @@ Deno.serve(async (req) => {
 
       if (!streamResponse.ok) {
         console.error(`[StreamProxy] Upstream error: ${streamResponse.status}`);
-        return new Response('Stream unavailable', { 
+        return new Response(`Stream unavailable (${streamResponse.status})`, { 
           status: 502,
           headers: corsHeaders 
         });
@@ -155,7 +179,8 @@ Deno.serve(async (req) => {
       if (isHls) {
         headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       } else {
-        headers.set('Cache-Control', 'public, max-age=3600, immutable');
+        // Short cache for segments - they change frequently in live streams
+        headers.set('Cache-Control', 'public, max-age=5');
       }
 
       // Rewrite HLS manifest URLs
