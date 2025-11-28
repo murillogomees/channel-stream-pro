@@ -172,7 +172,7 @@ class TMDBService {
       .from('content_metadata')
       .select('*')
       .eq('content_id', contentId)
-      .single();
+      .maybeSingle();
 
     if (cached) {
       return mapDbMetadata(cached);
