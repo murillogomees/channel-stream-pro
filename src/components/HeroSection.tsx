@@ -1,23 +1,54 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, CheckCircle, Smartphone, Monitor, Tv } from "lucide-react";
+import { Play, CheckCircle, Tv } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import logoWhiteSm from "@/assets/logo-white-sm.webp";
 import logoWhiteOpt from "@/assets/logo-white-opt.webp";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
+import { supabase } from "@/integrations/supabase/client";
+
+interface HeroContent {
+  description: string;
+  features: string[];
+  cta_primary_text: string;
+  cta_secondary_text: string;
+  trust_indicators: string[];
+  whatsapp_number: string;
+  whatsapp_message: string;
+}
 
 const HeroSection = () => {
-  const settings = {
-    components: {
-      hero: {
-        description: "Mais de 10.000 canais em Full HD e 4K com qualidade premium e estabilidade incomparável",
-        features: ["Teste Grátis 15 Dias", "Sem Contrato", "Suporte 24/7"],
-        ctaButtons: [
-          { text: "Falar com Suporte", variant: "secondary" }
-        ]
+  const [settings, setSettings] = useState<HeroContent>({
+    description: "Mais de 10.000 canais em Full HD e 4K com qualidade premium e estabilidade incomparável",
+    features: ["Teste Grátis 15 Dias", "Sem Contrato", "Suporte 24/7"],
+    cta_primary_text: "Ativar Meu Acesso Agora",
+    cta_secondary_text: "Falar com Suporte",
+    trust_indicators: ["Sem Contrato", "Suporte 24/7", "Acesso Global", "Cancele Quando Quiser"],
+    whatsapp_number: "556131425880",
+    whatsapp_message: "Olá! Gostaria de fazer o teste grátis do IPTV.",
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const { data } = await supabase
+          .from('homepage_content')
+          .select('content')
+          .eq('section_key', 'hero')
+          .single();
+
+        if (data?.content) {
+          setSettings(data.content as unknown as HeroContent);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar conteúdo do hero:', error);
       }
-    }
-  };
+    };
+
+    fetchContent();
+  }, []);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero px-4 sm:px-6 lg:px-8">
       {/* Background Image */}
@@ -59,12 +90,12 @@ const HeroSection = () => {
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4">
-            {settings.components.hero.description}
+            {settings.description}
           </p>
 
           {/* Key Benefits */}
           <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 my-6 sm:my-8 px-4">
-            {settings.components.hero.features.map((feature, index) => (
+            {settings.features.map((feature, index) => (
               <div key={index} className="flex items-center gap-2 bg-gradient-card px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-card">
                 <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 <span className="text-xs sm:text-sm font-medium">{feature}</span>
@@ -84,43 +115,30 @@ const HeroSection = () => {
               }}
             >
               <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
-              Ativar Meu Acesso Agora
+              {settings.cta_primary_text}
             </Button>
-            {settings.components.hero.ctaButtons.map((button, index) => (
-              <Button 
-                key={index}
-                variant={button.variant === "primary" ? "cta" : "outline"} 
-                size="lg" 
-                className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-                onClick={() => {
-                  trackEvent('Contact', { content_name: 'Hero CTA - WhatsApp', content_category: 'button' });
-                  window.location.href = "https://wa.me/556131425880?text=" + encodeURIComponent("Olá! Gostaria de fazer o teste grátis do IPTV.");
-                }}
-              >
-                {index === 0 ? <Play className="h-5 w-5 sm:h-6 sm:w-6" /> : <Tv className="h-5 w-5 sm:h-6 sm:w-6" />}
-                {button.text}
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
+              onClick={() => {
+                trackEvent('Contact', { content_name: 'Hero CTA - WhatsApp', content_category: 'button' });
+                window.location.href = `https://wa.me/${settings.whatsapp_number}?text=${encodeURIComponent(settings.whatsapp_message)}`;
+              }}
+            >
+              <Play className="h-5 w-5 sm:h-6 sm:w-6" />
+              {settings.cta_secondary_text}
+            </Button>
           </div>
 
           {/* Trust Indicators */}
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6 lg:gap-8 pt-6 sm:pt-8 text-xs sm:text-sm text-muted-foreground px-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Sem Contrato</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Suporte 24/7</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Acesso Global</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Cancele Quando Quiser</span>
-            </div>
+            {settings.trust_indicators.map((indicator, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                <span>{indicator}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
