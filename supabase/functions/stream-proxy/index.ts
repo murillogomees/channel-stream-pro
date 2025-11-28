@@ -7,6 +7,99 @@ const corsHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
 };
 
+// Helper to get base URL from a full URL
+function getBaseUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    pathParts.pop(); // Remove the file name
+    return `${urlObj.protocol}//${urlObj.host}${pathParts.join('/')}`;
+  } catch {
+    const lastSlash = url.lastIndexOf('/');
+    return lastSlash > 0 ? url.substring(0, lastSlash) : url;
+  }
+}
+
+// Rewrite URLs in HLS manifest to go through proxy
+function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string, listId: string): string {
+  const lines = content.split('\n');
+  const rewrittenLines = lines.map(line => {
+    const trimmedLine = line.trim();
+    
+    // Skip empty lines and comments (except URI in tags)
+    if (!trimmedLine || (trimmedLine.startsWith('#') && !trimmedLine.includes('URI="'))) {
+      // But handle URI attributes in tags like #EXT-X-KEY
+      if (trimmedLine.includes('URI="')) {
+        return rewriteUriInTag(trimmedLine, baseUrl, proxyBaseUrl, listId);
+      }
+      return line;
+    }
+    
+    // Rewrite URI in tags (e.g., #EXT-X-KEY:METHOD=AES-128,URI="...")
+    if (trimmedLine.startsWith('#') && trimmedLine.includes('URI="')) {
+      return rewriteUriInTag(trimmedLine, baseUrl, proxyBaseUrl, listId);
+    }
+    
+    // Rewrite segment/playlist URLs (lines that are URLs, not tags)
+    if (!trimmedLine.startsWith('#')) {
+      return rewriteUrl(trimmedLine, baseUrl, proxyBaseUrl, listId);
+    }
+    
+    return line;
+  });
+  
+  return rewrittenLines.join('\n');
+}
+
+// Rewrite URI attribute within a tag
+function rewriteUriInTag(line: string, baseUrl: string, proxyBaseUrl: string, listId: string): string {
+  return line.replace(/URI="([^"]+)"/g, (match, uri) => {
+    const fullUrl = resolveUrl(uri, baseUrl);
+    const proxiedUrl = `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}&list=${listId}`;
+    return `URI="${proxiedUrl}"`;
+  });
+}
+
+// Rewrite a single URL line
+function rewriteUrl(url: string, baseUrl: string, proxyBaseUrl: string, listId: string): string {
+  const fullUrl = resolveUrl(url.trim(), baseUrl);
+  return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}&list=${listId}`;
+}
+
+// Resolve relative URLs to absolute
+function resolveUrl(url: string, baseUrl: string): string {
+  // Already absolute URL
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Absolute path (starts with /)
+  if (url.startsWith('/')) {
+    try {
+      const base = new URL(baseUrl);
+      return `${base.protocol}//${base.host}${url}`;
+    } catch {
+      return url;
+    }
+  }
+  
+  // Relative path
+  return `${baseUrl}/${url}`;
+}
+
+// Check if content is HLS manifest
+function isHlsContent(url: string, contentType: string | null): boolean {
+  const urlLower = url.toLowerCase();
+  if (urlLower.includes('.m3u8') || urlLower.includes('.m3u')) {
+    return true;
+  }
+  if (contentType) {
+    const ctLower = contentType.toLowerCase();
+    return ctLower.includes('mpegurl') || ctLower.includes('x-mpegurl') || ctLower.includes('vnd.apple');
+  }
+  return false;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -113,7 +206,7 @@ Deno.serve(async (req) => {
 
     // Decodificar a URL do stream
     const decodedStreamUrl = decodeURIComponent(streamUrl);
-    console.log(`[StreamProxy] User ${user.id} accessing stream`);
+    console.log(`[StreamProxy] User ${user.id} accessing: ${decodedStreamUrl.substring(0, 80)}...`);
 
     // Preparar headers para o upstream
     const upstreamHeaders = new Headers();
@@ -132,7 +225,7 @@ Deno.serve(async (req) => {
 
     // Fazer proxy do stream com timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
 
     try {
       const streamResponse = await fetch(decodedStreamUrl, {
@@ -149,13 +242,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Build response headers
-      const headers = new Headers(corsHeaders);
-      
       // Get content type from response or infer from URL
       let contentType = streamResponse.headers.get('Content-Type');
+      const isHls = isHlsContent(decodedStreamUrl, contentType);
+      
       if (!contentType || contentType === 'application/octet-stream') {
-        if (decodedStreamUrl.includes('.m3u8')) {
+        if (isHls) {
           contentType = 'application/vnd.apple.mpegurl';
         } else if (decodedStreamUrl.includes('.ts')) {
           contentType = 'video/mp2t';
@@ -165,17 +257,34 @@ Deno.serve(async (req) => {
           contentType = 'video/mp2t';
         }
       }
+
+      // Build response headers
+      const headers = new Headers(corsHeaders);
       headers.set('Content-Type', contentType);
       
-      // Cache headers for CDN optimization
-      if (decodedStreamUrl.includes('.m3u8')) {
+      // Cache headers
+      if (isHls) {
         // HLS manifests: very short cache (live content updates frequently)
-        headers.set('Cache-Control', 'public, max-age=2, s-maxage=5');
+        headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       } else if (decodedStreamUrl.includes('.ts')) {
         // Video segments: longer cache (immutable content)
         headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, immutable');
       } else {
         headers.set('Cache-Control', 'public, max-age=30, s-maxage=120');
+      }
+
+      // If it's an HLS manifest, rewrite URLs inside it
+      if (isHls) {
+        const manifestContent = await streamResponse.text();
+        const baseUrl = getBaseUrl(decodedStreamUrl);
+        const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
+        
+        const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl, listId);
+        
+        return new Response(rewrittenManifest, {
+          status: 200,
+          headers,
+        });
       }
       
       // Keep important headers from upstream
