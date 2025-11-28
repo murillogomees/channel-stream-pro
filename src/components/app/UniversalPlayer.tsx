@@ -261,18 +261,25 @@ export default function UniversalPlayer({
     const originalLower = originalUrl.toLowerCase();
     
     // Detect content type from ORIGINAL URL (not proxy URL)
-    const isMP4 = originalLower.includes('.mp4') || originalLower.includes('/movie/') || originalLower.includes('/series/');
-    const isMKV = originalLower.includes('.mkv');
-    const isAVI = originalLower.includes('.avi');
-    const isWebM = originalLower.includes('.webm');
-    const isDirectStream = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/.test(originalUrl) && !originalLower.includes('.m3u');
-    const isNativePlayable = isMP4 || isMKV || isAVI || isWebM || isDirectStream;
+    // ONLY actual video files with extensions are native playable
+    // Xtream Codes live streams (no extension) need HLS processing
+    const hasVideoExtension = /\.(mp4|mkv|avi|webm|mov|m4v)(\?|$)/i.test(originalUrl);
+    const isMovieOrSeries = (originalLower.includes('/movie/') || originalLower.includes('/series/')) && hasVideoExtension;
+    const isNativePlayable = hasVideoExtension || isMovieOrSeries;
+    
+    // Check if it's an HLS stream
+    const isHlsStream = originalLower.includes('.m3u8') || originalLower.includes('.m3u');
+    
+    // Xtream Codes live pattern (no extension) - these need HLS
+    const isXtreamLive = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/.test(originalUrl) && !isHlsStream && !hasVideoExtension;
 
     console.log('[Player] ==========================================');
     console.log('[Player] Initializing playback');
     console.log('[Player] Proxy URL:', url.substring(0, 60) + '...');
     console.log('[Player] Original URL:', originalUrl.substring(0, 60) + '...');
-    console.log('[Player] Detected as native/direct:', isNativePlayable);
+    console.log('[Player] Has video extension:', hasVideoExtension);
+    console.log('[Player] Is Xtream live:', isXtreamLive);
+    console.log('[Player] Native playable:', isNativePlayable);
     console.log('[Player] HLS.js supported:', Hls.isSupported());
     
     // Reset state
@@ -286,12 +293,28 @@ export default function UniversalPlayer({
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    
+    // For Xtream Codes live streams, convert to HLS format by adding .m3u8
+    let playbackUrl = url;
+    if (isXtreamLive) {
+      // Append .m3u8 to get HLS stream from Xtream Codes
+      const hlsOriginalUrl = originalUrl + '.m3u8';
+      // Reconstruct proxy URL with HLS version
+      try {
+        const proxyBase = new URL(url);
+        proxyBase.searchParams.set('url', hlsOriginalUrl);
+        playbackUrl = proxyBase.toString();
+        console.log('[Player] Converted to HLS:', hlsOriginalUrl.substring(0, 60) + '...');
+      } catch {
+        playbackUrl = url;
+      }
+    }
 
     // ==== NATIVE VIDEO (MP4, WebM, MKV) ====
     if (isNativePlayable) {
       console.log('[Player] Using native video playback');
       
-      video.src = url;
+      video.src = playbackUrl;
       video.load();
       
       const onLoadedMetadata = () => {
@@ -335,7 +358,7 @@ export default function UniversalPlayer({
     if (supportsNativeHls && !Hls.isSupported()) {
       console.log('[Player] Using native HLS (Safari/iOS/TV)');
       
-      video.src = url;
+      video.src = playbackUrl;
       
       const onLoadedMetadata = () => {
         console.log('[Player] Native HLS ready');
@@ -371,7 +394,7 @@ export default function UniversalPlayer({
       // Fallback to native if HLS.js not supported but native is
       if (supportsNativeHls) {
         console.log('[Player] Falling back to native HLS');
-        video.src = url;
+        video.src = playbackUrl;
         video.load();
         if (autoplay) video.play().catch(console.warn);
         return;
@@ -396,7 +419,7 @@ export default function UniversalPlayer({
     hlsRef.current = hls;
 
     // Load source
-    hls.loadSource(url);
+    hls.loadSource(playbackUrl);
     hls.attachMedia(video);
     
     console.log('[Player] HLS source attached');
