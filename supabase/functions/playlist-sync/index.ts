@@ -27,8 +27,8 @@ const CORS_HEADERS = {
 // Configuration - optimized for CPU time limits
 const CONFIG = {
   FETCH_TIMEOUT_MS: 50000,
-  CHUNK_SIZE: 50000,           // Process 50k entries per call
-  BATCH_SIZE: 3000,            // Insert 3k entries per DB batch
+  CHUNK_SIZE: 20000,           // Process 20k entries per call (reduced for CPU limit)
+  BATCH_SIZE: 2000,            // Insert 2k entries per DB batch
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
 } as const;
