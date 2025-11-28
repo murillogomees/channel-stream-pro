@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
-import { supabase } from '@/integrations/supabase/client';
 
 interface VideoPlayerProps {
   url: string;
@@ -124,20 +123,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     cleanup();
 
-    // Get auth token FIRST before anything else
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || '';
-    
-    if (!token) {
-      console.error('[VideoPlayer] No auth token available');
-      setHasError(true);
-      setErrorMessage('Sessão expirada. Faça login novamente.');
-      setIsLoading(false);
-      return;
-    }
-    
-    console.log('[VideoPlayer] Auth token obtained:', token.substring(0, 20) + '...');
-
     // Set a timeout for loading - if it takes too long, show error
     loadTimeoutRef.current = window.setTimeout(() => {
       if (isLoading && !hasError) {
@@ -153,26 +138,7 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     if (streamType === 'hls') {
       if (Hls.isSupported()) {
-        // Custom XHR loader class that adds auth header
-        class AuthXhrLoader extends Hls.DefaultConfig.loader {
-          constructor(config: any) {
-            super(config);
-          }
-          
-          load(context: any, config: any, callbacks: any) {
-            // Override the XHR setup to add auth header
-            const xhrSetup = config.xhrSetup;
-            config.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
-              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-              if (xhrSetup) {
-                xhrSetup(xhr, url);
-              }
-            };
-            super.load(context, config, callbacks);
-          }
-        }
-        
-        // Use HLS.js with custom loader
+        // Use HLS.js with optimized settings for IPTV streams
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -196,7 +162,6 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
           fragLoadingRetryDelay: 1000,
           manifestLoadingRetryDelay: 1000,
           levelLoadingRetryDelay: 1000,
-          loader: AuthXhrLoader,
         });
 
         hlsRef.current = hls;
