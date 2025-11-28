@@ -56,10 +56,14 @@ export default function AdminIPTVTest() {
   const [playerChannel, setPlayerChannel] = useState<any>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
 
-  // Reset category selection when tab changes
+  // Reset category selection when tab changes - use startTransition for smoother UI
   useEffect(() => {
-    setSelectedCategory(null);
-    setSearchQuery('');
+    // Defer state updates to prevent blocking
+    const timeoutId = setTimeout(() => {
+      setSelectedCategory(null);
+      setSearchQuery('');
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [activeTab]);
 
   // Categorize content by type
@@ -135,14 +139,15 @@ export default function AdminIPTVTest() {
     }));
   }, [activeTab, categorizedContent]);
 
-  // Filtered channels based on search and category
+  // Filtered channels based on search and category - with limiting for performance
   const filteredChannels = useMemo(() => {
     let sourceCategories: typeof categories = [];
     
     if (activeTab === 'favorites') {
-      return allChannels.filter(ch => 
-        isFavorite(ch.id) && 
-        (!searchQuery || ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      const favs = allChannels.filter(ch => isFavorite(ch.id));
+      if (!searchQuery) return favs;
+      return favs.filter(ch => 
+        ch.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -156,7 +161,7 @@ export default function AdminIPTVTest() {
       case 'series': sourceCategories = categorizedContent.series; break;
     }
 
-    // Filter by selected category
+    // Filter by selected category first (most restrictive)
     if (selectedCategory) {
       sourceCategories = sourceCategories.filter(cat => cat.id === selectedCategory);
     }
@@ -168,8 +173,9 @@ export default function AdminIPTVTest() {
 
     // Filter by search
     if (searchQuery) {
+      const query = searchQuery.toLowerCase();
       channels = channels.filter(ch => 
-        ch.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ch.name.toLowerCase().includes(query)
       );
     }
 
