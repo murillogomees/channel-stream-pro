@@ -3,22 +3,26 @@
  * Só carrega recursos essenciais da página inicial
  */
 
-const criticalAssets = [
-  '/logo.webp',
-  // Hero logo é carregado via eager loading no componente
-];
-
 export function preloadCriticalAssets() {
   if (typeof window === 'undefined') return;
 
-  criticalAssets.forEach((asset) => {
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = asset.endsWith('.webp') || asset.endsWith('.jpg') ? 'image' : 'fetch';
-    link.href = asset;
-    // Definir fetchpriority para assets críticos
-    (link as any).fetchpriority = 'high';
-    document.head.appendChild(link);
+  // Already preloaded in index.html via <link rel="preload">
+  // This function can be used for dynamic preloading if needed
+  
+  // Preconnect to external resources that will be needed
+  const connections = [
+    'https://sdvyxdghxqmntyoweqbd.supabase.co'
+  ];
+  
+  connections.forEach((url) => {
+    // Check if preconnect already exists
+    if (!document.querySelector(`link[href="${url}"][rel="preconnect"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = url;
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    }
   });
 }
 

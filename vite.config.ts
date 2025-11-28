@@ -41,25 +41,21 @@ export default defineConfig(({ mode }) => ({
         screenshots: []
       },
       workbox: {
-        // Forçar atualização do cache
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        // Apenas arquivos essenciais - NÃO incluir JS/CSS no precache
         globPatterns: ['**/*.{html,ico,png,webp,svg}'],
-        // Ignorar chunks de páginas específicas para evitar erros de cache
         navigateFallback: null,
         maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
           {
-            // JS e CSS via NetworkFirst para evitar cache stale
             urlPattern: /\.(?:js|css)$/,
-            handler: 'NetworkFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'assets-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 dias
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
           },
@@ -84,7 +80,29 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: 'images-cache',
               expiration: {
-                maxEntries: 100,
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-stylesheets',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-webfonts',
+              expiration: {
+                maxEntries: 30,
                 maxAgeSeconds: 60 * 60 * 24 * 365
               }
             }
