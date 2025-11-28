@@ -3,15 +3,13 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Search, Filter, Grid, List, Star, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMovieMetadata } from '../hooks/useMovieMetadata';
-import { MovieCard, MovieCardSkeleton } from './MovieCard';
+import { MovieCard } from './MovieCard';
 import { MovieDetailSheet } from './MovieDetailSheet';
 import type { ContentMetadata } from '../types';
 
@@ -30,17 +28,17 @@ interface Channel {
   category_name?: string;
 }
 
+export type MovieSortOption = 'name' | 'rating' | 'year' | 'recent';
+
 interface MoviesViewProps {
   categories: Category[];
   onPlay: (channel: Channel) => void;
   isFavorite: (id: string) => boolean;
   onToggleFavorite: (id: string) => void;
   searchQuery?: string;
+  sortBy?: MovieSortOption;
   className?: string;
 }
-
-type SortOption = 'name' | 'rating' | 'year' | 'recent';
-type ViewMode = 'grid' | 'list';
 
 export function MoviesView({
   categories,
@@ -48,12 +46,10 @@ export function MoviesView({
   isFavorite,
   onToggleFavorite,
   searchQuery: externalSearch = '',
+  sortBy = 'name',
   className,
 }: MoviesViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [localSearch, setLocalSearch] = useState(externalSearch);
-  const [sortBy, setSortBy] = useState<SortOption>('name');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedMovie, setSelectedMovie] = useState<Channel | null>(null);
   const [movieMetadata, setMovieMetadata] = useState<ContentMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
@@ -83,9 +79,8 @@ export function MoviesView({
     }
 
     // Filter by search
-    const search = localSearch || externalSearch;
-    if (search) {
-      const query = search.toLowerCase();
+    if (externalSearch) {
+      const query = externalSearch.toLowerCase();
       movies = movies.filter(m =>
         m.name.toLowerCase().includes(query) ||
         m.category_name?.toLowerCase().includes(query)
@@ -111,7 +106,7 @@ export function MoviesView({
     });
 
     return movies;
-  }, [allMovies, selectedCategory, localSearch, externalSearch, sortBy, metadataCache]);
+  }, [allMovies, selectedCategory, externalSearch, sortBy, metadataCache]);
 
   // Load metadata for visible movies (lazy loading)
   useEffect(() => {
@@ -222,94 +217,31 @@ export function MoviesView({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Toolbar */}
-        <div className="sticky top-14 sm:top-16 z-30 bg-background/95 backdrop-blur-sm border-b border-border p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Mobile Category Select */}
-            <div className="lg:hidden">
-              <Select
-                value={selectedCategory || 'all'}
-                onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    Todos ({categoryCounts.all})
-                  </SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.display_name} ({cat.channels.length})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar filmes..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Sort & View Options */}
-            <div className="flex gap-2">
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">A-Z</SelectItem>
-                  <SelectItem value="rating">
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3" /> Avaliação
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="year">Ano</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="hidden sm:flex gap-1 border border-border rounded-lg p-1">
-                <Button
-                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <Grid className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Results count */}
-          <p className="text-sm text-muted-foreground mt-3">
-            {filteredMovies.length} filme{filteredMovies.length !== 1 ? 's' : ''} encontrado{filteredMovies.length !== 1 ? 's' : ''}
-          </p>
+        {/* Mobile Category Select */}
+        <div className="lg:hidden p-4 border-b border-border">
+          <Select
+            value={selectedCategory || 'all'}
+            onValueChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                Todos ({categoryCounts.all})
+              </SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.display_name} ({cat.channels.length})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Movies Grid */}
         <ScrollArea className="flex-1">
-          <div className={cn(
-            'p-4 lg:p-6',
-            viewMode === 'grid'
-              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4'
-              : 'space-y-3'
-          )}>
+          <div className="p-4 lg:p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {filteredMovies.length === 0 ? (
               <div className="col-span-full py-16 text-center">
                 <div className="text-muted-foreground">
@@ -331,7 +263,6 @@ export function MoviesView({
                   onPlay={() => handlePlay(movie)}
                   onInfo={() => handleMovieInfo(movie)}
                   onToggleFavorite={() => onToggleFavorite(movie.id)}
-                  variant={viewMode === 'list' ? 'compact' : 'default'}
                 />
               ))
             )}

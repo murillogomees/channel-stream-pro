@@ -28,6 +28,7 @@ import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useF
 // Smart features imports
 import { useContinueWatching, useTrending } from '@/features/player/hooks';
 import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView } from '@/features/player/components';
+import type { MovieSortOption } from '@/features/player/components';
 import { 
   favoritesService as playerFavoritesService, 
   watchProgressService,
@@ -78,6 +79,7 @@ export default function AppPlayer() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+  const [movieSortBy, setMovieSortBy] = useState<MovieSortOption>('name');
   
   // Smart features hooks
   const { 
@@ -404,6 +406,20 @@ export default function AppPlayer() {
               />
             </div>
 
+            {/* Sort select for movies */}
+            {activeTab === 'movies' && (
+              <Select value={movieSortBy} onValueChange={(v) => setMovieSortBy(v as MovieSortOption)}>
+                <SelectTrigger className="w-[90px] sm:w-[100px] h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">A-Z</SelectItem>
+                  <SelectItem value="rating">Avaliação</SelectItem>
+                  <SelectItem value="year">Ano</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
             {/* Admin playlist selector */}
             {isAdmin && availableLists.length > 0 && (
               <select
@@ -567,6 +583,7 @@ export default function AppPlayer() {
               isFavorite={isFavorite}
               onToggleFavorite={toggleFavorite}
               searchQuery={searchQuery}
+              sortBy={movieSortBy}
             />
           )}
 

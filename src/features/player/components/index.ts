@@ -15,5 +15,6 @@ export { MiniChannelList } from './MiniChannelList';
 
 // Movie components
 export { MoviesView } from './MoviesView';
+export type { MovieSortOption } from './MoviesView';
 export { MovieCard, MovieCardSkeleton } from './MovieCard';
 export { MovieDetailSheet } from './MovieDetailSheet';
