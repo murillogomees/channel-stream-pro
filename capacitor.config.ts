@@ -5,8 +5,9 @@ const config: CapacitorConfig = {
   appName: "IPTV Link",
   webDir: "dist",
   server: {
-    // Para desenvolvimento - comentar em produção
-    url: "https://a6d041f1-9e96-49e8-bc86-f2d4dd4bc0b2.lovableproject.com?forceHideBadge=true",
+    // Entry point do app nativo - apenas as páginas do IPTV
+    // Fluxo: /app (Splash) → /app/login → /app/player → /app/profile
+    url: "https://a6d041f1-9e96-49e8-bc86-f2d4dd4bc0b2.lovableproject.com/app?forceHideBadge=true",
     cleartext: true,
   },
   plugins: {
