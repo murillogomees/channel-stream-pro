@@ -575,30 +575,44 @@ Deno.serve(async (req) => {
         
         console.log(`[playlist-sync] Job created: ${job.id}, starting sync...`);
         
-        // Return immediately and run sync in background
-        // Supabase Edge Functions don't have waitUntil, so we run async
-        syncPlaylist(supabase, body, job.id)
-          .then(() => {
-            console.log(`[playlist-sync] Sync completed for ${body.key}`);
-          })
-          .catch((err) => {
-            console.error(`[playlist-sync] Sync failed for ${body.key}: ${err.message}`);
-          })
-          .finally(() => {
-            supabase.rpc('release_playlist_sync_lock', {
-              p_key: body.key,
-              p_locked_by: lockId,
-            });
+        // Run sync synchronously (Supabase Edge Functions don't support background processing)
+        try {
+          await syncPlaylist(supabase, body, job.id);
+          console.log(`[playlist-sync] Sync completed for ${body.key}`);
+          
+          // Get updated stats
+          const { data: updatedSource } = await supabase
+            .from('playlist_sources')
+            .select('entries_count, categories_count')
+            .eq('key', body.key)
+            .single();
+          
+          return new Response(JSON.stringify({
+            jobId: job.id,
+            status: 'completed',
+            message: 'Sync completed successfully',
+            entriesCount: updatedSource?.entries_count || 0,
+            categoriesCount: updatedSource?.categories_count || 0,
+          }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
-        
-        return new Response(JSON.stringify({
-          jobId: job.id,
-          status: 'queued',
-          message: 'Sync job started',
-        }), {
-          status: 200,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        });
+        } catch (syncError) {
+          console.error(`[playlist-sync] Sync failed for ${body.key}: ${syncError instanceof Error ? syncError.message : syncError}`);
+          return new Response(JSON.stringify({
+            jobId: job.id,
+            status: 'failed',
+            error: syncError instanceof Error ? syncError.message : 'Sync failed',
+          }), {
+            status: 500,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        } finally {
+          await supabase.rpc('release_playlist_sync_lock', {
+            p_key: body.key,
+            p_locked_by: lockId,
+          });
+        }
         
       } catch (error) {
         // Release lock on error
