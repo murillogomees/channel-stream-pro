@@ -28,15 +28,15 @@ import { TVContentGrid } from '@/components/iptv/TVContentGrid';
 import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
-import { useContinueWatching, useTrending } from '@/features/player/hooks';
-import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView, SeriesView } from '@/features/player/components';
+import { useContinueWatching, useTrending, useRecommendations } from '@/features/player/hooks';
+import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView, SeriesView, HomeView } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { 
   favoritesService as playerFavoritesService, 
   watchProgressService,
   analyticsService 
 } from '@/features/player/services';
-import type { WatchProgress, TrendingItem, ContentType } from '@/features/player/types';
+import type { WatchProgress, TrendingItem, ContentType, RecommendationItem } from '@/features/player/types';
 
 // Separate component for Client content
 function ClientPlayerContent() {
@@ -206,6 +206,15 @@ export default function AppPlayer() {
     categories.flatMap(cat => cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))),
     [categories]
   );
+
+  // Recommendations based on watch history (must be after allChannels)
+  const {
+    recommendationGroups,
+    seriesContinuations,
+    forYouMix,
+    isLoading: loadingRecommendations,
+    refresh: refreshRecommendations,
+  } = useRecommendations({ allChannels, enabled: activeTab === 'home' });
 
   // Featured items for hero
   const featuredItems = useMemo(() => {
@@ -615,75 +624,39 @@ export default function AppPlayer() {
         <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
           {/* Content based on active tab */}
           {activeTab === 'home' && (
-            <div className="space-y-6 px-4 lg:px-6 py-4">
-              {/* Hero Section */}
-              {featuredItems.length > 0 && !isBackendSearchActive && (
-                <TVHeroSection
-                  items={featuredItems}
-                  onPlay={handlePlay}
-                  onToggleFavorite={toggleFavorite}
-                  isFavorite={isFavorite}
-                />
-              )}
-
-              {/* Continue Watching */}
-              {!isBackendSearchActive && continueWatchingItems.length > 0 && (
-                <ContinueWatchingRow
-                  items={continueWatchingItems}
-                  onPlay={(item) => {
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) handlePlay(channel);
-                  }}
-                  onRemove={removeContinueWatchingItem}
-                />
-              )}
-
-              {/* Top 10 */}
-              {!isBackendSearchActive && trendingItems.length > 0 && (
-                <Top10Row
-                  items={trendingItems}
-                  onPlay={(item) => {
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) handlePlay(channel);
-                  }}
-                  onInfo={(item) => {
-                    const channel = allChannels.find(ch => ch.id === item.content_id);
-                    if (channel) handlePlay(channel);
-                  }}
-                />
-              )}
-
+            <div className="py-4">
               {/* Search results */}
-              {isBackendSearchActive && filteredChannels.length > 0 && (
-                <TVContentGrid
-                  channels={filteredChannels}
-                  onPlay={handlePlay}
-                  isFavorite={isFavorite}
-                  onToggleFavorite={toggleFavorite}
+              {isBackendSearchActive && filteredChannels.length > 0 ? (
+                <div className="px-4 lg:px-6">
+                  <TVContentGrid
+                    channels={filteredChannels}
+                    onPlay={handlePlay}
+                    isFavorite={isFavorite}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                </div>
+              ) : (
+                <HomeView
+                  continueWatchingItems={continueWatchingItems}
+                  loadingContinueWatching={loadingContinueWatching}
+                  onPlayContinue={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }}
+                  onRemoveContinue={removeContinueWatchingItem}
+                  seriesContinuations={seriesContinuations}
+                  onPlaySeries={handlePlay}
+                  recommendationGroups={recommendationGroups}
+                  forYouMix={forYouMix}
+                  loadingRecommendations={loadingRecommendations}
+                  onPlayRecommendation={(item) => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }}
+                  onPlayChannel={handlePlay}
+                  allChannels={allChannels}
                 />
               )}
-
-              {/* Home sections */}
-              {!isBackendSearchActive && homeContent.map((section) => (
-                <TVContentRow
-                  key={section.id}
-                  title={section.display_name}
-                  itemCount={section.channels.length}
-                >
-                  {section.channels.map((channel) => (
-                    <TVContentCard
-                      key={channel.id}
-                      id={channel.id}
-                      name={channel.name}
-                      logo={channel.tvg_logo}
-                      category={section.display_name}
-                      isFavorite={isFavorite(channel.id)}
-                      onPlay={() => handlePlay(channel)}
-                      onToggleFavorite={() => toggleFavorite(channel.id)}
-                    />
-                  ))}
-                </TVContentRow>
-              ))}
             </div>
           )}
 
