@@ -40,17 +40,6 @@
 - `rootMargin: 50px` para pré-carregar próximas imagens
 - Transição suave opacity 300ms
 
-**Como usar:**
-```tsx
-import { OptimizedImage } from '@/components/OptimizedImage';
-
-// Para hero/acima da dobra (carrega imediatamente)
-<OptimizedImage src={heroImg} alt="Hero" eager />
-
-// Para imagens normais (lazy load)
-<OptimizedImage src={img} alt="Descrição" />
-```
-
 ### 5. Preload de Assets Críticos
 
 **Arquivo:** `src/utils/preloadAssets.ts`
@@ -58,7 +47,68 @@ import { OptimizedImage } from '@/components/OptimizedImage';
 - Preparado para adicionar fonts críticas
 - Executado antes do React renderizar
 
-**Chamado em:** `src/main.tsx`
+### 6. Preloading Inteligente de Streams
+
+**Service:** `src/services/intelligentPreloadService.ts`
+**Hooks:** `useIntelligentPreload`, `useChannelPreloader`
+
+- Pré-carrega manifests de canais adjacentes
+- Predição baseada em histórico de uso
+- Cache de 30s com limite de 3 manifests
+- Indicador visual ⚡ para canais pré-carregados
+
+### 7. ABR (Adaptive Bitrate)
+
+**Service:** `src/services/abrService.ts`
+**Hook:** `useABR`
+**Componentes:** `QualitySelector`, `QualityBadge`
+
+- Múltiplas qualidades por stream HLS
+- Modo auto ou manual
+- Métricas: bitrate, buffer, dropped frames
+- UI integrada no player
+
+### 8. Connection-Aware Streaming
+
+**Service:** `src/services/connectionService.ts`
+**Hook:** `useConnectionAware`
+**Componente:** `ConnectionIndicator`
+
+- Detecta qualidade da conexão (Network Information API)
+- Sugere bitrate inicial baseado na conexão
+- Ajusta configuração HLS por qualidade de rede
+- Monitora mudanças de conexão em tempo real
+
+### 9. Error Recovery Avançado
+
+**Service:** `src/services/errorRecoveryService.ts`
+**Hook:** `useErrorRecovery`
+**Componente:** `RecoveryStatus`
+
+- Retry automático com backoff exponencial
+- Fallback de qualidade em erros de mídia
+- Reload de manifest em erros de rede
+- Estatísticas de recuperação
+
+### 10. Web Vitals Monitoring
+
+**Service:** `src/services/webVitalsService.ts`
+**Hook:** `useWebVitals`
+**Componente:** `WebVitalsCard` (Dashboard Admin)
+
+- Monitora LCP, FID, CLS, FCP, TTFB
+- Score geral de performance (0-100)
+- Rating por métrica (good/needs-improvement/poor)
+- Dashboard no Admin Analytics
+
+### 11. Stream Cache (Service Worker)
+
+**Service:** `src/services/streamCacheService.ts`
+
+- Cache de manifests HLS (30s TTL)
+- Cache de segmentos (60s TTL)
+- Limite de 100MB total
+- Prefetch de segmentos iniciais
 
 ## 📊 Performance Esperada
 

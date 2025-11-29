@@ -11,6 +11,18 @@ export { useStreamAnalytics } from './useStreamAnalytics';
 // ABR (Adaptive Bitrate)
 export { useABR } from './useABR';
 
+// Connection & Network
+export { useConnectionAware } from './useConnectionAware';
+
+// Error Recovery
+export { useErrorRecovery } from './useErrorRecovery';
+
+// Web Vitals
+export { useWebVitals } from './useWebVitals';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
+export type { ConnectionInfo, ConnectionQuality } from '@/services/connectionService';
+export type { RecoveryStats, RecoveryConfig } from '@/services/errorRecoveryService';
+export type { WebVitalMetric, WebVitalsReport, MetricName } from '@/services/webVitalsService';
