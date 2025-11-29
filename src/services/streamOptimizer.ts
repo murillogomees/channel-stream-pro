@@ -86,18 +86,28 @@ export function getOptimizedStreamUrl(
   
   const streamType = detectStreamType(originalUrl);
   
-  // Force proxy mode
-  if (forceProxy) {
+  // LIVE content goes DIRECT - no proxy, no cache (real-time streams)
+  if (streamType === 'live') {
     return {
-      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(originalUrl)}`,
-      routeType: 'stream-proxy',
-      cacheHint: streamType === 'live' ? 'public, max-age=2' : 'public, max-age=300',
+      url: originalUrl,
+      routeType: 'direct',
+      cacheHint: 'no-cache, no-store',
       isOptimized: false,
     };
   }
   
-  // Use CDN router for intelligent routing
-  if (useRouter) {
+  // Force proxy mode (only for VOD/HLS)
+  if (forceProxy) {
+    return {
+      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(originalUrl)}`,
+      routeType: 'stream-proxy',
+      cacheHint: 'public, max-age=300',
+      isOptimized: false,
+    };
+  }
+  
+  // Use CDN router for intelligent routing (VOD/HLS only)
+  if (useRouter && streamType !== 'direct') {
     const routerUrl = new URL(`${SUPABASE_URL}/functions/v1/cdn-router`);
     routerUrl.searchParams.set('url', originalUrl);
     if (channelId) {
@@ -112,11 +122,11 @@ export function getOptimizedStreamUrl(
     };
   }
   
-  // Fallback to stream-proxy
+  // Direct streams or fallback - no proxy
   return {
-    url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(originalUrl)}`,
-    routeType: 'stream-proxy',
-    cacheHint: streamType === 'live' ? 'public, max-age=2' : 'public, max-age=300',
+    url: originalUrl,
+    routeType: 'direct',
+    cacheHint: 'no-cache',
     isOptimized: false,
   };
 }
