@@ -5,15 +5,16 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-// Cache bust: v2-1764398000000
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
     headers: {
-      'Cache-Control': 'no-store',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
     },
   },
+  // Force completely new cache directory
+  cacheDir: 'node_modules/.vite-v3',
   plugins: [
     react(),
     mode === "development" && componentTagger(),
