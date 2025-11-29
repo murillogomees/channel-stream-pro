@@ -1,3 +1,7 @@
+// DEPRECATED: Este arquivo foi movido para deprecated/ em 2025-11-29
+// Motivo: Não é importado em nenhum lugar do código
+// Funcionalidade já existe em: src/lib/utils/indexedDB.ts e public/sw.js
+
 // src/outbox.js
 // Minimal Outbox helper para salvar requests quando offline e registrar Background Sync
 
@@ -19,12 +23,10 @@ export async function saveRequestToOutbox(item) {
     req.onsuccess = () => {
       tx.oncomplete = async () => {
         db.close();
-        // tenta registrar sync
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
           try {
             const reg = await navigator.serviceWorker.ready;
             await reg.sync.register('outbox-sync');
-            console.log('[outbox] sync registrado');
           } catch (err) {
             console.warn('[outbox] não foi possível registrar sync', err);
           }
@@ -32,10 +34,7 @@ export async function saveRequestToOutbox(item) {
         resolve(req.result);
       };
     };
-    req.onerror = () => {
-      db.close();
-      reject(req.error);
-    };
+    req.onerror = () => { db.close(); reject(req.error); };
   });
 }
 
@@ -47,19 +46,13 @@ export async function listOutboxItems() {
     const items = [];
     store.openCursor().onsuccess = e => {
       const cur = e.target.result;
-      if (cur) {
-        items.push(cur.value);
-        cur.continue();
-      } else {
-        db.close();
-        resolve(items);
-      }
+      if (cur) { items.push(cur.value); cur.continue(); }
+      else { db.close(); resolve(items); }
     };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-// recreate same openDb used in SW (version must match)
 function openDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('lovable-db', 1);
