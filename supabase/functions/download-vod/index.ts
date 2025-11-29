@@ -532,6 +532,8 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
           throw new Error('Não foi possível obter stream reader');
         }
         
+        let streamError: Error | null = null;
+        
         try {
           while (true) {
             // Verificar timeout de execução
@@ -544,7 +546,7 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
                 const partData = buffer.slice(0, R2_PART_SIZE);
                 const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
                 parts.push({ partNumber, etag });
-                downloadedBytes += R2_PART_SIZE;
+                partNumber++;
               }
               
               await supabase.from('vod_downloads').update({
@@ -557,7 +559,7 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
                   downloaded_bytes: downloadedBytes,
                   content_length: contentLength,
                   supports_ranges: false,
-                  streaming_interrupted: true
+                  streaming_paused: true
                 }
               }).eq('id', downloadId);
               
@@ -565,7 +567,16 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
               throw new Error('PAUSE_FOR_RESUME');
             }
             
-            const { done, value } = await reader.read();
+            let readResult: ReadableStreamReadResult<Uint8Array>;
+            try {
+              readResult = await reader.read();
+            } catch (readError: any) {
+              console.log(`⚠️ [VOD] Erro de conexão após ${(downloadedBytes / 1048576).toFixed(1)}MB: ${readError.message}`);
+              streamError = readError;
+              break;
+            }
+            
+            const { done, value } = readResult;
             
             if (done) {
               console.log(`📦 [VOD] Stream completo: ${(downloadedBytes / 1048576).toFixed(1)}MB`);
@@ -609,7 +620,62 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
             }
           }
         } finally {
-          reader.releaseLock();
+          try { reader.releaseLock(); } catch {}
+        }
+        
+        // Se houve erro de conexão mas temos partes, salvar e retry
+        if (streamError && parts.length > 0) {
+          console.log(`🔄 [VOD] Conexão interrompida com ${parts.length} partes, tentando finalizar...`);
+          
+          // Tentar fazer upload do buffer restante como parte final
+          if (buffer.length > 0) {
+            try {
+              console.log(`⬆️ [VOD] Parte final: ${(buffer.length / 1048576).toFixed(1)}MB`);
+              const etag = await uploadPart(r2Key, uploadId, partNumber, buffer);
+              parts.push({ partNumber, etag });
+              buffer = new Uint8Array(0);
+            } catch (uploadError) {
+              console.log(`⚠️ [VOD] Falha no upload da parte final: ${uploadError}`);
+            }
+          }
+          
+          // Completar o multipart com as partes que temos
+          if (parts.length > 0) {
+            try {
+              console.log(`🏁 [VOD] Finalizando com ${parts.length} partes (${(downloadedBytes / 1048576).toFixed(1)}MB)...`);
+              parts.sort((a, b) => a.partNumber - b.partNumber);
+              await completeMultipartUpload(r2Key, uploadId, parts);
+              
+              // Sucesso! Marcar como completo
+              await supabase.from('vod_downloads').update({ 
+                file_size_bytes: downloadedBytes 
+              }).eq('id', downloadId);
+              
+              console.log(`✅ [VOD] Upload parcial completo: ${(downloadedBytes / 1048576).toFixed(1)}MB em ${parts.length} partes`);
+              return;
+            } catch (completeError: any) {
+              console.log(`⚠️ [VOD] Falha ao finalizar multipart: ${completeError.message}`);
+              // Salvar estado para retry posterior
+              await supabase.from('vod_downloads').update({
+                status: 'paused',
+                error_message: `Conexão interrompida com ${parts.length} partes`,
+                file_size_bytes: downloadedBytes,
+                segments_downloaded: parts.length,
+                metadata: { 
+                  upload_id: uploadId, 
+                  parts, 
+                  downloaded_bytes: downloadedBytes,
+                  supports_ranges: false,
+                  connection_lost: true
+                }
+              }).eq('id', downloadId);
+              
+              scheduleResumeImmediate(downloadId);
+              throw new Error('PAUSE_FOR_RESUME');
+            }
+          }
+          
+          throw streamError;
         }
         
         // Upload buffer restante e finalizar
@@ -718,8 +784,34 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
     if (error.message === 'PAUSE_FOR_RESUME') {
       throw error; // Re-throw para não marcar como failed
     }
+    
+    // Se temos partes já enviadas, salvar estado para retry
+    if (uploadId && parts.length > 0) {
+      console.log(`⚠️ [VOD] Erro com ${parts.length} partes salvas (${(downloadedBytes / 1048576).toFixed(1)}MB), salvando para retry...`);
+      
+      await supabase.from('vod_downloads').update({
+        status: 'paused',
+        error_message: `Erro: ${error.message?.substring(0, 100)} - ${parts.length} partes salvas`,
+        file_size_bytes: downloadedBytes,
+        segments_downloaded: parts.length,
+        metadata: { 
+          upload_id: uploadId, 
+          parts, 
+          downloaded_bytes: downloadedBytes,
+          content_length: contentLength,
+          supports_ranges: supportsRanges,
+          error_recovery: true,
+          last_error: error.message
+        }
+      }).eq('id', downloadId);
+      
+      // Agendar retry em 5 segundos
+      scheduleResumeImmediate(downloadId);
+      throw new Error('PAUSE_FOR_RESUME');
+    }
+    
     console.error(`❌ [VOD] Erro no upload, abortando multipart...`);
-    if (uploadId && parts.length === 0) {
+    if (uploadId) {
       await abortMultipartUpload(r2Key, uploadId);
     }
     throw error;
