@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { createContext, useContext, useEffect, useState, type FC, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
