@@ -11,33 +11,26 @@ interface ImportPayload {
   sourceUrl?: string;
   sourceContent?: string;
   customListId: string;
+  resumeFromChannel?: number;
 }
 
-const DB_BATCH_SIZE = 100;
-const MAX_CHANNELS = 200000; // 200k channels max
-const MAX_SIZE = 100 * 1024 * 1024; // 100MB limit
-const UPDATE_INTERVAL = 500; // Update progress every 500 channels
+const DB_BATCH_SIZE = 200;
+const CHUNK_SIZE = 35000; // Process 35k channels per invocation to stay under CPU limit
+const MAX_CHANNELS = 300000;
+const MAX_SIZE = 150 * 1024 * 1024;
+const UPDATE_INTERVAL = 1000;
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
 
-// Convert Google Drive view/share URLs to direct download URLs
 function convertGoogleDriveUrl(url: string): string {
-  // Pattern: /file/d/FILE_ID/view
   const viewMatch = url.match(/drive\.google\.com\/file\/d\/([^\/]+)/);
   if (viewMatch) {
-    const fileId = viewMatch[1];
-    console.log(`[ProcessM3U] Converted Google Drive URL, fileId: ${fileId}`);
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    return `https://drive.google.com/uc?export=download&id=${viewMatch[1]}`;
   }
-  
-  // Pattern: open?id=FILE_ID
   const openMatch = url.match(/drive\.google\.com\/open\?id=([^&]+)/);
   if (openMatch) {
-    const fileId = openMatch[1];
-    console.log(`[ProcessM3U] Converted Google Drive open URL, fileId: ${fileId}`);
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    return `https://drive.google.com/uc?export=download&id=${openMatch[1]}`;
   }
-  
   return url;
 }
 
@@ -48,7 +41,8 @@ Deno.serve(async (req) => {
 
   try {
     const payload: ImportPayload = await req.json();
-    console.log('[ProcessM3U] Starting:', payload.sessionId, 'URL:', payload.sourceUrl);
+    const isResume = (payload.resumeFromChannel || 0) > 0;
+    console.log('[ProcessM3U] Starting:', payload.sessionId, isResume ? `(resuming from ${payload.resumeFromChannel})` : '(new)');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -56,18 +50,16 @@ Deno.serve(async (req) => {
 
     await supabase
       .from('m3u_import_sessions')
-      .update({ status: 'processing', processed_channels: 0 })
+      .update({ 
+        status: 'processing',
+        ...(!isResume && { processed_channels: 0 })
+      })
       .eq('id', payload.sessionId);
 
     EdgeRuntime.waitUntil(processInBackground(payload, supabase));
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Processing started',
-        sessionId: payload.sessionId,
-        maxChannels: MAX_CHANNELS
-      }),
+      JSON.stringify({ success: true, sessionId: payload.sessionId, chunkSize: CHUNK_SIZE }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -85,89 +77,68 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
     let content: string;
     
     if (payload.sourceType === 'url' && payload.sourceUrl) {
-      // Convert Google Drive URLs to direct download format
       const downloadUrl = convertGoogleDriveUrl(payload.sourceUrl);
       console.log('[ProcessM3U] Fetching:', downloadUrl);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
       
       try {
         const response = await fetch(downloadUrl, { 
           signal: controller.signal,
-          headers: { 
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': '*/*',
-          },
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' },
           redirect: 'follow',
         });
         clearTimeout(timeoutId);
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const contentType = response.headers.get('content-type') || '';
-        console.log('[ProcessM3U] Content-Type:', contentType);
         
-        // Check if Google Drive returned HTML (virus scan page or error)
         if (contentType.includes('text/html')) {
           const htmlContent = await response.text();
-          // Check for virus scan confirmation
-          if (htmlContent.includes('Google Drive - Virus scan warning') || 
-              htmlContent.includes('confirm=') ||
-              htmlContent.includes('download_warning')) {
-            // Try to extract the confirm token
+          if (htmlContent.includes('confirm=') || htmlContent.includes('download_warning')) {
             const confirmMatch = htmlContent.match(/confirm=([^&"]+)/);
             if (confirmMatch) {
-              const confirmToken = confirmMatch[1];
-              console.log('[ProcessM3U] Retrying with confirm token');
-              const confirmUrl = `${downloadUrl}&confirm=${confirmToken}`;
-              const retryResponse = await fetch(confirmUrl, {
-                headers: { 
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                },
+              const retryResponse = await fetch(`${downloadUrl}&confirm=${confirmMatch[1]}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
                 redirect: 'follow',
               });
-              if (!retryResponse.ok) {
-                throw new Error('Google Drive file too large or inaccessible');
-              }
+              if (!retryResponse.ok) throw new Error('Google Drive inaccessible');
               content = await retryResponse.text();
             } else {
-              throw new Error('Google Drive: arquivo muito grande ou requer confirmação manual. Tente usar a opção "Colar Conteúdo" ao invés de URL.');
+              throw new Error('Google Drive: use "Colar Conteúdo" ao invés de URL');
             }
           } else {
-            throw new Error('Google Drive retornou uma página HTML ao invés do arquivo. Verifique se o link está correto e o arquivo é público.');
+            throw new Error('Link retornou HTML. Verifique se está correto e público.');
           }
         } else {
-          // Read with size limit
           const reader = response.body?.getReader();
           if (!reader) throw new Error('No body');
           
           let totalSize = 0;
-          const chunks: string[] = [];
-          const decoder = new TextDecoder();
+          const chunks: Uint8Array[] = [];
           
           while (totalSize < MAX_SIZE) {
             const { done, value } = await reader.read();
             if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            chunks.push(text);
+            chunks.push(value);
             totalSize += value.length;
           }
-          
           reader.cancel().catch(() => {});
-          content = chunks.join('');
-          chunks.length = 0; // Free memory
+          
+          const combined = new Uint8Array(totalSize);
+          let offset = 0;
+          for (const chunk of chunks) {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+          }
+          content = new TextDecoder().decode(combined);
           console.log(`[ProcessM3U] Downloaded: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
         }
-        
       } catch (e: any) {
         clearTimeout(timeoutId);
-        if (e.name === 'AbortError') {
-          throw new Error('Timeout: o download demorou mais de 120 segundos');
-        }
-        throw new Error(`Fetch: ${e.message}`);
+        throw new Error(e.name === 'AbortError' ? 'Timeout: download demorou demais' : `Fetch: ${e.message}`);
       }
     } else if (payload.sourceContent) {
       content = payload.sourceContent;
@@ -175,9 +146,8 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
       throw new Error('No content provided');
     }
 
-    // Validate content is M3U
     if (!content.includes('#EXTM3U') && !content.includes('#EXTINF:')) {
-      throw new Error('Conteúdo não parece ser um arquivo M3U válido');
+      throw new Error('Conteúdo não parece ser M3U válido');
     }
 
     await processContent(content, payload, supabase);
@@ -196,37 +166,43 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
 }
 
 async function processContent(content: string, payload: ImportPayload, supabase: any) {
-  const categoryMap = new Map<string, string>();
-  let catOrder = 0;
-  let insertedCount = 0;
-  let batch: any[] = [];
-  
-  // First pass: count total channels quickly
   const lines = content.split(/\r?\n/);
-  let totalChannels = 0;
+  const resumeFrom = payload.resumeFromChannel || 0;
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.startsWith('#EXTINF:')) {
-      totalChannels++;
+  const { data: sessionData } = await supabase
+    .from('m3u_import_sessions')
+    .select('processed_channels, total_channels, metadata')
+    .eq('id', payload.sessionId)
+    .single();
+  
+  let existingProcessed = resumeFrom > 0 ? resumeFrom : 0;
+  let categoryMap = new Map<string, string>();
+  let catOrder = 0;
+  
+  // Restore state if resuming
+  if (resumeFrom > 0 && sessionData?.metadata?.categoryMap) {
+    const savedMap = sessionData.metadata.categoryMap;
+    for (const [key, value] of Object.entries(savedMap)) {
+      categoryMap.set(key, value as string);
     }
+    catOrder = sessionData.metadata.catOrder || 0;
+    console.log(`[ProcessM3U] Resumed with ${categoryMap.size} categories from channel ${resumeFrom}`);
   }
   
-  // Respect max limit
-  totalChannels = Math.min(totalChannels, MAX_CHANNELS);
-  
-  console.log(`[ProcessM3U] Total channels to import: ${totalChannels}`);
-  
-  // Update session with total channels count
-  await supabase
-    .from('m3u_import_sessions')
-    .update({ 
-      total_channels: totalChannels,
-      processed_channels: 0
-    })
-    .eq('id', payload.sessionId);
-  
-  content = ''; // Free the original string memory
+  // Count total channels on first run
+  let totalChannels = sessionData?.total_channels || 0;
+  if (totalChannels === 0) {
+    for (const line of lines) {
+      if (line.trim().startsWith('#EXTINF:')) totalChannels++;
+    }
+    totalChannels = Math.min(totalChannels, MAX_CHANNELS);
+    console.log(`[ProcessM3U] Total channels: ${totalChannels}`);
+    
+    await supabase
+      .from('m3u_import_sessions')
+      .update({ total_channels: totalChannels })
+      .eq('id', payload.sessionId);
+  }
   
   async function getCatId(name: string): Promise<string> {
     const key = name || 'Sem Categoria';
@@ -250,15 +226,58 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     return categoryMap.values().next().value || '';
   }
   
-  // Second pass: process and insert channels
+  let batch: any[] = [];
   let channel: any = null;
-  let channelsProcessed = 0;
+  let channelsInChunk = 0;
+  let insertedCount = existingProcessed;
+  let channelIndex = 0;
   
-  for (let i = 0; i < lines.length && insertedCount < MAX_CHANNELS; i++) {
+  // Skip to resume point
+  if (resumeFrom > 0) {
+    let count = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('#EXTINF:')) {
+        count++;
+        if (count > resumeFrom) {
+          channelIndex = i;
+          break;
+        }
+      }
+    }
+    console.log(`[ProcessM3U] Skipping to channel ${resumeFrom}, line ${channelIndex}`);
+  }
+  
+  for (let i = channelIndex; i < lines.length && insertedCount < MAX_CHANNELS; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
     if (line.startsWith('#EXTINF:')) {
+      // Check chunk limit
+      if (channelsInChunk >= CHUNK_SIZE) {
+        // Flush remaining batch
+        if (batch.length > 0) {
+          await supabase.from('m3u_channels').insert(batch);
+          batch = [];
+        }
+        
+        // Save state for continuation
+        const categoryMapObj: Record<string, string> = {};
+        categoryMap.forEach((v, k) => categoryMapObj[k] = v);
+        
+        await supabase
+          .from('m3u_import_sessions')
+          .update({ 
+            processed_channels: insertedCount,
+            status: 'processing',
+            metadata: { resumeFromChannel: insertedCount, categoryMap: categoryMapObj, catOrder, needsContinuation: true }
+          })
+          .eq('id', payload.sessionId);
+        
+        console.log(`[ProcessM3U] Chunk done: ${insertedCount}/${totalChannels}. Needs continuation.`);
+        return;
+      }
+      
       const g = line.match(/group-title="([^"]*)"/);
       const n = line.match(/,([^,]+)$/);
       const tid = line.match(/tvg-id="([^"]*)"/);
@@ -287,15 +306,14 @@ async function processContent(content: string, payload: ImportPayload, supabase:
       });
       
       insertedCount++;
-      channelsProcessed++;
+      channelsInChunk++;
       channel = null;
 
       if (batch.length >= DB_BATCH_SIZE) {
         await supabase.from('m3u_channels').insert(batch);
         batch = [];
 
-        // Update progress every UPDATE_INTERVAL channels
-        if (channelsProcessed % UPDATE_INTERVAL === 0) {
+        if (insertedCount % UPDATE_INTERVAL === 0) {
           await supabase
             .from('m3u_import_sessions')
             .update({ processed_channels: insertedCount })
@@ -306,14 +324,10 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     }
   }
 
-  // Insert remaining batch
   if (batch.length > 0) {
     await supabase.from('m3u_channels').insert(batch);
   }
 
-  const limited = insertedCount >= MAX_CHANNELS;
-  
-  // Final update
   await supabase
     .from('m3u_import_sessions')
     .update({ 
@@ -321,7 +335,8 @@ async function processContent(content: string, payload: ImportPayload, supabase:
       processed_channels: insertedCount,
       total_channels: insertedCount,
       completed_at: new Date().toISOString(),
-      error_message: limited ? `Limitado a ${MAX_CHANNELS} canais` : null,
+      error_message: null,
+      metadata: null
     })
     .eq('id', payload.sessionId);
 
