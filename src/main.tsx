@@ -1,6 +1,7 @@
 /**
  * React 18 Application Entry Point
- * @version 1.0.5
+ * @version 1.0.6
+ * Cache bust: v3
  */
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -11,6 +12,17 @@ import { preloadCriticalAssets } from "./utils/preloadAssets";
 import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
 import { webVitalsService } from "./services/webVitalsService";
 import { streamCacheService } from "./services/streamCacheService";
+
+// Force clear old caches on startup
+if ('caches' in window) {
+  caches.keys().then(names => {
+    names.forEach(name => {
+      if (name.includes('workbox') || name.includes('vite')) {
+        caches.delete(name);
+      }
+    });
+  });
+}
 
 // Create a query client for React Query
 const queryClient = new QueryClient({
