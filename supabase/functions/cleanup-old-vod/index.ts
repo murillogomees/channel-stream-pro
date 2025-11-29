@@ -45,12 +45,34 @@ serve(async (req) => {
   }
 
   try {
-    // Verificar autenticação via cron secret
+    // Verificar autenticação via cron secret ou admin
     const cronSecret = req.headers.get('x-supabase-cron-secret');
     const expectedSecret = Deno.env.get('CRON_SECRET');
+    const authHeader = req.headers.get('authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    const isCronRequest = cronSecret === expectedSecret;
+    const isServiceRoleRequest = authHeader?.includes(serviceRoleKey || '');
+    
+    let isAdminUser = false;
+    
+    if (!isCronRequest && !isServiceRoleRequest && authHeader) {
+      // Verificar se é um admin autenticado
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (!authError && user) {
+        const { data: adminCheck } = await supabaseAuth.rpc('is_admin', { uid: user.id });
+        isAdminUser = !!adminCheck;
+      }
+    }
 
-    if (cronSecret !== expectedSecret) {
-      console.error('[CleanupVOD] Unauthorized cron attempt');
+    if (!isCronRequest && !isServiceRoleRequest && !isAdminUser) {
+      console.error('[CleanupVOD] Unauthorized attempt');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
