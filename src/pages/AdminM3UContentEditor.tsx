@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, RefreshCw, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink
+  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,8 @@ import { Label } from '@/components/ui/label';
 import { useM3USyncEditor, ContentClass, M3UEntry, CategoryGroup, CLASS_LABELS } from '@/hooks/useM3USyncEditor';
 import { useM3USync } from '@/hooks/useM3USync';
 import { toast } from '@/hooks/use-toast';
+import { VirtualizedEntryList } from '@/components/admin/m3u/VirtualizedEntryList';
+import { LoadingProgressBar } from '@/components/admin/m3u/LoadingProgressBar';
 
 const CLASS_ICONS: Record<ContentClass, typeof Tv> = {
   tv: Tv,
@@ -67,6 +69,7 @@ export default function AdminM3UContentEditor() {
     allCategories,
     stats,
     isLoading,
+    loadingProgress,
     selectedSourceId,
     searchQuery,
     selectedClass,
@@ -142,7 +145,7 @@ export default function AdminM3UContentEditor() {
     });
   };
 
-  const toggleEntrySelection = (entryId: string) => {
+  const toggleEntrySelection = useCallback((entryId: string) => {
     setSelectedEntries(prev => {
       const next = new Set(prev);
       if (next.has(entryId)) {
@@ -152,7 +155,7 @@ export default function AdminM3UContentEditor() {
       }
       return next;
     });
-  };
+  }, []);
 
   const selectAllInCategory = (category: CategoryGroup) => {
     setSelectedEntries(prev => {
@@ -210,6 +213,14 @@ export default function AdminM3UContentEditor() {
     }
   };
 
+  const handleEditEntry = useCallback((entry: M3UEntry) => {
+    setEditingEntry(entry);
+  }, []);
+
+  const handleDeleteEntry = useCallback((entryId: string) => {
+    deleteEntry(entryId);
+  }, [deleteEntry]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -243,8 +254,13 @@ export default function AdminM3UContentEditor() {
         </div>
       </div>
 
+      {/* Loading Progress Bar */}
+      {isLoading && loadingProgress.phase !== 'done' && (
+        <LoadingProgressBar progress={loadingProgress} />
+      )}
+
       {/* Stats Cards */}
-      {selectedSourceId && (
+      {selectedSourceId && !isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Card>
             <CardHeader className="pb-2 pt-3 px-3">
@@ -292,7 +308,7 @@ export default function AdminM3UContentEditor() {
       )}
 
       {/* Filters & Actions */}
-      {selectedSourceId && (
+      {selectedSourceId && !isLoading && (
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
           <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -430,10 +446,13 @@ export default function AdminM3UContentEditor() {
       )}
 
       {/* Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+      {isLoading && loadingProgress.phase !== 'done' ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p>Carregando entradas...</p>
+          </CardContent>
+        </Card>
       ) : !selectedSourceId ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -549,51 +568,13 @@ export default function AdminM3UContentEditor() {
                             </div>
                             
                             <CollapsibleContent>
-                              <ScrollArea className="h-[250px] ml-8 mt-1 pr-4">
-                                <div className="space-y-1">
-                                  {category.entries.map(entry => (
-                                    <div 
-                                      key={entry.id}
-                                      className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/30 text-sm group"
-                                    >
-                                      <Checkbox
-                                        checked={selectedEntries.has(entry.id)}
-                                        onCheckedChange={() => toggleEntrySelection(entry.id)}
-                                      />
-                                      
-                                      {entry.tvg_logo && (
-                                        <img 
-                                          src={entry.tvg_logo} 
-                                          alt=""
-                                          className="w-6 h-6 rounded object-cover flex-shrink-0"
-                                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                                        />
-                                      )}
-                                      
-                                      <span className="flex-1 truncate">{entry.title}</span>
-                                      
-                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => setEditingEntry(entry)}
-                                        >
-                                          <Edit className="w-3 h-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 text-destructive hover:text-destructive"
-                                          onClick={() => deleteEntry(entry.id)}
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </ScrollArea>
+                              <VirtualizedEntryList
+                                entries={category.entries}
+                                selectedEntries={selectedEntries}
+                                onToggleSelection={toggleEntrySelection}
+                                onEdit={handleEditEntry}
+                                onDelete={handleDeleteEntry}
+                              />
                             </CollapsibleContent>
                           </Collapsible>
                         );
