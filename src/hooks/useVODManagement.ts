@@ -283,6 +283,93 @@ export const useVODManagement = () => {
     }
   }, [toast, fetchDownloads, fetchStatistics]);
 
+  // Resetar downloads órfãos (travados há mais de 5 minutos)
+  const resetOrphanedDownloads = useCallback(async () => {
+    try {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
+      // Marcar downloads travados como failed
+      const { data: orphaned, error } = await supabase
+        .from('vod_downloads' as any)
+        .update({ 
+          status: 'failed', 
+          error_message: 'Download travado - timeout automático' 
+        })
+        .in('status', ['downloading', 'processing', 'queued'])
+        .lt('updated_at', fiveMinutesAgo)
+        .select('id');
+
+      if (error) throw error;
+
+      const count = orphaned?.length || 0;
+      
+      if (count > 0) {
+        toast({
+          title: 'Downloads resetados',
+          description: `${count} downloads órfãos foram marcados como falhos`,
+        });
+      } else {
+        toast({
+          title: 'Nenhum download órfão',
+          description: 'Não há downloads travados para resetar',
+        });
+      }
+
+      await fetchDownloads();
+      await fetchStatistics();
+      
+      return count;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao resetar downloads',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return 0;
+    }
+  }, [toast, fetchDownloads, fetchStatistics]);
+
+  // Retry de um download específico
+  const retryDownload = useCallback(async (downloadId: string) => {
+    try {
+      // Buscar o download
+      const { data: downloadData, error: fetchError } = await supabase
+        .from('vod_downloads' as any)
+        .select('channel_id')
+        .eq('id', downloadId)
+        .maybeSingle();
+
+      const download = downloadData as unknown as { channel_id: string } | null;
+      if (fetchError || !download) throw new Error('Download não encontrado');
+
+      // Deletar o registro antigo
+      await supabase
+        .from('vod_downloads' as any)
+        .delete()
+        .eq('id', downloadId);
+
+      // Iniciar novo download
+      const { error } = await supabase.functions.invoke('download-vod', {
+        body: { channelId: download.channel_id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Retry iniciado',
+        description: 'Download reiniciado com sucesso',
+      });
+
+      await fetchDownloads();
+    } catch (error: any) {
+      toast({
+        title: 'Erro no retry',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }, [toast, fetchDownloads]);
+
   // Subscrição realtime para updates de progresso
   useEffect(() => {
     fetchDownloads();
@@ -349,6 +436,8 @@ export const useVODManagement = () => {
     markAsVOD,
     deleteVOD,
     detectVODs,
+    resetOrphanedDownloads,
+    retryDownload,
     refresh: () => {
       fetchDownloads();
       fetchStatistics();

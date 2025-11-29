@@ -12,10 +12,11 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
-  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs } = useVODManagement();
+  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
+  const [isResettingOrphans, setIsResettingOrphans] = useState(false);
 
   // Filtrar downloads por status
   const activeDownloads = downloads.filter(d => ['downloading', 'processing', 'queued'].includes(d.status));
@@ -107,6 +108,15 @@ export default function AdminVODStorage() {
     }
   };
 
+  const handleResetOrphans = async () => {
+    try {
+      setIsResettingOrphans(true);
+      await resetOrphanedDownloads();
+    } finally {
+      setIsResettingOrphans(false);
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -155,6 +165,18 @@ export default function AdminVODStorage() {
           <Trash2 className="w-4 h-4 mr-2" />
           {isCleaningUp ? 'Limpando...' : 'Limpar Órfãos'}
         </Button>
+
+        {activeDownloads.length > 0 && (
+          <Button
+            onClick={handleResetOrphans}
+            disabled={isResettingOrphans}
+            variant="outline"
+            className="border-orange-500 text-orange-500 hover:bg-orange-500/10"
+          >
+            <XCircle className="w-4 h-4 mr-2" />
+            {isResettingOrphans ? 'Resetando...' : `Resetar Travados (${activeDownloads.length})`}
+          </Button>
+        )}
         
         <Button
           onClick={refresh}
@@ -382,9 +404,19 @@ export default function AdminVODStorage() {
                             {download.error_message || 'Erro desconhecido'}
                           </p>
                         </div>
-                        <Badge variant="destructive" className="text-xs shrink-0">
-                          {download.retry_count}/3 tentativas
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="text-xs shrink-0">
+                            {download.retry_count}/3 tentativas
+                          </Badge>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => retryDownload(download.id)}
+                            className="text-xs"
+                          >
+                            Retry
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -396,7 +428,7 @@ export default function AdminVODStorage() {
       </div>
 
       {/* Lista Completa de Downloads */}
-      <VODDownloadProgress downloads={downloads} />
+      <VODDownloadProgress downloads={downloads} onRetry={retryDownload} />
 
       {/* Informações e Dicas */}
       <Card>
