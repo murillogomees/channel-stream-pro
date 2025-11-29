@@ -363,15 +363,21 @@ async function downloadHLSVODStreaming(
 
   console.log(`📊 [VOD HLS] ${segments.length} segmentos para ${channel.name}`);
 
+  // Atualizar segment_count imediatamente para mostrar progresso
   await supabase
     .from('vod_downloads')
-    .update({ segment_count: segments.length })
+    .update({ 
+      segment_count: segments.length,
+      segments_downloaded: 0,
+      status: 'downloading'
+    })
     .eq('id', downloadId);
 
   // 3. Download paralelo com throttling (5 simultâneos)
   let totalBytes = 0;
   let downloadedCount = 0;
   const PARALLEL_DOWNLOADS = 5;
+  let lastProgressUpdate = Date.now();
 
   for (let i = 0; i < segments.length; i += PARALLEL_DOWNLOADS) {
     const batch = segments.slice(i, i + PARALLEL_DOWNLOADS);
@@ -419,8 +425,10 @@ async function downloadHLSVODStreaming(
       })
     );
 
-    // Atualizar progresso a cada batch
-    if (downloadedCount % 20 === 0 || i + PARALLEL_DOWNLOADS >= segments.length) {
+    // Atualizar progresso a cada 2 segundos ou a cada 5 segmentos para tempo real
+    const now = Date.now();
+    if (now - lastProgressUpdate > 2000 || downloadedCount % 5 === 0 || i + PARALLEL_DOWNLOADS >= segments.length) {
+      lastProgressUpdate = now;
       await supabase
         .from('vod_downloads')
         .update({
@@ -428,6 +436,8 @@ async function downloadHLSVODStreaming(
           file_size_bytes: totalBytes
         })
         .eq('id', downloadId);
+      
+      console.log(`📈 [VOD] Progresso: ${downloadedCount}/${segments.length} (${Math.round((downloadedCount/segments.length)*100)}%)`);
     }
   }
 
@@ -459,9 +469,32 @@ async function downloadDirectVODStreaming(
 ): Promise<void> {
   console.log(`📥 [VOD Direct] Baixando: ${channel.name}`);
 
+  // Marcar como 1 segmento total para mostrar progresso
+  await supabase
+    .from('vod_downloads')
+    .update({
+      segment_count: 1,
+      segments_downloaded: 0,
+      status: 'downloading'
+    })
+    .eq('id', downloadId);
+
   const response = await fetchWithTimeout(channel.stream_url, 120000);
   if (!response.ok) {
     throw new Error(`Falha ao baixar: ${response.status}`);
+  }
+
+  // Para downloads diretos grandes, tentar ler em chunks e atualizar progresso
+  const contentLength = parseInt(response.headers.get('content-length') || '0');
+  
+  if (contentLength > 0) {
+    // Atualizar com tamanho estimado
+    await supabase
+      .from('vod_downloads')
+      .update({
+        file_size_bytes: contentLength
+      })
+      .eq('id', downloadId);
   }
 
   const data = await response.arrayBuffer();
@@ -470,6 +503,15 @@ async function downloadDirectVODStreaming(
   // Determinar extensão
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
+
+  // Marcar como processando durante upload
+  await supabase
+    .from('vod_downloads')
+    .update({
+      status: 'processing',
+      file_size_bytes: fileSize
+    })
+    .eq('id', downloadId);
 
   await uploadToR2(
     `vod/${channel.id}/video.${ext}`,
