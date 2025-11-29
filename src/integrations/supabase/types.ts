@@ -3238,6 +3238,89 @@ export type Database = {
         }
         Relationships: []
       }
+      stream_analytics: {
+        Row: {
+          avg_bitrate_kbps: number | null
+          buffer_events: number | null
+          cache_status: string | null
+          channel_id: string | null
+          connection_type: string | null
+          content_size_bytes: number | null
+          created_at: string | null
+          device_type: string | null
+          ended_at: string | null
+          error_code: string | null
+          error_message: string | null
+          estimated_bandwidth_kbps: number | null
+          id: string
+          player_version: string | null
+          profile_id: string | null
+          quality_changes: number | null
+          rebuffer_duration_ms: number | null
+          response_time_ms: number | null
+          route_type: string | null
+          session_id: string | null
+          startup_time_ms: number | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_bitrate_kbps?: number | null
+          buffer_events?: number | null
+          cache_status?: string | null
+          channel_id?: string | null
+          connection_type?: string | null
+          content_size_bytes?: number | null
+          created_at?: string | null
+          device_type?: string | null
+          ended_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          estimated_bandwidth_kbps?: number | null
+          id?: string
+          player_version?: string | null
+          profile_id?: string | null
+          quality_changes?: number | null
+          rebuffer_duration_ms?: number | null
+          response_time_ms?: number | null
+          route_type?: string | null
+          session_id?: string | null
+          startup_time_ms?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_bitrate_kbps?: number | null
+          buffer_events?: number | null
+          cache_status?: string | null
+          channel_id?: string | null
+          connection_type?: string | null
+          content_size_bytes?: number | null
+          created_at?: string | null
+          device_type?: string | null
+          ended_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          estimated_bandwidth_kbps?: number | null
+          id?: string
+          player_version?: string | null
+          profile_id?: string | null
+          quality_changes?: number | null
+          rebuffer_duration_ms?: number | null
+          response_time_ms?: number | null
+          route_type?: string | null
+          session_id?: string | null
+          startup_time_ms?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_analytics_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -3878,6 +3961,23 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_stream_performance: {
+        Row: {
+          avg_bitrate_kbps: number | null
+          avg_response_time_ms: number | null
+          avg_startup_time_ms: number | null
+          cache_status: string | null
+          device_type: string | null
+          error_count: number | null
+          hour: string | null
+          p95_response_time_ms: number | null
+          route_type: string | null
+          total_buffer_events: number | null
+          total_bytes_served: number | null
+          total_requests: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       acquire_playlist_sync_lock: {
@@ -3904,6 +4004,7 @@ export type Database = {
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_old_security_events: { Args: never; Returns: undefined }
+      cleanup_old_stream_analytics: { Args: never; Returns: undefined }
       cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
@@ -4046,6 +4147,21 @@ export type Database = {
           total_events: number
           unauthorized_access: number
           warning_count: number
+        }[]
+      }
+      get_stream_performance_summary: {
+        Args: { p_hours?: number }
+        Returns: {
+          avg_response_time_ms: number
+          avg_startup_time_ms: number
+          by_device_type: Json
+          by_route_type: Json
+          cache_hit_rate: number
+          error_rate: number
+          p95_response_time_ms: number
+          total_buffer_events: number
+          total_gb_served: number
+          total_streams: number
         }[]
       }
       get_top_threat_ips: {

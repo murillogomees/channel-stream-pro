@@ -1,5 +1,9 @@
 project_id = "sdvyxdghxqmntyoweqbd"
 
+# CDN Router - Intelligent content routing for optimal performance
+[functions.cdn-router]
+verify_jwt = false
+
 [functions.playlist-sync]
 verify_jwt = false
 
