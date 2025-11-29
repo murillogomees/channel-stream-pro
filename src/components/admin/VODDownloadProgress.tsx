@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Download, CheckCircle2, XCircle, Clock, Loader2, Play, Pause, RefreshCw, HardDrive, Zap, TrendingUp } from 'lucide-react';
+import { Download, CheckCircle2, XCircle, Clock, Loader2, Play, Pause, RefreshCw, HardDrive, Zap, TrendingUp, Trash2 } from 'lucide-react';
 import { VODDownload } from '@/hooks/useVODManagement';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
@@ -11,10 +11,11 @@ import { useEffect, useState } from 'react';
 interface VODDownloadProgressProps {
   downloads: VODDownload[];
   onRetry?: (downloadId: string) => void;
+  onCancel?: (downloadId: string) => void;
   channelNames?: Record<string, string>;
 }
 
-export default function VODDownloadProgress({ downloads, onRetry, channelNames = {} }: VODDownloadProgressProps) {
+export default function VODDownloadProgress({ downloads, onRetry, onCancel, channelNames = {} }: VODDownloadProgressProps) {
   const [pulseActive, setPulseActive] = useState(true);
   
   // Toggle pulse animation
@@ -26,7 +27,7 @@ export default function VODDownloadProgress({ downloads, onRetry, channelNames =
   }, []);
 
   const activeDownloads = downloads.filter(d => 
-    d.status === 'downloading' || d.status === 'processing' || d.status === 'queued'
+    d.status === 'downloading' || d.status === 'processing' || d.status === 'queued' || d.status === 'paused'
   );
 
   const completedDownloads = downloads.filter(d => d.status === 'completed');
@@ -258,17 +259,32 @@ export default function VODDownloadProgress({ downloads, onRetry, channelNames =
                         </div>
                       </div>
                       
-                      {download.status === 'failed' && onRetry && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRetry(download.id)}
-                          className="shrink-0"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Retry
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Botão Cancelar para downloads ativos ou travados */}
+                        {onCancel && (download.status === 'downloading' || download.status === 'processing' || download.status === 'queued' || download.status === 'paused') && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onCancel(download.id)}
+                            className="shrink-0 text-destructive hover:text-destructive"
+                            title="Cancelar download"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                        
+                        {download.status === 'failed' && onRetry && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onRetry(download.id)}
+                            className="shrink-0"
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Retry
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Progress Bar para downloads ativos */}

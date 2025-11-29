@@ -7,7 +7,7 @@ export interface VODDownload {
   channel_id: string;
   original_url: string;
   r2_url: string | null;
-  status: 'pending' | 'downloading' | 'processing' | 'completed' | 'failed' | 'queued';
+  status: 'pending' | 'downloading' | 'processing' | 'completed' | 'failed' | 'queued' | 'paused';
   file_size_bytes: number | null;
   segment_count: number;
   segments_downloaded: number;
@@ -332,69 +332,79 @@ export const useVODManagement = () => {
     }
   }, [toast, fetchDownloads, fetchStatistics]);
 
-  // Resetar downloads órfãos (travados há mais de 5 minutos)
+  // Resetar downloads órfãos (travados há mais de 2 minutos sem progresso ou 5 min com progresso)
   const resetOrphanedDownloads = useCallback(async () => {
     try {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       
-      // Primeiro, verificar downloads que estão em 100% mas não completaram
-      const { data: stuck100, error: stuck100Error } = await supabase
+      // Downloads sem progresso (0 bytes) há mais de 2 minutos - deletar
+      const { data: noProgress, error: noProgressError } = await supabase
+        .from('vod_downloads' as any)
+        .select('id')
+        .in('status', ['downloading', 'processing', 'queued'])
+        .eq('file_size_bytes', 0)
+        .lt('updated_at', twoMinutesAgo);
+
+      let deletedCount = 0;
+      if (!noProgressError && noProgress && noProgress.length > 0) {
+        const ids = noProgress.map((d: any) => d.id);
+        await supabase.from('vod_downloads' as any).delete().in('id', ids);
+        deletedCount = ids.length;
+        console.log(`[VOD] Deletados ${deletedCount} downloads sem progresso`);
+      }
+      
+      // Downloads com progresso travados há mais de 5 minutos - marcar como failed
+      const { data: stuck100 } = await supabase
         .from('vod_downloads' as any)
         .select('id, channel_id, segment_count, segments_downloaded')
         .in('status', ['downloading', 'processing'])
+        .gt('file_size_bytes', 0)
         .lt('updated_at', fiveMinutesAgo);
       
-      if (!stuck100Error && stuck100) {
-        // Filtrar os que estão em 100%
+      if (stuck100) {
         const stuckAt100 = (stuck100 as any[]).filter(d => 
           d.segment_count > 0 && d.segments_downloaded >= d.segment_count
         );
         
         for (const download of stuckAt100) {
-          console.log(`[VOD] Download ${download.id} travado em 100%, reiniciando...`);
-          
-          // Marcar como failed com mensagem específica
           await supabase
             .from('vod_downloads' as any)
             .update({ 
               status: 'failed', 
-              error_message: 'Reiniciado automaticamente - download travou em 100%' 
+              error_message: 'Download travou em 100%' 
             })
             .eq('id', download.id);
         }
       }
       
-      // Marcar outros downloads travados como failed
-      const { data: orphaned, error } = await supabase
+      // Outros downloads com progresso travados
+      const { data: orphaned } = await supabase
         .from('vod_downloads' as any)
-        .update({ 
-          status: 'failed', 
-          error_message: 'Download travado - timeout automático' 
-        })
+        .update({ status: 'failed', error_message: 'Timeout automático' })
         .in('status', ['downloading', 'processing', 'queued'])
+        .gt('file_size_bytes', 0)
         .lt('updated_at', fiveMinutesAgo)
         .select('id');
 
-      if (error) throw error;
-
-      const count = (orphaned?.length || 0) + ((stuck100 as any[])?.filter(d => d.segment_count > 0 && d.segments_downloaded >= d.segment_count).length || 0);
+      const totalReset = deletedCount + (orphaned?.length || 0);
       
-      if (count > 0) {
+      if (totalReset > 0) {
         toast({
-          title: 'Downloads resetados',
-          description: `${count} downloads órfãos foram marcados como falhos`,
+          title: 'Downloads limpos',
+          description: `${deletedCount} deletados, ${orphaned?.length || 0} marcados como falhos`,
         });
       } else {
         toast({
           title: 'Nenhum download órfão',
-          description: 'Não há downloads travados para resetar',
+          description: 'Não há downloads travados',
         });
       }
 
       await fetchDownloads();
       await fetchStatistics();
       
-      return count;
+      return totalReset;
     } catch (error: any) {
       toast({
         title: 'Erro ao resetar downloads',
@@ -402,6 +412,32 @@ export const useVODManagement = () => {
         variant: 'destructive',
       });
       return 0;
+    }
+  }, [toast, fetchDownloads, fetchStatistics]);
+
+  // Cancelar/deletar um download específico
+  const cancelDownload = useCallback(async (downloadId: string) => {
+    try {
+      const { error } = await supabase
+        .from('vod_downloads' as any)
+        .delete()
+        .eq('id', downloadId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Download cancelado',
+        description: 'Download removido da fila',
+      });
+
+      await fetchDownloads();
+      await fetchStatistics();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cancelar',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   }, [toast, fetchDownloads, fetchStatistics]);
 
@@ -418,6 +454,12 @@ export const useVODManagement = () => {
       const download = downloadData as unknown as { channel_id: string } | null;
       if (fetchError || !download) throw new Error('Download não encontrado');
 
+      // Resetar flag r2_uploaded do canal para permitir retry
+      await supabase
+        .from('m3u_channels')
+        .update({ r2_uploaded: false, r2_url: null } as any)
+        .eq('id', download.channel_id);
+
       // Deletar o registro antigo
       await supabase
         .from('vod_downloads' as any)
@@ -425,7 +467,7 @@ export const useVODManagement = () => {
         .eq('id', downloadId);
 
       // Iniciar novo download
-      const { error } = await supabase.functions.invoke('download-vod', {
+      const { data, error } = await supabase.functions.invoke('download-vod', {
         body: { channelId: download.channel_id }
       });
 
@@ -592,6 +634,7 @@ export const useVODManagement = () => {
     detectVODs,
     resetOrphanedDownloads,
     cleanupDuplicates,
+    cancelDownload,
     retryDownload,
     refresh,
   };
