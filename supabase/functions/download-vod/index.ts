@@ -12,10 +12,63 @@ declare const EdgeRuntime: {
 };
 
 // Configuração de chunks para arquivos grandes
-const CHUNK_SIZE = 25 * 1024 * 1024; // 25MB por chunk de download
-const R2_PART_SIZE = 10 * 1024 * 1024; // 10MB por parte de upload R2 (mínimo 5MB)
+const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB por chunk de download (menor = mais resiliente)
+const R2_PART_SIZE = 5 * 1024 * 1024; // 5MB por parte de upload R2 (mínimo)
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB máximo
-const EXECUTION_TIMEOUT = 45000; // 45 segundos por execução (edge function limit)
+const EXECUTION_TIMEOUT = 40000; // 40 segundos por execução
+const MAX_RETRIES = 3; // Máximo de tentativas por chunk
+const RETRY_DELAY = 2000; // 2 segundos entre retries
+
+// Função de retry com exponential backoff
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries = MAX_RETRIES): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok || response.status === 206) {
+        return response;
+      }
+      
+      // Server error - retry
+      if (response.status >= 500) {
+        lastError = new Error(`Server error: ${response.status}`);
+        console.log(`⚠️ [Retry] Tentativa ${attempt + 1}/${retries + 1} falhou: ${response.status}`);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error: any) {
+      lastError = error;
+      const errorMsg = error.message || 'Unknown error';
+      
+      // Erros que devem fazer retry
+      const shouldRetry = errorMsg.includes('error reading a body') ||
+                          errorMsg.includes('connection') ||
+                          errorMsg.includes('aborted') ||
+                          errorMsg.includes('timeout') ||
+                          errorMsg.includes('network');
+      
+      if (!shouldRetry || attempt >= retries) {
+        throw error;
+      }
+      
+      const delay = RETRY_DELAY * Math.pow(2, attempt);
+      console.log(`⚠️ [Retry] Tentativa ${attempt + 1}/${retries + 1}: ${errorMsg}. Aguardando ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
 
 let r2Client: AwsClient | null = null;
 
@@ -433,10 +486,10 @@ async function downloadLargeFile(
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
-  // Para arquivos pequenos (< 50MB), usar upload simples
+  // Para arquivos pequenos (< 50MB), usar upload simples com retry
   if (contentLength > 0 && contentLength < 50 * 1024 * 1024) {
     console.log(`📦 [LargeFile] Arquivo pequeno, usando upload simples`);
-    const response = await fetch(channel.stream_url);
+    const response = await fetchWithRetry(channel.stream_url);
     if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
     const data = new Uint8Array(await response.arrayBuffer());
     await uploadToR2Simple(r2Key, data, contentType, 'public, max-age=31536000, immutable');
@@ -489,9 +542,8 @@ async function downloadLargeFile(
         
         console.log(`📥 [LargeFile] Chunk ${currentByte}-${endByte} (${((endByte - currentByte + 1) / 1048576).toFixed(1)} MB)`);
         
-        const response = await fetch(channel.stream_url, {
-          headers: { 'Range': `bytes=${currentByte}-${endByte}` },
-          signal: AbortSignal.timeout(120000) // 2 min por chunk
+        const response = await fetchWithRetry(channel.stream_url, {
+          headers: { 'Range': `bytes=${currentByte}-${endByte}` }
         });
         
         if (!response.ok && response.status !== 206) {
@@ -559,15 +611,14 @@ async function downloadStreamingMode(
   startPartNumber: number,
   knownSize: number
 ): Promise<void> {
-  console.log(`📥 [Streaming] Download sem ranges...`);
+  console.log(`📥 [Streaming] Download sem ranges (retry habilitado)...`);
   
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
   const r2Key = `vod/${channel.id}/video.${ext}`;
   
-  const response = await fetch(channel.stream_url, {
-    signal: AbortSignal.timeout(1800000) // 30 min
-  });
+  // Usar fetchWithRetry para a conexão inicial
+  const response = await fetchWithRetry(channel.stream_url);
   
   if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
   
@@ -581,12 +632,12 @@ async function downloadStreamingMode(
   let bufferSize = 0;
   let lastUpdate = Date.now();
   const startExecution = Date.now();
+  let consecutiveErrors = 0;
   
   try {
     while (true) {
       // Verificar timeout
       if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
-        // Salvar progresso e pausar
         console.log(`⏸️ [Streaming] Timeout, salvando progresso...`);
         await supabase.from('vod_downloads').update({
           status: 'paused',
@@ -598,7 +649,31 @@ async function downloadStreamingMode(
         return;
       }
 
-      const { done, value } = await reader.read();
+      let readResult;
+      try {
+        readResult = await reader.read();
+        consecutiveErrors = 0; // Reset on success
+      } catch (readError: any) {
+        consecutiveErrors++;
+        console.error(`⚠️ [Streaming] Erro de leitura ${consecutiveErrors}/3:`, readError.message);
+        
+        if (consecutiveErrors >= 3) {
+          // Salvar progresso antes de falhar
+          await supabase.from('vod_downloads').update({
+            file_size_bytes: totalBytes,
+            segments_downloaded: parts.length,
+            metadata: { upload_id: uploadId, parts },
+            error_message: `Conexão instável: ${readError.message}`
+          }).eq('id', downloadId);
+          throw readError;
+        }
+        
+        // Esperar antes de tentar novamente
+        await new Promise(r => setTimeout(r, 1000 * consecutiveErrors));
+        continue;
+      }
+      
+      const { done, value } = readResult;
       if (done) break;
       
       // Processar dados
