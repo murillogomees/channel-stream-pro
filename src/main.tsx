@@ -5,6 +5,8 @@ import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
 import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
+import { webVitalsService } from "./services/webVitalsService";
+import { streamCacheService } from "./services/streamCacheService";
 
 // Create a query client for React Query
 const queryClient = new QueryClient({
@@ -23,6 +25,14 @@ preloadCriticalAssets();
 
 // Register Service Worker
 registerServiceWorker();
+
+// Initialize Web Vitals monitoring
+webVitalsService.init((report) => {
+  console.log('[WebVitals] Report:', report.score, 'score');
+});
+
+// Initialize stream cache service
+streamCacheService.init();
 
 // Suprimir erros de WebSocket do Realtime para evitar impacto no Lighthouse/SEO
 const originalConsoleError = console.error;

@@ -7,3 +7,5 @@ export { PreloadIndicator } from './PreloadIndicator';
 export { PreloadStats } from './PreloadStats';
 export { QualitySelector } from './QualitySelector';
 export { QualityBadge } from './QualityBadge';
+export { ConnectionIndicator } from './ConnectionIndicator';
+export { RecoveryStatus } from './RecoveryStatus';

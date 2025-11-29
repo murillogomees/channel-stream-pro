@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useStreamingMetrics } from "./useStreamingMetrics";
 import { StreamingMetricsCard } from "./StreamingMetricsCard";
+import { WebVitalsCard } from "./WebVitalsCard";
 import { 
   LineChart, 
   Line, 
@@ -399,6 +400,9 @@ export function StreamingDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Web Vitals */}
+      <WebVitalsCard />
 
       {/* Performance Tips */}
       <Card>
