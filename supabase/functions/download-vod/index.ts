@@ -252,8 +252,13 @@ async function processVODDownload(channel: any, downloadId: string, supabase: an
   const startTime = Date.now();
 
   try {
+    if (!downloadId) {
+      console.error(`❌ [VOD] Download ID inválido para canal: ${channel.name}`);
+      return;
+    }
+    
     await supabase.from('vod_downloads').update({ status: 'downloading' }).eq('id', downloadId);
-    console.log(`📥 [VOD] Iniciando: ${channel.name}`);
+    console.log(`📥 [VOD] Iniciando: ${channel.name} (ID: ${downloadId})`);
 
     const isHLS = channel.stream_url.includes('.m3u8');
     if (isHLS) {
@@ -263,15 +268,63 @@ async function processVODDownload(channel: any, downloadId: string, supabase: an
     }
 
     const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN');
-    const r2Url = isHLS ? `https://${r2Domain}/vod/${channel.id}/playlist.m3u8` : `https://${r2Domain}/vod/${channel.id}/video.mp4`;
+    if (!r2Domain) {
+      throw new Error('R2_PUBLIC_DOMAIN não configurado');
+    }
+    
+    const r2Url = isHLS 
+      ? `https://${r2Domain}/vod/${channel.id}/playlist.m3u8` 
+      : `https://${r2Domain}/vod/${channel.id}/video.mp4`;
 
-    await supabase.from('m3u_channels').update({ r2_uploaded: true, r2_url: r2Url, r2_uploaded_at: new Date().toISOString() }).eq('id', channel.id);
-    await supabase.from('vod_downloads').update({ status: 'completed', r2_url: r2Url, download_completed_at: new Date().toISOString() }).eq('id', downloadId);
+    console.log(`⬆️ [VOD] Atualizando canal e finalizando download...`);
+    
+    // Atualizar canal
+    const { error: channelError } = await supabase
+      .from('m3u_channels')
+      .update({ 
+        r2_uploaded: true, 
+        r2_url: r2Url, 
+        r2_uploaded_at: new Date().toISOString() 
+      })
+      .eq('id', channel.id);
+    
+    if (channelError) {
+      console.error(`⚠️ [VOD] Erro ao atualizar canal: ${channelError.message}`);
+    }
+    
+    // Marcar download como completo
+    const { error: downloadError } = await supabase
+      .from('vod_downloads')
+      .update({ 
+        status: 'completed', 
+        r2_url: r2Url, 
+        download_completed_at: new Date().toISOString() 
+      })
+      .eq('id', downloadId);
+    
+    if (downloadError) {
+      console.error(`⚠️ [VOD] Erro ao finalizar download: ${downloadError.message}`);
+    }
 
-    console.log(`✅ [VOD] Concluído: ${channel.name} em ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ [VOD] Concluído: ${channel.name} em ${duration}s - ${r2Url}`);
+    
   } catch (error: any) {
-    console.error(`❌ [VOD] Falha: ${channel.name} - ${error.message}`);
-    await supabase.from('vod_downloads').update({ status: 'failed', error_message: error.message }).eq('id', downloadId);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`❌ [VOD] Falha: ${channel.name} após ${duration}s - ${error.message}`);
+    
+    // Garantir que o status seja atualizado para failed
+    try {
+      await supabase
+        .from('vod_downloads')
+        .update({ 
+          status: 'failed', 
+          error_message: error.message?.substring(0, 500) || 'Erro desconhecido'
+        })
+        .eq('id', downloadId);
+    } catch (updateError) {
+      console.error(`❌ [VOD] Erro ao salvar status de falha:`, updateError);
+    }
   }
 }
 
@@ -334,6 +387,8 @@ async function downloadHLSVOD(channel: any, downloadId: string, supabase: any): 
 }
 
 async function downloadDirectVOD(channel: any, downloadId: string, supabase: any): Promise<void> {
+  console.log(`📥 [Direct] Iniciando download: ${channel.name}`);
+  
   const headRes = await fetchWithTimeout(channel.stream_url, 30000, 'HEAD');
   const contentLength = parseInt(headRes.headers.get('content-length') || '0');
   
@@ -351,8 +406,13 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
 
   // Arquivos < 100MB: download direto
   if (contentLength < 100 * 1024 * 1024) {
-    console.log(`📥 [Direct] Download simples`);
-    const res = await fetch(channel.stream_url, { headers: { 'User-Agent': 'VOD-Downloader/2.0' }, signal: AbortSignal.timeout(600000) });
+    console.log(`📥 [Direct] Download simples (< 100MB)`);
+    
+    const res = await fetch(channel.stream_url, { 
+      headers: { 'User-Agent': 'VOD-Downloader/2.0' }, 
+      signal: AbortSignal.timeout(600000) 
+    });
+    
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     
     const reader = res.body?.getReader();
@@ -367,21 +427,42 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
       if (value) {
         chunks.push(value);
         bytes += value.length;
-        if (Date.now() - lastUpdate > 1000) {
+        if (Date.now() - lastUpdate > 2000) {
           lastUpdate = Date.now();
-          await supabase.from('vod_downloads').update({ segments_downloaded: Math.ceil(bytes / CHUNK_SIZE), file_size_bytes: bytes }).eq('id', downloadId);
-          console.log(`📈 [Direct] ${Math.round((bytes / contentLength) * 100)}%`);
+          const progress = contentLength > 0 ? Math.round((bytes / contentLength) * 100) : 0;
+          await supabase.from('vod_downloads').update({ 
+            segments_downloaded: Math.ceil(bytes / CHUNK_SIZE), 
+            file_size_bytes: bytes 
+          }).eq('id', downloadId);
+          console.log(`📈 [Direct] Download: ${progress}% (${(bytes / 1048576).toFixed(1)} MB)`);
         }
       }
     }
 
+    console.log(`✅ [Direct] Download completo: ${(bytes / 1048576).toFixed(1)} MB`);
+    
+    // Criar array de dados
     const data = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
     let offset = 0;
     for (const c of chunks) { data.set(c, offset); offset += c.length; }
-
-    await supabase.from('vod_downloads').update({ status: 'processing' }).eq('id', downloadId);
-    await uploadToR2(r2Key, data, contentType, 'public, max-age=31536000, immutable');
-    await supabase.from('vod_downloads').update({ segments_downloaded: totalChunks }).eq('id', downloadId);
+    
+    // Atualizar status para processing
+    console.log(`⬆️ [Direct] Iniciando upload para R2...`);
+    await supabase.from('vod_downloads').update({ 
+      status: 'processing',
+      segments_downloaded: totalChunks,
+      file_size_bytes: bytes
+    }).eq('id', downloadId);
+    
+    // Upload para R2
+    try {
+      await uploadToR2(r2Key, data, contentType, 'public, max-age=31536000, immutable');
+      console.log(`✅ [Direct] Upload R2 completo: ${r2Key}`);
+    } catch (uploadError: any) {
+      console.error(`❌ [Direct] Erro no upload R2: ${uploadError.message}`);
+      throw new Error(`Falha no upload R2: ${uploadError.message}`);
+    }
+    
     return;
   }
 
