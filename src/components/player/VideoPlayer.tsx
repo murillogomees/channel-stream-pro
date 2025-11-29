@@ -29,7 +29,10 @@ import {
 import { useRemoteInput } from "@/modules/player/hooks/useRemoteInput";
 import { cn } from "@/lib/utils";
 import { useStreamAnalytics } from "@/hooks/useStreamAnalytics";
-import { streamOptimizer } from "@/services/streamOptimizer";
+import { streamOptimizer, detectStreamType } from "@/services/streamOptimizer";
+import { useABR } from "@/hooks/useABR";
+import { QualitySelector } from "./QualitySelector";
+import { QualityBadge } from "./QualityBadge";
 
 // =============================================================================
 // TYPES
@@ -48,6 +51,10 @@ interface VideoPlayerProps {
   userId?: string;
   /** Autoplay ao carregar */
   autoPlay?: boolean;
+  /** Enable ABR quality selector */
+  enableABR?: boolean;
+  /** Show quality stats */
+  showQualityStats?: boolean;
   /** Classes CSS adicionais */
   className?: string;
   /** Callback de erro */
@@ -152,6 +159,8 @@ export function VideoPlayer({
   channelId,
   userId,
   autoPlay = true,
+  enableABR = true,
+  showQualityStats = false,
   className,
   onError,
   onBack,
@@ -172,8 +181,20 @@ export function VideoPlayer({
   const maxRetries = 3;
   const startupTimeRef = useRef<number>(0);
 
+  // Detect if VOD content (enables ABR UI)
+  const isVOD = detectStreamType(url) === 'vod' || url.includes('/movie/') || url.includes('/series/');
+
   // Analytics tracking
   const analytics = useStreamAnalytics(channelId, userId);
+
+  // ABR Hook
+  const abr = useABR({
+    onQualityChange: (level) => {
+      if (!level.isAuto) {
+        analytics.recordQualityChange(level.bitrate);
+      }
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // Overlay Control
@@ -274,6 +295,11 @@ export function VideoPlayer({
 
       hls.loadSource(url);
       hls.attachMedia(video);
+
+      // Attach ABR service
+      if (enableABR) {
+        abr.attach(hls);
+      }
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
         const startupMs = Date.now() - startupTimeRef.current;
@@ -665,12 +691,32 @@ export function VideoPlayer({
             </button>
           </div>
 
-          {/* Live indicator */}
+          {/* Quality selector (VOD only) or Live indicator */}
           <div className="flex justify-center mt-4">
-            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              AO VIVO
-            </span>
+            {enableABR && abr.isAttached && abr.levels.length > 1 ? (
+              <div className="flex items-center gap-3">
+                <QualitySelector
+                  levels={abr.levels}
+                  currentLevel={abr.currentLevel}
+                  mode={abr.mode}
+                  stats={showQualityStats ? abr.stats : null}
+                  onSelectLevel={abr.setQuality}
+                  showStats={showQualityStats}
+                />
+                {abr.currentLevel && !abr.currentLevel.isAuto && (
+                  <QualityBadge
+                    height={abr.currentLevel.height}
+                    isAuto={abr.mode === 'auto'}
+                    size="md"
+                  />
+                )}
+              </div>
+            ) : (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                AO VIVO
+              </span>
+            )}
           </div>
         </div>
       </div>
