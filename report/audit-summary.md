@@ -27,15 +27,24 @@ Têm código implementado, aguardam dados reais:
 | **M3U Sync** | m3u_sync_sources, m3u_sync_jobs, m3u_sync_entries, m3u_sync_files, m3u_sync_errors, m3u_health_checks, m3u_import_changes |
 | **Admin UI** | admin_badge_notifications, admin_shortcuts, playlist_health_checks, custom_status_badges |
 
-### ⚠️ SEM USO DIRETO NO CÓDIGO (4 tabelas)
+### ✅ TABELAS ÓRFÃS REMOVIDAS (4 tabelas)
 
-| Tabela | Recomendação |
-|--------|--------------|
-| activation_keys | 🗑️ **REMOVER** - única realmente órfã |
-| admin_leaderboard_history | 📌 MANTER - funciona via DB triggers |
-| permission_discrepancy_alerts | 📌 MANTER - funciona via DB triggers |
+| Tabela | Status |
+|--------|--------|
+| activation_keys | ✅ REMOVIDA |
+| admin_leaderboard_history | ✅ REMOVIDA |
+| permission_discrepancy_alerts | ✅ REMOVIDA |
+| smartone_sync_retry_queue | ✅ REMOVIDA |
+
+**Funções também removidas:**
+- `save_monthly_leaderboard()`
+- `detect_permission_discrepancies()`
+
+### 📌 TABELAS PREPARADAS PARA USO FUTURO
+
+| Tabela | Status |
+|--------|--------|
 | series_episodes | 📌 MANTER - preparado para Player |
-| smartone_sync_retry_queue | 📌 MANTER - preparado para retry |
 
 ---
 
