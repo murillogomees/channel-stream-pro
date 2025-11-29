@@ -150,6 +150,29 @@
     />
   </head>
   <body>
+    <!-- Cache buster script - runs BEFORE React to prevent duplicate instances -->
+    <script>
+      (function() {
+        var CACHE_VERSION = 'v4';
+        var storageKey = 'app_cache_version';
+        var lastVersion = sessionStorage.getItem(storageKey);
+        
+        // Clear all service worker caches
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) { caches.delete(name); });
+          });
+        }
+        
+        // Force reload if version changed
+        if (lastVersion && lastVersion !== CACHE_VERSION) {
+          sessionStorage.setItem(storageKey, CACHE_VERSION);
+          location.reload(true);
+        } else {
+          sessionStorage.setItem(storageKey, CACHE_VERSION);
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
