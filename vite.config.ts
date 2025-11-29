@@ -4,17 +4,14 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-clean - Force FULL dependency rebuild
+// Vite config - simplified for stable React resolution
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    hmr: {
-      overlay: true,
-    },
   },
-  cacheDir: 'node_modules/.vite-clean-v1',
+  cacheDir: 'node_modules/.vite-stable',
   plugins: [
     react(),
     mode === "development" && componentTagger(),
@@ -164,28 +161,8 @@ export default defineConfig(({ mode }) => ({
     ],
   },
   optimizeDeps: {
-    include: [
-      "react", 
-      "react-dom", 
-      "react/jsx-runtime",
-      "react/jsx-dev-runtime",
-      "react-router-dom",
-      "@radix-ui/react-tooltip",
-      "@radix-ui/react-dialog",
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-tabs",
-      "@radix-ui/react-toast",
-      "@radix-ui/react-popover",
-      "@radix-ui/react-select",
-    ],
+    include: ["react", "react-dom", "react-router-dom"],
     exclude: [],
-    esbuildOptions: {
-      // Ensure all deps use the same React
-      define: {
-        global: 'globalThis',
-      },
-    },
-    force: true,
   },
   build: {
     chunkSizeWarningLimit: 1000,
