@@ -1,8 +1,9 @@
 /**
- * SeriesView - Optimized series catalog with lazy loading and background metadata
+ * SeriesView - Optimized series catalog with lazy loading and deferred computation
+ * @version 2.0.0 - Performance optimized with deferred rendering
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef, memo, startTransition } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, memo, startTransition, useDeferredValue } from 'react';
 import { TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -41,9 +42,13 @@ interface SeriesViewProps {
   className?: string;
 }
 
-// Helper to extract series name from episode name
+// Helper to extract series name from episode name - optimized with caching
+const seriesNameCache = new Map<string, string>();
 function extractSeriesName(name: string): string {
-  return name
+  const cached = seriesNameCache.get(name);
+  if (cached) return cached;
+  
+  const result = name
     .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
     .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
     .replace(/\s*-\s*Temporada\s*\d+.*/gi, '')
@@ -55,10 +60,27 @@ function extractSeriesName(name: string): string {
     .replace(/\s*\[.*?\]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  
+  // Limit cache size
+  if (seriesNameCache.size > 10000) {
+    const firstKey = seriesNameCache.keys().next().value;
+    if (firstKey) seriesNameCache.delete(firstKey);
+  }
+  seriesNameCache.set(name, result);
+  return result;
 }
 
 // Memoized series card
 const MemoizedSeriesCard = memo(SeriesCard);
+
+// Loading skeleton for initial render
+const SeriesGridSkeleton = memo(() => (
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    {Array.from({ length: 12 }).map((_, i) => (
+      <div key={i} className="aspect-[2/3] bg-muted/50 rounded-lg animate-pulse" />
+    ))}
+  </div>
+));
 
 export function SeriesView({
   categories,
@@ -73,6 +95,7 @@ export function SeriesView({
   const [selectedSeries, setSelectedSeries] = useState<Channel | null>(null);
   const [seriesMetadata, setSeriesMetadata] = useState<SeriesMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Metadata cache - persists across renders
   const metadataCacheRef = useRef<Map<string, SeriesMetadata>>(new Map());
@@ -81,20 +104,53 @@ export function SeriesView({
   
   // Track loading state
   const loadingSeriesRef = useRef<Set<string>>(new Set());
+  
+  // Use deferred values for non-critical updates
+  const deferredSearch = useDeferredValue(externalSearch);
+  const deferredSortBy = useDeferredValue(sortBy);
 
-  // Group episodes into series - memoized
+  // OPTIMIZED: Group episodes into series - compute once and cache
+  const seriesDataRef = useRef<{
+    seriesGroups: Array<{
+      seriesName: string;
+      representative: Channel & { category_id?: string };
+      episodes: Channel[];
+      episodeCount: number;
+    }>;
+    allEpisodes: Channel[];
+    categoriesHash: string;
+  } | null>(null);
+
+  const categoriesHash = useMemo(() => {
+    // Create a simple hash to detect category changes
+    return categories.map(c => `${c.id}:${c.channels.length}`).join('|');
+  }, [categories]);
+
+  // Compute series groups only when categories actually change
   const { seriesGroups, allEpisodes } = useMemo(() => {
+    // Check if we can reuse cached data
+    if (seriesDataRef.current && seriesDataRef.current.categoriesHash === categoriesHash) {
+      return {
+        seriesGroups: seriesDataRef.current.seriesGroups,
+        allEpisodes: seriesDataRef.current.allEpisodes,
+      };
+    }
+
     const episodesMap = new Map<string, Channel[]>();
     const allEps: Channel[] = [];
 
+    // Process in chunks to avoid blocking
     categories.forEach(cat => {
       cat.channels.forEach(ch => {
-        allEps.push({ ...ch, category_name: cat.display_name });
+        const channelWithCategory = { ...ch, category_name: cat.display_name };
+        allEps.push(channelWithCategory);
         const seriesName = extractSeriesName(ch.name);
-        if (!episodesMap.has(seriesName)) {
-          episodesMap.set(seriesName, []);
+        const existing = episodesMap.get(seriesName);
+        if (existing) {
+          existing.push(channelWithCategory);
+        } else {
+          episodesMap.set(seriesName, [channelWithCategory]);
         }
-        episodesMap.get(seriesName)!.push({ ...ch, category_name: cat.display_name });
       });
     });
 
@@ -124,10 +180,33 @@ export function SeriesView({
       }
     });
 
-    return { seriesGroups: groups, allEpisodes: allEps };
-  }, [categories]);
+    // Cache the result
+    seriesDataRef.current = {
+      seriesGroups: groups,
+      allEpisodes: allEps,
+      categoriesHash,
+    };
 
-  // Filter series - memoized
+    return { seriesGroups: groups, allEpisodes: allEps };
+  }, [categories, categoriesHash]);
+
+  // Mark initialization complete after first render
+  useEffect(() => {
+    if (seriesGroups.length > 0 && isInitializing) {
+      // Use requestIdleCallback for non-critical update
+      const handle = requestIdleCallback?.(() => {
+        setIsInitializing(false);
+      }, { timeout: 100 }) ?? setTimeout(() => setIsInitializing(false), 50);
+      
+      return () => {
+        if (typeof handle === 'number') {
+          cancelIdleCallback?.(handle) ?? clearTimeout(handle);
+        }
+      };
+    }
+  }, [seriesGroups.length, isInitializing]);
+
+  // Filter series - uses deferred values to keep UI responsive
   const filteredSeries = useMemo(() => {
     let series = [...seriesGroups];
 
@@ -135,8 +214,8 @@ export function SeriesView({
       series = series.filter(s => s.representative.category_id === selectedCategory);
     }
 
-    if (externalSearch) {
-      const query = externalSearch.toLowerCase();
+    if (deferredSearch) {
+      const query = deferredSearch.toLowerCase();
       series = series.filter(s =>
         s.seriesName.toLowerCase().includes(query) ||
         s.representative.category_name?.toLowerCase().includes(query)
@@ -148,7 +227,7 @@ export function SeriesView({
       const metaA = cache.get(a.representative.id);
       const metaB = cache.get(b.representative.id);
 
-      switch (sortBy) {
+      switch (deferredSortBy) {
         case 'rating':
           return (metaB?.tmdb_rating || 0) - (metaA?.tmdb_rating || 0);
         case 'year':
@@ -160,9 +239,9 @@ export function SeriesView({
     });
 
     return series;
-  }, [seriesGroups, selectedCategory, externalSearch, sortBy, metadataCacheVersion]);
+  }, [seriesGroups, selectedCategory, deferredSearch, deferredSortBy, metadataCacheVersion]);
 
-  // Use lazy loading
+  // Use lazy loading with smaller initial batch for faster first paint
   const {
     visibleItems: visibleSeries,
     hasMore,
@@ -170,53 +249,71 @@ export function SeriesView({
     visibleCount,
     totalCount,
   } = useLazyLoadContent(filteredSeries, {
-    initialCount: 24,
-    incrementCount: 24,
+    initialCount: 18, // Reduced from 24 for faster initial render
+    incrementCount: 18,
     rootMargin: '400px',
   });
 
-  // Load metadata in background - non-blocking
+  // Load metadata in background - with rate limiting
+  const metadataLoadTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  
   useEffect(() => {
-    const loadMetadataInBackground = async () => {
-      const cache = metadataCacheRef.current;
-      const loading = loadingSeriesRef.current;
-      
-      const seriesToLoad = visibleSeries
-        .slice(0, 20)
-        .filter(s => !cache.has(s.representative.id) && !loading.has(s.representative.id));
-
-      if (seriesToLoad.length === 0) return;
-
-      seriesToLoad.forEach(s => loading.add(s.representative.id));
-
-      const batchSize = 5;
-      for (let i = 0; i < seriesToLoad.length; i += batchSize) {
-        const batch = seriesToLoad.slice(i, i + batchSize);
+    // Clear any pending load
+    if (metadataLoadTimerRef.current) {
+      clearTimeout(metadataLoadTimerRef.current);
+    }
+    
+    // Defer metadata loading to not block initial render
+    metadataLoadTimerRef.current = setTimeout(() => {
+      const loadMetadataInBackground = async () => {
+        const cache = metadataCacheRef.current;
+        const loading = loadingSeriesRef.current;
         
-        await Promise.allSettled(
-          batch.map(async (series) => {
-            try {
-              const meta = await fetchSeriesMetadata(series.representative.id, series.seriesName);
-              if (meta) {
-                cache.set(series.representative.id, meta);
+        const seriesToLoad = visibleSeries
+          .slice(0, 12) // Reduced batch size
+          .filter(s => !cache.has(s.representative.id) && !loading.has(s.representative.id));
+
+        if (seriesToLoad.length === 0) return;
+
+        seriesToLoad.forEach(s => loading.add(s.representative.id));
+
+        const batchSize = 3; // Smaller batches for less blocking
+        for (let i = 0; i < seriesToLoad.length; i += batchSize) {
+          const batch = seriesToLoad.slice(i, i + batchSize);
+          
+          await Promise.allSettled(
+            batch.map(async (series) => {
+              try {
+                const meta = await fetchSeriesMetadata(series.representative.id, series.seriesName);
+                if (meta) {
+                  cache.set(series.representative.id, meta);
+                }
+              } catch {
+                // Silently fail
+              } finally {
+                loading.delete(series.representative.id);
               }
-            } catch {
-              // Silently fail
-            } finally {
-              loading.delete(series.representative.id);
-            }
-          })
-        );
-        
-        startTransition(() => {
-          setMetadataCacheVersion(v => v + 1);
-        });
+            })
+          );
+          
+          startTransition(() => {
+            setMetadataCacheVersion(v => v + 1);
+          });
+          
+          // Small delay between batches
+          await new Promise(r => setTimeout(r, 50));
+        }
+      };
+
+      loadMetadataInBackground();
+    }, 300); // Delay metadata loading to prioritize UI
+
+    return () => {
+      if (metadataLoadTimerRef.current) {
+        clearTimeout(metadataLoadTimerRef.current);
       }
     };
-
-    const timeoutId = setTimeout(loadMetadataInBackground, 100);
-    return () => clearTimeout(timeoutId);
-  }, [visibleSeries.map(s => s.representative.id).slice(0, 10).join(','), fetchSeriesMetadata]);
+  }, [visibleSeries.length, fetchSeriesMetadata]);
 
   // Handle series selection
   const handleSeriesInfo = useCallback(async (series: typeof seriesGroups[0]) => {
@@ -266,7 +363,7 @@ export function SeriesView({
     return group?.episodes || [];
   }, [selectedSeries, seriesGroups]);
 
-  // Category counts
+  // Category counts - memoized
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: seriesGroups.length };
     categories.forEach(cat => {
@@ -275,6 +372,29 @@ export function SeriesView({
     });
     return counts;
   }, [categories, seriesGroups]);
+
+  // Show skeleton during initial computation
+  if (isInitializing && categories.length > 0) {
+    return (
+      <div className={cn('flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]', className)}>
+        <aside className="hidden lg:flex flex-col w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border">
+          <div className="p-4 border-b border-border">
+            <h2 className="font-semibold text-lg">Categorias</h2>
+          </div>
+          <div className="p-4">
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-10 bg-muted/50 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </aside>
+        <div className="flex-1 p-4 lg:p-6">
+          <SeriesGridSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]', className)}>
