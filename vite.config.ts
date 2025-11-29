@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-v2
+// Cache bust: 2025-11-29-v3 - Removed playwright files
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -151,12 +151,7 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-runtime",
       "react-router-dom",
     ],
-    esbuildOptions: {
-      // Force single React instance
-      define: {
-        global: 'globalThis',
-      },
-    },
+    force: true,
   },
   build: {
     chunkSizeWarningLimit: 1000,
