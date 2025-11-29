@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Config for chunked sync
+const CHUNK_SIZE = 70000; // Entries per chunk
+const BATCH_INSERT_SIZE = 1000;
+
 // AWS S3 Signature V4 helper for R2
 async function signR2Request(
   method: string,
@@ -176,15 +180,20 @@ interface ParsedEntry {
   rawExtInf: string;
 }
 
-// Optimized M3U Parser - streaming line-by-line
-function parseM3UOptimized(content: string, maxEntries = 50000): { entries: ParsedEntry[]; invalidCount: number; totalParsed: number } {
+// Optimized M3U Parser with offset support for chunked processing
+function parseM3UChunked(
+  content: string, 
+  offset = 0, 
+  chunkSize = CHUNK_SIZE
+): { entries: ParsedEntry[]; invalidCount: number; totalEntries: number; hasMore: boolean } {
   const lines = content.split(/\r?\n/);
   const entries: ParsedEntry[] = [];
   let invalidCount = 0;
-  let totalParsed = 0;
+  let totalEntries = 0;
   let currentExtInf: string | null = null;
+  let entriesFound = 0;
   
-  for (let i = 0; i < lines.length && entries.length < maxEntries; i++) {
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     if (!line || line === '#EXTM3U') continue;
@@ -197,7 +206,22 @@ function parseM3UOptimized(content: string, maxEntries = 50000): { entries: Pars
     if (line.startsWith('#')) continue;
     
     if (currentExtInf && isValidUrl(line)) {
-      totalParsed++;
+      totalEntries++;
+      
+      // Skip entries before offset
+      if (entriesFound < offset) {
+        entriesFound++;
+        currentExtInf = null;
+        continue;
+      }
+      
+      // Stop if we've collected enough for this chunk
+      if (entries.length >= chunkSize) {
+        currentExtInf = null;
+        continue; // Continue counting total
+      }
+      
+      entriesFound++;
       const entry = parseExtInfFast(currentExtInf, line);
       if (entry) {
         entries.push(entry);
@@ -206,7 +230,18 @@ function parseM3UOptimized(content: string, maxEntries = 50000): { entries: Pars
       }
       currentExtInf = null;
     } else if (isValidUrl(line)) {
-      totalParsed++;
+      totalEntries++;
+      
+      if (entriesFound < offset) {
+        entriesFound++;
+        continue;
+      }
+      
+      if (entries.length >= chunkSize) {
+        continue;
+      }
+      
+      entriesFound++;
       entries.push({
         title: extractTitleFromUrl(line),
         streamUrl: line,
@@ -219,13 +254,14 @@ function parseM3UOptimized(content: string, maxEntries = 50000): { entries: Pars
     }
   }
   
-  return { entries, invalidCount, totalParsed };
+  const hasMore = (offset + entries.length) < totalEntries;
+  
+  return { entries, invalidCount, totalEntries, hasMore };
 }
 
 // Fast EXTINF parser
 function parseExtInfFast(extinf: string, url: string): ParsedEntry | null {
   try {
-    // Quick regex for common format
     const match = extinf.match(/#EXTINF:(-?\d+)\s*(.*?)(?:,(.*))?$/);
     if (!match) return { title: extractTitleFromUrl(url), streamUrl: url, duration: -1, rawExtInf: extinf };
     
@@ -233,7 +269,6 @@ function parseExtInfFast(extinf: string, url: string): ParsedEntry | null {
     const attributes = match[2] || '';
     const title = match[3]?.trim() || extractTitleFromUrl(url);
     
-    // Fast attribute extraction
     const attrs: Record<string, string> = {};
     const attrRegex = /([\w-]+)=["']([^"']*)["']/g;
     let attrMatch;
@@ -250,7 +285,7 @@ function parseExtInfFast(extinf: string, url: string): ParsedEntry | null {
       tvgLogo: attrs['tvg-logo'],
       tvgLanguage: attrs['tvg-language'],
       duration,
-      rawExtInf: extinf.substring(0, 500), // Limit stored EXTINF
+      rawExtInf: extinf.substring(0, 500),
     };
   } catch {
     return null;
@@ -281,11 +316,13 @@ function generateHash(str: string): string {
   return Math.abs(hash).toString(16);
 }
 
-// Background sync processor
+// Background sync processor with chunked support
 async function processSyncInBackground(
   source: any,
   jobId: string,
-  triggeredBy: string
+  triggeredBy: string,
+  offset = 0,
+  isFirstChunk = true
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -294,11 +331,11 @@ async function processSyncInBackground(
   const jobStartTime = Date.now();
   
   try {
-    console.log(`[M3U-Sync-BG] Starting background sync for ${source.key}`);
+    console.log(`[M3U-Sync-BG] Starting chunk sync for ${source.key}, offset: ${offset}`);
     
     // Fetch with timeout
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000); // 2min timeout
+    const timeout = setTimeout(() => controller.abort(), 120000);
     
     const response = await fetchWithR2Support(source.source_url, controller.signal);
     clearTimeout(timeout);
@@ -312,11 +349,11 @@ async function processSyncInBackground(
     
     console.log(`[M3U-Sync-BG] Downloaded ${fileSize} bytes for ${source.key}`);
     
-    // Parse with limit to avoid memory issues
-    const { entries, invalidCount, totalParsed } = parseM3UOptimized(content, 100000);
-    console.log(`[M3U-Sync-BG] Parsed ${entries.length} entries (total: ${totalParsed}, invalid: ${invalidCount})`);
+    // Parse chunk
+    const { entries, invalidCount, totalEntries, hasMore } = parseM3UChunked(content, offset, CHUNK_SIZE);
+    console.log(`[M3U-Sync-BG] Parsed chunk: ${entries.length} entries (offset: ${offset}, total: ${totalEntries}, hasMore: ${hasMore})`);
     
-    // Deduplicate using Map for better performance
+    // Deduplicate
     const uniqueMap = new Map<string, ParsedEntry>();
     for (const entry of entries) {
       const hash = generateHash(entry.streamUrl);
@@ -325,17 +362,17 @@ async function processSyncInBackground(
       }
     }
     const uniqueEntries = Array.from(uniqueMap.values());
-    console.log(`[M3U-Sync-BG] ${uniqueEntries.length} unique entries`);
+    console.log(`[M3U-Sync-BG] ${uniqueEntries.length} unique entries in chunk`);
     
-    // Delete old entries
-    await supabase.from('m3u_sync_entries').delete().eq('source_id', source.id);
+    // Delete old entries only on first chunk
+    if (isFirstChunk) {
+      await supabase.from('m3u_sync_entries').delete().eq('source_id', source.id);
+    }
     
-    // Insert in larger batches (1000 per batch)
-    const batchSize = 1000;
+    // Insert in batches
     let insertedCount = 0;
-    
-    for (let i = 0; i < uniqueEntries.length; i += batchSize) {
-      const batch = uniqueEntries.slice(i, i + batchSize).map(entry => ({
+    for (let i = 0; i < uniqueEntries.length; i += BATCH_INSERT_SIZE) {
+      const batch = uniqueEntries.slice(i, i + BATCH_INSERT_SIZE).map(entry => ({
         source_id: source.id,
         entry_hash: generateHash(entry.streamUrl),
         title: entry.title.substring(0, 500),
@@ -357,42 +394,102 @@ async function processSyncInBackground(
         insertedCount += batch.length;
       }
       
-      // Yield to event loop every few batches
-      if (i % (batchSize * 5) === 0 && i > 0) {
+      if (i % (BATCH_INSERT_SIZE * 5) === 0 && i > 0) {
         await new Promise(r => setTimeout(r, 10));
       }
     }
     
     const duration = Date.now() - jobStartTime;
-    const checksum = generateHash(String(uniqueEntries.length) + source.id);
+    const newOffset = offset + entries.length;
+    const currentChunk = Math.floor(offset / CHUNK_SIZE) + 1;
+    const totalChunks = Math.ceil(totalEntries / CHUNK_SIZE);
     
-    // Update source
-    await supabase.from('m3u_sync_sources').update({
-      last_sync_at: new Date().toISOString(),
-      last_sync_status: 'completed',
-      last_error: null,
-      entries_count: insertedCount,
-      invalid_entries_count: invalidCount,
-      file_size_bytes: fileSize,
-      checksum,
-      metadata: {
-        ...(source.metadata || {}),
-        last_duration_ms: duration,
-        total_parsed: totalParsed,
-      },
-    }).eq('id', source.id);
+    // If there are more entries, update status as partial and return info for next chunk
+    if (hasMore) {
+      // Get current entry count from previous chunks
+      const { count: existingCount } = await supabase
+        .from('m3u_sync_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_id', source.id);
+      
+      await supabase.from('m3u_sync_sources').update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_status: 'partial',
+        last_error: null,
+        entries_count: existingCount || insertedCount,
+        invalid_entries_count: invalidCount,
+        file_size_bytes: fileSize,
+        metadata: {
+          ...(source.metadata || {}),
+          sync_offset: newOffset,
+          total_entries_available: totalEntries,
+          current_chunk: currentChunk,
+          total_chunks: totalChunks,
+          last_chunk_duration_ms: duration,
+        },
+      }).eq('id', source.id);
+      
+      await supabase.from('m3u_sync_jobs').update({
+        status: 'partial',
+        duration_ms: duration,
+        entries_count: existingCount || insertedCount,
+        invalid_entries_count: invalidCount,
+        metadata: {
+          chunk: currentChunk,
+          total_chunks: totalChunks,
+          next_offset: newOffset,
+          has_more: true,
+        },
+      }).eq('id', jobId);
+      
+      console.log(`[M3U-Sync-BG] ⏳ Chunk ${currentChunk}/${totalChunks} completed. Next offset: ${newOffset}`);
+      
+    } else {
+      // All chunks processed - final update
+      const { count: totalCount } = await supabase
+        .from('m3u_sync_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_id', source.id);
+      
+      const checksum = generateHash(String(totalCount) + source.id);
+      
+      await supabase.from('m3u_sync_sources').update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_status: 'completed',
+        last_error: null,
+        entries_count: totalCount || insertedCount,
+        invalid_entries_count: invalidCount,
+        file_size_bytes: fileSize,
+        checksum,
+        metadata: {
+          ...(source.metadata || {}),
+          sync_offset: 0,
+          total_entries_available: totalEntries,
+          current_chunk: 0,
+          total_chunks: totalChunks,
+          last_full_sync_duration_ms: duration,
+          total_entries_synced: totalCount,
+        },
+      }).eq('id', source.id);
+      
+      await supabase.from('m3u_sync_jobs').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        duration_ms: duration,
+        entries_count: totalCount || insertedCount,
+        invalid_entries_count: invalidCount,
+        file_size_bytes: fileSize,
+        metadata: {
+          chunk: currentChunk,
+          total_chunks: totalChunks,
+          completed: true,
+        },
+      }).eq('id', jobId);
+      
+      console.log(`[M3U-Sync-BG] ✅ All chunks completed for ${source.key}: ${totalCount} entries`);
+    }
     
-    // Update job
-    await supabase.from('m3u_sync_jobs').update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      duration_ms: duration,
-      entries_count: insertedCount,
-      invalid_entries_count: invalidCount,
-      file_size_bytes: fileSize,
-    }).eq('id', jobId);
-    
-    console.log(`[M3U-Sync-BG] ✅ Completed sync for ${source.key}: ${insertedCount} entries in ${duration}ms`);
+    return { hasMore, nextOffset: newOffset, totalEntries, insertedCount, currentChunk, totalChunks };
     
   } catch (error: any) {
     const duration = Date.now() - jobStartTime;
@@ -419,6 +516,8 @@ async function processSyncInBackground(
       error_type: 'sync_failed',
       error_message: errorMsg,
     });
+    
+    return { hasMore: false, error: errorMsg };
   }
 }
 
@@ -477,7 +576,7 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     
-    // POST /sync - Trigger sync (ASYNC with background processing)
+    // POST /sync - Trigger sync with optional offset for chunked processing
     if (req.method === 'POST' && (path === '/sync' || path === '' || path === '/')) {
       const authHeader = req.headers.get('authorization');
       const cronSecret = Deno.env.get('CRON_SECRET');
@@ -501,7 +600,7 @@ serve(async (req) => {
             }
           }
         } catch (e) {
-          console.log('[M3U-Sync] Token verification failed');
+          console.log('[M3U-Sync] Auth check failed:', e);
         }
       }
       
@@ -513,102 +612,108 @@ serve(async (req) => {
       }
       
       const body = await req.json().catch(() => ({}));
-      const { key, triggered_by = 'api' } = body;
+      const { key, triggered_by = 'manual', offset = 0, continue_sync = false } = body;
+      const isFirstChunk = offset === 0 && !continue_sync;
       
-      console.log(`[M3U-Sync] Starting sync - key: ${key || 'all'}, triggered_by: ${triggered_by}`);
+      let sourcesToSync: any[] = [];
       
-      let query = supabase.from('m3u_sync_sources').select('*').eq('enabled', true);
-      if (key) query = query.eq('key', key);
+      if (key) {
+        const { data: source, error } = await supabase
+          .from('m3u_sync_sources')
+          .select('*')
+          .eq('key', key)
+          .eq('enabled', true)
+          .single();
+        
+        if (error || !source) {
+          return new Response(JSON.stringify({ error: 'Source not found or disabled' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        sourcesToSync = [source];
+      } else {
+        const { data: sources } = await supabase
+          .from('m3u_sync_sources')
+          .select('*')
+          .eq('enabled', true);
+        sourcesToSync = sources || [];
+      }
       
-      const { data: sources, error: sourcesError } = await query;
-      
-      if (sourcesError) throw sourcesError;
-      if (!sources || sources.length === 0) {
+      if (sourcesToSync.length === 0) {
         return new Response(JSON.stringify({ error: 'No sources to sync' }), {
-          status: 404,
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
-      const jobs = [];
+      const results: any[] = [];
       
-      // Create jobs and start background processing
-      for (const source of sources) {
+      for (const source of sourcesToSync) {
+        // Create job record
         const { data: job, error: jobError } = await supabase
           .from('m3u_sync_jobs')
-          .insert({ source_id: source.id, status: 'running', triggered_by })
+          .insert({
+            source_id: source.id,
+            status: 'running',
+            started_at: new Date().toISOString(),
+            triggered_by,
+            metadata: { offset, is_continuation: continue_sync },
+          })
           .select()
           .single();
         
         if (jobError) {
-          console.error(`[M3U-Sync] Failed to create job for ${source.key}:`, jobError);
+          console.error('[M3U-Sync] Failed to create job:', jobError);
           continue;
         }
         
-        jobs.push({ key: source.key, jobId: job.id, status: 'started' });
+        // Update source status
+        await supabase.from('m3u_sync_sources').update({
+          last_sync_status: 'running',
+          last_error: null,
+        }).eq('id', source.id);
         
-        // Start background processing using waitUntil
-        // @ts-ignore - EdgeRuntime is available in Supabase edge functions
-        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-          // @ts-ignore
-          EdgeRuntime.waitUntil(processSyncInBackground(source, job.id, triggered_by));
-        } else {
-          // Fallback for environments without waitUntil - process first source only
-          await processSyncInBackground(source, job.id, triggered_by);
-        }
+        // Start background processing
+        EdgeRuntime.waitUntil(
+          processSyncInBackground(source, job.id, triggered_by, offset, isFirstChunk)
+        );
+        
+        results.push({
+          source_key: source.key,
+          job_id: job.id,
+          status: 'started',
+          offset,
+          message: `Sync started for ${source.name}${offset > 0 ? ` (continuing from entry ${offset})` : ''}`,
+        });
       }
       
-      // Return immediately - sync continues in background
       return new Response(JSON.stringify({
         success: true,
-        message: 'Sync started in background',
-        jobs,
-        started_at: new Date().toISOString(),
+        syncs_started: results.length,
+        results,
+        chunked: true,
+        chunk_size: CHUNK_SIZE,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     
     // POST /source - Create new source
     if (req.method === 'POST' && path === '/source') {
-      const authHeader = req.headers.get('authorization');
-      if (!authHeader?.includes(supabaseKey)) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
       const body = await req.json();
-      const { key, name, source_url, sync_interval_minutes = 30 } = body;
-      
-      if (!key || !name || !source_url) {
-        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      if (!/^[a-z0-9-_]+$/.test(key)) {
-        return new Response(JSON.stringify({ error: 'Invalid key format' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
       
       const { data, error } = await supabase
         .from('m3u_sync_sources')
-        .insert({ key, name, source_url, sync_interval_minutes, enabled: true })
+        .insert({
+          key: body.key,
+          name: body.name,
+          source_url: body.source_url,
+          sync_interval_minutes: body.sync_interval_minutes || 30,
+          enabled: body.enabled ?? true,
+        })
         .select()
         .single();
       
-      if (error) {
-        if (error.code === '23505') {
-          return new Response(JSON.stringify({ error: 'Source already exists' }), {
-            status: 409,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        throw error;
-      }
+      if (error) throw error;
       
       return new Response(JSON.stringify({ source: data }), {
         status: 201,
@@ -618,16 +723,14 @@ serve(async (req) => {
     
     // DELETE /source/:key
     if (req.method === 'DELETE' && path.startsWith('/source/')) {
-      const authHeader = req.headers.get('authorization');
-      if (!authHeader?.includes(supabaseKey)) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
       const key = path.replace('/source/', '');
-      await supabase.from('m3u_sync_sources').delete().eq('key', key);
+      
+      const { error } = await supabase
+        .from('m3u_sync_sources')
+        .delete()
+        .eq('key', key);
+      
+      if (error) throw error;
       
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -636,30 +739,21 @@ serve(async (req) => {
     
     // GET /search
     if (req.method === 'GET' && path === '/search') {
-      const q = url.searchParams.get('q');
-      const sourceKey = url.searchParams.get('source');
-      const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
-      
-      if (!q || q.length < 2) {
-        return new Response(JSON.stringify({ error: 'Query must be at least 2 characters' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const query = url.searchParams.get('q') || '';
+      const sourceKey = url.searchParams.get('source') || null;
+      const limit = parseInt(url.searchParams.get('limit') || '50');
       
       const { data, error } = await supabase.rpc('search_m3u_entries', {
-        search_query: q,
-        source_key: sourceKey || null,
-        limit_count: limit,
+        search_query: query,
+        source_key: sourceKey,
+        limit_count: Math.min(limit, 200),
       });
       
       if (error) throw error;
       
-      return new Response(JSON.stringify({
-        query: q,
-        results: data || [],
-        count: data?.length || 0,
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ results: data || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
     return new Response(JSON.stringify({ error: 'Not found' }), {
@@ -669,14 +763,14 @@ serve(async (req) => {
     
   } catch (error: any) {
     console.error('[M3U-Sync] Error:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-// Handle shutdown gracefully
+// Graceful shutdown handler
 addEventListener('beforeunload', (ev: any) => {
   console.log('[M3U-Sync] Function shutting down:', ev.detail?.reason);
 });
