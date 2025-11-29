@@ -6,7 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-cron-secret',
 };
 
-// Declaração do EdgeRuntime para Deno
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void;
 };
@@ -17,22 +16,19 @@ serve(async (req) => {
   }
 
   try {
-    // Verificar autenticação via cron secret, service role, ou admin
+    // Verificar autenticação
     const cronSecret = req.headers.get('x-supabase-cron-secret');
     const authHeader = req.headers.get('authorization');
     const expectedSecret = Deno.env.get('CRON_SECRET');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-    // Verificar diferentes métodos de autorização
     const isCronRequest = cronSecret === expectedSecret;
     const isServiceRoleRequest = authHeader?.includes(serviceRoleKey || '');
-    // Permitir chamadas internas do pg_cron (vêm com anon key no header)
     const isPgCronRequest = authHeader?.includes(anonKey || '') && 
                            req.headers.get('user-agent')?.includes('pg_net');
     let isAdminRequest = false;
 
-    // Se for chamada do pg_cron ou service role, autorizar
     if (!isCronRequest && !isServiceRoleRequest && !isPgCronRequest && authHeader) {
       const supabaseAuth = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -46,238 +42,163 @@ serve(async (req) => {
       }
     }
 
-    const isAuthorized = isCronRequest || isServiceRoleRequest || isPgCronRequest || isAdminRequest;
-    
-    if (!isAuthorized) {
-      console.error('[ScheduleVOD] Unauthorized attempt');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!isCronRequest && !isServiceRoleRequest && !isPgCronRequest && !isAdminRequest) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    
-    console.log(`🔐 [ScheduleVOD] Autorizado via: ${isCronRequest ? 'cron_secret' : isServiceRoleRequest ? 'service_role' : isPgCronRequest ? 'pg_cron' : 'admin'}`);
-    
 
     const body = await req.json().catch(() => ({}));
-    const { 
-      limit = 20,           // Máximo de VODs por execução
-      priority = 'size',    // Priorizar por: 'size' (menores primeiro), 'recent', 'category'
-      categoryFilter = null // Filtrar por categoria específica
-    } = body;
+    const { limit = 3 } = body;
 
-    console.log(`🕐 [ScheduleVOD] Iniciando - limit: ${limit}, priority: ${priority}`);
+    console.log(`🕐 [ScheduleVOD] Iniciando - limit: ${limit}`);
 
-    const supabaseService = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // 1. Verificar downloads ativos
-    const { count: activeDownloads } = await supabaseService
+    const { count: activeCount } = await supabase
       .from('vod_downloads')
       .select('*', { count: 'exact', head: true })
       .in('status', ['downloading', 'processing', 'queued']);
 
-    // 1.1 Verificar downloads pausados que podem ser retomados
-    const { data: pausedDownloads } = await supabaseService
+    const MAX_CONCURRENT = 3;
+    const availableSlots = Math.max(0, MAX_CONCURRENT - (activeCount || 0));
+
+    if (availableSlots === 0) {
+      console.log(`⏸️ [ScheduleVOD] Limite atingido (${activeCount}/${MAX_CONCURRENT})`);
+      return new Response(JSON.stringify({ success: true, scheduled: 0, active: activeCount }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // 2. Resetar downloads travados (>10 min sem atualização)
+    const { data: stuckDownloads } = await supabase
+      .from('vod_downloads')
+      .select('id')
+      .in('status', ['downloading', 'processing'])
+      .lt('updated_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
+    if (stuckDownloads && stuckDownloads.length > 0) {
+      console.log(`🔄 [ScheduleVOD] Resetando ${stuckDownloads.length} downloads travados`);
+      await supabase
+        .from('vod_downloads')
+        .update({ status: 'failed', error_message: 'Timeout automático' })
+        .in('id', stuckDownloads.map(d => d.id));
+    }
+
+    // 3. Retomar downloads pausados primeiro
+    const { data: pausedDownloads } = await supabase
       .from('vod_downloads')
       .select('id')
       .eq('status', 'paused')
       .order('updated_at', { ascending: true })
-      .limit(3);
+      .limit(availableSlots);
 
-    // Retomar downloads pausados primeiro
     if (pausedDownloads && pausedDownloads.length > 0) {
       console.log(`🔄 [ScheduleVOD] Retomando ${pausedDownloads.length} downloads pausados`);
-      EdgeRuntime.waitUntil(
-        resumePausedDownloads(pausedDownloads.map(d => d.id), supabaseService)
-      );
+      EdgeRuntime.waitUntil(resumeDownloads(pausedDownloads.map(d => d.id)));
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        resumed: pausedDownloads.length,
+        active: activeCount 
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const MAX_CONCURRENT = 5;
-    const availableSlots = Math.max(0, MAX_CONCURRENT - (activeDownloads || 0) - (pausedDownloads?.length || 0));
-
-    if (availableSlots === 0) {
-      console.log(`⏸️ [ScheduleVOD] Slots esgotados (${activeDownloads}/${MAX_CONCURRENT})`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Downloads em andamento no limite',
-          scheduled: 0,
-          activeDownloads: activeDownloads || 0
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // 2. Buscar VODs pendentes com critérios inteligentes
-    let query = supabaseService
+    // 4. Buscar VODs pendentes
+    const { data: pendingVODs, error: pendingError } = await supabase
       .from('m3u_channels')
-      .select('id, name, stream_url, category_id, metadata, created_at')
+      .select('id, name, stream_url')
       .eq('is_vod', true)
-      .eq('r2_uploaded', false);
+      .eq('r2_uploaded', false)
+      .order('name')
+      .limit(availableSlots * 2);
 
-    if (categoryFilter) {
-      query = query.eq('category_id', categoryFilter);
-    }
-
-    // Aplicar ordenação por prioridade
-    switch (priority) {
-      case 'recent':
-        query = query.order('created_at', { ascending: false });
-        break;
-      case 'category':
-        query = query.order('category_id').order('name');
-        break;
-      default: // 'size' - menores primeiro (assumindo metadata.duration)
-        query = query.order('name'); // Fallback para nome
-    }
-
-    query = query.limit(Math.min(limit, availableSlots * 3)); // Buscar mais para filtrar
-
-    const { data: pendingVODs, error: pendingError } = await query;
-
-    if (pendingError) {
-      throw new Error(`Erro ao buscar VODs: ${pendingError.message}`);
-    }
-
-    if (!pendingVODs || pendingVODs.length === 0) {
+    if (pendingError || !pendingVODs || pendingVODs.length === 0) {
       console.log('✅ [ScheduleVOD] Nenhum VOD pendente');
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Nenhum VOD pendente',
-          scheduled: 0
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: true, scheduled: 0 }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 3. Filtrar VODs com muitas falhas E que já estão em download
+    // 5. Filtrar VODs já em download ou com muitas falhas
     const vodIds = pendingVODs.map(v => v.id);
+    
+    const { data: existingDownloads } = await supabase
+      .from('vod_downloads')
+      .select('channel_id, original_url, status, retry_count')
+      .or(`channel_id.in.(${vodIds.join(',')}),status.in.(queued,downloading,processing,paused)`);
+
+    const blockedChannels = new Set<string>();
+    const blockedUrls = new Set<string>();
+    
+    existingDownloads?.forEach(d => {
+      if (d.status && ['queued', 'downloading', 'processing', 'paused'].includes(d.status)) {
+        blockedChannels.add(d.channel_id);
+        if (d.original_url) blockedUrls.add(d.original_url);
+      }
+      if ((d.retry_count || 0) >= 3) {
+        blockedChannels.add(d.channel_id);
+      }
+    });
+
+    // Verificar URLs já no R2
     const vodUrls = pendingVODs.map(v => v.stream_url);
-    
-    // Buscar downloads com muitas falhas
-    const { data: failedDownloads } = await supabaseService
-      .from('vod_downloads')
-      .select('channel_id, retry_count')
-      .in('channel_id', vodIds)
-      .eq('status', 'failed')
-      .gte('retry_count', 3);
-
-    const blockedIds = new Set(failedDownloads?.map(f => f.channel_id) || []);
-
-    // Buscar VODs que JÁ ESTÃO em download (prevenir duplicados por canal)
-    const { data: alreadyInProgress } = await supabaseService
-      .from('vod_downloads')
-      .select('id, channel_id, original_url, status')
-      .in('status', ['queued', 'downloading', 'processing', 'paused']);
-
-    const alreadyDownloadingIds = new Set(alreadyInProgress?.map(d => d.channel_id) || []);
-    const alreadyDownloadingUrls = new Set(alreadyInProgress?.map(d => d.original_url) || []);
-    
-    // Se encontrou duplicados ativos, logar
-    if (alreadyDownloadingIds.size > 0) {
-      console.log(`⚠️ [ScheduleVOD] ${alreadyDownloadingIds.size} canais já em download, ignorando`);
-    }
-
-    // NOVO: Buscar canais com mesma URL que já tem r2_uploaded
-    const { data: alreadyUploadedSameUrl } = await supabaseService
+    const { data: uploadedSameUrl } = await supabase
       .from('m3u_channels')
       .select('stream_url')
       .in('stream_url', vodUrls)
       .eq('r2_uploaded', true);
 
-    const uploadedUrls = new Set(alreadyUploadedSameUrl?.map(c => c.stream_url) || []);
+    uploadedSameUrl?.forEach(c => blockedUrls.add(c.stream_url));
 
-    // Filtrar: remover bloqueados, já em download por canal OU por URL, E URLs já enviadas
-    const seenUrls = new Set<string>(); // Para evitar duplicados de URL no mesmo batch
-    const eligibleVODs = pendingVODs
-      .filter(v => {
-        // Verificar bloqueios
-        if (blockedIds.has(v.id)) return false;
-        if (alreadyDownloadingIds.has(v.id)) return false;
-        if (alreadyDownloadingUrls.has(v.stream_url)) return false;
-        if (uploadedUrls.has(v.stream_url)) return false;
-        
-        // NOVO: Evitar duplicados de URL no mesmo batch
-        if (seenUrls.has(v.stream_url)) {
-          console.log(`⚠️ [ScheduleVOD] URL duplicada no batch: ${v.name}`);
-          return false;
-        }
-        seenUrls.add(v.stream_url);
-        return true;
-      })
-      .slice(0, availableSlots);
+    // Filtrar elegíveis
+    const seenUrls = new Set<string>();
+    const eligible = pendingVODs.filter(v => {
+      if (blockedChannels.has(v.id)) return false;
+      if (blockedUrls.has(v.stream_url)) return false;
+      if (seenUrls.has(v.stream_url)) return false;
+      seenUrls.add(v.stream_url);
+      return true;
+    }).slice(0, availableSlots);
 
-    if (eligibleVODs.length === 0) {
-      console.log('⚠️ [ScheduleVOD] Nenhum VOD elegível (bloqueados, em download, ou URLs duplicadas)');
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Nenhum VOD elegível para download',
-          scheduled: 0,
-          blocked: blockedIds.size,
-          alreadyDownloading: alreadyDownloadingIds.size,
-          duplicateUrls: uploadedUrls.size
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (eligible.length === 0) {
+      console.log('⚠️ [ScheduleVOD] Nenhum VOD elegível');
+      return new Response(JSON.stringify({ 
+        success: true, 
+        scheduled: 0, 
+        blocked: blockedChannels.size 
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`📋 [ScheduleVOD] ${eligibleVODs.length} VODs para processar`);
+    console.log(`📋 [ScheduleVOD] ${eligible.length} VODs para processar`);
 
-    // 4. Usar batch mode para processar múltiplos VODs de forma eficiente
-    const channelIds = eligibleVODs.map(v => v.id);
+    // 6. Iniciar downloads
+    EdgeRuntime.waitUntil(triggerDownloads(eligible.map(v => v.id)));
 
-    // Iniciar processamento em background
-    EdgeRuntime.waitUntil(
-      triggerBatchDownload(channelIds, supabaseService)
-    );
+    // 7. Limpar downloads antigos
+    EdgeRuntime.waitUntil(supabase.rpc('cleanup_old_vod_downloads').catch(() => {}));
 
-    // 5. Limpar downloads antigos (em background)
-    EdgeRuntime.waitUntil(
-      (async () => {
-        const { error } = await supabaseService.rpc('cleanup_old_vod_downloads');
-        if (error) console.error('[ScheduleVOD] Cleanup error:', error);
-      })()
-    );
-
-    console.log(`✅ [ScheduleVOD] ${channelIds.length} VODs agendados para download`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        scheduled: channelIds.length,
-        activeDownloads: activeDownloads || 0,
-        availableSlots,
-        totalPending: pendingVODs.length,
-        blocked: blockedIds.size,
-        channelIds
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      scheduled: eligible.length,
+      active: activeCount,
+      channelIds: eligible.map(v => v.id)
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
     console.error('❌ [ScheduleVOD] Erro:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), 
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
 
-/**
- * Retoma downloads pausados
- */
-async function resumePausedDownloads(downloadIds: string[], _supabase: any): Promise<void> {
+async function resumeDownloads(downloadIds: string[]): Promise<void> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const cronSecret = Deno.env.get('CRON_SECRET');
   
   for (const downloadId of downloadIds) {
     try {
-      console.log(`🔄 [ScheduleVOD] Retomando download: ${downloadId}`);
       await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
         method: 'POST',
         headers: {
@@ -286,67 +207,27 @@ async function resumePausedDownloads(downloadIds: string[], _supabase: any): Pro
         },
         body: JSON.stringify({ resume: true, downloadId })
       });
-      // Pequeno delay entre retomadas
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
     } catch (err) {
-      console.error(`❌ [ScheduleVOD] Falha ao retomar ${downloadId}:`, err);
+      console.error(`❌ Falha ao retomar ${downloadId}:`, err);
     }
   }
 }
 
-/**
- * Dispara download em batch via edge function
- */
-async function triggerBatchDownload(
-  channelIds: string[],
-  _supabase: any
-): Promise<void> {
+async function triggerDownloads(channelIds: string[]): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  
   try {
-    console.log(`🚀 [ScheduleVOD] Disparando batch de ${channelIds.length} downloads`);
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const cronSecret = Deno.env.get('CRON_SECRET');
-    
-    const response = await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
+    await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-internal-secret': cronSecret || '',
+        'x-internal-secret': cronSecret || ''
       },
-      body: JSON.stringify({ 
-        batch: true,
-        channelIds 
-      })
+      body: JSON.stringify({ batch: true, channelIds })
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ [ScheduleVOD] Erro no batch: ${response.status} - ${errorText}`);
-    } else {
-      console.log(`✅ [ScheduleVOD] Batch iniciado com sucesso`);
-    }
   } catch (err) {
-    console.error(`❌ [ScheduleVOD] Falha ao disparar batch:`, err);
-    
-    // Fallback: invocar individualmente
-    console.log(`⚠️ [ScheduleVOD] Tentando downloads individuais...`);
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const cronSecret = Deno.env.get('CRON_SECRET');
-    
-    for (const channelId of channelIds.slice(0, 5)) { // Limitar fallback
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': cronSecret || '',
-          },
-          body: JSON.stringify({ channelId })
-        });
-      } catch {
-        console.error(`❌ [ScheduleVOD] Falha individual: ${channelId}`);
-      }
-    }
+    console.error(`❌ Falha ao disparar downloads:`, err);
   }
 }
