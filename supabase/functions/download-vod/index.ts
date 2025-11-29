@@ -11,13 +11,14 @@ declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void;
 };
 
-// Configuração de chunks para arquivos grandes
-const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB por chunk de download (menor = mais resiliente)
-const R2_PART_SIZE = 5 * 1024 * 1024; // 5MB por parte de upload R2 (mínimo)
+// Configuração de chunks para arquivos grandes - OTIMIZADO PARA ALTA BANDA
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB por chunk de download (maior = mais rápido)
+const R2_PART_SIZE = 25 * 1024 * 1024; // 25MB por parte de upload R2 (maior throughput)
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB máximo
-const EXECUTION_TIMEOUT = 40000; // 40 segundos por execução
-const MAX_RETRIES = 3; // Máximo de tentativas por chunk
-const RETRY_DELAY = 2000; // 2 segundos entre retries
+const EXECUTION_TIMEOUT = 50000; // 50 segundos por execução
+const MAX_RETRIES = 2; // Menos retries para falhar rápido
+const RETRY_DELAY = 1000; // 1 segundo entre retries (mais rápido)
+const BATCH_CONCURRENCY = 4; // Downloads simultâneos em batch
 
 // Função de retry com exponential backoff
 async function fetchWithRetry(url: string, options: RequestInit = {}, retries = MAX_RETRIES): Promise<Response> {
@@ -401,14 +402,13 @@ serve(async (req) => {
 });
 
 async function processBatchDownloads(channelIds: string[], supabase: any): Promise<void> {
-  const CONCURRENCY = 2;
   const queue = [...channelIds];
   const active: Promise<void>[] = [];
   const processedUrls = new Set<string>(); // Track URLs being processed in this batch
 
   while (queue.length > 0 || active.length > 0) {
-    while (active.length < CONCURRENCY && queue.length > 0) {
-      const channelId = queue.shift()!;
+    while (active.length < BATCH_CONCURRENCY && queue.length > 0) {
+      const channelId = queue.shift()!
       const promise = (async () => {
         try {
           const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
