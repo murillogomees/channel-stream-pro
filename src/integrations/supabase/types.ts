@@ -3671,6 +3671,7 @@ export type Database = {
           file_size_bytes: number | null
           id: string
           max_retries: number | null
+          metadata: Json | null
           original_url: string
           r2_url: string | null
           retry_count: number | null
@@ -3688,6 +3689,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           max_retries?: number | null
+          metadata?: Json | null
           original_url: string
           r2_url?: string | null
           retry_count?: number | null
@@ -3705,6 +3707,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           max_retries?: number | null
+          metadata?: Json | null
           original_url?: string
           r2_url?: string | null
           retry_count?: number | null
