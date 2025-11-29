@@ -33,14 +33,28 @@ export interface VODStatistics {
   vods_pending: number;
   downloads_in_progress: number;
   downloads_failed: number;
+  downloads_paused: number;
   total_storage_bytes: number;
   avg_file_size_mb: number;
+  blocked_hosts: number;
+  active_downloads: number;
 }
 
 export interface VODDetectionResult {
   updated_count: number;
   vod_count: number;
   live_count: number;
+}
+
+export interface HostStatus {
+  host: string;
+  consecutive_failures: number;
+  total_failures: number;
+  total_successes: number;
+  blocked_until: string | null;
+  health_status: 'healthy' | 'warning' | 'blocked';
+  avg_speed_mbps: number | null;
+  vod_count: number;
 }
 
 export const useVODManagement = () => {
@@ -663,6 +677,77 @@ export const useVODManagement = () => {
     fetchHostedVODs();
   }, [fetchDownloads, fetchStatistics, fetchHostedVODs]);
 
+  // Buscar status dos hosts (circuit breaker)
+  const fetchHostStatus = useCallback(async (): Promise<HostStatus[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('vw_host_status' as any)
+        .select('*')
+        .order('consecutive_failures', { ascending: false });
+      
+      if (error) throw error;
+      return (data || []) as unknown as HostStatus[];
+    } catch (error: any) {
+      console.error('Error fetching host status:', error);
+      return [];
+    }
+  }, []);
+
+  // Desbloquear host manualmente
+  const unblockHost = useCallback(async (host: string) => {
+    try {
+      const { error } = await supabase
+        .from('vod_host_status' as any)
+        .update({ blocked_until: null, consecutive_failures: 0 })
+        .eq('host', host);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Host desbloqueado',
+        description: `${host} foi desbloqueado com sucesso`,
+      });
+
+      await fetchStatistics();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao desbloquear',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }, [toast, fetchStatistics]);
+
+  // Retomar download específico (pausado)
+  const resumeDownload = useCallback(async (downloadId: string) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('download-vod', {
+        body: { resume: true, downloadId },
+        headers: session?.session?.access_token 
+          ? { Authorization: `Bearer ${session.session.access_token}` }
+          : undefined,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Download retomado',
+        description: 'O download será retomado em alguns segundos',
+      });
+
+      await fetchDownloads();
+      return data;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao retomar',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [toast, fetchDownloads]);
+
   return {
     downloads,
     hostedVODs,
@@ -678,8 +763,11 @@ export const useVODManagement = () => {
     cleanupDuplicates,
     cancelDownload,
     retryDownload,
+    resumeDownload,
     pauseAllDownloads,
     resumeAllDownloads,
+    fetchHostStatus,
+    unblockHost,
     refresh,
   };
 };

@@ -3674,6 +3674,7 @@ export type Database = {
           download_completed_at: string | null
           download_started_at: string | null
           error_message: string | null
+          etag: string | null
           file_size_bytes: number | null
           id: string
           max_retries: number | null
@@ -3683,6 +3684,7 @@ export type Database = {
           retry_count: number | null
           segment_count: number | null
           segments_downloaded: number | null
+          sha256: string | null
           status: string | null
           updated_at: string | null
         }
@@ -3692,6 +3694,7 @@ export type Database = {
           download_completed_at?: string | null
           download_started_at?: string | null
           error_message?: string | null
+          etag?: string | null
           file_size_bytes?: number | null
           id?: string
           max_retries?: number | null
@@ -3701,6 +3704,7 @@ export type Database = {
           retry_count?: number | null
           segment_count?: number | null
           segments_downloaded?: number | null
+          sha256?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -3710,6 +3714,7 @@ export type Database = {
           download_completed_at?: string | null
           download_started_at?: string | null
           error_message?: string | null
+          etag?: string | null
           file_size_bytes?: number | null
           id?: string
           max_retries?: number | null
@@ -3719,6 +3724,7 @@ export type Database = {
           retry_count?: number | null
           segment_count?: number | null
           segments_downloaded?: number | null
+          sha256?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -3731,6 +3737,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vod_host_status: {
+        Row: {
+          avg_download_speed_bps: number | null
+          blocked_until: string | null
+          consecutive_failures: number | null
+          created_at: string | null
+          host: string
+          id: string
+          last_failure_at: string | null
+          last_success_at: string | null
+          total_failures: number | null
+          total_successes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_download_speed_bps?: number | null
+          blocked_until?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          host: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_download_speed_bps?: number | null
+          blocked_until?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          host?: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       watch_history: {
         Row: {
@@ -3991,6 +4039,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_host_status: {
+        Row: {
+          avg_download_speed_bps: number | null
+          avg_speed_mbps: number | null
+          blocked_until: string | null
+          consecutive_failures: number | null
+          health_status: string | null
+          host: string | null
+          last_failure_at: string | null
+          last_success_at: string | null
+          total_failures: number | null
+          total_successes: number | null
+          updated_at: string | null
+          vod_count: number | null
+        }
+        Insert: {
+          avg_download_speed_bps?: number | null
+          avg_speed_mbps?: never
+          blocked_until?: string | null
+          consecutive_failures?: number | null
+          health_status?: never
+          host?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string | null
+          vod_count?: never
+        }
+        Update: {
+          avg_download_speed_bps?: number | null
+          avg_speed_mbps?: never
+          blocked_until?: string | null
+          consecutive_failures?: number | null
+          health_status?: never
+          host?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string | null
+          vod_count?: never
+        }
+        Relationships: []
+      }
       vw_stream_performance: {
         Row: {
           avg_bitrate_kbps: number | null
@@ -4023,6 +4116,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_host_circuit_breaker: {
+        Args: { p_url: string }
+        Returns: {
+          blocked_until: string
+          consecutive_failures: number
+          host: string
+          is_blocked: boolean
+        }[]
+      }
       check_suspicious_login: {
         Args: { _email?: string; _ip_address: string }
         Returns: Json
@@ -4037,6 +4139,7 @@ export type Database = {
       cleanup_old_stream_analytics: { Args: never; Returns: undefined }
       cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
+      cleanup_orphaned_downloads: { Args: never; Returns: number }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       detect_vod_channels: {
         Args: never
@@ -4052,6 +4155,14 @@ export type Database = {
           live_count: number
           updated_count: number
           vod_count: number
+        }[]
+      }
+      find_vod_by_hash: {
+        Args: { p_sha256: string }
+        Returns: {
+          channel_id: string
+          file_size_bytes: number
+          r2_url: string
         }[]
       }
       get_active_sessions: {
@@ -4216,9 +4327,12 @@ export type Database = {
       get_vod_statistics: {
         Args: never
         Returns: {
+          active_downloads: number
           avg_file_size_mb: number
+          blocked_hosts: number
           downloads_failed: number
           downloads_in_progress: number
+          downloads_paused: number
           total_storage_bytes: number
           total_vods: number
           vods_pending: number
@@ -4290,6 +4404,14 @@ export type Database = {
           p_profile_id: string
           p_watch_seconds?: number
         }
+        Returns: undefined
+      }
+      record_host_failure: {
+        Args: { p_error?: string; p_url: string }
+        Returns: undefined
+      }
+      record_host_success: {
+        Args: { p_bytes?: number; p_duration_ms?: number; p_url: string }
         Returns: undefined
       }
       release_playlist_sync_lock: {

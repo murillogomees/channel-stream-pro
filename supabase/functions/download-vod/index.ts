@@ -17,8 +17,10 @@ const CHUNK_SIZE = 5 * 1024 * 1024;         // 5MB por chunk de download
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB máximo
 const EXECUTION_TIMEOUT = 55000;            // 55 segundos max por execução (edge limit ~60s)
 const FETCH_TIMEOUT_CHUNK = 30000;          // 30s timeout por chunk com range
-const FETCH_TIMEOUT_FULL = 120000;          // 120s timeout para download completo sem range
-const PROGRESS_UPDATE_INTERVAL = 5000;      // 5 segundos
+const PROGRESS_UPDATE_INTERVAL = 3000;      // 3 segundos (mais frequente)
+const MAX_RETRIES_PER_CHUNK = 3;            // Máximo de retries por chunk
+const RETRY_BASE_DELAY = 1000;              // 1s delay base para retry
+const CONNECTION_RETRY_DELAY = 2000;        // 2s antes de reconectar
 
 let r2Client: AwsClient | null = null;
 
@@ -95,19 +97,27 @@ async function uploadPart(key: string, uploadId: string, partNumber: number, bod
   const client = getR2Client();
   const endpoint = getR2Endpoint();
   
-  const response = await client.fetch(
-    `${endpoint}/${key}?partNumber=${partNumber}&uploadId=${uploadId}`,
-    { method: 'PUT', body }
-  );
-  
-  if (!response.ok) {
-    throw new Error(`Failed to upload part ${partNumber}: ${response.status}`);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await client.fetch(
+        `${endpoint}/${key}?partNumber=${partNumber}&uploadId=${uploadId}`,
+        { method: 'PUT', body }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to upload part ${partNumber}: ${response.status}`);
+      }
+      
+      const etag = response.headers.get('etag');
+      if (!etag) throw new Error(`No ETag for part ${partNumber}`);
+      
+      return etag;
+    } catch (e) {
+      if (attempt === 2) throw e;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
   }
-  
-  const etag = response.headers.get('etag');
-  if (!etag) throw new Error(`No ETag for part ${partNumber}`);
-  
-  return etag;
+  throw new Error('Upload part failed after retries');
 }
 
 async function completeMultipartUpload(key: string, uploadId: string, parts: { partNumber: number; etag: string }[]): Promise<void> {
@@ -136,6 +146,15 @@ async function abortMultipartUpload(key: string, uploadId: string): Promise<void
     await client.fetch(`${endpoint}/${key}?uploadId=${uploadId}`, { method: 'DELETE' });
   } catch (e) {
     console.error('Failed to abort multipart:', e);
+  }
+}
+
+// Extrair host da URL para circuit breaker
+function extractHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'unknown';
   }
 }
 
@@ -202,6 +221,7 @@ serve(async (req) => {
       const { data: paused } = await supabaseService.from('vod_downloads')
         .select('id')
         .eq('status', 'paused')
+        .order('updated_at', { ascending: false })
         .limit(3);
       
       if (paused && paused.length > 0) {
@@ -238,13 +258,25 @@ serve(async (req) => {
     if (channelError || !channel) throw new Error(`Canal não encontrado`);
     if (!channel.is_vod) throw new Error('Canal não é VOD');
 
+    // Verificar circuit breaker do host
+    const host = extractHost(channel.stream_url);
+    const { data: circuitStatus } = await supabaseService.rpc('check_host_circuit_breaker', { p_url: channel.stream_url });
+    
+    if (circuitStatus?.[0]?.is_blocked) {
+      const blockedUntil = new Date(circuitStatus[0].blocked_until).toLocaleTimeString();
+      return new Response(JSON.stringify({ 
+        error: `Host ${host} bloqueado temporariamente até ${blockedUntil}`, 
+        blocked_until: circuitStatus[0].blocked_until 
+      }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Verificar se já foi enviado ao R2
     if (channel.r2_uploaded) {
       return new Response(JSON.stringify({ error: 'Já enviado ao R2', r2Url: channel.r2_url }), 
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Verificar se mesma URL já está no R2
+    // Verificar se mesma URL já está no R2 (deduplicação)
     const { data: sameUrlUploaded } = await supabaseService
       .from('m3u_channels')
       .select('id, r2_url')
@@ -259,6 +291,7 @@ serve(async (req) => {
         r2_url: sameUrlUploaded.r2_url, 
         r2_uploaded_at: new Date().toISOString() 
       }).eq('id', channelId);
+      console.log(`🔗 [VOD] Deduplicado por URL: ${channel.name}`);
       return new Response(JSON.stringify({ success: true, linked: true, r2Url: sameUrlUploaded.r2_url }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -272,6 +305,12 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingDownload) {
+      // Se está pausado, retomar
+      if (existingDownload.status === 'paused') {
+        EdgeRuntime.waitUntil(processResumeDownload(existingDownload.id, supabaseService));
+        return new Response(JSON.stringify({ success: true, resumed: true, downloadId: existingDownload.id }), 
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       return new Response(JSON.stringify({ error: 'Download em andamento', downloadId: existingDownload.id }), 
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -306,14 +345,26 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
       const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
       if (!channel?.is_vod || channel.r2_uploaded) continue;
 
+      // Verificar circuit breaker
+      const { data: circuitStatus } = await supabase.rpc('check_host_circuit_breaker', { p_url: channel.stream_url });
+      if (circuitStatus?.[0]?.is_blocked) {
+        console.log(`⚠️ [VOD] Host bloqueado, pulando: ${channel.name}`);
+        continue;
+      }
+
       const { data: existing } = await supabase
         .from('vod_downloads')
-        .select('id')
+        .select('id, status')
         .eq('channel_id', channelId)
         .in('status', ['queued', 'downloading', 'processing', 'paused'])
         .maybeSingle();
       
-      if (existing) continue;
+      if (existing) {
+        if (existing.status === 'paused') {
+          await processResumeDownload(existing.id, supabase);
+        }
+        continue;
+      }
 
       const { data: downloadRecord } = await supabase.from('vod_downloads').insert({
         channel_id: channelId,
@@ -340,30 +391,46 @@ async function processResumeDownload(downloadId: string, supabase: any): Promise
 
   if (!download) return;
 
+  // Verificar circuit breaker antes de retomar
+  const { data: circuitStatus } = await supabase.rpc('check_host_circuit_breaker', { p_url: download.original_url });
+  if (circuitStatus?.[0]?.is_blocked) {
+    console.log(`⚠️ [VOD] Host bloqueado, adiando resume: ${downloadId}`);
+    return;
+  }
+
   await processDownload(download.m3u_channels, downloadId, supabase, download.metadata);
 }
 
 async function processDownload(channel: any, downloadId: string, supabase: any, resumeMetadata?: any): Promise<void> {
   const startTime = Date.now();
+  const host = extractHost(channel.stream_url);
   
   try {
-    // Marcar início imediato para evitar órfãos
+    // Marcar início imediato
     await supabase.from('vod_downloads').update({ 
       status: 'downloading',
       updated_at: new Date().toISOString()
     }).eq('id', downloadId);
     
-    console.log(`📥 [VOD] Processando: ${channel.name}`);
+    console.log(`📥 [VOD] Processando: ${channel.name} (${host})`);
 
     const isHLS = channel.stream_url.includes('.m3u8');
     
     if (isHLS) {
       await downloadHLS(channel, downloadId, supabase);
     } else {
-      await downloadFileChunked(channel, downloadId, supabase, resumeMetadata);
+      await downloadFileWithReconnect(channel, downloadId, supabase, resumeMetadata);
     }
 
-    // Sucesso - atualizar canal
+    // Sucesso - registrar no circuit breaker
+    const duration = Date.now() - startTime;
+    await supabase.rpc('record_host_success', { 
+      p_url: channel.stream_url, 
+      p_bytes: resumeMetadata?.downloaded_bytes || null,
+      p_duration_ms: duration 
+    });
+
+    // Atualizar canal
     let r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN')?.replace(/^https?:\/\//, '');
     const ext = new URL(channel.stream_url).pathname.split('.').pop() || 'mp4';
     const r2Url = isHLS 
@@ -376,7 +443,7 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
       r2_uploaded_at: new Date().toISOString() 
     }).eq('id', channel.id);
 
-    // Atualizar outros canais com mesma URL
+    // Atualizar outros canais com mesma URL (deduplicação)
     await supabase.from('m3u_channels').update({ 
       r2_uploaded: true, 
       r2_url: r2Url, 
@@ -395,8 +462,10 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
   } catch (error: any) {
     console.error(`❌ [VOD] Falha: ${channel.name} - ${error.message}`);
     
-    // Só marca como failed se não for timeout controlado
+    // Registrar falha no circuit breaker (exceto pausas controladas)
     if (!error.message?.includes('PAUSE_FOR_RESUME')) {
+      await supabase.rpc('record_host_failure', { p_url: channel.stream_url, p_error: error.message });
+      
       await supabase.from('vod_downloads').update({ 
         status: 'failed', 
         error_message: error.message?.substring(0, 200),
@@ -406,16 +475,24 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
   }
 }
 
-// Download em chunks com Range headers para permitir resumo real
-async function downloadFileChunked(channel: any, downloadId: string, supabase: any, resumeMetadata?: any): Promise<void> {
+// Download com reconexão automática
+async function downloadFileWithReconnect(channel: any, downloadId: string, supabase: any, resumeMetadata?: any): Promise<void> {
   const ext = new URL(channel.stream_url).pathname.split('.').pop() || 'mp4';
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
-  // Obter tamanho total do arquivo
+  // Estado do download
   let contentLength = resumeMetadata?.content_length || 0;
   let supportsRanges = resumeMetadata?.supports_ranges || false;
+  let uploadId = resumeMetadata?.upload_id;
+  let parts: { partNumber: number; etag: string }[] = resumeMetadata?.parts || [];
+  let downloadedBytes = resumeMetadata?.downloaded_bytes || 0;
+  let partNumber = parts.length + 1;
+  let buffer = new Uint8Array(0);
+  let connectionRetries = resumeMetadata?.connection_retries || 0;
+  const maxConnectionRetries = 5;
   
+  // Obter tamanho total se não temos
   if (!contentLength) {
     try {
       const headRes = await fetch(channel.stream_url, { 
@@ -435,9 +512,9 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
     throw new Error(`Arquivo muito grande: ${(contentLength / 1073741824).toFixed(1)}GB`);
   }
 
-  console.log(`📊 [VOD] Tamanho: ${contentLength > 0 ? (contentLength / 1048576).toFixed(1) + 'MB' : 'desconhecido'}, Ranges: ${supportsRanges}`);
+  console.log(`📊 [VOD] Tamanho: ${contentLength > 0 ? (contentLength / 1048576).toFixed(1) + 'MB' : 'desconhecido'}, Ranges: ${supportsRanges}, Retries: ${connectionRetries}`);
 
-  // Atualizar progresso imediatamente para evitar detecção como órfão
+  // Atualizar estado inicial
   await supabase.from('vod_downloads').update({
     file_size_bytes: contentLength || null,
     updated_at: new Date().toISOString(),
@@ -455,312 +532,239 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
     return;
   }
 
-  // Recuperar estado do resume se disponível
-  let uploadId = resumeMetadata?.upload_id;
-  let parts: { partNumber: number; etag: string }[] = resumeMetadata?.parts || [];
-  let downloadedBytes = resumeMetadata?.downloaded_bytes || 0;
-  let partNumber = parts.length + 1;
-
   // Iniciar multipart upload se não tiver
   if (!uploadId) {
     uploadId = await initiateMultipartUpload(r2Key, contentType);
     console.log(`🔑 [VOD] Upload ID: ${uploadId.substring(0, 20)}...`);
   } else {
-    console.log(`🔄 [VOD] Retomando de ${(downloadedBytes / 1048576).toFixed(1)}MB, parte ${partNumber}`);
+    console.log(`🔄 [VOD] Retomando de ${(downloadedBytes / 1048576).toFixed(1)}MB, parte ${partNumber}, retry ${connectionRetries}`);
   }
 
   const startExecution = Date.now();
   let lastUpdate = Date.now();
-  let buffer = new Uint8Array(0);
-
-  try {
-    // Download com Range headers se suportado e temos progresso
-    while (downloadedBytes < contentLength || contentLength === 0) {
-      // Verificar timeout de execução
-      if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
-        console.log(`⏸️ [VOD] Timeout, pausando em ${(downloadedBytes / 1048576).toFixed(1)}MB`);
-        
-        // Upload buffer pendente se for grande o suficiente
-        if (buffer.length >= R2_PART_SIZE) {
-          const partData = buffer.slice(0, R2_PART_SIZE);
-          const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
-          parts.push({ partNumber, etag });
-          buffer = buffer.slice(R2_PART_SIZE);
-          partNumber++;
-          downloadedBytes += R2_PART_SIZE;
-        }
-        
-        // Salvar estado para retomada
-        await supabase.from('vod_downloads').update({
-          status: 'paused',
-          file_size_bytes: contentLength,
-          segments_downloaded: parts.length,
-          metadata: { 
-            upload_id: uploadId, 
-            parts, 
-            downloaded_bytes: downloadedBytes,
-            content_length: contentLength,
-            supports_ranges: supportsRanges
-          }
-        }).eq('id', downloadId);
-        
-        // Agendar retomada imediata
-        scheduleResumeImmediate(downloadId);
-        throw new Error('PAUSE_FOR_RESUME');
-      }
-
-      // Definir range para download
-      const rangeStart = downloadedBytes;
-      const rangeEnd = Math.min(downloadedBytes + CHUNK_SIZE - 1, contentLength > 0 ? contentLength - 1 : downloadedBytes + CHUNK_SIZE - 1);
-      
-      const headers: Record<string, string> = {};
-      if (supportsRanges && contentLength > 0) {
-        headers['Range'] = `bytes=${rangeStart}-${rangeEnd}`;
-      }
-
-      // Para servidores sem suporte a Range, usar streaming
-      if (!supportsRanges && downloadedBytes === 0) {
-        console.log(`📥 [VOD] Iniciando download via streaming (sem Range support)`);
-        
-        const response = await fetch(channel.stream_url);
-        if (!response.ok) {
-          throw new Error(`Download falhou: ${response.status}`);
-        }
-        
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('Não foi possível obter stream reader');
-        }
-        
-        let streamError: Error | null = null;
-        
-        try {
-          while (true) {
-            // Verificar timeout de execução
-            if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
-              console.log(`⏸️ [VOD] Timeout durante streaming, pausando em ${(downloadedBytes / 1048576).toFixed(1)}MB`);
-              reader.cancel();
-              
-              // Upload buffer pendente
-              if (buffer.length >= R2_PART_SIZE) {
-                const partData = buffer.slice(0, R2_PART_SIZE);
-                const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
-                parts.push({ partNumber, etag });
-                partNumber++;
-              }
-              
-              await supabase.from('vod_downloads').update({
-                status: 'paused',
-                file_size_bytes: downloadedBytes,
-                segments_downloaded: parts.length,
-                metadata: { 
-                  upload_id: uploadId, 
-                  parts, 
-                  downloaded_bytes: downloadedBytes,
-                  content_length: contentLength,
-                  supports_ranges: false,
-                  streaming_paused: true
-                }
-              }).eq('id', downloadId);
-              
-              scheduleResumeImmediate(downloadId);
-              throw new Error('PAUSE_FOR_RESUME');
-            }
-            
-            let readResult: ReadableStreamReadResult<Uint8Array>;
-            try {
-              readResult = await reader.read();
-            } catch (readError: any) {
-              console.log(`⚠️ [VOD] Erro de conexão após ${(downloadedBytes / 1048576).toFixed(1)}MB: ${readError.message}`);
-              streamError = readError;
-              break;
-            }
-            
-            const { done, value } = readResult;
-            
-            if (done) {
-              console.log(`📦 [VOD] Stream completo: ${(downloadedBytes / 1048576).toFixed(1)}MB`);
-              break;
-            }
-            
-            if (value) {
-              // Adicionar ao buffer
-              const newBuffer = new Uint8Array(buffer.length + value.length);
-              newBuffer.set(buffer);
-              newBuffer.set(value, buffer.length);
-              buffer = newBuffer;
-              downloadedBytes += value.length;
-              
-              // Upload quando buffer atingir tamanho mínimo
-              while (buffer.length >= R2_PART_SIZE) {
-                const partData = buffer.slice(0, R2_PART_SIZE);
-                console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
-                
-                const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
-                parts.push({ partNumber, etag });
-                buffer = buffer.slice(R2_PART_SIZE);
-                partNumber++;
-              }
-              
-              // Atualizar progresso periodicamente
-              if (Date.now() - lastUpdate > PROGRESS_UPDATE_INTERVAL) {
-                lastUpdate = Date.now();
-                await supabase.from('vod_downloads').update({
-                  file_size_bytes: downloadedBytes,
-                  segments_downloaded: parts.length,
-                  metadata: { 
-                    upload_id: uploadId, 
-                    parts, 
-                    downloaded_bytes: downloadedBytes,
-                    supports_ranges: false
-                  }
-                }).eq('id', downloadId);
-                console.log(`📈 [VOD] Streaming: ${(downloadedBytes / 1048576).toFixed(1)}MB, ${parts.length} partes`);
-              }
-            }
-          }
-        } finally {
-          try { reader.releaseLock(); } catch {}
-        }
-        
-        // Se houve erro de conexão mas temos partes, salvar e retry
-        if (streamError && parts.length > 0) {
-          console.log(`🔄 [VOD] Conexão interrompida com ${parts.length} partes, tentando finalizar...`);
-          
-          // Tentar fazer upload do buffer restante como parte final
-          if (buffer.length > 0) {
-            try {
-              console.log(`⬆️ [VOD] Parte final: ${(buffer.length / 1048576).toFixed(1)}MB`);
-              const etag = await uploadPart(r2Key, uploadId, partNumber, buffer);
-              parts.push({ partNumber, etag });
-              buffer = new Uint8Array(0);
-            } catch (uploadError) {
-              console.log(`⚠️ [VOD] Falha no upload da parte final: ${uploadError}`);
-            }
-          }
-          
-          // Completar o multipart com as partes que temos
-          if (parts.length > 0) {
-            try {
-              console.log(`🏁 [VOD] Finalizando com ${parts.length} partes (${(downloadedBytes / 1048576).toFixed(1)}MB)...`);
-              parts.sort((a, b) => a.partNumber - b.partNumber);
-              await completeMultipartUpload(r2Key, uploadId, parts);
-              
-              // Sucesso! Marcar como completo
-              await supabase.from('vod_downloads').update({ 
-                file_size_bytes: downloadedBytes 
-              }).eq('id', downloadId);
-              
-              console.log(`✅ [VOD] Upload parcial completo: ${(downloadedBytes / 1048576).toFixed(1)}MB em ${parts.length} partes`);
-              return;
-            } catch (completeError: any) {
-              console.log(`⚠️ [VOD] Falha ao finalizar multipart: ${completeError.message}`);
-              // Salvar estado para retry posterior
-              await supabase.from('vod_downloads').update({
-                status: 'paused',
-                error_message: `Conexão interrompida com ${parts.length} partes`,
-                file_size_bytes: downloadedBytes,
-                segments_downloaded: parts.length,
-                metadata: { 
-                  upload_id: uploadId, 
-                  parts, 
-                  downloaded_bytes: downloadedBytes,
-                  supports_ranges: false,
-                  connection_lost: true
-                }
-              }).eq('id', downloadId);
-              
-              scheduleResumeImmediate(downloadId);
-              throw new Error('PAUSE_FOR_RESUME');
-            }
-          }
-          
-          throw streamError;
-        }
-        
-        // Upload buffer restante e finalizar
-        break;
-      }
-
-      console.log(`📥 [VOD] Chunk ${rangeStart}-${rangeEnd} (${((rangeEnd - rangeStart + 1) / 1048576).toFixed(1)}MB)`);
-
-      const response = await fetch(channel.stream_url, { 
-        headers,
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_CHUNK) 
-      });
-      
-      if (!response.ok && response.status !== 206) {
-        throw new Error(`Download falhou: ${response.status}`);
-      }
-
-      const chunkData = new Uint8Array(await response.arrayBuffer());
-      
-      // Se retornou 200 ao invés de 206, servidor não suportou Range
-      if (response.status === 200) {
-        console.log(`📦 [VOD] Servidor ignorou Range, recebeu: ${(chunkData.length / 1048576).toFixed(1)}MB`);
-        
-        // Upload direto se for pequeno
-        if (chunkData.length < 10 * 1024 * 1024) {
-          await uploadToR2Simple(r2Key, chunkData, contentType);
-        } else {
-          await uploadLargeBuffer(r2Key, uploadId, chunkData, parts, partNumber);
-        }
-        
-        await supabase.from('vod_downloads').update({ 
-          file_size_bytes: chunkData.length 
-        }).eq('id', downloadId);
-        return;
-      }
-
-      // Adicionar ao buffer
-      const newBuffer = new Uint8Array(buffer.length + chunkData.length);
-      newBuffer.set(buffer);
-      newBuffer.set(chunkData, buffer.length);
-      buffer = newBuffer;
-      downloadedBytes += chunkData.length;
-
-      // Upload quando buffer atingir tamanho mínimo
-      while (buffer.length >= R2_PART_SIZE) {
+  
+  // Função para salvar estado e agendar retry
+  const saveStateAndRetry = async (reason: string) => {
+    // Upload buffer pendente se for grande o suficiente
+    if (buffer.length >= R2_PART_SIZE) {
+      try {
         const partData = buffer.slice(0, R2_PART_SIZE);
-        console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
-        
         const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
         parts.push({ partNumber, etag });
         buffer = buffer.slice(R2_PART_SIZE);
         partNumber++;
+        console.log(`⬆️ [VOD] Parte ${partNumber-1} salva antes de pausar`);
+      } catch (e) {
+        console.log(`⚠️ [VOD] Não foi possível salvar parte antes de pausar`);
       }
+    }
+    
+    await supabase.from('vod_downloads').update({
+      status: 'paused',
+      error_message: reason,
+      file_size_bytes: contentLength || downloadedBytes,
+      segments_downloaded: parts.length,
+      metadata: { 
+        upload_id: uploadId, 
+        parts, 
+        downloaded_bytes: downloadedBytes,
+        content_length: contentLength,
+        supports_ranges: supportsRanges,
+        connection_retries: connectionRetries,
+        buffer_size: buffer.length,
+        reason
+      }
+    }).eq('id', downloadId);
+    
+    scheduleResumeImmediate(downloadId);
+    throw new Error('PAUSE_FOR_RESUME');
+  };
 
-      // Atualizar progresso periodicamente
-      if (Date.now() - lastUpdate > PROGRESS_UPDATE_INTERVAL) {
-        lastUpdate = Date.now();
-        const progress = contentLength > 0 ? Math.round((downloadedBytes / contentLength) * 100) : 0;
-        await supabase.from('vod_downloads').update({
-          file_size_bytes: contentLength,
-          segments_downloaded: parts.length,
-          metadata: { 
-            upload_id: uploadId, 
-            parts, 
-            downloaded_bytes: downloadedBytes,
-            content_length: contentLength,
-            supports_ranges: supportsRanges
+  try {
+    // Download com Range headers se suportado
+    if (supportsRanges && contentLength > 0 && downloadedBytes > 0) {
+      // Continuar de onde parou com Range
+      while (downloadedBytes < contentLength) {
+        // Verificar timeout
+        if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
+          console.log(`⏸️ [VOD] Timeout, pausando em ${(downloadedBytes / 1048576).toFixed(1)}MB`);
+          await saveStateAndRetry('Timeout de execução');
+        }
+
+        const rangeStart = downloadedBytes;
+        const rangeEnd = Math.min(downloadedBytes + CHUNK_SIZE - 1, contentLength - 1);
+        
+        console.log(`📥 [VOD] Range ${rangeStart}-${rangeEnd}`);
+
+        let response: Response | null = null;
+        for (let retry = 0; retry < MAX_RETRIES_PER_CHUNK; retry++) {
+          try {
+            response = await fetch(channel.stream_url, { 
+              headers: { 'Range': `bytes=${rangeStart}-${rangeEnd}` },
+              signal: AbortSignal.timeout(FETCH_TIMEOUT_CHUNK) 
+            });
+            
+            if (response.ok || response.status === 206) break;
+            throw new Error(`HTTP ${response.status}`);
+          } catch (e: any) {
+            if (retry === MAX_RETRIES_PER_CHUNK - 1) {
+              console.log(`❌ [VOD] Chunk falhou após ${MAX_RETRIES_PER_CHUNK} tentativas`);
+              throw e;
+            }
+            await new Promise(r => setTimeout(r, RETRY_BASE_DELAY * Math.pow(2, retry)));
           }
-        }).eq('id', downloadId);
-        console.log(`📈 [VOD] ${(downloadedBytes / 1048576).toFixed(1)}/${(contentLength / 1048576).toFixed(1)}MB (${progress}%)`);
-      }
+        }
 
-      // Verificar se terminou
-      if (contentLength > 0 && downloadedBytes >= contentLength) {
-        break;
+        if (!response) throw new Error('Download falhou');
+
+        const chunkData = new Uint8Array(await response.arrayBuffer());
+        
+        // Adicionar ao buffer
+        const newBuffer = new Uint8Array(buffer.length + chunkData.length);
+        newBuffer.set(buffer);
+        newBuffer.set(chunkData, buffer.length);
+        buffer = newBuffer;
+        downloadedBytes += chunkData.length;
+
+        // Upload quando buffer atingir tamanho mínimo
+        while (buffer.length >= R2_PART_SIZE) {
+          const partData = buffer.slice(0, R2_PART_SIZE);
+          console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
+          
+          const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
+          parts.push({ partNumber, etag });
+          buffer = buffer.slice(R2_PART_SIZE);
+          partNumber++;
+        }
+
+        // Atualizar progresso
+        if (Date.now() - lastUpdate > PROGRESS_UPDATE_INTERVAL) {
+          lastUpdate = Date.now();
+          const progress = Math.round((downloadedBytes / contentLength) * 100);
+          await supabase.from('vod_downloads').update({
+            file_size_bytes: contentLength,
+            segments_downloaded: parts.length,
+            metadata: { upload_id: uploadId, parts, downloaded_bytes: downloadedBytes, content_length: contentLength, supports_ranges: true }
+          }).eq('id', downloadId);
+          console.log(`📈 [VOD] ${(downloadedBytes / 1048576).toFixed(1)}/${(contentLength / 1048576).toFixed(1)}MB (${progress}%)`);
+        }
+      }
+    } else {
+      // Streaming sem Range - precisa reconectar se falhar
+      console.log(`📥 [VOD] Download via streaming (sem Range)`);
+      
+      let response: Response | null = null;
+      for (let retry = 0; retry < MAX_RETRIES_PER_CHUNK; retry++) {
+        try {
+          response = await fetch(channel.stream_url);
+          if (response.ok) break;
+          throw new Error(`HTTP ${response.status}`);
+        } catch (e: any) {
+          if (retry === MAX_RETRIES_PER_CHUNK - 1) throw e;
+          console.log(`⚠️ [VOD] Conexão falhou, tentativa ${retry + 1}...`);
+          await new Promise(r => setTimeout(r, CONNECTION_RETRY_DELAY));
+        }
       }
       
-      // Sem content-length, verificar se recebemos menos dados que pedimos
-      if (contentLength === 0 && chunkData.length < CHUNK_SIZE) {
-        contentLength = downloadedBytes;
-        break;
+      if (!response) throw new Error('Não foi possível conectar');
+      
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Não foi possível obter stream reader');
+
+      try {
+        while (true) {
+          // Verificar timeout
+          if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
+            console.log(`⏸️ [VOD] Timeout durante streaming em ${(downloadedBytes / 1048576).toFixed(1)}MB`);
+            reader.cancel();
+            
+            // Se temos partes, não perder o progresso
+            if (parts.length > 0) {
+              connectionRetries++;
+              if (connectionRetries < maxConnectionRetries) {
+                await saveStateAndRetry(`Timeout de execução - retry ${connectionRetries}`);
+              }
+            }
+            
+            await saveStateAndRetry('Timeout de execução');
+          }
+
+          let readResult: ReadableStreamReadResult<Uint8Array>;
+          try {
+            readResult = await reader.read();
+          } catch (readError: any) {
+            console.log(`⚠️ [VOD] Erro de leitura: ${readError.message}`);
+            
+            // Tentar finalizar com o que temos
+            if (parts.length > 0 || buffer.length > 0) {
+              connectionRetries++;
+              
+              if (connectionRetries < maxConnectionRetries) {
+                console.log(`🔄 [VOD] Reconexão ${connectionRetries}/${maxConnectionRetries}...`);
+                
+                // Upload buffer atual se possível
+                if (buffer.length >= R2_PART_SIZE) {
+                  try {
+                    const partData = buffer.slice(0, R2_PART_SIZE);
+                    const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
+                    parts.push({ partNumber, etag });
+                    buffer = buffer.slice(R2_PART_SIZE);
+                    partNumber++;
+                  } catch {}
+                }
+                
+                await saveStateAndRetry(`Conexão interrompida - retry ${connectionRetries}`);
+              }
+              
+              // Último recurso: tentar finalizar com o que temos
+              console.log(`🏁 [VOD] Tentando finalizar com ${parts.length} partes...`);
+              break;
+            }
+            
+            throw readError;
+          }
+
+          const { done, value } = readResult;
+          
+          if (done) {
+            console.log(`📦 [VOD] Stream completo: ${(downloadedBytes / 1048576).toFixed(1)}MB`);
+            break;
+          }
+
+          if (value) {
+            const newBuffer = new Uint8Array(buffer.length + value.length);
+            newBuffer.set(buffer);
+            newBuffer.set(value, buffer.length);
+            buffer = newBuffer;
+            downloadedBytes += value.length;
+
+            while (buffer.length >= R2_PART_SIZE) {
+              const partData = buffer.slice(0, R2_PART_SIZE);
+              console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
+              
+              const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
+              parts.push({ partNumber, etag });
+              buffer = buffer.slice(R2_PART_SIZE);
+              partNumber++;
+            }
+
+            if (Date.now() - lastUpdate > PROGRESS_UPDATE_INTERVAL) {
+              lastUpdate = Date.now();
+              await supabase.from('vod_downloads').update({
+                file_size_bytes: downloadedBytes,
+                segments_downloaded: parts.length,
+                metadata: { upload_id: uploadId, parts, downloaded_bytes: downloadedBytes, supports_ranges: false }
+              }).eq('id', downloadId);
+              console.log(`📈 [VOD] Streaming: ${(downloadedBytes / 1048576).toFixed(1)}MB, ${parts.length} partes`);
+            }
+          }
+        }
+      } finally {
+        try { reader.releaseLock(); } catch {}
       }
     }
 
-    // Upload do buffer restante
+    // Upload buffer restante
     if (buffer.length > 0) {
       console.log(`⬆️ [VOD] Parte final: ${(buffer.length / 1048576).toFixed(1)}MB`);
       const etag = await uploadPart(r2Key, uploadId, partNumber, buffer);
@@ -781,68 +785,42 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
     console.log(`✅ [VOD] Upload completo: ${(downloadedBytes / 1048576).toFixed(1)}MB em ${parts.length} partes`);
 
   } catch (error: any) {
-    if (error.message === 'PAUSE_FOR_RESUME') {
-      throw error; // Re-throw para não marcar como failed
-    }
+    if (error.message === 'PAUSE_FOR_RESUME') throw error;
     
-    // Se temos partes já enviadas, salvar estado para retry
+    // Se temos partes, salvar para retry
     if (uploadId && parts.length > 0) {
-      console.log(`⚠️ [VOD] Erro com ${parts.length} partes salvas (${(downloadedBytes / 1048576).toFixed(1)}MB), salvando para retry...`);
+      console.log(`⚠️ [VOD] Erro com ${parts.length} partes, salvando...`);
+      connectionRetries++;
       
-      await supabase.from('vod_downloads').update({
-        status: 'paused',
-        error_message: `Erro: ${error.message?.substring(0, 100)} - ${parts.length} partes salvas`,
-        file_size_bytes: downloadedBytes,
-        segments_downloaded: parts.length,
-        metadata: { 
-          upload_id: uploadId, 
-          parts, 
-          downloaded_bytes: downloadedBytes,
-          content_length: contentLength,
-          supports_ranges: supportsRanges,
-          error_recovery: true,
-          last_error: error.message
-        }
-      }).eq('id', downloadId);
-      
-      // Agendar retry em 5 segundos
-      scheduleResumeImmediate(downloadId);
-      throw new Error('PAUSE_FOR_RESUME');
+      if (connectionRetries < maxConnectionRetries) {
+        await supabase.from('vod_downloads').update({
+          status: 'paused',
+          error_message: `${error.message} - ${parts.length} partes salvas`,
+          file_size_bytes: downloadedBytes,
+          segments_downloaded: parts.length,
+          metadata: { 
+            upload_id: uploadId, 
+            parts, 
+            downloaded_bytes: downloadedBytes,
+            content_length: contentLength,
+            supports_ranges: supportsRanges,
+            connection_retries: connectionRetries,
+            last_error: error.message
+          }
+        }).eq('id', downloadId);
+        
+        // Agendar retry em alguns segundos
+        setTimeout(() => scheduleResumeImmediate(downloadId), 3000);
+        throw new Error('PAUSE_FOR_RESUME');
+      }
     }
     
-    console.error(`❌ [VOD] Erro no upload, abortando multipart...`);
-    if (uploadId) {
+    console.error(`❌ [VOD] Erro, abortando multipart...`);
+    if (uploadId && parts.length === 0) {
       await abortMultipartUpload(r2Key, uploadId);
     }
     throw error;
   }
-}
-
-async function uploadLargeBuffer(
-  r2Key: string, 
-  uploadId: string, 
-  data: Uint8Array, 
-  parts: { partNumber: number; etag: string }[],
-  startPartNumber: number
-): Promise<void> {
-  let offset = 0;
-  let partNumber = startPartNumber;
-  
-  while (offset < data.length) {
-    const end = Math.min(offset + R2_PART_SIZE, data.length);
-    const partData = data.slice(offset, end);
-    
-    console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
-    const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
-    parts.push({ partNumber, etag });
-    
-    offset = end;
-    partNumber++;
-  }
-  
-  // Completar
-  parts.sort((a, b) => a.partNumber - b.partNumber);
-  await completeMultipartUpload(r2Key, uploadId, parts);
 }
 
 async function downloadHLS(channel: any, downloadId: string, supabase: any): Promise<void> {
@@ -906,7 +884,7 @@ async function downloadHLS(channel: any, downloadId: string, supabase: any): Pro
         break;
       } catch (e) {
         if (retry === 2) console.error(`❌ Segment ${seg.index} failed after 3 retries`);
-        await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+        await new Promise(r => setTimeout(r, 1000 * (retry + 1)));
       }
     }
 
@@ -915,54 +893,51 @@ async function downloadHLS(channel: any, downloadId: string, supabase: any): Pro
         segments_downloaded: downloaded, 
         file_size_bytes: totalBytes 
       }).eq('id', downloadId);
-      console.log(`📈 [HLS] ${Math.round((downloaded / segments.length) * 100)}%`);
     }
   }
 
-  // Reescrever manifest
-  let newManifest = manifestContent;
-  for (const seg of segments) {
-    newManifest = newManifest.replace(
-      seg.line, 
-      `https://${r2Domain}/vod/${channel.id}/segment_${seg.index.toString().padStart(6, '0')}.ts`
-    );
+  // Gerar manifest atualizado
+  const newManifestLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const seg = segments.find(s => s.line === trimmed);
+      if (seg) {
+        newManifestLines.push(`https://${r2Domain}/vod/${channel.id}/segment_${seg.index.toString().padStart(6, '0')}.ts`);
+      } else {
+        newManifestLines.push(trimmed);
+      }
+    } else {
+      newManifestLines.push(line);
+    }
   }
-  
-  await uploadToR2Simple(
-    `vod/${channel.id}/playlist.m3u8`, 
-    new TextEncoder().encode(newManifest), 
-    'application/vnd.apple.mpegurl'
-  );
 
-  await supabase.from('vod_downloads').update({ 
-    segments_downloaded: downloaded, 
-    file_size_bytes: totalBytes 
-  }).eq('id', downloadId);
+  const newManifest = newManifestLines.join('\n');
+  await uploadToR2Simple(`vod/${channel.id}/playlist.m3u8`, new TextEncoder().encode(newManifest), 'application/vnd.apple.mpegurl');
   
-  console.log(`✅ [HLS] ${downloaded}/${segments.length} segmentos, ${(totalBytes / 1048576).toFixed(1)}MB`);
+  console.log(`✅ [HLS] ${downloaded}/${segments.length} segmentos (${(totalBytes / 1048576).toFixed(1)}MB)`);
 }
 
+// Agendar retry imediato
 function scheduleResumeImmediate(downloadId: string): void {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const cronSecret = Deno.env.get('CRON_SECRET');
   
-  // Usar EdgeRuntime.waitUntil para garantir que a chamada seja feita
-  EdgeRuntime.waitUntil((async () => {
-    // Pequeno delay para garantir que o status foi salvo
-    await new Promise(r => setTimeout(r, 1000));
-    
+  if (!supabaseUrl || !cronSecret) return;
+
+  setTimeout(async () => {
     try {
-      const response = await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
+      await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-internal-secret': cronSecret || ''
+          'x-internal-secret': cronSecret,
         },
-        body: JSON.stringify({ resume: true, downloadId })
+        body: JSON.stringify({ resume: true, downloadId }),
       });
-      console.log(`🔄 [VOD] Retomada agendada: ${response.status}`);
+      console.log(`📡 [VOD] Retry agendado para ${downloadId}`);
     } catch (e) {
-      console.error(`❌ Falha ao agendar retomada:`, e);
+      console.error(`❌ [VOD] Falha ao agendar retry:`, e);
     }
-  })());
+  }, 2000);
 }
