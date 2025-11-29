@@ -131,7 +131,7 @@ export function useM3USyncEditor() {
     setSelectedSourceId(sourceId);
 
     try {
-      const PAGE_SIZE = 1000;
+      const PAGE_SIZE = 10000;
       let allData: any[] = [];
       let page = 0;
       let hasMore = true;
@@ -453,7 +453,7 @@ export function useM3USyncEditor() {
 
         // Create new category name with target class prefix
         const prefix = CLASS_PREFIXES[targetClass];
-        
+
         // Remove existing class prefix if present
         let baseName = categoryName;
         for (const p of Object.values(CLASS_PREFIXES)) {
@@ -462,12 +462,12 @@ export function useM3USyncEditor() {
             break;
           }
         }
-        
+
         // If baseName contains ":", take the part after it
         if (baseName.includes(":")) {
           baseName = baseName.split(":").slice(1).join(":").trim();
         }
-        
+
         const newCategoryName = `${prefix} ${baseName}`;
 
         const { error } = await supabase
