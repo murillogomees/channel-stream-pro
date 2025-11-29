@@ -8,7 +8,7 @@
  * - public.user_roles para permissões
  */
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from '@/lib/react-shim';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';

@@ -4,14 +4,12 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Vite config - using React shim for consistent resolution
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
   },
-  cacheDir: 'node_modules/.vite-shim',
   plugins: [
     react(),
     mode === "development" && componentTagger(),
