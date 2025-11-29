@@ -14,11 +14,23 @@ interface ImportPayload {
   resumeFromChannel?: number;
 }
 
+interface ChangeRecord {
+  session_id: string;
+  custom_list_id: string;
+  change_type: 'added' | 'removed' | 'modified';
+  entity_type: 'channel' | 'category';
+  entity_name: string;
+  entity_id?: string;
+  old_data?: any;
+  new_data?: any;
+}
+
 const DB_BATCH_SIZE = 200;
-const CHUNK_SIZE = 35000; // Process 35k channels per invocation to stay under CPU limit
+const CHUNK_SIZE = 35000;
 const MAX_CHANNELS = 300000;
 const MAX_SIZE = 150 * 1024 * 1024;
 const UPDATE_INTERVAL = 1000;
+const CHANGES_BATCH_SIZE = 500;
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
 
@@ -165,6 +177,36 @@ async function processInBackground(payload: ImportPayload, supabase: any) {
   }
 }
 
+async function getExistingData(supabase: any, customListId: string) {
+  // Get existing categories
+  const { data: existingCategories } = await supabase
+    .from('m3u_categories')
+    .select('id, name, display_name')
+    .eq('custom_list_id', customListId);
+
+  // Get existing channels with their categories
+  const { data: existingChannels } = await supabase
+    .from('m3u_channels')
+    .select('id, name, stream_url, tvg_logo, group_title, category_id')
+    .in('category_id', (existingCategories || []).map((c: any) => c.id));
+
+  return {
+    categories: new Map((existingCategories || []).map((c: any) => [c.name, c])),
+    channels: new Map((existingChannels || []).map((c: any) => [`${c.name}|${c.stream_url}`, c])),
+  };
+}
+
+async function saveChanges(supabase: any, changes: ChangeRecord[]) {
+  if (changes.length === 0) return;
+  
+  // Insert in batches
+  for (let i = 0; i < changes.length; i += CHANGES_BATCH_SIZE) {
+    const batch = changes.slice(i, i + CHANGES_BATCH_SIZE);
+    await supabase.from('m3u_import_changes').insert(batch);
+  }
+  console.log(`[ProcessM3U] Saved ${changes.length} change records`);
+}
+
 async function processContent(content: string, payload: ImportPayload, supabase: any) {
   const lines = content.split(/\r?\n/);
   const resumeFrom = payload.resumeFromChannel || 0;
@@ -178,6 +220,20 @@ async function processContent(content: string, payload: ImportPayload, supabase:
   let existingProcessed = resumeFrom > 0 ? resumeFrom : 0;
   let categoryMap = new Map<string, string>();
   let catOrder = 0;
+  
+  // Track changes
+  const changes: ChangeRecord[] = [];
+  let existingData: { categories: Map<string, any>, channels: Map<string, any> } | null = null;
+  
+  // Only load existing data on first run to detect changes
+  if (resumeFrom === 0) {
+    existingData = await getExistingData(supabase, payload.customListId);
+    console.log(`[ProcessM3U] Existing data: ${existingData.categories.size} categories, ${existingData.channels.size} channels`);
+  }
+  
+  // Track new data for comparison
+  const newCategoryNames = new Set<string>();
+  const newChannelKeys = new Set<string>();
   
   // Restore state if resuming
   if (resumeFrom > 0 && sessionData?.metadata?.categoryMap) {
@@ -206,7 +262,12 @@ async function processContent(content: string, payload: ImportPayload, supabase:
   
   async function getCatId(name: string): Promise<string> {
     const key = name || 'Sem Categoria';
+    newCategoryNames.add(key);
+    
     if (categoryMap.has(key)) return categoryMap.get(key)!;
+    
+    // Check if this is a new category
+    const isNewCategory = existingData && !existingData.categories.has(key);
     
     const { data } = await supabase
       .from('m3u_categories')
@@ -221,6 +282,20 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     
     if (data) {
       categoryMap.set(key, data.id);
+      
+      // Record new category
+      if (isNewCategory) {
+        changes.push({
+          session_id: payload.sessionId,
+          custom_list_id: payload.customListId,
+          change_type: 'added',
+          entity_type: 'category',
+          entity_name: key,
+          entity_id: data.id,
+          new_data: { name: key, display_name: key },
+        });
+      }
+      
       return data.id;
     }
     return categoryMap.values().next().value || '';
@@ -261,6 +336,12 @@ async function processContent(content: string, payload: ImportPayload, supabase:
           batch = [];
         }
         
+        // Save changes collected so far
+        if (changes.length > 0) {
+          await saveChanges(supabase, changes);
+          changes.length = 0;
+        }
+        
         // Save state for continuation
         const categoryMapObj: Record<string, string> = {};
         categoryMap.forEach((v, k) => categoryMapObj[k] = v);
@@ -293,8 +374,10 @@ async function processContent(content: string, payload: ImportPayload, supabase:
       };
     } else if (!line.startsWith('#') && channel) {
       const catId = await getCatId(channel.group);
+      const channelKey = `${channel.name}|${line}`;
+      newChannelKeys.add(channelKey);
       
-      batch.push({
+      const channelData = {
         category_id: catId,
         name: channel.name,
         stream_url: line,
@@ -303,7 +386,40 @@ async function processContent(content: string, payload: ImportPayload, supabase:
         tvg_logo: channel.tvgLogo,
         group_title: channel.group,
         order_position: insertedCount,
-      });
+      };
+      
+      // Check for changes
+      if (existingData) {
+        const existingChannel = existingData.channels.get(channelKey);
+        if (!existingChannel) {
+          // New channel
+          changes.push({
+            session_id: payload.sessionId,
+            custom_list_id: payload.customListId,
+            change_type: 'added',
+            entity_type: 'channel',
+            entity_name: channel.name,
+            new_data: { name: channel.name, stream_url: line, group: channel.group, tvg_logo: channel.tvgLogo },
+          });
+        } else if (
+          existingChannel.tvg_logo !== channel.tvgLogo ||
+          existingChannel.group_title !== channel.group
+        ) {
+          // Modified channel
+          changes.push({
+            session_id: payload.sessionId,
+            custom_list_id: payload.customListId,
+            change_type: 'modified',
+            entity_type: 'channel',
+            entity_name: channel.name,
+            entity_id: existingChannel.id,
+            old_data: { tvg_logo: existingChannel.tvg_logo, group: existingChannel.group_title },
+            new_data: { tvg_logo: channel.tvgLogo, group: channel.group },
+          });
+        }
+      }
+      
+      batch.push(channelData);
       
       insertedCount++;
       channelsInChunk++;
@@ -328,6 +444,49 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     await supabase.from('m3u_channels').insert(batch);
   }
 
+  // Detect removed items (only on first run when we have existing data)
+  if (existingData && resumeFrom === 0) {
+    // Check for removed categories
+    for (const [catName, catData] of existingData.categories) {
+      if (!newCategoryNames.has(catName)) {
+        changes.push({
+          session_id: payload.sessionId,
+          custom_list_id: payload.customListId,
+          change_type: 'removed',
+          entity_type: 'category',
+          entity_name: catName,
+          entity_id: catData.id,
+          old_data: { name: catName, display_name: catData.display_name },
+        });
+      }
+    }
+    
+    // Check for removed channels
+    for (const [channelKey, channelData] of existingData.channels) {
+      if (!newChannelKeys.has(channelKey)) {
+        changes.push({
+          session_id: payload.sessionId,
+          custom_list_id: payload.customListId,
+          change_type: 'removed',
+          entity_type: 'channel',
+          entity_name: channelData.name,
+          entity_id: channelData.id,
+          old_data: { name: channelData.name, stream_url: channelData.stream_url, group: channelData.group_title },
+        });
+      }
+    }
+  }
+
+  // Save all remaining changes
+  if (changes.length > 0) {
+    await saveChanges(supabase, changes);
+  }
+
+  // Update session with change counts
+  const addedCount = changes.filter(c => c.change_type === 'added').length;
+  const removedCount = changes.filter(c => c.change_type === 'removed').length;
+  const modifiedCount = changes.filter(c => c.change_type === 'modified').length;
+
   await supabase
     .from('m3u_import_sessions')
     .update({ 
@@ -336,7 +495,14 @@ async function processContent(content: string, payload: ImportPayload, supabase:
       total_channels: insertedCount,
       completed_at: new Date().toISOString(),
       error_message: null,
-      metadata: null
+      metadata: {
+        changes: {
+          added: addedCount,
+          removed: removedCount,
+          modified: modifiedCount,
+          total: changes.length,
+        }
+      }
     })
     .eq('id', payload.sessionId);
 
@@ -349,5 +515,5 @@ async function processContent(content: string, payload: ImportPayload, supabase:
     })
     .eq('id', payload.customListId);
 
-  console.log(`[ProcessM3U] Completed: ${insertedCount} channels, ${categoryMap.size} categories`);
+  console.log(`[ProcessM3U] Completed: ${insertedCount} channels, ${categoryMap.size} categories. Changes: +${addedCount} -${removedCount} ~${modifiedCount}`);
 }
