@@ -90,22 +90,46 @@ src/pages/
 
 ## ⏳ PRÓXIMOS PASSOS (Fase 2)
 
-### Para implementar após aprovação:
+### ✅ Concluído nesta iteração:
 
-1. **Mover páginas órfãs para deprecated/**
-   - AdminAutoNotifications.tsx
-   - AdminTemplates.tsx
-   - AdminConversionDashboard.tsx
-   - AdminCoupons.tsx
-   - etc.
+1. **Páginas órfãs** - NÃO HÁ páginas órfãs
+   - Todas as sub-páginas são usadas como tabs nos hubs consolidados
+   - Nenhum arquivo movido para deprecated/
 
-2. **Remover rotas legacy** (após 30 dias)
-   - Remover todos os `<Navigate to="..." replace />`
-   - Deixar apenas rotas canonical
+2. **Rotas legacy** - SCHEDULED para remoção
+   - Data de remoção: **2025-12-29** (30 dias)
+   - Total: 35 rotas redirect
+   - Ver `deprecated/DEPRECATION_NOTES.md` para lista completa
 
-3. **Testes E2E**
-   - Implementar testes Playwright
-   - Cobertura de todas as rotas admin
+3. **Testes E2E** - IMPLEMENTADOS ✅
+   - Arquivo: `src/tests/e2e/admin.spec.ts`
+   - Config: `src/tests/e2e/playwright.config.ts`
+   - Cobertura: Admin Hub, M3U, Security, Notifications, Analytics
+   - Testes de redirect para rotas legacy
+
+### Pendente (após período de deprecação):
+
+1. **2025-12-29**: Remover rotas legacy do App.tsx (linhas 120-154)
+2. **Antes da remoção**:
+   - [ ] Verificar analytics de uso
+   - [ ] Confirmar zero erros 404 em staging
+   - [ ] Rodar suite E2E completa
+
+---
+
+## 📊 MÉTRICAS DE COBERTURA E2E
+
+| Módulo | Testes | Status |
+|--------|--------|--------|
+| Admin Hub | 3 | ✅ Criado |
+| M3U Management | 2 | ✅ Criado |
+| Security | 2 | ✅ Criado |
+| Notifications | 1 | ✅ Criado |
+| Analytics | 2 | ✅ Criado |
+| Legacy Redirects | 6 | ✅ Criado |
+| Access Control | 2 | ✅ Criado |
+
+**Total: 18 testes E2E**
 
 ---
 
