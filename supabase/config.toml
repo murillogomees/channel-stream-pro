@@ -135,3 +135,19 @@ verify_jwt = false
 # Generate M3U from sync entries and upload to CDN - auth verified inside
 [functions.generate-m3u-from-sync]
 verify_jwt = false
+
+# ==========================================
+# CLOUDFLARE STREAM INTEGRATION
+# ==========================================
+
+# Upload VODs to Cloudflare Stream - admin auth verified inside
+[functions.cf-stream-upload]
+verify_jwt = false
+
+# Webhook for Cloudflare Stream status updates
+[functions.cf-stream-webhook]
+verify_jwt = false
+
+# Scheduler for batch Stream uploads - cron/admin access
+[functions.cf-stream-scheduler]
+verify_jwt = false
