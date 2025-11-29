@@ -1,17 +1,21 @@
 /**
  * MiniChannelList - Quick channel switcher overlay
+ * With intelligent preloading support
  */
 
-import { memo, useState, useEffect, useRef } from 'react';
-import { Search, Tv, Star, Clock, X } from 'lucide-react';
+import { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Tv, Star, Clock, X, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useChannelPreloader } from '@/hooks/useChannelPreloader';
+import { PreloadIndicator } from '@/components/player/PreloadIndicator';
 
 interface Channel {
   id: string;
   name: string;
+  stream_url?: string;
   tvg_logo?: string;
   category_name?: string;
 }
@@ -19,27 +23,54 @@ interface Channel {
 interface MiniChannelListProps {
   channels: Channel[];
   currentChannelId?: string;
+  currentCategoryId?: string;
+  profileId?: string;
   recentChannels?: Channel[];
   onSelectChannel: (channel: Channel) => void;
   onClose: () => void;
   isVisible: boolean;
   className?: string;
   getChannelNumber?: (channel: Channel) => number | null;
+  enablePreload?: boolean;
 }
 
 export const MiniChannelList = memo(function MiniChannelList({
   channels,
   currentChannelId,
+  currentCategoryId,
+  profileId,
   recentChannels = [],
   onSelectChannel,
   onClose,
   isVisible,
   className,
   getChannelNumber,
+  enablePreload = true,
 }: MiniChannelListProps) {
   const [search, setSearch] = useState('');
   const [show, setShow] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Intelligent preloading
+  const {
+    preloadOnHover,
+    getChannelPreloadStatus,
+    stats,
+    isPreloading,
+  } = useChannelPreloader({
+    channels: channels.filter(c => c.stream_url) as Array<{ id: string; name: string; stream_url: string }>,
+    currentChannelId,
+    currentCategoryId,
+    profileId,
+    enabled: enablePreload && isVisible,
+  });
+
+  // Handle hover for preloading
+  const handleChannelHover = useCallback((channelId: string) => {
+    if (enablePreload) {
+      preloadOnHover(channelId);
+    }
+  }, [enablePreload, preloadOnHover]);
 
   // Animate entrance
   useEffect(() => {
@@ -100,7 +131,14 @@ export const MiniChannelList = memo(function MiniChannelList({
         {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold">Canais</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold">Canais</h2>
+              {enablePreload && isPreloading && (
+                <span className="flex items-center gap-1 text-xs text-yellow-500">
+                  <Zap className="w-3 h-3 animate-pulse" />
+                </span>
+              )}
+            </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
@@ -117,6 +155,17 @@ export const MiniChannelList = memo(function MiniChannelList({
               className="pl-9"
             />
           </div>
+          
+          {/* Preload stats (debug) */}
+          {enablePreload && stats.preloaded > 0 && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Zap className="w-3 h-3 text-green-500" />
+              <span>{stats.preloaded} pré-carregados</span>
+              {stats.cacheHits > 0 && (
+                <span className="text-green-500">• {stats.cacheHits} hits</span>
+              )}
+            </div>
+          )}
         </div>
 
         <ScrollArea className="h-[calc(100vh-120px)]">
@@ -128,15 +177,20 @@ export const MiniChannelList = memo(function MiniChannelList({
                 <span className="text-sm font-medium text-muted-foreground">Recentes</span>
               </div>
               <div className="space-y-1">
-                {recentChannels.map((channel) => (
-                  <ChannelItem
-                    key={`recent-${channel.id}`}
-                    channel={channel}
-                    isCurrent={channel.id === currentChannelId}
-                    channelNumber={getChannelNumber?.(channel)}
-                    onClick={() => onSelectChannel(channel)}
-                  />
-                ))}
+                {recentChannels.map((channel) => {
+                  const preloadStatus = enablePreload ? getChannelPreloadStatus(channel.id) : null;
+                  return (
+                    <ChannelItem
+                      key={`recent-${channel.id}`}
+                      channel={channel}
+                      isCurrent={channel.id === currentChannelId}
+                      channelNumber={getChannelNumber?.(channel)}
+                      onClick={() => onSelectChannel(channel)}
+                      onHover={() => handleChannelHover(channel.id)}
+                      preloadStatus={preloadStatus}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -156,15 +210,20 @@ export const MiniChannelList = memo(function MiniChannelList({
                   <p>Nenhum canal encontrado</p>
                 </div>
               ) : (
-                filteredChannels.map((channel) => (
-                  <ChannelItem
-                    key={channel.id}
-                    channel={channel}
-                    isCurrent={channel.id === currentChannelId}
-                    channelNumber={getChannelNumber?.(channel)}
-                    onClick={() => onSelectChannel(channel)}
-                  />
-                ))
+                filteredChannels.map((channel) => {
+                  const preloadStatus = enablePreload ? getChannelPreloadStatus(channel.id) : null;
+                  return (
+                    <ChannelItem
+                      key={channel.id}
+                      channel={channel}
+                      isCurrent={channel.id === currentChannelId}
+                      channelNumber={getChannelNumber?.(channel)}
+                      onClick={() => onSelectChannel(channel)}
+                      onHover={() => handleChannelHover(channel.id)}
+                      preloadStatus={preloadStatus}
+                    />
+                  );
+                })
               )}
             </div>
           </div>
@@ -174,21 +233,34 @@ export const MiniChannelList = memo(function MiniChannelList({
   );
 });
 
-// Channel item component
+// Channel item component with preload indicator
+interface ChannelItemProps {
+  channel: Channel;
+  isCurrent: boolean;
+  channelNumber?: number | null;
+  onClick: () => void;
+  onHover?: () => void;
+  preloadStatus?: {
+    isPreloaded: boolean;
+    isPending: boolean;
+    priority?: 'high' | 'medium' | 'low';
+    reason?: string;
+  } | null;
+}
+
 const ChannelItem = memo(function ChannelItem({
   channel,
   isCurrent,
   channelNumber,
   onClick,
-}: {
-  channel: Channel;
-  isCurrent: boolean;
-  channelNumber?: number | null;
-  onClick: () => void;
-}) {
+  onHover,
+  preloadStatus,
+}: ChannelItemProps) {
   return (
     <button
       onClick={onClick}
+      onMouseEnter={onHover}
+      onFocus={onHover}
       className={cn(
         'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
         'hover:bg-muted focus:bg-muted focus:outline-none',
@@ -196,7 +268,7 @@ const ChannelItem = memo(function ChannelItem({
       )}
     >
       {/* Logo */}
-      <div className="w-10 h-10 flex-shrink-0 rounded bg-muted overflow-hidden">
+      <div className="w-10 h-10 flex-shrink-0 rounded bg-muted overflow-hidden relative">
         {channel.tvg_logo ? (
           <img
             src={channel.tvg_logo}
@@ -211,6 +283,13 @@ const ChannelItem = memo(function ChannelItem({
             <Tv className="w-5 h-5 text-muted-foreground" />
           </div>
         )}
+        
+        {/* Preload indicator badge */}
+        {preloadStatus?.isPreloaded && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+            <Zap className="w-2 h-2 text-white" />
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -222,6 +301,15 @@ const ChannelItem = memo(function ChannelItem({
             </span>
           )}
           <span className="text-sm font-medium truncate">{channel.name}</span>
+          {/* Inline preload indicator */}
+          {preloadStatus && (
+            <PreloadIndicator
+              isPreloaded={preloadStatus.isPreloaded}
+              isPending={preloadStatus.isPending}
+              priority={preloadStatus.priority}
+              className="ml-auto"
+            />
+          )}
         </div>
         {channel.category_name && (
           <span className="text-xs text-muted-foreground truncate block">

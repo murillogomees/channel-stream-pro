@@ -2,5 +2,6 @@
  * Player Components - Exports
  */
 
-export { VideoPlayer } from './VideoPlayer';
-export { default } from './VideoPlayer';
+export { VideoPlayer, default } from './VideoPlayer';
+export { PreloadIndicator } from './PreloadIndicator';
+export { PreloadStats } from './PreloadStats';
