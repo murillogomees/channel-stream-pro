@@ -133,11 +133,23 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force single React instance
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
-    dedupe: ["react", "react-dom"],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
   optimizeDeps: {
-    include: ["react", "react-dom"],
+    include: [
+      "react", 
+      "react-dom", 
+      "react/jsx-runtime",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-tabs"
+    ],
+    exclude: ["@playwright/test"],
+    force: true,
   },
   build: {
     chunkSizeWarningLimit: 1000,
