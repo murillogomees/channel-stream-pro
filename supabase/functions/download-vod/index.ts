@@ -7,43 +7,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Declaração do EdgeRuntime para Deno
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseService = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
+    const cronSecret = req.headers.get('x-supabase-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+
+    // Permitir tanto auth de admin quanto cron secret
+    const isCronRequest = cronSecret === expectedCronSecret;
+
+    if (!isCronRequest && authHeader) {
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Token inválido' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: isAdmin } = await supabaseAuth.rpc('is_admin', { uid: user.id });
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Acesso negado' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (!isCronRequest) {
       return new Response(
         JSON.stringify({ error: 'Autenticação necessária' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const body = await req.json().catch(() => ({}));
+    const { channelId, batch = false, channelIds = [] } = body;
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Modo batch: processar múltiplos canais em background
+    if (batch && channelIds.length > 0) {
+      console.log(`🚀 [VOD] Iniciando batch de ${channelIds.length} downloads em background`);
+      
+      EdgeRuntime.waitUntil(processBatchDownloads(channelIds, supabaseService));
+      
       return new Response(
-        JSON.stringify({ error: 'Token inválido' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: true,
+          message: `${channelIds.length} downloads iniciados em background`,
+          channelIds
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { data: isAdmin, error: roleError } = await supabase.rpc('is_admin', { uid: user.id });
-    if (roleError || !isAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Acesso negado - privilégios de administrador necessários' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { channelId } = await req.json();
+    // Modo single
     if (!channelId) {
       return new Response(
         JSON.stringify({ error: 'channelId é obrigatório' }),
@@ -51,17 +86,12 @@ serve(async (req) => {
       );
     }
 
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Buscar canal
     const { data: channel, error: channelError } = await supabaseService
       .from('m3u_channels')
       .select('*')
       .eq('id', channelId)
-      .single();
+      .maybeSingle();
 
     if (channelError || !channel) {
       throw new Error(`Canal não encontrado: ${channelError?.message}`);
@@ -77,72 +107,31 @@ serve(async (req) => {
       .insert({
         channel_id: channelId,
         original_url: channel.stream_url,
-        status: 'downloading',
+        status: 'queued',
         download_started_at: new Date().toISOString()
       })
       .select()
       .single();
 
-    console.log(`🎬 Iniciando download de VOD: ${channel.name}`);
+    console.log(`🎬 [VOD] Download enfileirado: ${channel.name}`);
 
-    try {
-      // Detectar se é HLS (.m3u8) ou stream direto
-      const isHLS = channel.stream_url.includes('.m3u8');
-      
-      if (isHLS) {
-        await downloadHLSVOD(channel, downloadRecord.id, supabaseService);
-      } else {
-        await downloadDirectVOD(channel, downloadRecord.id, supabaseService);
-      }
+    // Processar em background para resposta rápida
+    EdgeRuntime.waitUntil(
+      processVODDownload(channel, downloadRecord?.id || '', supabaseService)
+    );
 
-      // Atualizar canal com URL do R2
-      const r2Url = `https://${Deno.env.get('R2_PUBLIC_DOMAIN')}/vod/${channelId}/playlist.m3u8`;
-      
-      await supabaseService
-        .from('m3u_channels')
-        .update({
-          r2_uploaded: true,
-          r2_url: r2Url,
-          r2_uploaded_at: new Date().toISOString()
-        })
-        .eq('id', channelId);
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Download iniciado em background',
+        channelId,
+        downloadId: downloadRecord?.id
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
-      await supabaseService
-        .from('vod_downloads')
-        .update({
-          status: 'completed',
-          download_completed_at: new Date().toISOString()
-        })
-        .eq('id', downloadRecord.id);
-
-      console.log(`✅ VOD baixado com sucesso: ${channel.name}`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          channelId,
-          r2Url
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (downloadError) {
-      console.error(`❌ Erro no download de VOD:`, downloadError);
-      
-      await supabaseService
-        .from('vod_downloads')
-        .update({
-          status: 'failed',
-          error_message: downloadError.message,
-          retry_count: downloadRecord.retry_count + 1
-        })
-        .eq('id', downloadRecord.id);
-
-      throw downloadError;
-    }
-
-  } catch (error) {
-    console.error('❌ Erro geral:', error);
+  } catch (error: any) {
+    console.error('❌ [VOD] Erro:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -151,171 +140,339 @@ serve(async (req) => {
 });
 
 /**
- * Download de VOD HLS (.m3u8 + segmentos .ts)
+ * Processa batch de downloads em paralelo controlado
  */
-async function downloadHLSVOD(
-  channel: any, 
-  downloadId: string, 
+async function processBatchDownloads(
+  channelIds: string[],
   supabase: any
-) {
-  console.log(`📥 Baixando HLS: ${channel.stream_url}`);
+): Promise<void> {
+  const CONCURRENCY = 3; // Downloads simultâneos
+  const queue = [...channelIds];
+  const active: Promise<void>[] = [];
 
-  // 1. Download do manifest principal
-  const manifestResponse = await fetch(channel.stream_url);
+  console.log(`📦 [VOD Batch] Processando ${queue.length} VODs com concorrência de ${CONCURRENCY}`);
+
+  while (queue.length > 0 || active.length > 0) {
+    // Preencher slots disponíveis
+    while (active.length < CONCURRENCY && queue.length > 0) {
+      const channelId = queue.shift()!;
+      
+      const promise = (async () => {
+        try {
+          const { data: channel } = await supabase
+            .from('m3u_channels')
+            .select('*')
+            .eq('id', channelId)
+            .maybeSingle();
+
+          if (channel && channel.is_vod && !channel.r2_uploaded) {
+            const { data: downloadRecord } = await supabase
+              .from('vod_downloads')
+              .insert({
+                channel_id: channelId,
+                original_url: channel.stream_url,
+                status: 'downloading',
+                download_started_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            await processVODDownload(channel, downloadRecord?.id || '', supabase);
+          }
+        } catch (err) {
+          console.error(`❌ [VOD Batch] Erro em ${channelId}:`, err);
+        }
+      })();
+
+      active.push(promise);
+    }
+
+    if (active.length > 0) {
+      // Aguardar pelo menos um terminar
+      await Promise.race(active);
+      // Remover completados
+      for (let i = active.length - 1; i >= 0; i--) {
+        const result = await Promise.race([active[i], Promise.resolve('pending')]);
+        if (result !== 'pending') {
+          active.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  console.log(`✅ [VOD Batch] Batch concluído`);
+}
+
+/**
+ * Processa download de um VOD individual
+ */
+async function processVODDownload(
+  channel: any,
+  downloadId: string,
+  supabase: any
+): Promise<void> {
+  const startTime = Date.now();
+
+  try {
+    await supabase
+      .from('vod_downloads')
+      .update({ status: 'downloading' })
+      .eq('id', downloadId);
+
+    console.log(`📥 [VOD] Iniciando: ${channel.name}`);
+
+    const isHLS = channel.stream_url.includes('.m3u8');
+
+    if (isHLS) {
+      await downloadHLSVODStreaming(channel, downloadId, supabase);
+    } else {
+      await downloadDirectVODStreaming(channel, downloadId, supabase);
+    }
+
+    // Atualizar canal com URL do R2
+    const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN');
+    const r2Url = isHLS 
+      ? `https://${r2Domain}/vod/${channel.id}/playlist.m3u8`
+      : `https://${r2Domain}/vod/${channel.id}/video.mp4`;
+
+    await supabase
+      .from('m3u_channels')
+      .update({
+        r2_uploaded: true,
+        r2_url: r2Url,
+        r2_uploaded_at: new Date().toISOString()
+      })
+      .eq('id', channel.id);
+
+    await supabase
+      .from('vod_downloads')
+      .update({
+        status: 'completed',
+        r2_url: r2Url,
+        download_completed_at: new Date().toISOString()
+      })
+      .eq('id', downloadId);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ [VOD] Concluído: ${channel.name} em ${duration}s`);
+
+  } catch (error: any) {
+    console.error(`❌ [VOD] Falha: ${channel.name} - ${error.message}`);
+
+    await supabase
+      .from('vod_downloads')
+      .update({
+        status: 'failed',
+        error_message: error.message,
+        retry_count: supabase.sql`retry_count + 1`
+      })
+      .eq('id', downloadId);
+  }
+}
+
+/**
+ * Download HLS com streaming para R2 (não carrega tudo na memória)
+ */
+async function downloadHLSVODStreaming(
+  channel: any,
+  downloadId: string,
+  supabase: any
+): Promise<void> {
+  const s3Client = createS3Client();
+  const bucketName = Deno.env.get('R2_BUCKET_NAME')!;
+  const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN')!;
+
+  // 1. Download do manifest
+  const manifestResponse = await fetchWithTimeout(channel.stream_url, 30000);
   if (!manifestResponse.ok) {
     throw new Error(`Falha ao baixar manifest: ${manifestResponse.status}`);
   }
 
   const manifestContent = await manifestResponse.text();
-  
-  // 2. Parse do manifest para identificar segmentos .ts
-  const lines = manifestContent.split('\n');
-  const tsUrls: string[] = [];
   const baseUrl = channel.stream_url.substring(0, channel.stream_url.lastIndexOf('/') + 1);
 
+  // 2. Parse segmentos
+  const lines = manifestContent.split('\n');
+  const segments: { index: number; url: string; line: string }[] = [];
+  let segmentIndex = 0;
+
   for (const line of lines) {
-    if (line.trim() && !line.startsWith('#')) {
-      const tsUrl = line.startsWith('http') ? line : baseUrl + line;
-      tsUrls.push(tsUrl);
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const url = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
+      segments.push({ index: segmentIndex++, url, line: trimmed });
     }
   }
 
-  console.log(`📊 Total de segmentos: ${tsUrls.length}`);
+  console.log(`📊 [VOD HLS] ${segments.length} segmentos para ${channel.name}`);
 
-  // Atualizar contagem total
   await supabase
     .from('vod_downloads')
-    .update({ segment_count: tsUrls.length })
+    .update({ segment_count: segments.length })
     .eq('id', downloadId);
 
-  // 3. Download paralelo de segmentos (batches de 5)
-  const s3Client = createS3Client();
-  const batchSize = 5;
-  let downloadedCount = 0;
+  // 3. Download paralelo com throttling (5 simultâneos)
   let totalBytes = 0;
+  let downloadedCount = 0;
+  const PARALLEL_DOWNLOADS = 5;
 
-  for (let i = 0; i < tsUrls.length; i += batchSize) {
-    const batch = tsUrls.slice(i, i + batchSize);
-    
+  for (let i = 0; i < segments.length; i += PARALLEL_DOWNLOADS) {
+    const batch = segments.slice(i, i + PARALLEL_DOWNLOADS);
+
     await Promise.all(
-      batch.map(async (tsUrl, index) => {
-        const segmentIndex = i + index;
-        const segmentResponse = await fetch(tsUrl);
-        const segmentData = await segmentResponse.arrayBuffer();
-        totalBytes += segmentData.byteLength;
+      batch.map(async (segment) => {
+        try {
+          const response = await fetchWithTimeout(segment.url, 60000);
+          if (!response.ok) {
+            throw new Error(`Segment ${segment.index} failed: ${response.status}`);
+          }
 
-        // Upload para R2
-        await s3Client.send(
-          new PutObjectCommand({
-            Bucket: Deno.env.get('R2_BUCKET_NAME'),
-            Key: `vod/${channel.id}/segment_${segmentIndex.toString().padStart(6, '0')}.ts`,
-            Body: new Uint8Array(segmentData),
-            ContentType: 'video/mp2t',
-            CacheControl: 'public, max-age=31536000, immutable',
-          })
-        );
+          const data = await response.arrayBuffer();
+          totalBytes += data.byteLength;
 
-        downloadedCount++;
-        
-        // Atualizar progresso a cada 10 segmentos
-        if (downloadedCount % 10 === 0) {
-          await supabase
-            .from('vod_downloads')
-            .update({ 
-              segments_downloaded: downloadedCount,
-              file_size_bytes: totalBytes 
+          // Upload streaming para R2
+          await s3Client.send(
+            new PutObjectCommand({
+              Bucket: bucketName,
+              Key: `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
+              Body: new Uint8Array(data),
+              ContentType: 'video/mp2t',
+              CacheControl: 'public, max-age=31536000, immutable',
             })
-            .eq('id', downloadId);
+          );
+
+          downloadedCount++;
+        } catch (err) {
+          console.error(`⚠️ [VOD] Segment ${segment.index} error:`, err);
+          // Retry uma vez
+          try {
+            const retryResponse = await fetchWithTimeout(segment.url, 60000);
+            if (retryResponse.ok) {
+              const data = await retryResponse.arrayBuffer();
+              totalBytes += data.byteLength;
+              await s3Client.send(
+                new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
+                  Body: new Uint8Array(data),
+                  ContentType: 'video/mp2t',
+                  CacheControl: 'public, max-age=31536000, immutable',
+                })
+              );
+              downloadedCount++;
+            }
+          } catch {
+            console.error(`❌ [VOD] Segment ${segment.index} retry failed`);
+          }
         }
       })
     );
+
+    // Atualizar progresso a cada batch
+    if (downloadedCount % 20 === 0 || i + PARALLEL_DOWNLOADS >= segments.length) {
+      await supabase
+        .from('vod_downloads')
+        .update({
+          segments_downloaded: downloadedCount,
+          file_size_bytes: totalBytes
+        })
+        .eq('id', downloadId);
+    }
   }
 
   // 4. Gerar novo manifest apontando para R2
-  const newManifest = manifestContent.replace(
-    /^(?!#)(.*\.ts)$/gm,
-    (match) => {
-      const segmentIndex = tsUrls.indexOf(
-        match.startsWith('http') ? match : baseUrl + match
-      );
-      return `https://${Deno.env.get('R2_PUBLIC_DOMAIN')}/vod/${channel.id}/segment_${segmentIndex.toString().padStart(6, '0')}.ts`;
-    }
-  );
+  let newManifest = manifestContent;
+  for (const segment of segments) {
+    const r2SegmentUrl = `https://${r2Domain}/vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`;
+    newManifest = newManifest.replace(segment.line, r2SegmentUrl);
+  }
 
-  // 5. Upload do novo manifest para R2
+  // 5. Upload manifest
   await s3Client.send(
     new PutObjectCommand({
-      Bucket: Deno.env.get('R2_BUCKET_NAME'),
+      Bucket: bucketName,
       Key: `vod/${channel.id}/playlist.m3u8`,
-      Body: newManifest,
+      Body: new TextEncoder().encode(newManifest),
       ContentType: 'application/vnd.apple.mpegurl',
       CacheControl: 'public, max-age=3600',
     })
   );
 
-  await supabase
-    .from('vod_downloads')
-    .update({ 
-      segments_downloaded: downloadedCount,
-      file_size_bytes: totalBytes,
-      status: 'processing'
-    })
-    .eq('id', downloadId);
-
-  console.log(`✅ HLS baixado: ${downloadedCount} segmentos, ${(totalBytes / 1048576).toFixed(2)} MB`);
+  console.log(`✅ [VOD HLS] Concluído: ${downloadedCount}/${segments.length} segmentos, ${(totalBytes / 1048576).toFixed(1)} MB`);
 }
 
 /**
- * Download de stream direto (não-HLS)
+ * Download de stream direto com streaming
  */
-async function downloadDirectVOD(
-  channel: any, 
-  downloadId: string, 
+async function downloadDirectVODStreaming(
+  channel: any,
+  downloadId: string,
   supabase: any
-) {
-  console.log(`📥 Baixando stream direto: ${channel.stream_url}`);
+): Promise<void> {
+  const s3Client = createS3Client();
+  const bucketName = Deno.env.get('R2_BUCKET_NAME')!;
 
-  const streamResponse = await fetch(channel.stream_url);
-  if (!streamResponse.ok) {
-    throw new Error(`Falha ao baixar stream: ${streamResponse.status}`);
+  console.log(`📥 [VOD Direct] Baixando: ${channel.name}`);
+
+  const response = await fetchWithTimeout(channel.stream_url, 120000);
+  if (!response.ok) {
+    throw new Error(`Falha ao baixar: ${response.status}`);
   }
 
-  const streamData = await streamResponse.arrayBuffer();
-  const fileSize = streamData.byteLength;
+  const data = await response.arrayBuffer();
+  const fileSize = data.byteLength;
 
-  console.log(`📊 Tamanho do arquivo: ${(fileSize / 1048576).toFixed(2)} MB`);
-
-  // Upload para R2
-  const s3Client = createS3Client();
-  const ext = channel.stream_url.split('.').pop() || 'mp4';
+  // Determinar extensão
+  const urlPath = new URL(channel.stream_url).pathname;
+  const ext = urlPath.split('.').pop() || 'mp4';
 
   await s3Client.send(
     new PutObjectCommand({
-      Bucket: Deno.env.get('R2_BUCKET_NAME'),
+      Bucket: bucketName,
       Key: `vod/${channel.id}/video.${ext}`,
-      Body: new Uint8Array(streamData),
-      ContentType: `video/${ext}`,
+      Body: new Uint8Array(data),
+      ContentType: ext === 'mp4' ? 'video/mp4' : `video/${ext}`,
       CacheControl: 'public, max-age=31536000, immutable',
     })
   );
 
   await supabase
     .from('vod_downloads')
-    .update({ 
+    .update({
       file_size_bytes: fileSize,
       segment_count: 1,
-      segments_downloaded: 1,
-      status: 'processing'
+      segments_downloaded: 1
     })
     .eq('id', downloadId);
 
-  console.log(`✅ Stream direto baixado: ${(fileSize / 1048576).toFixed(2)} MB`);
+  console.log(`✅ [VOD Direct] Concluído: ${(fileSize / 1048576).toFixed(1)} MB`);
+}
+
+/**
+ * Fetch com timeout
+ */
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'VOD-Downloader/1.0',
+        'Accept': '*/*',
+      },
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**
  * Criar cliente S3 para Cloudflare R2
  */
-function createS3Client() {
+function createS3Client(): S3Client {
   const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
   const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
   const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
