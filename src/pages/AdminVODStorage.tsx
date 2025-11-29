@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
-  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload } = useVODManagement();
+  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload, channelNames } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
@@ -507,7 +507,7 @@ export default function AdminVODStorage() {
       </div>
 
       {/* Lista Completa de Downloads */}
-      <VODDownloadProgress downloads={downloads} onRetry={retryDownload} />
+      <VODDownloadProgress downloads={downloads} onRetry={retryDownload} channelNames={channelNames} />
 
       {/* Informações e Dicas */}
       <Card>
