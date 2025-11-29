@@ -386,6 +386,7 @@ async function downloadHLSVOD(channel: any, downloadId: string, supabase: any): 
   console.log(`✅ [HLS] ${downloaded}/${segments.length} segmentos, ${(totalBytes / 1048576).toFixed(1)} MB`);
 }
 
+// NOVA FUNÇÃO: Download direto usando SEMPRE multipart para evitar OOM
 async function downloadDirectVOD(channel: any, downloadId: string, supabase: any): Promise<void> {
   console.log(`📥 [Direct] Iniciando download: ${channel.name}`);
   
@@ -394,87 +395,33 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
   
   console.log(`📊 [Direct] Tamanho: ${(contentLength / 1048576).toFixed(1)} MB`);
 
-  const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB chunks
+  // CRÍTICO: Usar chunks menores (10MB) para evitar estouro de memória
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks (antes era 50MB)
   const totalChunks = contentLength > 0 ? Math.ceil(contentLength / CHUNK_SIZE) : 1;
 
-  await supabase.from('vod_downloads').update({ segment_count: totalChunks, segments_downloaded: 0, file_size_bytes: contentLength }).eq('id', downloadId);
+  await supabase.from('vod_downloads').update({ 
+    segment_count: totalChunks, 
+    segments_downloaded: 0, 
+    file_size_bytes: contentLength 
+  }).eq('id', downloadId);
 
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
-  // Arquivos < 100MB: download direto
-  if (contentLength < 100 * 1024 * 1024) {
-    console.log(`📥 [Direct] Download simples (< 100MB)`);
-    
-    const res = await fetch(channel.stream_url, { 
-      headers: { 'User-Agent': 'VOD-Downloader/2.0' }, 
-      signal: AbortSignal.timeout(600000) 
-    });
-    
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No stream');
-    
-    const chunks: Uint8Array[] = [];
-    let bytes = 0, lastUpdate = Date.now();
-    
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        chunks.push(value);
-        bytes += value.length;
-        if (Date.now() - lastUpdate > 2000) {
-          lastUpdate = Date.now();
-          const progress = contentLength > 0 ? Math.round((bytes / contentLength) * 100) : 0;
-          await supabase.from('vod_downloads').update({ 
-            segments_downloaded: Math.ceil(bytes / CHUNK_SIZE), 
-            file_size_bytes: bytes 
-          }).eq('id', downloadId);
-          console.log(`📈 [Direct] Download: ${progress}% (${(bytes / 1048576).toFixed(1)} MB)`);
-        }
-      }
-    }
-
-    console.log(`✅ [Direct] Download completo: ${(bytes / 1048576).toFixed(1)} MB`);
-    
-    // Criar array de dados
-    const data = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
-    let offset = 0;
-    for (const c of chunks) { data.set(c, offset); offset += c.length; }
-    
-    // Atualizar status para processing
-    console.log(`⬆️ [Direct] Iniciando upload para R2...`);
-    await supabase.from('vod_downloads').update({ 
-      status: 'processing',
-      segments_downloaded: totalChunks,
-      file_size_bytes: bytes
-    }).eq('id', downloadId);
-    
-    // Upload para R2
-    try {
-      await uploadToR2(r2Key, data, contentType, 'public, max-age=31536000, immutable');
-      console.log(`✅ [Direct] Upload R2 completo: ${r2Key}`);
-    } catch (uploadError: any) {
-      console.error(`❌ [Direct] Erro no upload R2: ${uploadError.message}`);
-      throw new Error(`Falha no upload R2: ${uploadError.message}`);
-    }
-    
-    return;
-  }
-
-  // Arquivos grandes: Multipart Upload
-  console.log(`📥 [Direct] Multipart: ${totalChunks} chunks de ${(CHUNK_SIZE / 1048576).toFixed(0)}MB`);
+  // SEMPRE usar multipart upload para evitar estouro de memória
+  // Mesmo arquivos pequenos usam chunks para streaming
+  console.log(`📥 [Direct] Multipart streaming: ${totalChunks} chunks de ${(CHUNK_SIZE / 1048576).toFixed(0)}MB`);
   
   const uploadId = await initiateMultipartUpload(r2Key, contentType);
   console.log(`🔑 Upload ID: ${uploadId.substring(0, 16)}...`);
 
   const parts: { partNumber: number; etag: string }[] = [];
   let downloadedBytes = 0, completedChunks = 0, lastUpdate = Date.now();
-  const PARALLEL = 4;
+  
+  // Processar 2 chunks por vez para reduzir uso de memória
+  const PARALLEL = 2;
 
   try {
     for (let i = 0; i < totalChunks; i += PARALLEL) {
@@ -484,7 +431,7 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
         const idx = i + j;
         const start = idx * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE - 1, contentLength - 1);
-        chunkPromises.push(downloadChunk(channel.stream_url, start, end, r2Key, uploadId, idx + 1));
+        chunkPromises.push(downloadAndUploadChunk(channel.stream_url, start, end, r2Key, uploadId, idx + 1));
       }
 
       const results = await Promise.all(chunkPromises);
@@ -494,40 +441,74 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
         completedChunks++;
       }
 
-      if (Date.now() - lastUpdate > 1000 || completedChunks === totalChunks) {
+      // Atualizar progresso
+      if (Date.now() - lastUpdate > 2000 || completedChunks === totalChunks) {
         lastUpdate = Date.now();
-        await supabase.from('vod_downloads').update({ segments_downloaded: completedChunks, file_size_bytes: downloadedBytes }).eq('id', downloadId);
-        console.log(`📈 [Direct] ${Math.round((completedChunks / totalChunks) * 100)}% - ${completedChunks}/${totalChunks}`);
+        const progress = Math.round((completedChunks / totalChunks) * 100);
+        await supabase.from('vod_downloads').update({ 
+          segments_downloaded: completedChunks, 
+          file_size_bytes: downloadedBytes 
+        }).eq('id', downloadId);
+        console.log(`📈 [Direct] ${progress}% - ${completedChunks}/${totalChunks} chunks (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
       }
     }
 
+    // Ordenar parts e finalizar
     parts.sort((a, b) => a.partNumber - b.partNumber);
+    
+    console.log(`⬆️ [Direct] Finalizando multipart upload...`);
     await supabase.from('vod_downloads').update({ status: 'processing' }).eq('id', downloadId);
     
-    console.log(`⬆️ [Direct] Finalizando multipart...`);
     await completeMultipartUpload(r2Key, uploadId, parts);
-    console.log(`✅ [Direct] ${(downloadedBytes / 1048576).toFixed(1)} MB em ${totalChunks} chunks`);
+    console.log(`✅ [Direct] Upload completo: ${(downloadedBytes / 1048576).toFixed(1)} MB em ${totalChunks} chunks`);
+    
   } catch (error) {
+    console.error(`❌ [Direct] Erro no multipart, abortando...`);
     await abortMultipartUpload(r2Key, uploadId);
     throw error;
   }
 }
 
-async function downloadChunk(url: string, start: number, end: number, r2Key: string, uploadId: string, partNumber: number): Promise<{ partNumber: number; etag: string; bytes: number }> {
+// Função otimizada: baixa e faz upload de chunk imediatamente, sem acumular na memória
+async function downloadAndUploadChunk(
+  url: string, 
+  start: number, 
+  end: number, 
+  r2Key: string, 
+  uploadId: string, 
+  partNumber: number
+): Promise<{ partNumber: number; etag: string; bytes: number }> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+      // Download do chunk
       const res = await fetch(url, {
-        headers: { 'Range': `bytes=${start}-${end}`, 'User-Agent': 'VOD-Downloader/2.0' },
-        signal: AbortSignal.timeout(300000), // 5 min per chunk
+        headers: { 
+          'Range': `bytes=${start}-${end}`, 
+          'User-Agent': 'VOD-Downloader/3.0' 
+        },
+        signal: AbortSignal.timeout(180000), // 3 min timeout por chunk
       });
-      if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
       
+      if (!res.ok && res.status !== 206) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      // Ler dados diretamente como Uint8Array
       const data = new Uint8Array(await res.arrayBuffer());
+      const bytes = data.length;
+      
+      // Upload imediato para R2
       const etag = await uploadPart(r2Key, uploadId, partNumber, data);
-      return { partNumber, etag, bytes: data.length };
-    } catch (e) {
-      console.error(`⚠️ Chunk ${partNumber} tentativa ${attempt}/3:`, e);
-      if (attempt === 3) throw new Error(`Chunk ${partNumber} falhou`);
+      
+      // Chunk processado com sucesso
+      return { partNumber, etag, bytes };
+      
+    } catch (e: any) {
+      console.error(`⚠️ Chunk ${partNumber} tentativa ${attempt}/3: ${e.message}`);
+      if (attempt === 3) {
+        throw new Error(`Chunk ${partNumber} falhou após 3 tentativas: ${e.message}`);
+      }
+      // Backoff exponencial
       await new Promise(r => setTimeout(r, 2000 * attempt));
     }
   }
@@ -538,7 +519,11 @@ async function fetchWithTimeout(url: string, timeoutMs: number, method = 'GET'):
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { method, signal: controller.signal, headers: { 'User-Agent': 'VOD-Downloader/2.0' } });
+    return await fetch(url, { 
+      method, 
+      signal: controller.signal, 
+      headers: { 'User-Agent': 'VOD-Downloader/3.0' } 
+    });
   } finally {
     clearTimeout(timeout);
   }
