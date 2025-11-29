@@ -108,7 +108,9 @@ async function fetchWithR2Support(
   // Try public domain first if available
   if (r2PublicDomain && isR2Url(url)) {
     const parsedUrl = new URL(url);
-    const publicUrl = `https://${r2PublicDomain}${parsedUrl.pathname}`;
+    // Remove https:// prefix if present to avoid duplication
+    const cleanDomain = r2PublicDomain.replace(/^https?:\/\//, '');
+    const publicUrl = `https://${cleanDomain}${parsedUrl.pathname}`;
     console.log(`[M3U-Sync] Trying public R2 URL: ${publicUrl}`);
     
     try {
