@@ -168,13 +168,13 @@ serve(async (req) => {
     const blockedIds = new Set(failedDownloads?.map(f => f.channel_id) || []);
 
     // Buscar VODs que JÁ ESTÃO em download (prevenir duplicados)
-    const { data: activeDownloads } = await supabaseService
+    const { data: alreadyInProgress } = await supabaseService
       .from('vod_downloads')
       .select('id, channel_id, status')
       .in('channel_id', vodIds)
       .in('status', ['queued', 'downloading', 'processing', 'paused']);
 
-    const alreadyDownloadingIds = new Set(activeDownloads?.map(d => d.channel_id) || []);
+    const alreadyDownloadingIds = new Set(alreadyInProgress?.map(d => d.channel_id) || []);
     
     // Se encontrou duplicados ativos, logar
     if (alreadyDownloadingIds.size > 0) {
