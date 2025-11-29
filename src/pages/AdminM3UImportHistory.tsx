@@ -5,8 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Calendar, Clock, FileText, TrendingUp, Filter, Search } from 'lucide-react';
+import { useM3UImport } from '@/hooks/useM3UImport';
+import { ArrowLeft, Calendar, Clock, FileText, Filter, Search, Play, Pause, XCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -44,6 +47,18 @@ export default function AdminM3UImportHistory() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  
+  const {
+    session: activeSession,
+    progress: importProgress,
+    isImporting,
+    loadExistingSession,
+    pauseImport,
+    resumeImport,
+    cancelImport,
+    resetImport,
+  } = useM3UImport();
 
   useEffect(() => {
     loadSessions();
@@ -123,6 +138,28 @@ export default function AdminM3UImportHistory() {
       default: return '•';
     }
   };
+
+  const handleResumeSession = async (session: ImportSession) => {
+    try {
+      setImportDialogOpen(true);
+      await loadExistingSession(session.id);
+    } catch (error) {
+      console.error('Error resuming session:', error);
+    }
+  };
+
+  const handleCloseImportDialog = () => {
+    setImportDialogOpen(false);
+    resetImport();
+    loadSessions(); // Refresh list
+  };
+
+  // Update list when active session changes
+  useEffect(() => {
+    if (activeSession?.status === 'completed' || activeSession?.status === 'failed') {
+      loadSessions();
+    }
+  }, [activeSession?.status]);
 
   const filteredSessions = sessions.filter(session =>
     searchQuery === '' ||
@@ -273,13 +310,21 @@ export default function AdminM3UImportHistory() {
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className="flex items-center gap-1">
                               <FileText className="h-3 w-3" />
-                              {session.total_channels || 0} canais
+                              {session.processed_channels || 0}/{session.total_channels || 0} canais
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {format(new Date(session.created_at), 'dd/MM/yy HH:mm', { locale: ptBR })}
                             </div>
                           </div>
+
+                          {/* Progress bar for incomplete sessions */}
+                          {(session.status === 'processing' || session.status === 'paused') && session.total_channels > 0 && (
+                            <Progress 
+                              value={(session.processed_channels / session.total_channels) * 100} 
+                              className="h-2"
+                            />
+                          )}
 
                           {session.conflicts_detected > 0 && (
                             <Badge variant="outline" className="text-xs">
@@ -291,6 +336,22 @@ export default function AdminM3UImportHistory() {
                             <p className="text-xs text-destructive">
                               ⚠️ {session.error_message}
                             </p>
+                          )}
+
+                          {/* Resume button for paused/processing sessions */}
+                          {(session.status === 'paused' || session.status === 'processing') && session.source_type === 'url' && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="w-full mt-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResumeSession(session);
+                              }}
+                            >
+                              <RefreshCw className="h-3 w-3 mr-2" />
+                              Retomar Importação
+                            </Button>
                           )}
                         </div>
                       </CardContent>
@@ -351,6 +412,123 @@ export default function AdminM3UImportHistory() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Import Progress Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={handleCloseImportDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação M3U</DialogTitle>
+            <DialogDescription>
+              {activeSession?.status === 'completed' 
+                ? 'Importação concluída com sucesso!' 
+                : activeSession?.status === 'failed'
+                ? 'Erro na importação'
+                : 'Acompanhe o progresso da importação'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Status */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Status:</span>
+              {activeSession?.status === 'completed' && (
+                <Badge variant="default">Concluído</Badge>
+              )}
+              {activeSession?.status === 'failed' && (
+                <Badge variant="destructive">Falhou</Badge>
+              )}
+              {activeSession?.status === 'processing' && (
+                <Badge variant="outline">Processando</Badge>
+              )}
+              {activeSession?.status === 'paused' && (
+                <Badge variant="secondary">Pausado</Badge>
+              )}
+            </div>
+
+            {/* Progress */}
+            {activeSession && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progresso</span>
+                  <span>
+                    {activeSession.processedChannels || 0} / {activeSession.totalChannels || '?'} canais
+                  </span>
+                </div>
+                <Progress value={importProgress} className="h-3" />
+                <p className="text-xs text-muted-foreground text-center">
+                  {importProgress.toFixed(1)}% concluído
+                </p>
+              </div>
+            )}
+
+            {/* Error message */}
+            {activeSession?.errorMessage && (
+              <div className="p-3 bg-destructive/10 rounded-lg">
+                <p className="text-sm text-destructive">{activeSession.errorMessage}</p>
+              </div>
+            )}
+
+            {/* Control buttons */}
+            {isImporting && activeSession?.status === 'processing' && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={pauseImport}
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pausar
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    cancelImport();
+                    handleCloseImportDialog();
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+              </div>
+            )}
+
+            {activeSession?.status === 'paused' && (
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  className="flex-1"
+                  onClick={resumeImport}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Continuar
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    cancelImport();
+                    handleCloseImportDialog();
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+              </div>
+            )}
+
+            {(activeSession?.status === 'completed' || activeSession?.status === 'failed') && (
+              <Button
+                variant="default"
+                className="w-full"
+                onClick={handleCloseImportDialog}
+              >
+                Fechar
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

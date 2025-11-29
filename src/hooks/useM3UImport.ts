@@ -419,6 +419,7 @@ export function useM3UImport() {
     if (!session) return;
     try {
       await m3uImportService.pauseImport(session.id);
+      setSession(prev => prev ? { ...prev, status: 'paused' } : null);
       toast.info('Importação pausada');
     } catch (err: any) {
       toast.error(`Erro ao pausar: ${err.message}`);
@@ -428,12 +429,38 @@ export function useM3UImport() {
   const resumeImport = useCallback(async () => {
     if (!session) return;
     try {
+      setIsImporting(true);
+      
+      // Update status to processing first
       await m3uImportService.resumeImport(session.id);
+      setSession(prev => prev ? { ...prev, status: 'processing' } : null);
+      
       // Restart polling
       startPolling(session.id);
-      toast.info('Importação retomada');
+      
+      // Re-invoke edge function to continue processing
+      const resumeFrom = session.processedChannels || 0;
+      console.log('[useM3UImport] Resuming from channel:', resumeFrom);
+      
+      const { error: invokeError } = await supabase.functions.invoke('process-m3u-import', {
+        body: {
+          sessionId: session.id,
+          sourceType: session.sourceType,
+          sourceUrl: session.sourceUrl,
+          customListId: session.customListId,
+          resumeFromChannel: resumeFrom,
+        },
+      });
+      
+      if (invokeError) {
+        console.error('[useM3UImport] Error resuming import:', invokeError);
+        toast.error(`Erro ao retomar: ${invokeError.message}`);
+      } else {
+        toast.info('Importação retomada');
+      }
     } catch (err: any) {
       toast.error(`Erro ao retomar: ${err.message}`);
+      setIsImporting(false);
     }
   }, [session, startPolling]);
 
@@ -458,6 +485,68 @@ export function useM3UImport() {
     sessionIdRef.current = null;
   }, [cleanup]);
 
+  /**
+   * Load and resume an existing session from history
+   */
+  const loadExistingSession = useCallback(async (sessionId: string) => {
+    try {
+      cleanup();
+      setIsImporting(true);
+      setError(null);
+      
+      const sessionData = await fetchSessionFromDb(sessionId);
+      if (!sessionData) {
+        throw new Error('Sessão não encontrada');
+      }
+      
+      setSession(sessionData);
+      sessionIdRef.current = sessionId;
+      
+      // Start polling to track progress
+      startPolling(sessionId);
+      
+      // If session is paused or stuck in processing, auto-resume
+      if (sessionData.status === 'paused' || sessionData.status === 'processing') {
+        const resumeFrom = sessionData.processedChannels || 0;
+        
+        // Update status if paused
+        if (sessionData.status === 'paused') {
+          await supabase
+            .from('m3u_import_sessions')
+            .update({ status: 'processing' })
+            .eq('id', sessionId);
+        }
+        
+        console.log('[useM3UImport] Loading and resuming session from channel:', resumeFrom);
+        
+        const { error: invokeError } = await supabase.functions.invoke('process-m3u-import', {
+          body: {
+            sessionId: sessionId,
+            sourceType: sessionData.sourceType,
+            sourceUrl: sessionData.sourceUrl,
+            customListId: sessionData.customListId,
+            resumeFromChannel: resumeFrom,
+          },
+        });
+        
+        if (invokeError) {
+          console.error('[useM3UImport] Error loading session:', invokeError);
+          toast.error(`Erro ao carregar sessão: ${invokeError.message}`);
+        } else {
+          toast.success(`Retomando importação de ${resumeFrom} canais...`);
+        }
+      }
+      
+      return sessionData;
+    } catch (err: any) {
+      console.error('[useM3UImport] Error loading session:', err);
+      setError(err.message);
+      toast.error(`Erro ao carregar sessão: ${err.message}`);
+      setIsImporting(false);
+      throw err;
+    }
+  }, [cleanup, fetchSessionFromDb, startPolling]);
+
   return {
     session,
     progress,
@@ -469,5 +558,6 @@ export function useM3UImport() {
     resumeImport,
     cancelImport,
     resetImport,
+    loadExistingSession,
   };
 }
