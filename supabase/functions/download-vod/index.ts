@@ -203,7 +203,95 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { channelId, batch = false, channelIds = [], resume = false, downloadId, pauseAll = false, resumeAll = false } = body;
+    const { channelId, batch = false, channelIds = [], resume = false, downloadId, pauseAll = false, resumeAll = false, completeUpload = false } = body;
+
+    // Completar upload multipart travado
+    if (completeUpload && downloadId) {
+      console.log(`🔧 [VOD] Completando upload travado: ${downloadId}`);
+      
+      const { data: download, error: downloadError } = await supabaseService
+        .from('vod_downloads')
+        .select('*')
+        .eq('id', downloadId)
+        .maybeSingle();
+      
+      if (downloadError || !download) {
+        return new Response(JSON.stringify({ error: 'Download não encontrado' }), 
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      const metadata = download.metadata || {};
+      const uploadId = metadata.upload_id;
+      const parts = metadata.parts || [];
+      
+      if (!uploadId || parts.length === 0) {
+        return new Response(JSON.stringify({ error: 'Sem dados de upload multipart para completar' }), 
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      try {
+        // Buscar o canal para obter o R2 key
+        const { data: channel } = await supabaseService
+          .from('m3u_channels')
+          .select('id, name, stream_url')
+          .eq('id', download.channel_id)
+          .maybeSingle();
+        
+        if (!channel) {
+          return new Response(JSON.stringify({ error: 'Canal não encontrado' }), 
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        const ext = download.original_url?.match(/\.(mp4|mkv|avi|ts|m3u8)$/i)?.[1] || 'mp4';
+        const r2Key = `vod/${channel.id}/${channel.id}.${ext}`;
+        const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN')?.replace(/^https?:\/\//, '');
+        const r2Url = `https://${r2Domain}/${r2Key}`;
+        
+        console.log(`🔧 [VOD] Completando multipart: ${parts.length} partes, uploadId: ${uploadId.slice(0, 20)}...`);
+        
+        // Ordenar partes por partNumber
+        const sortedParts = parts.map((p: any) => ({
+          partNumber: p.partNumber,
+          etag: p.etag
+        })).sort((a: any, b: any) => a.partNumber - b.partNumber);
+        
+        // Completar o multipart upload
+        await completeMultipartUpload(r2Key, uploadId, sortedParts);
+        
+        // Atualizar o download como completed
+        await supabaseService.from('vod_downloads').update({
+          status: 'completed',
+          r2_url: r2Url,
+          download_completed_at: new Date().toISOString(),
+          error_message: null,
+          metadata: { ...metadata, completed_manually: true }
+        }).eq('id', downloadId);
+        
+        // Atualizar o canal
+        await supabaseService.from('m3u_channels').update({
+          r2_uploaded: true,
+          r2_url: r2Url,
+          r2_uploaded_at: new Date().toISOString()
+        }).eq('id', channel.id);
+        
+        // Registrar sucesso no circuit breaker
+        await supabaseService.rpc('record_host_success', { p_url: download.original_url });
+        
+        console.log(`✅ [VOD] Upload completado manualmente: ${channel.name}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          r2Url, 
+          partsCount: sortedParts.length,
+          message: 'Upload multipart completado com sucesso'
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        
+      } catch (e: any) {
+        console.error(`❌ [VOD] Erro ao completar upload:`, e.message);
+        return new Response(JSON.stringify({ error: e.message }), 
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
 
     // Pausar todos downloads
     if (pauseAll) {

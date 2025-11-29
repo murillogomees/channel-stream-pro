@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Download, CheckCircle2, XCircle, Clock, Loader2, Play, Pause, RefreshCw, HardDrive, Zap, TrendingUp, Trash2 } from 'lucide-react';
+import { Download, CheckCircle2, XCircle, Clock, Loader2, Play, Pause, RefreshCw, HardDrive, Zap, TrendingUp, Trash2, CheckCheck } from 'lucide-react';
 import { VODDownload } from '@/hooks/useVODManagement';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
@@ -12,10 +12,11 @@ interface VODDownloadProgressProps {
   downloads: VODDownload[];
   onRetry?: (downloadId: string) => void;
   onCancel?: (downloadId: string) => void;
+  onComplete?: (downloadId: string) => void;
   channelNames?: Record<string, string>;
 }
 
-export default function VODDownloadProgress({ downloads, onRetry, onCancel, channelNames = {} }: VODDownloadProgressProps) {
+export default function VODDownloadProgress({ downloads, onRetry, onCancel, onComplete, channelNames = {} }: VODDownloadProgressProps) {
   const [pulseActive, setPulseActive] = useState(true);
   
   // Toggle pulse animation
@@ -260,6 +261,20 @@ export default function VODDownloadProgress({ downloads, onRetry, onCancel, chan
                       </div>
                       
                       <div className="flex items-center gap-2">
+                        {/* Botão Completar para uploads com muitas partes que travaram */}
+                        {onComplete && partsCount >= 5 && progress >= 80 && (download.status === 'downloading' || download.status === 'paused') && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => onComplete(download.id)}
+                            className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                            title="Completar upload multipart"
+                          >
+                            <CheckCheck className="h-3 w-3 mr-1" />
+                            Completar
+                          </Button>
+                        )}
+                        
                         {/* Botão Cancelar para downloads ativos ou travados */}
                         {onCancel && (download.status === 'downloading' || download.status === 'processing' || download.status === 'queued' || download.status === 'paused') && (
                           <Button

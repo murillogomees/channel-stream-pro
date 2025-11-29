@@ -503,6 +503,40 @@ export const useVODManagement = () => {
     }
   }, [toast, fetchDownloads]);
 
+  // Completar upload multipart travado
+  const completeUpload = useCallback(async (downloadId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('download-vod', {
+        body: { completeUpload: true, downloadId }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      toast({
+        title: 'Upload completado',
+        description: `${data.partsCount} partes finalizadas com sucesso`,
+      });
+
+      await fetchDownloads();
+      await fetchStatistics();
+      await fetchHostedVODs();
+      
+      return data;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao completar upload',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast, fetchDownloads, fetchStatistics, fetchHostedVODs]);
+
   // Subscrição realtime para updates de progresso
   useEffect(() => {
     fetchDownloads();
@@ -764,6 +798,7 @@ export const useVODManagement = () => {
     cancelDownload,
     retryDownload,
     resumeDownload,
+    completeUpload,
     pauseAllDownloads,
     resumeAllDownloads,
     fetchHostStatus,
