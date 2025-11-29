@@ -1,8 +1,6 @@
 /**
  * Main App Component
- * @cache-bust 2025-11-29-clean
  */
-import * as React from "react";
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
