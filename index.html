@@ -17,25 +17,58 @@
     <!-- Local favicon - eliminates redirect -->
     <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <!-- Preconnect to critical origins -->
+    <!-- ========== RESOURCE HINTS FOR PERFORMANCE ========== -->
+    
+    <!-- Preconnect to critical origins (establishes early connection) -->
     <link rel="preconnect" href="https://sdvyxdghxqmntyoweqbd.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://sdvyxdghxqmntyoweqbd.supabase.co" />
+    
+    <!-- CDN and storage preconnect -->
+    <link rel="preconnect" href="https://storage.googleapis.com" crossorigin />
+    <link rel="dns-prefetch" href="https://storage.googleapis.com" />
+    
+    <!-- Cloudflare R2 CDN (if used) -->
+    <link rel="dns-prefetch" href="https://pub-cdn.example.com" />
+    
+    <!-- Google Fonts - preconnect for faster font loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Facebook/Meta Pixel DNS prefetch -->
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
 
-    <!-- Preload LCP image -->
+    <!-- ========== CRITICAL ASSET PRELOADS ========== -->
+    
+    <!-- Preload LCP image with high priority -->
     <link rel="preload" as="image" href="/logo.webp" fetchpriority="high" type="image/webp" />
 
-    <!-- System font stack - no external fonts needed for initial render -->
+    <!-- ========== INLINE CRITICAL CSS ========== -->
     <style>
+      /* System font stack for immediate render - custom fonts loaded async */
       :root {
         --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       }
-      body { font-family: var(--font-sans); }
+      body { 
+        font-family: var(--font-sans);
+        /* Prevent FOUC */
+        opacity: 1;
+        transition: opacity 0.1s ease-in;
+      }
+      body.fonts-loading {
+        /* Optional: slight opacity while fonts load */
+      }
       #root { min-height: 100vh; }
+      /* Critical above-fold skeleton */
+      .skeleton-pulse {
+        animation: pulse 1.5s ease-in-out infinite;
+        background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+        background-size: 200% 100%;
+      }
+      @keyframes pulse {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
     </style>
-
-    <!-- Google Fonts loaded async after page render -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -120,18 +153,42 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Non-critical resources loaded after page interactive -->
+    <!-- ========== DEFERRED RESOURCE LOADING ========== -->
     <script>
       (function() {
-        // Load Google Fonts after page is interactive
+        'use strict';
+        
+        // Performance marks for debugging
+        if (window.performance && performance.mark) {
+          performance.mark('deferred-scripts-start');
+        }
+
+        // Load Google Fonts asynchronously (non-blocking)
         function loadFonts() {
+          document.body.classList.add('fonts-loading');
+          
+          // All fonts in single request for efficiency
+          var fonts = [
+            'family=Work+Sans:wght@400;500;600;700',
+            'family=Roboto:wght@400;500',
+            'family=Roboto+Mono:wght@400;700',
+            'family=Crimson+Pro:wght@400;600'
+          ].join('&');
+          
           var link = document.createElement('link');
           link.rel = 'stylesheet';
-          link.href = 'https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap';
+          link.href = 'https://fonts.googleapis.com/css2?' + fonts + '&display=swap';
+          link.onload = function() {
+            document.body.classList.remove('fonts-loading');
+            document.body.classList.add('fonts-loaded');
+            if (window.performance && performance.mark) {
+              performance.mark('fonts-loaded');
+            }
+          };
           document.head.appendChild(link);
         }
 
-        // Load Meta Pixel after idle
+        // Load Meta Pixel after idle (lowest priority)
         function loadMetaPixel() {
           !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
           n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
@@ -141,12 +198,20 @@
           fbq('init','706630189163732');fbq('track','PageView');
         }
 
+        // Use requestIdleCallback for truly non-blocking loading
         if ('requestIdleCallback' in window) {
+          // Fonts: load during first idle period (high priority)
           requestIdleCallback(loadFonts, { timeout: 1000 });
-          requestIdleCallback(loadMetaPixel, { timeout: 3000 });
+          // Meta Pixel: load during idle with low priority
+          requestIdleCallback(loadMetaPixel, { timeout: 5000 });
         } else {
-          setTimeout(loadFonts, 100);
-          setTimeout(loadMetaPixel, 2000);
+          // Fallback for Safari and older browsers
+          setTimeout(loadFonts, 50);
+          setTimeout(loadMetaPixel, 3000);
+        }
+        
+        if (window.performance && performance.mark) {
+          performance.mark('deferred-scripts-end');
         }
       })();
     </script>

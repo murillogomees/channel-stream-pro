@@ -1,12 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Roboto&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lora&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Crimson+Pro&display=swap");
-
-/* Fonts loaded via index.html with display=swap for non-blocking */
+/**
+ * ============================================================================
+ * PERFORMANCE OPTIMIZATION: Fonts loaded via index.html
+ * ============================================================================
+ * 
+ * Fonts are loaded asynchronously in index.html using requestIdleCallback
+ * to prevent render-blocking. DO NOT use @import here as it blocks CSS parsing.
+ * 
+ * Available fonts (loaded async):
+ * - Work Sans: Primary font for headings
+ * - Roboto: Body text
+ * - Roboto Mono: Code/monospace
+ * - Crimson Pro: Serif accent font
+ * ============================================================================
+ */
 
 @tailwind base;
 @tailwind components;

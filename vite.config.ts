@@ -3,8 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
-// Cache bust: 2025-11-29-v3 - Removed playwright files
+// Cache bust: 2025-11-29-v4 - Added bundle analyzer
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -14,6 +15,14 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    // Bundle analyzer - generates stats.html on build
+    mode === "production" && visualizer({
+      filename: "dist/stats.html",
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+      template: "treemap", // sunburst, treemap, network
+    }),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,

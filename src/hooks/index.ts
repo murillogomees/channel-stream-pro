@@ -20,6 +20,13 @@ export { useErrorRecovery } from './useErrorRecovery';
 // Web Vitals
 export { useWebVitals } from './useWebVitals';
 
+// Memory Management
+export { usePlayerCleanup, cleanupDetachedPlayers } from './usePlayerCleanup';
+
+// Search & Performance
+export { useDebouncedSearch, useDebouncedValue } from './useDebouncedSearch';
+export { useLazyLoadContent } from './useLazyLoadContent';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
