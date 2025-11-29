@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Star, LinkIcon, Check, RefreshCw, Pencil, Save, Users } from 'lucide-react';
+import { Plus, Trash2, Loader2, Star, LinkIcon, Check, Pencil, Users, RefreshCw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useM3UListFavorites } from '@/hooks/useM3UListFavorites';
-import { PageHeader } from '@/components/admin/PageHeader';
 import { M3UClientManager } from '@/components/admin/M3UClientManager';
 
 interface M3UList {
@@ -267,174 +266,168 @@ export default function AdminM3ULists() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-6 max-w-7xl overflow-x-hidden">
-      <PageHeader title="Listas M3U" description="Gerencie as listas de canais IPTV" />
-      
-      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mb-4 sm:mb-6">
-        <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header com botão */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-lg sm:text-xl font-semibold">Listas M3U</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Gerencie as listas de canais IPTV</p>
+        </div>
+        <Button onClick={() => handleOpenDialog()} size="sm" className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nova Lista
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      {/* Stats Grid - Responsivo */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total de Listas</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-4 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lists.length}</div>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{lists.length}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Listas Ativas</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-4 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium">Ativas</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">
               {lists.filter(l => l.status === 'active').length}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total em Uso</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-4 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium">Em Uso</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">
               {lists.reduce((sum, l) => sum + (l.usage_count || 0), 0)}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Listas M3U Cadastradas</CardTitle>
+      {/* Tabela Desktop */}
+      <Card className="hidden md:block">
+        <CardHeader className="p-4">
+          <CardTitle className="text-base">Listas Cadastradas</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Tipos de Plano</TableHead>
-                <TableHead>Uso</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lists.length === 0 ? (
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    Nenhuma lista cadastrada
-                  </TableCell>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="hidden lg:table-cell">Planos</TableHead>
+                  <TableHead>Uso</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right w-[120px]">Ações</TableHead>
                 </TableRow>
-              ) : (
-                lists.map((list) => (
-                  <TableRow key={list.id}>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleFavorite(list.id)}
-                      >
-                        <Star
-                          className={`h-4 w-4 ${
-                            isFavorite(list.id)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-muted-foreground'
-                          }`}
-                        />
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{list.name}</span>
-                        {list.is_default && (
-                          <Badge variant="secondary">Padrão</Badge>
-                        )}
-                      </div>
-                      {list.description && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {list.description}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {(list.plan_type || []).map(type => (
-                          <Badge key={type} variant="outline" className="text-xs">
-                            {PLAN_TYPES.find(p => p.value === type)?.label || type}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{list.usage_count || 0} clientes</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
-                        {list.status === 'active' ? 'Ativa' : 'Inativa'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenClientManager(list)}
-                          title="Gerenciar clientes"
-                        >
-                          <Users className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(list)}
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {!list.is_default && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSetDefault(list.id)}
-                            title="Definir como padrão"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            navigator.clipboard.writeText(list.file_url);
-                            toast.success('URL copiada!');
-                          }}
-                          title="Copiar URL"
-                        >
-                          <LinkIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteList(list.id)}
-                          title="Deletar"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {lists.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Nenhuma lista cadastrada
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  lists.map((list) => (
+                    <TableRow key={list.id}>
+                      <TableCell className="p-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleFavorite(list.id)}>
+                          <Star className={`h-4 w-4 ${isFavorite(list.id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate max-w-[150px]">{list.name}</span>
+                          {list.is_default && <Badge variant="secondary" className="text-xs">Padrão</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {(list.plan_type || []).slice(0, 3).map(type => (
+                            <Badge key={type} variant="outline" className="text-xs">{PLAN_TYPES.find(p => p.value === type)?.label || type}</Badge>
+                          ))}
+                          {(list.plan_type || []).length > 3 && <Badge variant="outline" className="text-xs">+{(list.plan_type || []).length - 3}</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{list.usage_count || 0}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={list.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                          {list.status === 'active' ? 'Ativa' : 'Inativa'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right p-2">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenClientManager(list)}><Users className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(list)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          {!list.is_default && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSetDefault(list.id)}><Check className="h-3.5 w-3.5" /></Button>}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { navigator.clipboard.writeText(list.file_url); toast.success('URL copiada!'); }}><LinkIcon className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteList(list.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Cards Mobile */}
+      <div className="md:hidden space-y-3">
+        {lists.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              Nenhuma lista cadastrada
+            </CardContent>
+          </Card>
+        ) : (
+          lists.map((list) => (
+            <Card key={list.id}>
+              <CardContent className="p-3">
+                <div className="flex items-start gap-2">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => toggleFavorite(list.id)}>
+                    <Star className={`h-4 w-4 ${isFavorite(list.id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                  </Button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm truncate">{list.name}</span>
+                      {list.is_default && <Badge variant="secondary" className="text-xs">Padrão</Badge>}
+                      <Badge variant={list.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                        {list.status === 'active' ? 'Ativa' : 'Inativa'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <Badge variant="outline" className="text-xs">{list.usage_count || 0} clientes</Badge>
+                      {(list.plan_type || []).slice(0, 2).map(type => (
+                        <Badge key={type} variant="outline" className="text-xs">{PLAN_TYPES.find(p => p.value === type)?.label || type}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenClientManager(list)}><Users className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog(list)}><Pencil className="h-4 w-4" /></Button>
+                  {!list.is_default && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSetDefault(list.id)}><Check className="h-4 w-4" /></Button>}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(list.file_url); toast.success('URL copiada!'); }}><LinkIcon className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteList(list.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

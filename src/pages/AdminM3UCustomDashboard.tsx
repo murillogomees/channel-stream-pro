@@ -72,230 +72,224 @@ export default function AdminM3UCustomDashboard() {
     : 0;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header responsivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard M3U Personalizado</h1>
-          <p className="text-muted-foreground">Monitoramento e estatísticas das listas M3U</p>
+          <h2 className="text-lg sm:text-xl font-semibold">Dashboard M3U</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Monitoramento das listas personalizadas</p>
         </div>
-        <Button onClick={() => navigate('/admin/m3u-builder')}>
+        <Button onClick={() => navigate('/admin/m3u-builder')} size="sm" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
-          Nova Lista Personalizada
+          Nova Lista
         </Button>
       </div>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Grid - Responsivo 2x2 no mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Listas</CardTitle>
-            <List className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Listas</CardTitle>
+            <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalLists}</div>
-            <p className="text-xs text-muted-foreground">
-              {activeLists} ativa(s)
-            </p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{totalLists}</div>
+            <p className="text-xs text-muted-foreground">{activeLists} ativa(s)</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Canais</CardTitle>
-            <Tv className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Canais</CardTitle>
+            <Tv className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalChannels}</div>
-            <p className="text-xs text-muted-foreground">
-              {totalCategories} categoria(s)
-            </p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{totalChannels}</div>
+            <p className="text-xs text-muted-foreground">{totalCategories} cat.</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gerações CDN</CardTitle>
-            <Cloud className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">CDN</CardTitle>
+            <Cloud className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{successfulGenerations}</div>
-            <p className="text-xs text-muted-foreground">
-              {failedGenerations} falha(s)
-            </p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{successfulGenerations}</div>
+            <p className="text-xs text-muted-foreground">{failedGenerations} falha(s)</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tempo Médio</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Tempo</CardTitle>
+            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{averageGenerationTime}ms</div>
-            <p className="text-xs text-muted-foreground">
-              Geração de M3U
-            </p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{averageGenerationTime}ms</div>
+            <p className="text-xs text-muted-foreground">geração</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Lista de Listas M3U */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Listas M3U Criadas</CardTitle>
-          <CardDescription>Visão geral de todas as listas personalizadas</CardDescription>
+      {/* Lista de Listas M3U - Desktop */}
+      <Card className="hidden md:block">
+        <CardHeader className="p-4">
+          <CardTitle className="text-base">Listas Criadas</CardTitle>
+          <CardDescription className="text-xs">Visão geral das listas personalizadas</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Carregando...</p>
+            <p className="text-sm text-muted-foreground p-4">Carregando...</p>
           ) : lists.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma lista criada ainda</p>
+            <p className="text-sm text-muted-foreground p-4">Nenhuma lista criada ainda</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Categorias</TableHead>
-                  <TableHead>Canais</TableHead>
-                  <TableHead>Última Geração</TableHead>
-                  <TableHead>URL CDN</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lists.map((list) => (
-                  <TableRow key={list.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{list.name}</p>
-                        <p className="text-xs text-muted-foreground">{list.slug}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={list.status === 'active' ? 'default' : 'secondary'}>
-                        {list.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{list.total_categories}</TableCell>
-                    <TableCell>{list.total_channels}</TableCell>
-                    <TableCell>
-                      {list.last_generated_at
-                        ? format(new Date(list.last_generated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {list.cdn_url ? (
-                        <a
-                          href={list.cdn_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline text-sm"
-                        >
-                          Ver URL
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Não gerado</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/admin/m3u-builder?list=${list.id}`)}
-                          title="Editar Lista"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {list.cdn_url && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => window.open(list.cdn_url, '_blank')}
-                            title="Visualizar M3U"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Cat.</TableHead>
+                    <TableHead>Canais</TableHead>
+                    <TableHead className="hidden lg:table-cell">Última Geração</TableHead>
+                    <TableHead>CDN</TableHead>
+                    <TableHead className="text-right w-[80px]">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {lists.map((list) => (
+                    <TableRow key={list.id}>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate max-w-[150px]">{list.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{list.slug}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={list.status === 'active' ? 'default' : 'secondary'} className="text-xs">{list.status}</Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">{list.total_categories}</TableCell>
+                      <TableCell>{list.total_channels}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs">
+                        {list.last_generated_at ? format(new Date(list.last_generated_at), "dd/MM HH:mm", { locale: ptBR }) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {list.cdn_url ? (
+                          <a href={list.cdn_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">URL</a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right p-2">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/admin/m3u-builder?list=${list.id}`)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          {list.cdn_url && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(list.cdn_url, '_blank')}><Eye className="h-3.5 w-3.5" /></Button>}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Informações sobre Otimização R2 */}
+      {/* Lista de Listas M3U - Mobile */}
+      <div className="md:hidden space-y-3">
+        <h3 className="text-sm font-medium">Listas Criadas</h3>
+        {isLoading ? (
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">Carregando...</CardContent></Card>
+        ) : lists.length === 0 ? (
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">Nenhuma lista criada</CardContent></Card>
+        ) : (
+          lists.map((list) => (
+            <Card key={list.id}>
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{list.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{list.slug}</p>
+                  </div>
+                  <Badge variant={list.status === 'active' ? 'default' : 'secondary'} className="text-xs flex-shrink-0">{list.status}</Badge>
+                </div>
+                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                  <span>{list.total_categories} cat.</span>
+                  <span>{list.total_channels} canais</span>
+                  {list.last_generated_at && <span>{format(new Date(list.last_generated_at), "dd/MM", { locale: ptBR })}</span>}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                  {list.cdn_url ? (
+                    <a href={list.cdn_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">Ver URL CDN</a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">CDN não gerado</span>
+                  )}
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/admin/m3u-builder?list=${list.id}`)}><Pencil className="h-4 w-4" /></Button>
+                    {list.cdn_url && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(list.cdn_url, '_blank')}><Eye className="h-4 w-4" /></Button>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Informações sobre Otimização R2 - Collapsible no mobile */}
       <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5 text-blue-500" />
-            Otimizações Cloudflare R2 Ativas
+        <CardHeader className="p-3 sm:p-4">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+            <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+            Otimizações R2 Ativas
           </CardTitle>
-          <CardDescription>
-            Seu conteúdo já está otimizado com tecnologias avançadas
-          </CardDescription>
+          <CardDescription className="text-xs">Tecnologias avançadas</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="p-3 sm:p-4 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">CDN Global</p>
-                  <p className="text-xs text-muted-foreground">
-                    Conteúdo distribuído globalmente com latência mínima
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">CDN Global</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Latência mínima global</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Cache Agressivo</p>
-                  <p className="text-xs text-muted-foreground">
-                    Manifests HLS cached (30s), segments (24h) para performance máxima
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">Cache Agressivo</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Performance máxima</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Zero Egress Fees</p>
-                  <p className="text-xs text-muted-foreground">
-                    Sem custos de saída de dados, economize até 90% vs S3
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">Zero Egress</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">90% economia vs S3</p>
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">VOD Hosting</p>
-                  <p className="text-xs text-muted-foreground">
-                    Conteúdo VOD hospedado no R2 para independência total
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">VOD Hosting</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Hospedagem independente</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Stream Proxy</p>
-                  <p className="text-xs text-muted-foreground">
-                    Autenticação e controle de acesso em tempo real
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">Stream Proxy</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Autenticação tempo real</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Regeneração Automática</p>
-                  <p className="text-xs text-muted-foreground">
-                    M3U regenerados diariamente e enviados ao CDN
-                  </p>
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-xs sm:text-sm">Auto Regeneração</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">M3U diário ao CDN</p>
                 </div>
               </div>
             </div>
@@ -303,65 +297,86 @@ export default function AdminM3UCustomDashboard() {
         </CardContent>
       </Card>
 
-      {/* Logs de Geração */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico de Gerações</CardTitle>
-          <CardDescription>Últimas 50 gerações de arquivos M3U</CardDescription>
+      {/* Logs de Geração - Desktop */}
+      <Card className="hidden md:block">
+        <CardHeader className="p-4">
+          <CardTitle className="text-base">Histórico de Gerações</CardTitle>
+          <CardDescription className="text-xs">Últimas 50 gerações</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoadingLogs ? (
-            <p className="text-sm text-muted-foreground">Carregando logs...</p>
+            <p className="text-sm text-muted-foreground p-4">Carregando...</p>
           ) : logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma geração registrada</p>
+            <p className="text-sm text-muted-foreground p-4">Nenhuma geração</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Lista</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Canais</TableHead>
-                  <TableHead>Tamanho</TableHead>
-                  <TableHead>Tempo Geração</TableHead>
-                  <TableHead>Tempo Upload</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-sm">
-                      {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell className="text-sm">{log.list_name || 'N/A'}</TableCell>
-                    <TableCell>
-                      {log.cdn_upload_status === 'success' ? (
-                        <Badge variant="default" className="flex items-center gap-1 w-fit">
-                          <CheckCircle className="h-3 w-3" />
-                          Sucesso
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive" className="flex items-center gap-1 w-fit">
-                          <XCircle className="h-3 w-3" />
-                          Falha
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{log.channels_count}</TableCell>
-                    <TableCell className="text-sm">
-                      {log.file_size ? `${(log.file_size / 1024).toFixed(2)} KB` : '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">{log.generation_time_ms}ms</TableCell>
-                    <TableCell className="text-sm">
-                      {log.cdn_upload_time_ms ? `${log.cdn_upload_time_ms}ms` : '-'}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Lista</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Canais</TableHead>
+                    <TableHead className="hidden lg:table-cell">Tamanho</TableHead>
+                    <TableHead>Tempo</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {logs.slice(0, 20).map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-xs whitespace-nowrap">{format(new Date(log.created_at), "dd/MM HH:mm", { locale: ptBR })}</TableCell>
+                      <TableCell className="text-xs max-w-[100px] truncate">{log.list_name || 'N/A'}</TableCell>
+                      <TableCell>
+                        {log.cdn_upload_status === 'success' ? (
+                          <Badge variant="default" className="text-xs"><CheckCircle className="h-3 w-3 mr-1" />OK</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs"><XCircle className="h-3 w-3 mr-1" />Erro</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs hidden lg:table-cell">{log.channels_count}</TableCell>
+                      <TableCell className="text-xs hidden lg:table-cell">{log.file_size ? `${(log.file_size / 1024).toFixed(1)}KB` : '-'}</TableCell>
+                      <TableCell className="text-xs">{log.generation_time_ms}ms</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Logs de Geração - Mobile */}
+      <div className="md:hidden space-y-3">
+        <h3 className="text-sm font-medium">Histórico de Gerações</h3>
+        {isLoadingLogs ? (
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">Carregando...</CardContent></Card>
+        ) : logs.length === 0 ? (
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">Nenhuma geração</CardContent></Card>
+        ) : (
+          <div className="space-y-2">
+            {logs.slice(0, 10).map((log) => (
+              <Card key={log.id}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{log.list_name || 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(log.created_at), "dd/MM HH:mm", { locale: ptBR })}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{log.generation_time_ms}ms</span>
+                      {log.cdn_upload_status === 'success' ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

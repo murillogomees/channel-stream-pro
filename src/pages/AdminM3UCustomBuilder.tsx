@@ -383,24 +383,25 @@ export default function AdminM3UCustomBuilder() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header responsivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Editor de Listas M3U Personalizadas</h1>
-          <p className="text-muted-foreground">Crie e gerencie suas listas de canais IPTV</p>
+          <h2 className="text-lg sm:text-xl font-semibold">Editor M3U</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Crie e gerencie listas personalizadas</p>
         </div>
         
         <Dialog open={isNewListDialogOpen} onOpenChange={setIsNewListDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button size="sm" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Nova Lista
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="mx-4 sm:mx-0 max-w-[95vw] sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Criar Nova Lista M3U</DialogTitle>
-              <DialogDescription>Preencha os dados da nova lista personalizada</DialogDescription>
+              <DialogTitle>Nova Lista M3U</DialogTitle>
+              <DialogDescription>Preencha os dados da lista</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -425,6 +426,7 @@ export default function AdminM3UCustomBuilder() {
                   value={newListData.description}
                   onChange={(e) => setNewListData({ ...newListData, description: e.target.value })}
                   placeholder="Lista com canais esportivos em HD..."
+                  className="min-h-[80px]"
                 />
               </div>
               <Button onClick={handleCreateList} className="w-full">
@@ -436,7 +438,8 @@ export default function AdminM3UCustomBuilder() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Grid responsivo - stack no mobile, 3 colunas no desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Coluna 1: Listas */}
         <Card>
           <CardHeader>
