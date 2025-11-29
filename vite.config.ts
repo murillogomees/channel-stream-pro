@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-v6 - Force single React with explicit path aliases
+// Cache bust: 2025-11-29-v7 - Fix React import consistency
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
