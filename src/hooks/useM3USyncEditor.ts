@@ -36,6 +36,13 @@ export interface ClassGroup {
   totalEntries: number;
 }
 
+export interface LoadingProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+  phase: 'counting' | 'fetching' | 'processing' | 'done';
+}
+
 // Classify content based on group_title patterns
 function classifyContent(groupTitle: string | null): ContentClass {
   if (!groupTitle) return "other";
@@ -117,59 +124,104 @@ const CLASS_PREFIXES: Record<ContentClass, string> = {
 
 export { CLASS_LABELS, CLASS_PREFIXES };
 
+// Helper to chunk array
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function useM3USyncEditor() {
   const [entries, setEntries] = useState<M3UEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>({
+    loaded: 0,
+    total: 0,
+    percent: 0,
+    phase: 'done',
+  });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState<ContentClass | "all">("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Load ALL entries from a source using pagination
+  // Load ALL entries from a source using optimized parallel pagination
   const loadEntries = useCallback(async (sourceId: string) => {
     setIsLoading(true);
     setSelectedSourceId(sourceId);
+    setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'counting' });
 
     try {
-      const PAGE_SIZE = 1000;
+      const PAGE_SIZE = 5000;
+      const PARALLEL_REQUESTS = 5;
+
+      // First, get total count
+      const { count, error: countError } = await supabase
+        .from("m3u_sync_entries")
+        .select("*", { count: "exact", head: true })
+        .eq("source_id", sourceId)
+        .eq("is_valid", true);
+
+      if (countError) throw countError;
+
+      const totalCount = count || 0;
+      if (totalCount === 0) {
+        setEntries([]);
+        setLoadingProgress({ loaded: 0, total: 0, percent: 100, phase: 'done' });
+        toast({
+          title: "Sem entradas",
+          description: "Esta fonte não possui entradas válidas",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      setLoadingProgress({ loaded: 0, total: totalCount, percent: 0, phase: 'fetching' });
+
+      // Calculate total pages
+      const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+      const pageNumbers = Array.from({ length: totalPages }, (_, i) => i);
+      const pageBatches = chunkArray(pageNumbers, PARALLEL_REQUESTS);
+
       let allData: any[] = [];
-      let page = 0;
-      let hasMore = true;
 
-      // Fetch all entries using pagination
-      while (hasMore) {
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+      // Fetch pages in parallel batches
+      for (const batch of pageBatches) {
+        const requests = batch.map(async (page) => {
+          const from = page * PAGE_SIZE;
+          const to = from + PAGE_SIZE - 1;
 
-        const { data, error } = await supabase
-          .from("m3u_sync_entries")
-          .select("*")
-          .eq("source_id", sourceId)
-          .eq("is_valid", true)
-          .order("group_title")
-          .order("title")
-          .range(from, to);
+          const { data, error } = await supabase
+            .from("m3u_sync_entries")
+            .select("*")
+            .eq("source_id", sourceId)
+            .eq("is_valid", true)
+            .order("group_title")
+            .order("title")
+            .range(from, to);
 
-        if (error) throw error;
+          if (error) throw error;
+          return data || [];
+        });
 
-        if (data && data.length > 0) {
-          allData = [...allData, ...data];
-          hasMore = data.length === PAGE_SIZE;
-          page++;
+        const results = await Promise.all(requests);
+        const batchData = results.flat();
+        allData = [...allData, ...batchData];
 
-          // Show loading progress
-          if (hasMore) {
-            toast({
-              title: "Carregando...",
-              description: `${allData.length.toLocaleString()} entradas carregadas...`,
-            });
-          }
-        } else {
-          hasMore = false;
-        }
+        // Update progress
+        setLoadingProgress(prev => ({
+          loaded: allData.length,
+          total: totalCount,
+          percent: Math.round((allData.length / totalCount) * 100),
+          phase: 'fetching',
+        }));
       }
 
       // Process entries
+      setLoadingProgress(prev => ({ ...prev, phase: 'processing' }));
+
       const processedEntries: M3UEntry[] = allData.map((entry) => ({
         ...entry,
         content_class: classifyContent(entry.group_title),
@@ -178,10 +230,16 @@ export function useM3USyncEditor() {
       }));
 
       setEntries(processedEntries);
+      setLoadingProgress({ 
+        loaded: processedEntries.length, 
+        total: processedEntries.length, 
+        percent: 100, 
+        phase: 'done' 
+      });
 
       toast({
         title: "Conteúdo carregado",
-        description: `${processedEntries.length.toLocaleString()} entradas carregadas`,
+        description: `${processedEntries.length.toLocaleString()} entradas em ${totalPages} páginas`,
       });
     } catch (error: any) {
       console.error("[M3USyncEditor] Error loading entries:", error);
@@ -190,6 +248,7 @@ export function useM3USyncEditor() {
         description: "Falha ao carregar entradas",
         variant: "destructive",
       });
+      setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'done' });
     } finally {
       setIsLoading(false);
     }
@@ -609,6 +668,7 @@ export function useM3USyncEditor() {
     allCategories,
     stats,
     isLoading,
+    loadingProgress,
     selectedSourceId,
     searchQuery,
     selectedClass,
