@@ -13,8 +13,8 @@ export default defineConfig(({ mode }) => ({
       'Cache-Control': 'no-store, no-cache, must-revalidate',
     },
   },
-  // Force completely new cache directory
-  cacheDir: 'node_modules/.vite-v3',
+// Force completely new cache directory
+  cacheDir: 'node_modules/.vite-fresh',
   plugins: [
     react(),
     mode === "development" && componentTagger(),
