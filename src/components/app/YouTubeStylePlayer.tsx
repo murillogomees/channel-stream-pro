@@ -876,7 +876,7 @@ export default function YouTubeStylePlayer({
 
           {/* Details Panel - Mobile */}
           {showDetails && (
-            <ScrollArea className="lg:hidden flex-1 min-h-0 max-h-[40vh]">
+            <ScrollArea className="lg:hidden flex-1 min-h-0">
               <div className="p-4">
               <StreamDetailsPanel 
                   title={title}
