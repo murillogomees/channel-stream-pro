@@ -131,3 +131,7 @@ verify_jwt = false
 # M3U Cron sync - public for cron access with secret verification
 [functions.m3u-cron-sync]
 verify_jwt = false
+
+# Generate M3U from sync entries and upload to CDN - auth verified inside
+[functions.generate-m3u-from-sync]
+verify_jwt = false

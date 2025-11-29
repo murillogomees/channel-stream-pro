@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, RefreshCw, Save, X, Check, ArrowRightLeft
+  Loader2, RefreshCw, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,7 @@ export default function AdminM3UContentEditor() {
     deleteEntry,
     renameCategory,
     moveCategoryToClass,
+    generateM3UCDN,
   } = useM3USyncEditor();
 
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
@@ -90,6 +91,8 @@ export default function AdminM3UContentEditor() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [targetCategory, setTargetCategory] = useState('');
+  const [isGeneratingCDN, setIsGeneratingCDN] = useState(false);
+  const [lastCdnUrl, setLastCdnUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSources();
@@ -193,6 +196,18 @@ export default function AdminM3UContentEditor() {
       tvg_id: editingEntry.tvg_id,
     });
     setEditingEntry(null);
+  };
+
+  const handleGenerateCDN = async () => {
+    setIsGeneratingCDN(true);
+    try {
+      const result = await generateM3UCDN();
+      if (result.success && result.cdnUrl) {
+        setLastCdnUrl(result.cdnUrl);
+      }
+    } finally {
+      setIsGeneratingCDN(false);
+    }
   };
 
   return (
@@ -322,6 +337,35 @@ export default function AdminM3UContentEditor() {
             </SelectContent>
           </Select>
 
+          {/* Generate CDN Button */}
+          <div className="flex gap-2 items-center">
+            <Button 
+              size="sm" 
+              variant="default"
+              onClick={handleGenerateCDN}
+              disabled={isGeneratingCDN || entries.length === 0}
+              className="gap-1"
+            >
+              {isGeneratingCDN ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Cloud className="w-4 h-4" />
+              )}
+              Gerar M3U CDN
+            </Button>
+            {lastCdnUrl && (
+              <Button
+                size="sm"
+                variant="ghost"
+                asChild
+              >
+                <a href={lastCdnUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </Button>
+            )}
+          </div>
+
           {/* Bulk move categories button */}
           {selectedCategories.size > 0 && (
             <div className="flex gap-2 items-center">
@@ -417,7 +461,7 @@ export default function AdminM3UContentEditor() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <ScrollArea className="max-h-[500px]">
+                  <ScrollArea className="h-[400px] pr-4">
                     <div className="space-y-2">
                       {classGroup.categories.map(category => {
                         const isExpanded = expandedCategories.has(category.name);
@@ -505,54 +549,51 @@ export default function AdminM3UContentEditor() {
                             </div>
                             
                             <CollapsibleContent>
-                              <div className="ml-8 mt-1 space-y-1 max-h-[300px] overflow-y-auto">
-                                {category.entries.slice(0, 100).map(entry => (
-                                  <div 
-                                    key={entry.id}
-                                    className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/30 text-sm group"
-                                  >
-                                    <Checkbox
-                                      checked={selectedEntries.has(entry.id)}
-                                      onCheckedChange={() => toggleEntrySelection(entry.id)}
-                                    />
-                                    
-                                    {entry.tvg_logo && (
-                                      <img 
-                                        src={entry.tvg_logo} 
-                                        alt=""
-                                        className="w-6 h-6 rounded object-cover"
-                                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                              <ScrollArea className="h-[250px] ml-8 mt-1 pr-4">
+                                <div className="space-y-1">
+                                  {category.entries.map(entry => (
+                                    <div 
+                                      key={entry.id}
+                                      className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/30 text-sm group"
+                                    >
+                                      <Checkbox
+                                        checked={selectedEntries.has(entry.id)}
+                                        onCheckedChange={() => toggleEntrySelection(entry.id)}
                                       />
-                                    )}
-                                    
-                                    <span className="flex-1 truncate">{entry.title}</span>
-                                    
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => setEditingEntry(entry)}
-                                      >
-                                        <Edit className="w-3 h-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-destructive hover:text-destructive"
-                                        onClick={() => deleteEntry(entry.id)}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
+                                      
+                                      {entry.tvg_logo && (
+                                        <img 
+                                          src={entry.tvg_logo} 
+                                          alt=""
+                                          className="w-6 h-6 rounded object-cover flex-shrink-0"
+                                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                                        />
+                                      )}
+                                      
+                                      <span className="flex-1 truncate">{entry.title}</span>
+                                      
+                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => setEditingEntry(entry)}
+                                        >
+                                          <Edit className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-destructive hover:text-destructive"
+                                          onClick={() => deleteEntry(entry.id)}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                                {category.entries.length > 100 && (
-                                  <p className="text-xs text-muted-foreground text-center py-2">
-                                    +{category.entries.length - 100} itens (use busca para filtrar)
-                                  </p>
-                                )}
-                              </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
                             </CollapsibleContent>
                           </Collapsible>
                         );
