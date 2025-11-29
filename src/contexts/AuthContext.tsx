@@ -1,5 +1,6 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO
+ * @version 2.0.0
  * 
  * Gerencia autenticação e autorização usando:
  * - Supabase Auth para identidade
