@@ -177,7 +177,13 @@ serve(async (req) => {
     EdgeRuntime.waitUntil(triggerDownloads(eligible.map(v => v.id)));
 
     // 7. Limpar downloads antigos
-    EdgeRuntime.waitUntil(supabase.rpc('cleanup_old_vod_downloads').catch(() => {}));
+    EdgeRuntime.waitUntil((async () => {
+      try {
+        await supabase.rpc('cleanup_old_vod_downloads');
+      } catch (e) {
+        console.log('Cleanup error (ignorado):', e);
+      }
+    })());
 
     return new Response(JSON.stringify({
       success: true,
