@@ -83,6 +83,7 @@ export default function AdminM3UContentEditor() {
   } = useM3USyncEditor();
 
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<M3UEntry | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -96,8 +97,34 @@ export default function AdminM3UContentEditor() {
 
   const handleSourceChange = (sourceId: string) => {
     setSelectedEntries(new Set());
+    setSelectedCategories(new Set());
     setExpandedCategories(new Set());
     loadEntries(sourceId);
+  };
+
+  const toggleCategorySelection = (categoryName: string) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryName)) {
+        next.delete(categoryName);
+      } else {
+        next.add(categoryName);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkMoveCategoriestoClass = async (targetClass: ContentClass) => {
+    if (selectedCategories.size === 0) return;
+    
+    for (const categoryName of selectedCategories) {
+      await moveCategoryToClass(categoryName, targetClass);
+    }
+    setSelectedCategories(new Set());
+    toast({
+      title: 'Categorias movidas',
+      description: `${selectedCategories.size} categorias movidas para ${CLASS_LABELS[targetClass]}`,
+    });
   };
 
   const toggleCategory = (categoryName: string) => {
@@ -251,7 +278,7 @@ export default function AdminM3UContentEditor() {
 
       {/* Filters & Actions */}
       {selectedSourceId && (
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
           <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -295,10 +322,48 @@ export default function AdminM3UContentEditor() {
             </SelectContent>
           </Select>
 
+          {/* Bulk move categories button */}
+          {selectedCategories.size > 0 && (
+            <div className="flex gap-2 items-center">
+              <Badge variant="secondary" className="gap-1">
+                {selectedCategories.size} categorias
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <ArrowRightLeft className="w-4 h-4 mr-1" />
+                    Mover
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(['tv', 'movies', 'series', 'other'] as ContentClass[]).map(cls => {
+                    const ClsIcon = CLASS_ICONS[cls];
+                    return (
+                      <DropdownMenuItem 
+                        key={cls}
+                        onClick={() => handleBulkMoveCategoriestoClass(cls)}
+                      >
+                        <ClsIcon className="w-4 h-4 mr-2" />
+                        {CLASS_LABELS[cls]}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button 
+                size="sm" 
+                variant="ghost"
+                onClick={() => setSelectedCategories(new Set())}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+
           {selectedEntries.size > 0 && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Badge variant="secondary">
-                {selectedEntries.size} selecionados
+                {selectedEntries.size} entradas
               </Badge>
               <Button 
                 size="sm" 
@@ -367,9 +432,9 @@ export default function AdminM3UContentEditor() {
                           >
                             <div className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group">
                               <Checkbox
-                                checked={allSelected}
-                                onCheckedChange={() => selectAllInCategory(category)}
-                                className={someSelected && !allSelected ? 'opacity-50' : ''}
+                                checked={selectedCategories.has(category.name)}
+                                onCheckedChange={() => toggleCategorySelection(category.name)}
+                                title="Selecionar categoria para mover em massa"
                               />
                               
                               <CollapsibleTrigger asChild>
