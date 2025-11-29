@@ -79,8 +79,24 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .in('status', ['downloading', 'processing', 'queued']);
 
+    // 1.1 Verificar downloads pausados que podem ser retomados
+    const { data: pausedDownloads } = await supabaseService
+      .from('vod_downloads')
+      .select('id')
+      .eq('status', 'paused')
+      .order('updated_at', { ascending: true })
+      .limit(3);
+
+    // Retomar downloads pausados primeiro
+    if (pausedDownloads && pausedDownloads.length > 0) {
+      console.log(`🔄 [ScheduleVOD] Retomando ${pausedDownloads.length} downloads pausados`);
+      EdgeRuntime.waitUntil(
+        resumePausedDownloads(pausedDownloads.map(d => d.id), supabaseService)
+      );
+    }
+
     const MAX_CONCURRENT = 5;
-    const availableSlots = Math.max(0, MAX_CONCURRENT - (activeDownloads || 0));
+    const availableSlots = Math.max(0, MAX_CONCURRENT - (activeDownloads || 0) - (pausedDownloads?.length || 0));
 
     if (availableSlots === 0) {
       console.log(`⏸️ [ScheduleVOD] Slots esgotados (${activeDownloads}/${MAX_CONCURRENT})`);
@@ -208,6 +224,32 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Retoma downloads pausados
+ */
+async function resumePausedDownloads(downloadIds: string[], _supabase: any): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  
+  for (const downloadId of downloadIds) {
+    try {
+      console.log(`🔄 [ScheduleVOD] Retomando download: ${downloadId}`);
+      await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': cronSecret || ''
+        },
+        body: JSON.stringify({ resume: true, downloadId })
+      });
+      // Pequeno delay entre retomadas
+      await new Promise(r => setTimeout(r, 500));
+    } catch (err) {
+      console.error(`❌ [ScheduleVOD] Falha ao retomar ${downloadId}:`, err);
+    }
+  }
+}
 
 /**
  * Dispara download em batch via edge function
