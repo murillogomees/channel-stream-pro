@@ -6,6 +6,160 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// AWS S3 Signature V4 helper for R2
+async function signR2Request(
+  method: string,
+  url: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  accountId: string
+): Promise<Headers> {
+  const parsedUrl = new URL(url);
+  const service = 's3';
+  const region = 'auto';
+  const host = parsedUrl.host;
+  const path = parsedUrl.pathname;
+  
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.substring(0, 8);
+  
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const payloadHash = await sha256('');
+  
+  const canonicalRequest = [
+    method,
+    path,
+    '', // query string
+    `host:${host}`,
+    `x-amz-content-sha256:${payloadHash}`,
+    `x-amz-date:${amzDate}`,
+    '',
+    signedHeaders,
+    payloadHash
+  ].join('\n');
+  
+  const stringToSign = [
+    algorithm,
+    amzDate,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join('\n');
+  
+  const signingKey = await getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signature = await hmacHex(signingKey, stringToSign);
+  
+  const authorizationHeader = `${algorithm} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  
+  const headers = new Headers();
+  headers.set('Host', host);
+  headers.set('X-Amz-Date', amzDate);
+  headers.set('X-Amz-Content-Sha256', payloadHash);
+  headers.set('Authorization', authorizationHeader);
+  
+  return headers;
+}
+
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmac(key: ArrayBuffer, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
+}
+
+async function hmacHex(key: ArrayBuffer, message: string): Promise<string> {
+  const sig = await hmac(key, message);
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getSignatureKey(key: string, dateStamp: string, region: string, service: string): Promise<ArrayBuffer> {
+  const kDate = await hmac(new TextEncoder().encode('AWS4' + key), dateStamp);
+  const kRegion = await hmac(kDate, region);
+  const kService = await hmac(kRegion, service);
+  return await hmac(kService, 'aws4_request');
+}
+
+function isR2Url(url: string): boolean {
+  return url.includes('.r2.cloudflarestorage.com');
+}
+
+async function fetchWithR2Support(
+  url: string,
+  signal?: AbortSignal
+): Promise<Response> {
+  const r2AccessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
+  const r2SecretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
+  const r2AccountId = Deno.env.get('R2_ACCOUNT_ID');
+  const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN');
+  
+  // Try public domain first if available
+  if (r2PublicDomain && isR2Url(url)) {
+    const parsedUrl = new URL(url);
+    const publicUrl = `https://${r2PublicDomain}${parsedUrl.pathname}`;
+    console.log(`[M3U-Sync] Trying public R2 URL: ${publicUrl}`);
+    
+    try {
+      const response = await fetch(publicUrl, {
+        signal,
+        headers: {
+          'User-Agent': 'M3U-Sync/1.0',
+          'Accept': 'application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain, */*',
+        },
+      });
+      
+      if (response.ok) {
+        console.log('[M3U-Sync] Public R2 URL succeeded');
+        return response;
+      }
+      console.log(`[M3U-Sync] Public URL failed: ${response.status}`);
+    } catch (e) {
+      console.log('[M3U-Sync] Public URL error:', e);
+    }
+  }
+  
+  // If R2 URL and we have credentials, use signed request
+  if (isR2Url(url) && r2AccessKeyId && r2SecretAccessKey && r2AccountId) {
+    console.log('[M3U-Sync] Using R2 signed request');
+    
+    const signedHeaders = await signR2Request(
+      'GET',
+      url,
+      r2AccessKeyId,
+      r2SecretAccessKey,
+      r2AccountId
+    );
+    
+    signedHeaders.set('User-Agent', 'M3U-Sync/1.0');
+    
+    return await fetch(url, {
+      signal,
+      headers: signedHeaders,
+    });
+  }
+  
+  // Standard fetch for non-R2 URLs
+  return await fetch(url, {
+    signal,
+    headers: {
+      'User-Agent': 'M3U-Sync/1.0',
+      'Accept': 'application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain, */*',
+    },
+  });
+}
+
 // M3U Parser - robust parsing with multi-line EXTINF support
 function parseM3U(content: string): { entries: ParsedEntry[]; invalidCount: number; warnings: string[] } {
   const lines = content.split(/\r?\n/);
@@ -353,17 +507,11 @@ serve(async (req) => {
         try {
           console.log(`[M3U-Sync] Fetching ${source.key} from ${source.source_url}`);
           
-          // Fetch M3U content
+          // Fetch M3U content (with R2 support)
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+          const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
           
-          const response = await fetch(source.source_url, {
-            signal: controller.signal,
-            headers: {
-              'User-Agent': 'M3U-Sync/1.0',
-              'Accept': 'application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain, */*',
-            },
-          });
+          const response = await fetchWithR2Support(source.source_url, controller.signal);
           clearTimeout(timeout);
           
           if (!response.ok) {
