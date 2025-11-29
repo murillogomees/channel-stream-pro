@@ -288,6 +288,42 @@ serve(async (req) => {
         
       } catch (e: any) {
         console.error(`❌ [VOD] Erro ao completar upload:`, e.message);
+        
+        // Se o multipart upload expirou ou não existe mais, resetar para reiniciar
+        if (e.message?.includes('NoSuchUpload') || e.message?.includes('does not exist')) {
+          console.log(`🔄 [VOD] Upload expirado, resetando para reinício: ${downloadId}`);
+          
+          // Resetar o download para permitir reinício limpo
+          await supabaseService.from('vod_downloads').update({
+            status: 'queued',
+            segments_downloaded: 0,
+            error_message: 'Upload multipart expirou - reiniciando',
+            metadata: { 
+              previous_upload_expired: true, 
+              expired_at: new Date().toISOString(),
+              previous_parts_count: parts.length
+            }
+          }).eq('id', downloadId);
+          
+          // Iniciar novo download automaticamente
+          const { data: channel } = await supabaseService
+            .from('m3u_channels')
+            .select('*')
+            .eq('id', download.channel_id)
+            .maybeSingle();
+          
+          if (channel) {
+            console.log(`🚀 [VOD] Reiniciando download: ${channel.name}`);
+            EdgeRuntime.waitUntil(processDownload(channel, downloadId, supabaseService));
+          }
+          
+          return new Response(JSON.stringify({ 
+            success: true, 
+            restarted: true,
+            message: 'Upload expirado - download reiniciado automaticamente'
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
         return new Response(JSON.stringify({ error: e.message }), 
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
