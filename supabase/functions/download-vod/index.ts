@@ -4,34 +4,43 @@ import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.18';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret, x-player-active',
 };
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void;
 };
 
-// Configuração de chunks para arquivos grandes - OTIMIZADO PARA ALTA BANDA
-const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB por chunk de download (maior = mais rápido)
-const R2_PART_SIZE = 25 * 1024 * 1024; // 25MB por parte de upload R2 (maior throughput)
-const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB máximo
-const EXECUTION_TIMEOUT = 50000; // 50 segundos por execução
-const MAX_RETRIES = 2; // Menos retries para falhar rápido
-const RETRY_DELAY = 1000; // 1 segundo entre retries (mais rápido)
-const BATCH_CONCURRENCY = 4; // Downloads simultâneos em batch
+// ============= CONFIGURAÇÃO ULTRA OTIMIZADA PARA MÁXIMA VELOCIDADE =============
+const CHUNK_SIZE = 100 * 1024 * 1024; // 100MB por chunk (máximo throughput)
+const R2_PART_SIZE = 50 * 1024 * 1024; // 50MB por parte R2 (upload rápido)
+const SMALL_FILE_THRESHOLD = 25 * 1024 * 1024; // Arquivos <25MB upload direto (sem multipart)
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB máximo
+const EXECUTION_TIMEOUT = 55000; // 55 segundos (quase limite edge function)
+const FETCH_TIMEOUT = 120000; // 2 min timeout por request
+const MAX_RETRIES = 1; // Falhar rápido, retry externamente
+const RETRY_DELAY = 500; // 500ms entre retries
+const BATCH_CONCURRENCY = 8; // 8 downloads simultâneos
+const PARALLEL_UPLOADS = 3; // Upload 3 partes em paralelo
 
-// Função de retry com exponential backoff
+// Função de fetch otimizada para máxima velocidade
 async function fetchWithRetry(url: string, options: RequestInit = {}, retries = MAX_RETRIES): Promise<Response> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
       
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
+        // Headers otimizados para velocidade
+        headers: {
+          ...options.headers as Record<string, string>,
+          'Connection': 'keep-alive',
+          'Accept-Encoding': 'identity', // Sem compressão para streams
+        }
       });
       
       clearTimeout(timeoutId);
@@ -40,31 +49,22 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
         return response;
       }
       
-      // Server error - retry
-      if (response.status >= 500) {
+      if (response.status >= 500 && attempt < retries) {
         lastError = new Error(`Server error: ${response.status}`);
-        console.log(`⚠️ [Retry] Tentativa ${attempt + 1}/${retries + 1} falhou: ${response.status}`);
-      } else {
-        throw new Error(`HTTP ${response.status}`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY));
+        continue;
       }
+      
+      throw new Error(`HTTP ${response.status}`);
     } catch (error: any) {
       lastError = error;
-      const errorMsg = error.message || 'Unknown error';
+      if (attempt >= retries) throw error;
       
-      // Erros que devem fazer retry
-      const shouldRetry = errorMsg.includes('error reading a body') ||
-                          errorMsg.includes('connection') ||
-                          errorMsg.includes('aborted') ||
-                          errorMsg.includes('timeout') ||
-                          errorMsg.includes('network');
+      const shouldRetry = ['error reading', 'connection', 'aborted', 'timeout', 'network']
+        .some(s => (error.message || '').toLowerCase().includes(s));
       
-      if (!shouldRetry || attempt >= retries) {
-        throw error;
-      }
-      
-      const delay = RETRY_DELAY * Math.pow(2, attempt);
-      console.log(`⚠️ [Retry] Tentativa ${attempt + 1}/${retries + 1}: ${errorMsg}. Aguardando ${delay}ms...`);
-      await new Promise(r => setTimeout(r, delay));
+      if (!shouldRetry) throw error;
+      await new Promise(r => setTimeout(r, RETRY_DELAY * (attempt + 1)));
     }
   }
   
@@ -238,7 +238,34 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { channelId, batch = false, channelIds = [], resume = false, downloadId } = body;
+    const { channelId, batch = false, channelIds = [], resume = false, downloadId, pauseAll = false, resumeAll = false } = body;
+
+    // Pausar todos downloads (prioridade do player)
+    if (pauseAll) {
+      console.log(`⏸️ [VOD] Pausando todos downloads para prioridade do player`);
+      await supabaseService.from('vod_downloads')
+        .update({ status: 'paused', error_message: 'Pausado para player' })
+        .in('status', ['downloading', 'processing', 'queued']);
+      return new Response(JSON.stringify({ success: true, message: 'Downloads pausados' }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Retomar todos downloads pausados
+    if (resumeAll) {
+      console.log(`▶️ [VOD] Retomando downloads pausados`);
+      const { data: paused } = await supabaseService.from('vod_downloads')
+        .select('id')
+        .eq('status', 'paused')
+        .limit(BATCH_CONCURRENCY);
+      
+      if (paused && paused.length > 0) {
+        for (const d of paused) {
+          EdgeRuntime.waitUntil(resumeDownload(d.id, supabaseService));
+        }
+      }
+      return new Response(JSON.stringify({ success: true, message: `${paused?.length || 0} downloads retomados` }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // Modo resumo - continua download existente
     if (resume && downloadId) {
@@ -653,33 +680,57 @@ async function processVODDownload(
   }
 }
 
-// Download otimizado para arquivos grandes com suporte a resume
+// Upload paralelo de partes para máxima velocidade
+async function uploadPartsParallel(
+  r2Key: string, 
+  uploadId: string, 
+  chunks: { partNumber: number; data: Uint8Array }[]
+): Promise<{ partNumber: number; etag: string }[]> {
+  const results: { partNumber: number; etag: string }[] = [];
+  
+  // Upload em paralelo (PARALLEL_UPLOADS simultâneos)
+  for (let i = 0; i < chunks.length; i += PARALLEL_UPLOADS) {
+    const batch = chunks.slice(i, i + PARALLEL_UPLOADS);
+    const promises = batch.map(async (chunk) => {
+      const etag = await uploadPart(r2Key, uploadId, chunk.partNumber, chunk.data);
+      return { partNumber: chunk.partNumber, etag };
+    });
+    
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults);
+  }
+  
+  return results;
+}
+
+// Download otimizado para arquivos grandes - ULTRA RÁPIDO
 async function downloadLargeFile(
   channel: any, 
   downloadId: string, 
   supabase: any,
   resumeOptions?: { resumeFrom: number; uploadId?: string; existingParts?: any[] }
 ): Promise<void> {
-  console.log(`📥 [LargeFile] Iniciando download: ${channel.name}`);
+  console.log(`🚀 [LargeFile] Download ULTRA: ${channel.name}`);
   
-  // Obter tamanho do arquivo
+  // Obter tamanho do arquivo com timeout curto
   let contentLength = 0;
   let supportsRanges = false;
   
   try {
-    const headRes = await fetch(channel.stream_url, { method: 'HEAD' });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 10000);
+    const headRes = await fetch(channel.stream_url, { method: 'HEAD', signal: controller.signal });
     if (headRes.ok) {
       contentLength = parseInt(headRes.headers.get('content-length') || '0');
       supportsRanges = headRes.headers.get('accept-ranges') === 'bytes';
-      console.log(`📊 [LargeFile] Tamanho: ${(contentLength / 1048576).toFixed(1)} MB, Ranges: ${supportsRanges}`);
+      console.log(`📊 Tamanho: ${(contentLength / 1048576).toFixed(1)} MB, Ranges: ${supportsRanges}`);
     }
   } catch (e) {
-    console.log(`⚠️ [LargeFile] Não foi possível obter tamanho`);
+    console.log(`⚠️ Não foi possível obter tamanho, tentando streaming direto`);
   }
 
-  // Verificar limite de tamanho
   if (contentLength > MAX_FILE_SIZE) {
-    throw new Error(`Arquivo muito grande: ${(contentLength / 1073741824).toFixed(1)} GB (máximo: ${MAX_FILE_SIZE / 1073741824} GB)`);
+    throw new Error(`Arquivo muito grande: ${(contentLength / 1073741824).toFixed(1)} GB`);
   }
 
   const urlPath = new URL(channel.stream_url).pathname;
@@ -687,9 +738,9 @@ async function downloadLargeFile(
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
-  // Para arquivos pequenos (< 50MB), usar upload simples com retry
-  if (contentLength > 0 && contentLength < 50 * 1024 * 1024) {
-    console.log(`📦 [LargeFile] Arquivo pequeno, usando upload simples`);
+  // Para arquivos pequenos (< 25MB), upload direto sem multipart
+  if (contentLength > 0 && contentLength < SMALL_FILE_THRESHOLD) {
+    console.log(`⚡ [LargeFile] Upload direto (${(contentLength / 1048576).toFixed(1)} MB)`);
     const response = await fetchWithRetry(channel.stream_url);
     if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
     const data = new Uint8Array(await response.arrayBuffer());
@@ -698,21 +749,19 @@ async function downloadLargeFile(
     return;
   }
 
-  // Para arquivos grandes, usar multipart com streaming
+  // Para arquivos grandes, usar multipart com streaming e upload paralelo
   const startByte = resumeOptions?.resumeFrom || 0;
   let uploadId = resumeOptions?.uploadId;
   let parts: { partNumber: number; etag: string }[] = resumeOptions?.existingParts || [];
   let partNumber = parts.length + 1;
   let totalBytes = startByte;
 
-  // Iniciar multipart se não existir
   if (!uploadId) {
     uploadId = await initiateMultipartUpload(r2Key, contentType);
-    console.log(`🔑 [LargeFile] Upload ID: ${uploadId.substring(0, 16)}...`);
+    console.log(`🔑 Upload ID: ${uploadId.substring(0, 16)}...`);
   }
 
   try {
-    // Salvar estado inicial
     await supabase.from('vod_downloads').update({
       file_size_bytes: contentLength || 0,
       metadata: { upload_id: uploadId, parts, start_byte: startByte }
@@ -720,28 +769,24 @@ async function downloadLargeFile(
 
     const startExecution = Date.now();
 
-    // Se suporta ranges, baixar em chunks
     if (supportsRanges && contentLength > 0) {
       let currentByte = startByte;
       
       while (currentByte < contentLength) {
-        // Verificar timeout de execução
         if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
-          console.log(`⏸️ [LargeFile] Timeout de execução, salvando progresso...`);
+          console.log(`⏸️ Timeout, salvando progresso em ${totalBytes} bytes...`);
           await supabase.from('vod_downloads').update({
             status: 'paused',
             file_size_bytes: totalBytes,
             metadata: { upload_id: uploadId, parts, resume_byte: currentByte }
           }).eq('id', downloadId);
-          
-          // Agendar retomada
           scheduleResume(downloadId, supabase);
           return;
         }
 
         const endByte = Math.min(currentByte + CHUNK_SIZE - 1, contentLength - 1);
-        
-        console.log(`📥 [LargeFile] Chunk ${currentByte}-${endByte} (${((endByte - currentByte + 1) / 1048576).toFixed(1)} MB)`);
+        const chunkSize = endByte - currentByte + 1;
+        console.log(`📥 Chunk ${(currentByte / 1048576).toFixed(0)}-${(endByte / 1048576).toFixed(0)} MB`);
         
         const response = await fetchWithRetry(channel.stream_url, {
           headers: { 'Range': `bytes=${currentByte}-${endByte}` }
@@ -753,26 +798,30 @@ async function downloadLargeFile(
         
         const chunkData = new Uint8Array(await response.arrayBuffer());
         
-        // Upload do chunk para R2 em partes menores
+        // Dividir chunk em partes para upload paralelo
+        const chunksToUpload: { partNumber: number; data: Uint8Array }[] = [];
+        
         for (let offset = 0; offset < chunkData.length; offset += R2_PART_SIZE) {
           const partData = chunkData.slice(offset, Math.min(offset + R2_PART_SIZE, chunkData.length));
           
-          // Última parte pode ser menor que 5MB
-          if (partData.length < 5 * 1024 * 1024 && currentByte + chunkData.length < contentLength) {
-            // Guardar para juntar com próximo chunk
-            continue;
-          }
+          // Última parte pode ser menor que 5MB - só aceitar se for a última do arquivo
+          const isLastChunk = currentByte + chunkData.length >= contentLength;
+          if (partData.length < 5 * 1024 * 1024 && !isLastChunk) continue;
           
-          console.log(`⬆️ [LargeFile] Parte ${partNumber} (${(partData.length / 1048576).toFixed(1)} MB)`);
-          const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
-          parts.push({ partNumber, etag });
+          chunksToUpload.push({ partNumber, data: partData });
           partNumber++;
+        }
+        
+        // Upload paralelo das partes
+        if (chunksToUpload.length > 0) {
+          console.log(`⬆️ Upload paralelo: ${chunksToUpload.length} partes`);
+          const uploadedParts = await uploadPartsParallel(r2Key, uploadId, chunksToUpload);
+          parts.push(...uploadedParts);
         }
         
         totalBytes += chunkData.length;
         currentByte = endByte + 1;
         
-        // Atualizar progresso
         const progress = Math.round((totalBytes / contentLength) * 100);
         await supabase.from('vod_downloads').update({
           file_size_bytes: totalBytes,
@@ -780,7 +829,7 @@ async function downloadLargeFile(
           metadata: { upload_id: uploadId, parts, resume_byte: currentByte }
         }).eq('id', downloadId);
         
-        console.log(`📈 [LargeFile] ${progress}% (${(totalBytes / 1048576).toFixed(1)} MB)`);
+        console.log(`📈 ${progress}% (${(totalBytes / 1048576).toFixed(1)} MB)`);
       }
     } else {
       // Streaming sem ranges
@@ -788,15 +837,14 @@ async function downloadLargeFile(
       return;
     }
 
-    // Completar multipart
-    console.log(`⬆️ [LargeFile] Finalizando com ${parts.length} partes...`);
+    console.log(`⬆️ Finalizando com ${parts.length} partes...`);
     parts.sort((a, b) => a.partNumber - b.partNumber);
     await completeMultipartUpload(r2Key, uploadId, parts);
     
-    console.log(`✅ [LargeFile] Upload completo: ${(totalBytes / 1048576).toFixed(1)} MB`);
+    console.log(`✅ Upload completo: ${(totalBytes / 1048576).toFixed(1)} MB em ${((Date.now() - startExecution) / 1000).toFixed(1)}s`);
 
   } catch (error) {
-    console.error(`❌ [LargeFile] Erro, abortando...`);
+    console.error(`❌ Erro, abortando upload...`);
     if (uploadId) await abortMultipartUpload(r2Key, uploadId);
     throw error;
   }

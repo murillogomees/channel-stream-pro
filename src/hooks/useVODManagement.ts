@@ -614,6 +614,47 @@ export const useVODManagement = () => {
     }
   }, [toast, fetchDownloads, fetchStatistics]);
 
+  // Pausar todos downloads (prioridade do player)
+  const pauseAllDownloads = useCallback(async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('download-vod', {
+        body: { pauseAll: true },
+        headers: session?.session?.access_token 
+          ? { Authorization: `Bearer ${session.session.access_token}` }
+          : undefined,
+      });
+
+      if (response.error) throw response.error;
+      console.log('⏸️ Downloads pausados para prioridade do player');
+      return true;
+    } catch (error) {
+      console.error('Erro ao pausar downloads:', error);
+      return false;
+    }
+  }, []);
+
+  // Retomar downloads pausados
+  const resumeAllDownloads = useCallback(async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('download-vod', {
+        body: { resumeAll: true },
+        headers: session?.session?.access_token 
+          ? { Authorization: `Bearer ${session.session.access_token}` }
+          : undefined,
+      });
+
+      if (response.error) throw response.error;
+      console.log('▶️ Downloads retomados');
+      await fetchDownloads();
+      return true;
+    } catch (error) {
+      console.error('Erro ao retomar downloads:', error);
+      return false;
+    }
+  }, [fetchDownloads]);
+
   // Stable refresh function
   const refresh = useCallback(() => {
     fetchDownloads();
@@ -636,6 +677,8 @@ export const useVODManagement = () => {
     cleanupDuplicates,
     cancelDownload,
     retryDownload,
+    pauseAllDownloads,
+    resumeAllDownloads,
     refresh,
   };
 };

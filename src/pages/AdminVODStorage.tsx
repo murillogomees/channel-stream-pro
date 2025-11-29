@@ -8,16 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload } from 'lucide-react';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
-  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload, cancelDownload, channelNames } = useVODManagement();
+  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload, cancelDownload, channelNames, pauseAllDownloads, resumeAllDownloads } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
   const [isResettingOrphans, setIsResettingOrphans] = useState(false);
+  const [isPausingDownloads, setIsPausingDownloads] = useState(false);
   const [downloadLimit, setDownloadLimit] = useState<string>('50');
 
   // Filtrar downloads por status
@@ -118,6 +119,34 @@ export default function AdminVODStorage() {
       await resetOrphanedDownloads();
     } finally {
       setIsResettingOrphans(false);
+    }
+  };
+
+  const handlePauseDownloads = async () => {
+    try {
+      setIsPausingDownloads(true);
+      await pauseAllDownloads();
+      toast({
+        title: 'Downloads pausados',
+        description: 'Todos os downloads foram pausados',
+      });
+      refresh();
+    } finally {
+      setIsPausingDownloads(false);
+    }
+  };
+
+  const handleResumeDownloads = async () => {
+    try {
+      setIsPausingDownloads(true);
+      await resumeAllDownloads();
+      toast({
+        title: 'Downloads retomados',
+        description: 'Downloads pausados foram retomados',
+      });
+      refresh();
+    } finally {
+      setIsPausingDownloads(false);
     }
   };
 
@@ -263,6 +292,30 @@ export default function AdminVODStorage() {
           >
             <XCircle className="w-4 h-4 mr-2" />
             {isResettingOrphans ? 'Resetando...' : `Resetar Travados (${activeDownloads.length})`}
+          </Button>
+        )}
+
+        {activeDownloads.length > 0 && (
+          <Button
+            onClick={handlePauseDownloads}
+            disabled={isPausingDownloads}
+            variant="outline"
+            className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+          >
+            <Pause className="w-4 h-4 mr-2" />
+            {isPausingDownloads ? 'Pausando...' : 'Pausar Downloads'}
+          </Button>
+        )}
+
+        {downloads.some(d => d.status === 'paused') && (
+          <Button
+            onClick={handleResumeDownloads}
+            disabled={isPausingDownloads}
+            variant="outline"
+            className="border-green-500 text-green-500 hover:bg-green-500/10"
+          >
+            <Play className="w-4 h-4 mr-2" />
+            {isPausingDownloads ? 'Retomando...' : 'Retomar Pausados'}
           </Button>
         )}
       </div>
