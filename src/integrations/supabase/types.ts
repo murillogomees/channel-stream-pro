@@ -102,18 +102,6 @@ export type Database = {
           },
         ]
       }
-      activation_keys: {
-        Row: {
-          id: string
-        }
-        Insert: {
-          id?: string
-        }
-        Update: {
-          id?: string
-        }
-        Relationships: []
-      }
       activity_logs: {
         Row: {
           action_description: string
@@ -177,54 +165,6 @@ export type Database = {
           earned_at?: string | null
           id?: string
           read_at?: string | null
-        }
-        Relationships: []
-      }
-      admin_leaderboard_history: {
-        Row: {
-          admin_id: string
-          admin_name: string
-          admin_phone: string
-          avg_response_time_minutes: number | null
-          badges_earned: Json
-          confirmation_rate: number
-          created_at: string | null
-          id: string
-          level: number
-          month_year: string
-          rank: number
-          score: number
-          total_alerts: number
-        }
-        Insert: {
-          admin_id: string
-          admin_name: string
-          admin_phone: string
-          avg_response_time_minutes?: number | null
-          badges_earned?: Json
-          confirmation_rate: number
-          created_at?: string | null
-          id?: string
-          level: number
-          month_year: string
-          rank: number
-          score: number
-          total_alerts: number
-        }
-        Update: {
-          admin_id?: string
-          admin_name?: string
-          admin_phone?: string
-          avg_response_time_minutes?: number | null
-          badges_earned?: Json
-          confirmation_rate?: number
-          created_at?: string | null
-          id?: string
-          level?: number
-          month_year?: string
-          rank?: number
-          score?: number
-          total_alerts?: number
         }
         Relationships: []
       }
@@ -2462,65 +2402,6 @@ export type Database = {
         }
         Relationships: []
       }
-      permission_discrepancy_alerts: {
-        Row: {
-          admins_notified: boolean | null
-          created_at: string | null
-          diagnostic_id: string | null
-          discrepancy_description: string
-          discrepancy_type: string
-          id: string
-          notified_at: string | null
-          resolution_notes: string | null
-          resolved: boolean | null
-          resolved_at: string | null
-          resolved_by: string | null
-          severity: string
-          user_email: string
-          user_id: string
-        }
-        Insert: {
-          admins_notified?: boolean | null
-          created_at?: string | null
-          diagnostic_id?: string | null
-          discrepancy_description: string
-          discrepancy_type: string
-          id?: string
-          notified_at?: string | null
-          resolution_notes?: string | null
-          resolved?: boolean | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          severity?: string
-          user_email: string
-          user_id: string
-        }
-        Update: {
-          admins_notified?: boolean | null
-          created_at?: string | null
-          diagnostic_id?: string | null
-          discrepancy_description?: string
-          discrepancy_type?: string
-          id?: string
-          notified_at?: string | null
-          resolution_notes?: string | null
-          resolved?: boolean | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          severity?: string
-          user_email?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "permission_discrepancy_alerts_diagnostic_id_fkey"
-            columns: ["diagnostic_id"]
-            isOneToOne: false
-            referencedRelation: "permission_diagnostics"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       player_analytics: {
         Row: {
           content_id: string
@@ -3327,60 +3208,6 @@ export type Database = {
           },
         ]
       }
-      smartone_sync_retry_queue: {
-        Row: {
-          attempt_count: number | null
-          cliente_id: string
-          created_at: string | null
-          error_details: Json | null
-          id: string
-          last_error: string | null
-          max_attempts: number | null
-          next_retry_at: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          attempt_count?: number | null
-          cliente_id: string
-          created_at?: string | null
-          error_details?: Json | null
-          id?: string
-          last_error?: string | null
-          max_attempts?: number | null
-          next_retry_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          attempt_count?: number | null
-          cliente_id?: string
-          created_at?: string | null
-          error_details?: Json | null
-          id?: string
-          last_error?: string | null
-          max_attempts?: number | null
-          next_retry_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "smartone_sync_retry_queue_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "smartone_sync_retry_queue_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_expiration_summary"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       status_change_history: {
         Row: {
           changed_at: string | null
@@ -4080,18 +3907,6 @@ export type Database = {
       cleanup_old_suspicious_attempts: { Args: never; Returns: undefined }
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
-      detect_permission_discrepancies: {
-        Args: {
-          _auth_context_is_admin: boolean
-          _diagnostic_id: string
-          _is_admin_rpc: boolean
-          _roles_rpc: string[]
-          _roles_table: string[]
-          _user_email: string
-          _user_id: string
-        }
-        Returns: undefined
-      }
       detect_vod_channels: {
         Args: never
         Returns: {
@@ -4297,7 +4112,6 @@ export type Database = {
         Args: { p_key: string; p_locked_by: string }
         Returns: boolean
       }
-      save_monthly_leaderboard: { Args: never; Returns: undefined }
       search_m3u_entries: {
         Args: {
           limit_count?: number
