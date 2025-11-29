@@ -96,49 +96,91 @@ function isR2Url(url: string): boolean {
   return url.includes('.r2.cloudflarestorage.com');
 }
 
+// Helper to normalize URL - fix common issues like missing : in protocol
+function normalizeUrl(urlStr: string): string {
+  if (!urlStr) return urlStr;
+  
+  // Fix common protocol issues: https// -> https://, http// -> http://
+  let normalized = urlStr
+    .replace(/^https\/\//i, 'https://')
+    .replace(/^http\/\//i, 'http://')
+    .replace(/^https:\/\/https:\/\//i, 'https://')
+    .replace(/^https:\/\/http:\/\//i, 'http://')
+    .replace(/^https:\/\/https\/\//i, 'https://')
+    .replace(/^http:\/\/http\/\//i, 'http://');
+  
+  // Ensure URL has protocol
+  if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    normalized = 'https://' + normalized;
+  }
+  
+  return normalized;
+}
+
 async function fetchWithR2Support(
   url: string,
   signal?: AbortSignal
 ): Promise<Response> {
+  // Normalize the URL first
+  const normalizedUrl = normalizeUrl(url);
+  console.log(`[M3U-Sync] Fetching URL: ${normalizedUrl}`);
+  
   const r2AccessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
   const r2SecretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
   const r2AccountId = Deno.env.get('R2_ACCOUNT_ID');
   const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN');
   
-  // Try public domain first if available
-  if (r2PublicDomain && isR2Url(url)) {
-    const parsedUrl = new URL(url);
-    // Remove https:// prefix if present to avoid duplication
-    const cleanDomain = r2PublicDomain.replace(/^https?:\/\//, '');
-    const publicUrl = `https://${cleanDomain}${parsedUrl.pathname}`;
-    console.log(`[M3U-Sync] Trying public R2 URL: ${publicUrl}`);
-    
+  // Try public domain first if available and valid
+  if (r2PublicDomain && isR2Url(normalizedUrl)) {
     try {
-      const response = await fetch(publicUrl, {
-        signal,
-        headers: {
-          'User-Agent': 'M3U-Sync/1.0',
-          'Accept': 'application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain, */*',
-        },
-      });
-      
-      if (response.ok) {
-        console.log('[M3U-Sync] Public R2 URL succeeded');
-        return response;
+      const parsedUrl = new URL(normalizedUrl);
+      // Normalize the public domain too
+      const normalizedDomain = normalizeUrl(r2PublicDomain);
+      // Extract just the hostname from the normalized domain
+      let cleanDomain: string;
+      try {
+        const domainUrl = new URL(normalizedDomain);
+        cleanDomain = domainUrl.host;
+      } catch {
+        // If it fails to parse as URL, try to clean it manually
+        cleanDomain = normalizedDomain
+          .replace(/^https?:\/\//, '')
+          .replace(/\/.*$/, '');
       }
-      console.log(`[M3U-Sync] Public URL failed: ${response.status}`);
+      
+      // Only use public domain if it looks valid (contains a dot)
+      if (cleanDomain && cleanDomain.includes('.') && !cleanDomain.includes('//')) {
+        const publicUrl = `https://${cleanDomain}${parsedUrl.pathname}`;
+        console.log(`[M3U-Sync] Trying public R2 URL: ${publicUrl}`);
+        
+        const response = await fetch(publicUrl, {
+          signal,
+          headers: {
+            'User-Agent': 'M3U-Sync/1.0',
+            'Accept': 'application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain, */*',
+          },
+        });
+        
+        if (response.ok) {
+          console.log('[M3U-Sync] Public R2 URL succeeded');
+          return response;
+        }
+        console.log(`[M3U-Sync] Public URL failed: ${response.status}`);
+      } else {
+        console.log(`[M3U-Sync] Invalid R2_PUBLIC_DOMAIN: ${r2PublicDomain}`);
+      }
     } catch (e) {
       console.log('[M3U-Sync] Public URL error:', e);
     }
   }
   
   // If R2 URL and we have credentials, use signed request
-  if (isR2Url(url) && r2AccessKeyId && r2SecretAccessKey && r2AccountId) {
+  if (isR2Url(normalizedUrl) && r2AccessKeyId && r2SecretAccessKey && r2AccountId) {
     console.log('[M3U-Sync] Using R2 signed request');
     
     const signedHeaders = await signR2Request(
       'GET',
-      url,
+      normalizedUrl,
       r2AccessKeyId,
       r2SecretAccessKey,
       r2AccountId
@@ -146,14 +188,15 @@ async function fetchWithR2Support(
     
     signedHeaders.set('User-Agent', 'M3U-Sync/1.0');
     
-    return await fetch(url, {
+    return await fetch(normalizedUrl, {
       signal,
       headers: signedHeaders,
     });
   }
   
   // Standard fetch for non-R2 URLs
-  return await fetch(url, {
+  console.log('[M3U-Sync] Using standard fetch');
+  return await fetch(normalizedUrl, {
     signal,
     headers: {
       'User-Agent': 'M3U-Sync/1.0',
