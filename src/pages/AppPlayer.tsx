@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, startTransition, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Tv, ArrowLeft, Search, Settings, RefreshCw, Database } from 'lucide-react';
+import { Loader2, Tv, ArrowLeft, Settings, RefreshCw, Database } from 'lucide-react';
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
@@ -605,18 +605,12 @@ export default function AppPlayer() {
               </div>
             )}
             
-            <div className="relative w-40 sm:w-48 md:w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar..."
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-9 h-9 sm:h-10"
-              />
-              {isSearching && (
-                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
+            <TVTopSearchBar
+              value={searchQuery}
+              onChange={handleSearchChange}
+              isSearching={isSearching}
+              placeholder="Buscar..."
+            />
           </div>
         </header>
 
