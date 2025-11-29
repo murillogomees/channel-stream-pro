@@ -1,16 +1,67 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.418.0';
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.18';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
 };
 
 // Declaração do EdgeRuntime para Deno
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void;
 };
+
+let r2Client: AwsClient | null = null;
+
+function getR2Client(): AwsClient {
+  if (r2Client) return r2Client;
+  
+  const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
+  const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
+  
+  if (!R2_ACCESS_KEY || !R2_SECRET_KEY) {
+    throw new Error('R2 credentials not configured');
+  }
+  
+  r2Client = new AwsClient({
+    accessKeyId: R2_ACCESS_KEY,
+    secretAccessKey: R2_SECRET_KEY,
+    service: 's3',
+  });
+  
+  return r2Client;
+}
+
+function getR2Endpoint(): string {
+  const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
+  const R2_BUCKET_NAME = Deno.env.get('R2_BUCKET_NAME');
+  
+  if (!R2_ACCOUNT_ID || !R2_BUCKET_NAME) {
+    throw new Error('R2 account/bucket not configured');
+  }
+  
+  return `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET_NAME}`;
+}
+
+async function uploadToR2(key: string, body: Uint8Array, contentType: string, cacheControl: string): Promise<void> {
+  const client = getR2Client();
+  const endpoint = getR2Endpoint();
+  
+  const response = await client.fetch(`${endpoint}/${key}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': cacheControl,
+    },
+    body,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`R2 upload failed: ${response.status} - ${errorText}`);
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -269,10 +320,12 @@ async function processVODDownload(
       .from('vod_downloads')
       .update({
         status: 'failed',
-        error_message: error.message,
-        retry_count: supabase.sql`retry_count + 1`
+        error_message: error.message
       })
       .eq('id', downloadId);
+    
+    // Incrementar retry count separadamente
+    await supabase.rpc('increment_vod_retry', { download_id: downloadId }).catch(() => {});
   }
 }
 
@@ -284,8 +337,6 @@ async function downloadHLSVODStreaming(
   downloadId: string,
   supabase: any
 ): Promise<void> {
-  const s3Client = createS3Client();
-  const bucketName = Deno.env.get('R2_BUCKET_NAME')!;
   const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN')!;
 
   // 1. Download do manifest
@@ -336,15 +387,12 @@ async function downloadHLSVODStreaming(
           const data = await response.arrayBuffer();
           totalBytes += data.byteLength;
 
-          // Upload streaming para R2
-          await s3Client.send(
-            new PutObjectCommand({
-              Bucket: bucketName,
-              Key: `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
-              Body: new Uint8Array(data),
-              ContentType: 'video/mp2t',
-              CacheControl: 'public, max-age=31536000, immutable',
-            })
+          // Upload para R2
+          await uploadToR2(
+            `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
+            new Uint8Array(data),
+            'video/mp2t',
+            'public, max-age=31536000, immutable'
           );
 
           downloadedCount++;
@@ -356,14 +404,11 @@ async function downloadHLSVODStreaming(
             if (retryResponse.ok) {
               const data = await retryResponse.arrayBuffer();
               totalBytes += data.byteLength;
-              await s3Client.send(
-                new PutObjectCommand({
-                  Bucket: bucketName,
-                  Key: `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
-                  Body: new Uint8Array(data),
-                  ContentType: 'video/mp2t',
-                  CacheControl: 'public, max-age=31536000, immutable',
-                })
+              await uploadToR2(
+                `vod/${channel.id}/segment_${segment.index.toString().padStart(6, '0')}.ts`,
+                new Uint8Array(data),
+                'video/mp2t',
+                'public, max-age=31536000, immutable'
               );
               downloadedCount++;
             }
@@ -394,14 +439,11 @@ async function downloadHLSVODStreaming(
   }
 
   // 5. Upload manifest
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: `vod/${channel.id}/playlist.m3u8`,
-      Body: new TextEncoder().encode(newManifest),
-      ContentType: 'application/vnd.apple.mpegurl',
-      CacheControl: 'public, max-age=3600',
-    })
+  await uploadToR2(
+    `vod/${channel.id}/playlist.m3u8`,
+    new TextEncoder().encode(newManifest),
+    'application/vnd.apple.mpegurl',
+    'public, max-age=3600'
   );
 
   console.log(`✅ [VOD HLS] Concluído: ${downloadedCount}/${segments.length} segmentos, ${(totalBytes / 1048576).toFixed(1)} MB`);
@@ -415,9 +457,6 @@ async function downloadDirectVODStreaming(
   downloadId: string,
   supabase: any
 ): Promise<void> {
-  const s3Client = createS3Client();
-  const bucketName = Deno.env.get('R2_BUCKET_NAME')!;
-
   console.log(`📥 [VOD Direct] Baixando: ${channel.name}`);
 
   const response = await fetchWithTimeout(channel.stream_url, 120000);
@@ -432,14 +471,11 @@ async function downloadDirectVODStreaming(
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
 
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: `vod/${channel.id}/video.${ext}`,
-      Body: new Uint8Array(data),
-      ContentType: ext === 'mp4' ? 'video/mp4' : `video/${ext}`,
-      CacheControl: 'public, max-age=31536000, immutable',
-    })
+  await uploadToR2(
+    `vod/${channel.id}/video.${ext}`,
+    new Uint8Array(data),
+    ext === 'mp4' ? 'video/mp4' : `video/${ext}`,
+    'public, max-age=31536000, immutable'
   );
 
   await supabase
@@ -473,26 +509,4 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   } finally {
     clearTimeout(timeout);
   }
-}
-
-/**
- * Criar cliente S3 para Cloudflare R2
- */
-function createS3Client(): S3Client {
-  const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
-  const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
-  const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
-
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY || !R2_SECRET_KEY) {
-    throw new Error('R2 credentials not configured');
-  }
-
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY,
-      secretAccessKey: R2_SECRET_KEY,
-    },
-  });
 }
