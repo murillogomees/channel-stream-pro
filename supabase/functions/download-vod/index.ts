@@ -264,7 +264,7 @@ serve(async (req) => {
     if (channelError || !channel) throw new Error(`Canal não encontrado: ${channelError?.message}`);
     if (!channel.is_vod) throw new Error('Canal não é VOD');
 
-    // Verificar se já foi enviado ao R2
+    // Verificar se já foi enviado ao R2 (este canal)
     if (channel.r2_uploaded) {
       console.log(`⚠️ [VOD] Conteúdo já enviado ao R2: ${channel.name}`);
       
@@ -272,7 +272,6 @@ serve(async (req) => {
       let fixedUrl = channel.r2_url;
       if (fixedUrl && fixedUrl.includes('https://https://')) {
         fixedUrl = fixedUrl.replace('https://https://', 'https://');
-        // Atualizar URL corrigida no banco
         await supabaseService.from('m3u_channels').update({ r2_url: fixedUrl }).eq('id', channelId);
         console.log(`🔧 [VOD] URL corrigida: ${fixedUrl}`);
       }
@@ -284,7 +283,37 @@ serve(async (req) => {
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Verificar se já existe download ativo para este canal - PREVENIR DUPLICADOS
+    // NOVO: Verificar se OUTRO canal com a mesma URL de origem já foi enviado ao R2
+    const { data: sameUrlUploaded } = await supabaseService
+      .from('m3u_channels')
+      .select('id, name, r2_url')
+      .eq('stream_url', channel.stream_url)
+      .eq('r2_uploaded', true)
+      .not('id', 'eq', channelId)
+      .maybeSingle();
+
+    if (sameUrlUploaded && sameUrlUploaded.r2_url) {
+      console.log(`🔗 [VOD] Mesmo conteúdo já no R2 via ${sameUrlUploaded.name}, vinculando ${channel.name}`);
+      
+      // Vincular este canal ao mesmo arquivo R2
+      await supabaseService
+        .from('m3u_channels')
+        .update({ 
+          r2_uploaded: true, 
+          r2_url: sameUrlUploaded.r2_url, 
+          r2_uploaded_at: new Date().toISOString() 
+        })
+        .eq('id', channelId);
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'Conteúdo vinculado ao R2 existente', 
+        linkedTo: sameUrlUploaded.name,
+        r2Url: sameUrlUploaded.r2_url 
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Verificar se já existe download ativo para este canal
     const { data: existingDownloads } = await supabaseService
       .from('vod_downloads')
       .select('id, status, created_at')
@@ -293,28 +322,41 @@ serve(async (req) => {
       .order('created_at', { ascending: false });
 
     if (existingDownloads && existingDownloads.length > 0) {
-      // Manter apenas o mais recente, deletar os outros (limpeza de duplicados)
       if (existingDownloads.length > 1) {
         const duplicateIds = existingDownloads.slice(1).map(d => d.id);
         console.log(`🗑️ [VOD] Removendo ${duplicateIds.length} downloads duplicados para ${channel.name}`);
-        await supabaseService
-          .from('vod_downloads')
-          .delete()
-          .in('id', duplicateIds);
+        await supabaseService.from('vod_downloads').delete().in('id', duplicateIds);
       }
-
       const activeDownload = existingDownloads[0];
       console.log(`⚠️ [VOD] Download já em andamento: ${channel.name} (${activeDownload.status})`);
       return new Response(JSON.stringify({ 
         error: 'Download já em andamento', 
         existingDownload: true,
         downloadId: activeDownload.id,
-        status: activeDownload.status,
-        duplicatesRemoved: existingDownloads.length - 1
+        status: activeDownload.status
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Verificar também downloads "completed" recentes (últimas 24h) para evitar re-download
+    // NOVO: Verificar se já existe download ativo para a MESMA URL (outro canal)
+    const { data: sameUrlDownloading } = await supabaseService
+      .from('vod_downloads')
+      .select('id, channel_id, status')
+      .eq('original_url', channel.stream_url)
+      .in('status', ['queued', 'downloading', 'processing', 'paused'])
+      .not('channel_id', 'eq', channelId)
+      .maybeSingle();
+
+    if (sameUrlDownloading) {
+      console.log(`⚠️ [VOD] Mesma URL já sendo baixada por outro canal: ${channel.stream_url}`);
+      return new Response(JSON.stringify({ 
+        error: 'Mesma URL já em download por outro canal', 
+        existingDownload: true,
+        downloadId: sameUrlDownloading.id,
+        status: sameUrlDownloading.status
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Verificar downloads "completed" recentes (últimas 24h)
     const { data: recentCompleted } = await supabaseService
       .from('vod_downloads')
       .select('id, r2_url')
@@ -362,6 +404,7 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
   const CONCURRENCY = 2;
   const queue = [...channelIds];
   const active: Promise<void>[] = [];
+  const processedUrls = new Set<string>(); // Track URLs being processed in this batch
 
   while (queue.length > 0 || active.length > 0) {
     while (active.length < CONCURRENCY && queue.length > 0) {
@@ -369,54 +412,86 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
       const promise = (async () => {
         try {
           const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
-          if (channel?.is_vod && !channel.r2_uploaded) {
-            // Verificar se já existe download ativo - PREVENIR DUPLICADOS EM BATCH
-            const { data: existingDownloads } = await supabase
-              .from('vod_downloads')
-              .select('id, status, created_at')
-              .eq('channel_id', channelId)
-              .in('status', ['queued', 'downloading', 'processing', 'paused'])
-              .order('created_at', { ascending: false });
-
-            if (existingDownloads && existingDownloads.length > 0) {
-              // Limpeza: remover duplicados, manter apenas o mais recente
-              if (existingDownloads.length > 1) {
-                const duplicateIds = existingDownloads.slice(1).map(d => d.id);
-                console.log(`🗑️ [Batch] Removendo ${duplicateIds.length} duplicados para ${channel.name}`);
-                await supabase.from('vod_downloads').delete().in('id', duplicateIds);
-              }
-              console.log(`⚠️ [Batch] Download já existe para ${channel.name}: ${existingDownloads[0].status}`);
-              return;
-            }
-
-            // Verificar se já completou recentemente
-            const { data: recentCompleted } = await supabase
-              .from('vod_downloads')
-              .select('id')
-              .eq('channel_id', channelId)
-              .eq('status', 'completed')
-              .gte('download_completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-              .maybeSingle();
-
-            if (recentCompleted) {
-              console.log(`⚠️ [Batch] VOD ${channel.name} já completado recentemente`);
-              return;
-            }
-
-            const { data: downloadRecord, error: insertErr } = await supabase.from('vod_downloads').insert({
-              channel_id: channelId,
-              original_url: channel.stream_url,
-              status: 'downloading',
-              download_started_at: new Date().toISOString()
-            }).select().single();
-            
-            if (insertErr || !downloadRecord?.id) {
-              console.error(`❌ [Batch] Falha ao criar registro para ${channel.name}: ${insertErr?.message}`);
-              return;
-            }
-            
-            await processVODDownload(channel, downloadRecord.id, supabase);
+          if (!channel?.is_vod) return;
+          
+          // Já enviado ao R2
+          if (channel.r2_uploaded) {
+            console.log(`⚠️ [Batch] ${channel.name} já no R2`);
+            return;
           }
+
+          // NOVO: Verificar se outro canal com mesma URL já foi enviado
+          const { data: sameUrlUploaded } = await supabase
+            .from('m3u_channels')
+            .select('id, r2_url')
+            .eq('stream_url', channel.stream_url)
+            .eq('r2_uploaded', true)
+            .neq('id', channelId)
+            .maybeSingle();
+
+          if (sameUrlUploaded?.r2_url) {
+            console.log(`🔗 [Batch] Vinculando ${channel.name} ao R2 existente`);
+            await supabase.from('m3u_channels').update({
+              r2_uploaded: true,
+              r2_url: sameUrlUploaded.r2_url,
+              r2_uploaded_at: new Date().toISOString()
+            }).eq('id', channelId);
+            return;
+          }
+
+          // NOVO: Verificar se mesma URL já sendo processada neste batch
+          if (processedUrls.has(channel.stream_url)) {
+            console.log(`⚠️ [Batch] URL ${channel.stream_url} já em processamento neste batch`);
+            return;
+          }
+
+          // NOVO: Verificar download ativo para mesma URL (outro canal)
+          const { data: sameUrlDownload } = await supabase
+            .from('vod_downloads')
+            .select('id')
+            .eq('original_url', channel.stream_url)
+            .in('status', ['queued', 'downloading', 'processing', 'paused'])
+            .maybeSingle();
+
+          if (sameUrlDownload) {
+            console.log(`⚠️ [Batch] Mesma URL já em download: ${channel.stream_url}`);
+            return;
+          }
+
+          // Verificar se já existe download ativo para este canal
+          const { data: existingDownloads } = await supabase
+            .from('vod_downloads')
+            .select('id, status, created_at')
+            .eq('channel_id', channelId)
+            .in('status', ['queued', 'downloading', 'processing', 'paused'])
+            .order('created_at', { ascending: false });
+
+          if (existingDownloads && existingDownloads.length > 0) {
+            if (existingDownloads.length > 1) {
+              const duplicateIds = existingDownloads.slice(1).map(d => d.id);
+              await supabase.from('vod_downloads').delete().in('id', duplicateIds);
+            }
+            console.log(`⚠️ [Batch] Download já existe para ${channel.name}`);
+            return;
+          }
+
+          // Marcar URL como em processamento
+          processedUrls.add(channel.stream_url);
+
+          const { data: downloadRecord, error: insertErr } = await supabase.from('vod_downloads').insert({
+            channel_id: channelId,
+            original_url: channel.stream_url,
+            status: 'downloading',
+            download_started_at: new Date().toISOString()
+          }).select().single();
+          
+          if (insertErr || !downloadRecord?.id) {
+            console.error(`❌ [Batch] Falha ao criar registro para ${channel.name}: ${insertErr?.message}`);
+            processedUrls.delete(channel.stream_url);
+            return;
+          }
+          
+          await processVODDownload(channel, downloadRecord.id, supabase);
         } catch (err) {
           console.error(`❌ [Batch] Erro ${channelId}:`, err);
         }
@@ -508,6 +583,27 @@ async function processVODDownload(
       .eq('id', channel.id);
     
     if (channelError) console.error(`⚠️ [VOD] Erro ao atualizar canal: ${channelError.message}`);
+
+    // NOVO: Atualizar OUTROS canais com a mesma stream_url para compartilhar o R2
+    const { data: sameUrlChannels, error: sameUrlError } = await supabase
+      .from('m3u_channels')
+      .update({ r2_uploaded: true, r2_url: r2Url, r2_uploaded_at: new Date().toISOString() })
+      .eq('stream_url', channel.stream_url)
+      .eq('r2_uploaded', false)
+      .neq('id', channel.id)
+      .select('id');
+    
+    if (sameUrlChannels && sameUrlChannels.length > 0) {
+      console.log(`🔗 [VOD] Vinculados ${sameUrlChannels.length} canais com mesma URL ao R2`);
+      
+      // Deletar downloads pendentes para esses canais (evitar downloads duplicados)
+      const linkedIds = sameUrlChannels.map((c: any) => c.id);
+      await supabase
+        .from('vod_downloads')
+        .delete()
+        .in('channel_id', linkedIds)
+        .in('status', ['queued', 'downloading', 'processing', 'paused', 'pending']);
+    }
     
     // Marcar download como completo
     const { error: downloadError } = await supabase

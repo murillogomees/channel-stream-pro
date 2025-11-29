@@ -156,6 +156,7 @@ serve(async (req) => {
 
     // 3. Filtrar VODs com muitas falhas E que já estão em download
     const vodIds = pendingVODs.map(v => v.id);
+    const vodUrls = pendingVODs.map(v => v.stream_url);
     
     // Buscar downloads com muitas falhas
     const { data: failedDownloads } = await supabaseService
@@ -167,33 +168,59 @@ serve(async (req) => {
 
     const blockedIds = new Set(failedDownloads?.map(f => f.channel_id) || []);
 
-    // Buscar VODs que JÁ ESTÃO em download (prevenir duplicados)
+    // Buscar VODs que JÁ ESTÃO em download (prevenir duplicados por canal)
     const { data: alreadyInProgress } = await supabaseService
       .from('vod_downloads')
-      .select('id, channel_id, status')
-      .in('channel_id', vodIds)
+      .select('id, channel_id, original_url, status')
       .in('status', ['queued', 'downloading', 'processing', 'paused']);
 
     const alreadyDownloadingIds = new Set(alreadyInProgress?.map(d => d.channel_id) || []);
+    const alreadyDownloadingUrls = new Set(alreadyInProgress?.map(d => d.original_url) || []);
     
     // Se encontrou duplicados ativos, logar
     if (alreadyDownloadingIds.size > 0) {
-      console.log(`⚠️ [ScheduleVOD] ${alreadyDownloadingIds.size} VODs já em download, ignorando`);
+      console.log(`⚠️ [ScheduleVOD] ${alreadyDownloadingIds.size} canais já em download, ignorando`);
     }
 
-    // Filtrar: remover bloqueados E já em download
+    // NOVO: Buscar canais com mesma URL que já tem r2_uploaded
+    const { data: alreadyUploadedSameUrl } = await supabaseService
+      .from('m3u_channels')
+      .select('stream_url')
+      .in('stream_url', vodUrls)
+      .eq('r2_uploaded', true);
+
+    const uploadedUrls = new Set(alreadyUploadedSameUrl?.map(c => c.stream_url) || []);
+
+    // Filtrar: remover bloqueados, já em download por canal OU por URL, E URLs já enviadas
+    const seenUrls = new Set<string>(); // Para evitar duplicados de URL no mesmo batch
     const eligibleVODs = pendingVODs
-      .filter(v => !blockedIds.has(v.id) && !alreadyDownloadingIds.has(v.id))
+      .filter(v => {
+        // Verificar bloqueios
+        if (blockedIds.has(v.id)) return false;
+        if (alreadyDownloadingIds.has(v.id)) return false;
+        if (alreadyDownloadingUrls.has(v.stream_url)) return false;
+        if (uploadedUrls.has(v.stream_url)) return false;
+        
+        // NOVO: Evitar duplicados de URL no mesmo batch
+        if (seenUrls.has(v.stream_url)) {
+          console.log(`⚠️ [ScheduleVOD] URL duplicada no batch: ${v.name}`);
+          return false;
+        }
+        seenUrls.add(v.stream_url);
+        return true;
+      })
       .slice(0, availableSlots);
 
     if (eligibleVODs.length === 0) {
-      console.log('⚠️ [ScheduleVOD] Todos VODs pendentes têm muitas falhas');
+      console.log('⚠️ [ScheduleVOD] Nenhum VOD elegível (bloqueados, em download, ou URLs duplicadas)');
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'VODs pendentes com muitas tentativas falhadas',
+          message: 'Nenhum VOD elegível para download',
           scheduled: 0,
-          blocked: blockedIds.size
+          blocked: blockedIds.size,
+          alreadyDownloading: alreadyDownloadingIds.size,
+          duplicateUrls: uploadedUrls.size
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
