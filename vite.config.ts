@@ -4,18 +4,17 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-v10 - Force complete dependency rebuild with new cache
+// Cache bust: 2025-11-29-clean - Force FULL dependency rebuild
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    // Force HMR and clear any stale connections
     hmr: {
       overlay: true,
     },
   },
-  cacheDir: 'node_modules/.vite-v10',
+  cacheDir: 'node_modules/.vite-clean-v1',
   plugins: [
     react(),
     mode === "development" && componentTagger(),
