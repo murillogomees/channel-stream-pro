@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw } from 'lucide-react';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Play, Rocket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
@@ -14,6 +14,44 @@ export default function AdminVODStorage() {
   const { downloads, statistics, isLoading, refresh, detectVODs } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [isStartingDownloads, setIsStartingDownloads] = useState(false);
+
+  const handleStartDownloads = async () => {
+    try {
+      setIsStartingDownloads(true);
+      
+      const { data, error } = await supabase.functions.invoke('schedule-vod-downloads', {
+        body: { 
+          limit: 50,
+          priority: 'size' // menores primeiro para resultados rápidos
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.scheduled > 0) {
+        toast({
+          title: 'Downloads iniciados',
+          description: `${data.scheduled} VODs agendados para download. ${data.totalPending - data.scheduled} ainda pendentes.`,
+        });
+      } else {
+        toast({
+          title: 'Nenhum VOD para baixar',
+          description: data.message || 'Todos os VODs já foram processados ou estão em andamento.',
+        });
+      }
+
+      refresh();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao iniciar downloads',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingDownloads(false);
+    }
+  };
 
   const handleCleanup = async () => {
     try {
@@ -84,12 +122,22 @@ export default function AdminVODStorage() {
       {/* Ações Rápidas */}
       <div className="flex flex-wrap gap-3">
         <Button
+          onClick={handleStartDownloads}
+          disabled={isStartingDownloads || (statistics?.vods_pending || 0) === 0}
+          variant="default"
+          className="bg-green-600 hover:bg-green-700"
+        >
+          <Rocket className="w-4 h-4 mr-2" />
+          {isStartingDownloads ? 'Iniciando...' : `Baixar VODs para R2 (${statistics?.vods_pending || 0} pendentes)`}
+        </Button>
+
+        <Button
           onClick={handleDetectVODs}
           disabled={isDetecting}
-          variant="default"
+          variant="secondary"
         >
           <Wand2 className="w-4 h-4 mr-2" />
-          {isDetecting ? 'Detectando...' : 'Detectar VODs Automaticamente'}
+          {isDetecting ? 'Detectando...' : 'Detectar VODs'}
         </Button>
         
         <Button
@@ -98,7 +146,7 @@ export default function AdminVODStorage() {
           variant="outline"
         >
           <Trash2 className="w-4 h-4 mr-2" />
-          {isCleaningUp ? 'Limpando...' : 'Limpar VODs Órfãos'}
+          {isCleaningUp ? 'Limpando...' : 'Limpar Órfãos'}
         </Button>
         
         <Button
