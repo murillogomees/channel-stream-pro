@@ -1,3 +1,4 @@
+// React 18 Application Entry Point
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
