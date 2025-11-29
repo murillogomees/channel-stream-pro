@@ -460,7 +460,7 @@ async function downloadHLSVODStreaming(
 }
 
 /**
- * Download de stream direto com streaming
+ * Download de stream direto com streaming e progresso real
  */
 async function downloadDirectVODStreaming(
   channel: any,
@@ -469,36 +469,81 @@ async function downloadDirectVODStreaming(
 ): Promise<void> {
   console.log(`📥 [VOD Direct] Baixando: ${channel.name}`);
 
-  // Marcar como 1 segmento total para mostrar progresso
-  await supabase
-    .from('vod_downloads')
-    .update({
-      segment_count: 1,
-      segments_downloaded: 0,
-      status: 'downloading'
-    })
-    .eq('id', downloadId);
-
-  const response = await fetchWithTimeout(channel.stream_url, 120000);
+  const response = await fetchWithTimeout(channel.stream_url, 300000); // 5 min timeout
   if (!response.ok) {
     throw new Error(`Falha ao baixar: ${response.status}`);
   }
 
-  // Para downloads diretos grandes, tentar ler em chunks e atualizar progresso
   const contentLength = parseInt(response.headers.get('content-length') || '0');
   
-  if (contentLength > 0) {
-    // Atualizar com tamanho estimado
-    await supabase
-      .from('vod_downloads')
-      .update({
-        file_size_bytes: contentLength
-      })
-      .eq('id', downloadId);
+  // Para arquivos grandes, usar 100 chunks virtuais para mostrar progresso
+  const VIRTUAL_CHUNKS = contentLength > 100 * 1024 * 1024 ? 100 : 10;
+  const chunkSize = contentLength > 0 ? Math.ceil(contentLength / VIRTUAL_CHUNKS) : 10 * 1024 * 1024;
+  
+  await supabase
+    .from('vod_downloads')
+    .update({
+      segment_count: VIRTUAL_CHUNKS,
+      segments_downloaded: 0,
+      file_size_bytes: contentLength,
+      status: 'downloading'
+    })
+    .eq('id', downloadId);
+
+  // Streaming download com progresso
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Stream não disponível');
   }
 
-  const data = await response.arrayBuffer();
-  const fileSize = data.byteLength;
+  const chunks: Uint8Array[] = [];
+  let downloadedBytes = 0;
+  let lastProgressUpdate = Date.now();
+  let reportedChunks = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    
+    if (done) break;
+    
+    if (value) {
+      chunks.push(value);
+      downloadedBytes += value.length;
+      
+      // Calcular chunks completos
+      const currentChunks = Math.min(
+        VIRTUAL_CHUNKS,
+        Math.floor((downloadedBytes / contentLength) * VIRTUAL_CHUNKS)
+      );
+      
+      // Atualizar progresso a cada 2s ou quando houver mudança significativa
+      const now = Date.now();
+      if (currentChunks > reportedChunks || now - lastProgressUpdate > 2000) {
+        reportedChunks = currentChunks;
+        lastProgressUpdate = now;
+        
+        await supabase
+          .from('vod_downloads')
+          .update({
+            segments_downloaded: reportedChunks,
+            file_size_bytes: downloadedBytes
+          })
+          .eq('id', downloadId);
+        
+        const percent = contentLength > 0 ? Math.round((downloadedBytes / contentLength) * 100) : 0;
+        console.log(`📈 [VOD Direct] ${channel.name}: ${percent}% (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
+      }
+    }
+  }
+
+  // Juntar todos os chunks
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const data = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.length;
+  }
 
   // Determinar extensão
   const urlPath = new URL(channel.stream_url).pathname;
@@ -509,27 +554,31 @@ async function downloadDirectVODStreaming(
     .from('vod_downloads')
     .update({
       status: 'processing',
-      file_size_bytes: fileSize
+      file_size_bytes: totalLength,
+      segments_downloaded: VIRTUAL_CHUNKS
     })
     .eq('id', downloadId);
 
+  console.log(`⬆️ [VOD Direct] Uploading ${(totalLength / 1048576).toFixed(1)} MB to R2...`);
+
   await uploadToR2(
     `vod/${channel.id}/video.${ext}`,
-    new Uint8Array(data),
+    data,
     ext === 'mp4' ? 'video/mp4' : `video/${ext}`,
     'public, max-age=31536000, immutable'
   );
 
+  // Marcar como concluído
   await supabase
     .from('vod_downloads')
     .update({
-      file_size_bytes: fileSize,
-      segment_count: 1,
-      segments_downloaded: 1
+      file_size_bytes: totalLength,
+      segment_count: VIRTUAL_CHUNKS,
+      segments_downloaded: VIRTUAL_CHUNKS
     })
     .eq('id', downloadId);
 
-  console.log(`✅ [VOD Direct] Concluído: ${(fileSize / 1048576).toFixed(1)} MB`);
+  console.log(`✅ [VOD Direct] Concluído: ${(totalLength / 1048576).toFixed(1)} MB`);
 }
 
 /**
