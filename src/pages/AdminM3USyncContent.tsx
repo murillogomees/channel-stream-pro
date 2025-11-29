@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { 
   RefreshCw, Plus, Trash2, Play, Search, 
   Clock, CheckCircle, XCircle, AlertTriangle, FileText,
-  Copy, Loader2, Pencil, Cloud, ExternalLink, List
+  Copy, Loader2, Pencil, Cloud, ExternalLink
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,10 +68,6 @@ export default function AdminM3USyncContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
-  // Playlists CDN do Editor
-  const [editorPlaylists, setEditorPlaylists] = useState<any[]>([]);
-  const [isLoadingEditorPlaylists, setIsLoadingEditorPlaylists] = useState(true);
 
   const [newSource, setNewSource] = useState({
     key: '',
@@ -91,26 +86,21 @@ export default function AdminM3USyncContent() {
   useEffect(() => {
     fetchSources();
     fetchStats();
-    fetchEditorPlaylists();
   }, [fetchSources, fetchStats]);
 
-  // Buscar playlists CDN criadas no Editor (m3u_custom_lists)
-  const fetchEditorPlaylists = async () => {
-    try {
-      setIsLoadingEditorPlaylists(true);
-      const { data, error } = await supabase
-        .from('m3u_custom_lists')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setEditorPlaylists(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar playlists do editor:', error);
-    } finally {
-      setIsLoadingEditorPlaylists(false);
-    }
-  };
+  // Extrair playlists CDN dos sources (metadata contém cdn_url)
+  const cdnPlaylists = sources
+    .filter(s => s.metadata?.cdn_url)
+    .map(s => ({
+      id: s.id,
+      key: s.key,
+      name: s.name,
+      cdn_url: s.metadata?.cdn_url as string,
+      cdn_entries_count: s.metadata?.cdn_entries_count as number || 0,
+      cdn_file_size: s.metadata?.cdn_file_size as number || 0,
+      cdn_generated_at: s.metadata?.cdn_generated_at as string || null,
+      enabled: s.enabled,
+    }));
 
   const handleCreateSource = async () => {
     if (!newSource.key || !newSource.name || !newSource.source_url) {
@@ -571,87 +561,79 @@ export default function AdminM3USyncContent() {
         </CardContent>
       </Card>
 
-      {/* Playlists CDN (Editor) */}
+      {/* Playlists CDN (Sincronização) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <List className="w-5 h-5 text-blue-500" />
-            Playlists CDN (Editor)
+            <Cloud className="w-5 h-5 text-blue-500" />
+            Playlists CDN
           </CardTitle>
           <CardDescription>
-            Playlists M3U criadas no editor e hospedadas no CDN
+            Playlists M3U geradas e hospedadas no CDN R2
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingEditorPlaylists ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : editorPlaylists.length === 0 ? (
+          {cdnPlaylists.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <List className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhuma playlist criada no editor</p>
-              <p className="text-sm">Acesse o M3U Builder para criar sua primeira playlist</p>
+              <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Nenhuma playlist CDN gerada</p>
+              <p className="text-sm">Sincronize uma fonte para gerar a playlist CDN</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Slug</TableHead>
+                  <TableHead>Chave</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Canais</TableHead>
-                  <TableHead>Categorias</TableHead>
+                  <TableHead>Entradas CDN</TableHead>
+                  <TableHead>Tamanho</TableHead>
                   <TableHead>Última Geração</TableHead>
                   <TableHead className="text-right">URL CDN</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {editorPlaylists.map((playlist) => (
+                {cdnPlaylists.map((playlist) => (
                   <TableRow key={playlist.id}>
                     <TableCell className="font-medium">{playlist.name}</TableCell>
                     <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">{playlist.slug}</code>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{playlist.key}</code>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={playlist.status === 'active' ? 'default' : 'secondary'}>
-                        {playlist.status === 'active' ? 'Ativa' : 'Inativa'}
+                      <Badge variant={playlist.enabled ? 'default' : 'secondary'}>
+                        {playlist.enabled ? 'Ativa' : 'Inativa'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{(playlist.total_channels || 0).toLocaleString()}</TableCell>
-                    <TableCell>{playlist.total_categories || 0}</TableCell>
+                    <TableCell>{playlist.cdn_entries_count.toLocaleString()}</TableCell>
+                    <TableCell>{formatBytes(playlist.cdn_file_size)}</TableCell>
                     <TableCell>
-                      {playlist.last_generated_at ? (
+                      {playlist.cdn_generated_at ? (
                         <span className="text-sm">
-                          {formatDistanceToNow(new Date(playlist.last_generated_at), { locale: ptBR, addSuffix: true })}
+                          {formatDistanceToNow(new Date(playlist.cdn_generated_at), { locale: ptBR, addSuffix: true })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {playlist.cdn_url ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleCopyUrl(playlist.cdn_url)}
-                            title="Copiar URL"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => window.open(playlist.cdn_url, '_blank')}
-                            title="Abrir URL"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Não gerado</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCopyUrl(playlist.cdn_url)}
+                          title="Copiar URL"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(playlist.cdn_url, '_blank')}
+                          title="Abrir URL"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
