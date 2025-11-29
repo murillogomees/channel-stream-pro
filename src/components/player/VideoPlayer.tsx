@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * VideoPlayer - Player IPTV Universal
+ * VideoPlayer - Player IPTV Universal (Netflix-Grade Performance)
  * ============================================================================
  * 
  * Player 100% funcional compatível com:
@@ -15,8 +15,10 @@
  * - Auto-reconnect inteligente
  * - Overlay elegante com auto-hide
  * - Muted-on-start para autoplay seguro
+ * - Analytics de performance
+ * - Configuração otimizada por dispositivo
  * 
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -26,6 +28,8 @@ import {
 } from "lucide-react";
 import { useRemoteInput } from "@/modules/player/hooks/useRemoteInput";
 import { cn } from "@/lib/utils";
+import { useStreamAnalytics } from "@/hooks/useStreamAnalytics";
+import { streamOptimizer } from "@/services/streamOptimizer";
 
 // =============================================================================
 // TYPES
@@ -38,6 +42,10 @@ interface VideoPlayerProps {
   title?: string;
   /** Logo do canal */
   logo?: string;
+  /** Channel ID for analytics */
+  channelId?: string;
+  /** User ID for analytics */
+  userId?: string;
   /** Autoplay ao carregar */
   autoPlay?: boolean;
   /** Classes CSS adicionais */
@@ -51,28 +59,39 @@ interface VideoPlayerProps {
 }
 
 // =============================================================================
-// HLS CONFIG
+// HLS CONFIG - Device-optimized
 // =============================================================================
 
-const HLS_CONFIG: Partial<Hls['config']> = {
-  enableWorker: true,
-  lowLatencyMode: false,
-  backBufferLength: 60,
-  maxBufferLength: 60,
-  maxMaxBufferLength: 120,
-  maxBufferSize: 60 * 1000 * 1000,
-  maxBufferHole: 0.5,
-  startFragPrefetch: true,
-  testBandwidth: true,
-  progressive: true,
-  fragLoadingTimeOut: 20000,
-  fragLoadingMaxRetry: 6,
-  fragLoadingRetryDelay: 1000,
-  manifestLoadingTimeOut: 15000,
-  manifestLoadingMaxRetry: 4,
-  levelLoadingTimeOut: 15000,
-  levelLoadingMaxRetry: 4,
-};
+function getHlsConfig(): Partial<Hls['config']> {
+  const preset = streamOptimizer.getHlsPresetForDevice();
+  
+  return {
+    enableWorker: true,
+    lowLatencyMode: preset.config.lowLatencyMode,
+    backBufferLength: preset.config.backBufferLength,
+    maxBufferLength: preset.config.maxBufferLength,
+    maxMaxBufferLength: preset.config.maxMaxBufferLength,
+    maxBufferSize: preset.config.maxBufferSize,
+    maxBufferHole: preset.config.maxBufferHole,
+    startFragPrefetch: preset.config.startFragPrefetch,
+    testBandwidth: true,
+    progressive: true,
+    fragLoadingTimeOut: 20000,
+    fragLoadingMaxRetry: 6,
+    fragLoadingRetryDelay: 1000,
+    manifestLoadingTimeOut: 15000,
+    manifestLoadingMaxRetry: 4,
+    levelLoadingTimeOut: 15000,
+    levelLoadingMaxRetry: 4,
+    // ABR config for smoother quality transitions
+    abrEwmaFastLive: 3.0,
+    abrEwmaSlowLive: 9.0,
+    abrEwmaFastVoD: 3.0,
+    abrEwmaSlowVoD: 9.0,
+    abrBandWidthFactor: 0.95,
+    abrBandWidthUpFactor: 0.7,
+  };
+}
 
 // =============================================================================
 // STREAM TYPE DETECTION
@@ -130,6 +149,8 @@ export function VideoPlayer({
   url,
   title = "",
   logo,
+  channelId,
+  userId,
   autoPlay = true,
   className,
   onError,
@@ -149,6 +170,10 @@ export function VideoPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCount = useRef(0);
   const maxRetries = 3;
+  const startupTimeRef = useRef<number>(0);
+
+  // Analytics tracking
+  const analytics = useStreamAnalytics(channelId, userId);
 
   // ---------------------------------------------------------------------------
   // Overlay Control
@@ -170,6 +195,10 @@ export function VideoPlayer({
 
     setLoading(true);
     setError(null);
+    startupTimeRef.current = Date.now();
+
+    // Start analytics session
+    analytics.startSession();
 
     // Cleanup previous instance
     if (hlsRef.current) {
@@ -188,9 +217,11 @@ export function VideoPlayer({
       video.src = url;
       
       const onLoadedData = () => {
-        console.log('[VideoPlayer] Direct stream loaded');
+        const startupMs = Date.now() - startupTimeRef.current;
+        console.log('[VideoPlayer] Direct stream loaded in', startupMs, 'ms');
         setLoading(false);
         retryCount.current = 0;
+        analytics.recordStartup(startupMs);
         onReady?.();
         
         if (autoPlay) {
@@ -206,6 +237,7 @@ export function VideoPlayer({
       const onVideoError = () => {
         const mediaError = video.error;
         console.error('[VideoPlayer] Direct stream error:', mediaError?.code, mediaError?.message);
+        analytics.recordError(String(mediaError?.code || 'UNKNOWN'), mediaError?.message || 'Direct stream error');
         
         if (retryCount.current < maxRetries) {
           retryCount.current++;
@@ -236,17 +268,19 @@ export function VideoPlayer({
 
     // HLS.js for HLS streams
     if (Hls.isSupported() && isHls) {
-      console.log('[VideoPlayer] Using HLS.js');
-      const hls = new Hls(HLS_CONFIG);
+      console.log('[VideoPlayer] Using HLS.js with optimized config');
+      const hls = new Hls(getHlsConfig());
       hlsRef.current = hls;
 
       hls.loadSource(url);
       hls.attachMedia(video);
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('[VideoPlayer] Manifest parsed');
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const startupMs = Date.now() - startupTimeRef.current;
+        console.log('[VideoPlayer] Manifest parsed in', startupMs, 'ms, levels:', data.levels.length);
         setLoading(false);
         retryCount.current = 0;
+        analytics.recordStartup(startupMs);
         onReady?.();
         
         if (autoPlay) {
@@ -259,10 +293,21 @@ export function VideoPlayer({
         }
       });
 
+      // Track quality changes
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const level = hls.levels[data.level];
+        if (level) {
+          analytics.recordQualityChange(level.bitrate);
+          console.log('[VideoPlayer] Quality:', level.height + 'p', level.bitrate / 1000, 'kbps');
+        }
+      });
+
       hls.on(Hls.Events.ERROR, (_, data) => {
-        console.error('[VideoPlayer] HLS Error:', data);
+        console.error('[VideoPlayer] HLS Error:', data.type, data.details);
         
         if (!data.fatal) return;
+
+        analytics.recordError(data.details, data.type);
 
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           if (retryCount.current < maxRetries) {
@@ -337,6 +382,9 @@ export function VideoPlayer({
     showOverlay();
 
     return () => {
+      // End analytics session
+      analytics.endSession();
+      
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -357,8 +405,14 @@ export function VideoPlayer({
 
     const handlePlay = () => setPaused(false);
     const handlePause = () => setPaused(true);
-    const handleWaiting = () => setLoading(true);
-    const handlePlaying = () => setLoading(false);
+    const handleWaiting = () => {
+      setLoading(true);
+      analytics.recordBufferStart();
+    };
+    const handlePlaying = () => {
+      setLoading(false);
+      analytics.recordBufferEnd();
+    };
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
@@ -371,7 +425,7 @@ export function VideoPlayer({
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('playing', handlePlaying);
     };
-  }, []);
+  }, [analytics]);
 
   // ---------------------------------------------------------------------------
   // Controls
