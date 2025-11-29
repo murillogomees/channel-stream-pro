@@ -107,6 +107,16 @@ const CLASS_LABELS: Record<ContentClass, string> = {
   other: "Outros",
 };
 
+// Prefixes to force content into a specific class
+const CLASS_PREFIXES: Record<ContentClass, string> = {
+  tv: "CANAIS:",
+  movies: "FILMES:",
+  series: "SÉRIES:",
+  other: "OUTROS:",
+};
+
+export { CLASS_LABELS, CLASS_PREFIXES };
+
 export function useM3USyncEditor() {
   const [entries, setEntries] = useState<M3UEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -431,6 +441,79 @@ export function useM3USyncEditor() {
     [selectedSourceId],
   );
 
+  // Move category to a different content class
+  const moveCategoryToClass = useCallback(
+    async (categoryName: string, targetClass: ContentClass): Promise<boolean> => {
+      if (!selectedSourceId) return false;
+
+      try {
+        // Get entries in this category
+        const categoryEntries = entries.filter((e) => e.group_title === categoryName);
+        if (categoryEntries.length === 0) return false;
+
+        // Create new category name with target class prefix
+        const prefix = CLASS_PREFIXES[targetClass];
+        
+        // Remove existing class prefix if present
+        let baseName = categoryName;
+        for (const p of Object.values(CLASS_PREFIXES)) {
+          if (categoryName.toUpperCase().startsWith(p)) {
+            baseName = categoryName.slice(p.length).trim();
+            break;
+          }
+        }
+        
+        // If baseName contains ":", take the part after it
+        if (baseName.includes(":")) {
+          baseName = baseName.split(":").slice(1).join(":").trim();
+        }
+        
+        const newCategoryName = `${prefix} ${baseName}`;
+
+        const { error } = await supabase
+          .from("m3u_sync_entries")
+          .update({
+            group_title: newCategoryName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("source_id", selectedSourceId)
+          .eq("group_title", categoryName);
+
+        if (error) throw error;
+
+        // Update local state
+        setEntries((prev) =>
+          prev.map((e) => {
+            if (e.group_title === categoryName) {
+              return {
+                ...e,
+                group_title: newCategoryName,
+                content_class: targetClass,
+                parent_category: extractParentCategory(newCategoryName),
+              };
+            }
+            return e;
+          }),
+        );
+
+        toast({
+          title: "Categoria movida",
+          description: `"${categoryName}" → "${newCategoryName}" (${CLASS_LABELS[targetClass]})`,
+        });
+        return true;
+      } catch (error: any) {
+        console.error("[M3USyncEditor] Error moving category to class:", error);
+        toast({
+          title: "Erro",
+          description: "Falha ao mover categoria",
+          variant: "destructive",
+        });
+        return false;
+      }
+    },
+    [selectedSourceId, entries],
+  );
+
   // Statistics
   const stats = useMemo(
     () => ({
@@ -462,5 +545,6 @@ export function useM3USyncEditor() {
     bulkUpdateCategory,
     deleteEntry,
     renameCategory,
+    moveCategoryToClass,
   };
 }

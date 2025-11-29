@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, RefreshCw, Save, X, Check
+  Loader2, RefreshCw, Save, X, Check, ArrowRightLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -38,7 +41,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
-import { useM3USyncEditor, ContentClass, M3UEntry, CategoryGroup } from '@/hooks/useM3USyncEditor';
+import { useM3USyncEditor, ContentClass, M3UEntry, CategoryGroup, CLASS_LABELS } from '@/hooks/useM3USyncEditor';
 import { useM3USync } from '@/hooks/useM3USync';
 import { toast } from '@/hooks/use-toast';
 
@@ -76,6 +79,7 @@ export default function AdminM3UContentEditor() {
     bulkUpdateCategory,
     deleteEntry,
     renameCategory,
+    moveCategoryToClass,
   } = useM3USyncEditor();
 
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
@@ -175,7 +179,13 @@ export default function AdminM3UContentEditor() {
           </p>
         </div>
         
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 items-center w-full sm:w-auto">
+          {selectedSourceId && (
+            <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-600/30 bg-green-500/10">
+              <Check className="w-3 h-3" />
+              Auto-save ativo
+            </Badge>
+          )}
           <Select onValueChange={handleSourceChange} value={selectedSourceId || ''}>
             <SelectTrigger className="w-full sm:w-[250px]">
               <SelectValue placeholder="Selecione uma fonte" />
@@ -402,6 +412,29 @@ export default function AdminM3UContentEditor() {
                                     <Check className="w-4 h-4 mr-2" />
                                     Selecionar Todos
                                   </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      <ArrowRightLeft className="w-4 h-4 mr-2" />
+                                      Mover para Classe
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                      {(['tv', 'movies', 'series', 'other'] as ContentClass[])
+                                        .filter(cls => cls !== category.contentClass)
+                                        .map(cls => {
+                                          const ClsIcon = CLASS_ICONS[cls];
+                                          return (
+                                            <DropdownMenuItem 
+                                              key={cls}
+                                              onClick={() => moveCategoryToClass(category.name, cls)}
+                                            >
+                                              <ClsIcon className="w-4 h-4 mr-2" />
+                                              {CLASS_LABELS[cls]}
+                                            </DropdownMenuItem>
+                                          );
+                                        })}
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
