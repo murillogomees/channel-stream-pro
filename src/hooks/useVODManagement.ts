@@ -49,6 +49,7 @@ export const useVODManagement = () => {
   const [hostedVODs, setHostedVODs] = useState<HostedVOD[]>([]);
   const [statistics, setStatistics] = useState<VODStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [channelNames, setChannelNames] = useState<Record<string, string>>({});
   
   // Then useRef
   const lastUpdateRef = useRef<number>(0);
@@ -66,7 +67,25 @@ export const useVODManagement = () => {
         .limit(100);
 
       if (error) throw error;
-      setDownloads((data || []) as unknown as VODDownload[]);
+      const downloadsList = (data || []) as unknown as VODDownload[];
+      setDownloads(downloadsList);
+      
+      // Buscar nomes dos canais para os downloads
+      const channelIds = [...new Set(downloadsList.map(d => d.channel_id))];
+      if (channelIds.length > 0) {
+        const { data: channelsData } = await supabase
+          .from('m3u_channels')
+          .select('id, name')
+          .in('id', channelIds);
+        
+        if (channelsData) {
+          const namesMap: Record<string, string> = {};
+          channelsData.forEach((ch: any) => {
+            namesMap[ch.id] = ch.name;
+          });
+          setChannelNames(prev => ({ ...prev, ...namesMap }));
+        }
+      }
     } catch (error: any) {
       console.error('Error fetching VOD downloads:', error);
     }
@@ -440,11 +459,11 @@ export const useVODManagement = () => {
       )
       .subscribe();
 
-    // Polling de backup a cada 10 segundos para garantir sincronização
+    // Polling de backup a cada 5 segundos para garantir sincronização fluida
     const pollInterval = setInterval(() => {
       fetchDownloads();
       fetchStatistics();
-    }, 10000);
+    }, 5000);
 
     return () => {
       downloadsChannel.unsubscribe();
@@ -465,6 +484,7 @@ export const useVODManagement = () => {
     hostedVODs,
     statistics,
     isLoading,
+    channelNames,
     downloadChannel,
     downloadBatch,
     markAsVOD,
