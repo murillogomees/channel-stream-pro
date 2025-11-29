@@ -316,7 +316,7 @@ function generateHash(str: string): string {
   return Math.abs(hash).toString(16);
 }
 
-// Background sync processor with chunked support
+// Background sync processor with chunked support and auto-continuation
 async function processSyncInBackground(
   source: any,
   jobId: string,
@@ -404,14 +404,33 @@ async function processSyncInBackground(
     const currentChunk = Math.floor(offset / CHUNK_SIZE) + 1;
     const totalChunks = Math.ceil(totalEntries / CHUNK_SIZE);
     
-    // If there are more entries, update status as partial and return info for next chunk
+    // Get current entry count
+    const { count: existingCount } = await supabase
+      .from('m3u_sync_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', source.id);
+    
+    // Complete current job
+    await supabase.from('m3u_sync_jobs').update({
+      status: hasMore ? 'completed' : 'completed',
+      completed_at: new Date().toISOString(),
+      duration_ms: duration,
+      entries_count: existingCount || insertedCount,
+      invalid_entries_count: invalidCount,
+      file_size_bytes: fileSize,
+      metadata: {
+        chunk: currentChunk,
+        total_chunks: totalChunks,
+        next_offset: hasMore ? newOffset : null,
+        has_more: hasMore,
+      },
+    }).eq('id', jobId);
+    
+    // If there are more entries, auto-trigger next chunk
     if (hasMore) {
-      // Get current entry count from previous chunks
-      const { count: existingCount } = await supabase
-        .from('m3u_sync_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_id', source.id);
+      console.log(`[M3U-Sync-BG] ⏳ Chunk ${currentChunk}/${totalChunks} completed. Auto-continuing to offset: ${newOffset}`);
       
+      // Update source with partial status
       await supabase.from('m3u_sync_sources').update({
         last_sync_at: new Date().toISOString(),
         last_sync_status: 'partial',
@@ -429,35 +448,40 @@ async function processSyncInBackground(
         },
       }).eq('id', source.id);
       
-      await supabase.from('m3u_sync_jobs').update({
-        status: 'partial',
-        duration_ms: duration,
-        entries_count: existingCount || insertedCount,
-        invalid_entries_count: invalidCount,
-        metadata: {
-          chunk: currentChunk,
-          total_chunks: totalChunks,
-          next_offset: newOffset,
-          has_more: true,
-        },
-      }).eq('id', jobId);
-      
-      console.log(`[M3U-Sync-BG] ⏳ Chunk ${currentChunk}/${totalChunks} completed. Next offset: ${newOffset}`);
+      // Auto-invoke next chunk via HTTP call to self
+      try {
+        const nextChunkResponse = await fetch(`${supabaseUrl}/functions/v1/m3u-sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            key: source.key,
+            triggered_by: 'auto_continuation',
+            offset: newOffset,
+            continue_sync: true,
+          }),
+        });
+        
+        if (nextChunkResponse.ok) {
+          console.log(`[M3U-Sync-BG] ✅ Auto-triggered chunk ${currentChunk + 1}/${totalChunks}`);
+        } else {
+          console.error(`[M3U-Sync-BG] ❌ Failed to auto-trigger next chunk:`, await nextChunkResponse.text());
+        }
+      } catch (e) {
+        console.error(`[M3U-Sync-BG] ❌ Error auto-triggering next chunk:`, e);
+      }
       
     } else {
       // All chunks processed - final update
-      const { count: totalCount } = await supabase
-        .from('m3u_sync_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_id', source.id);
-      
-      const checksum = generateHash(String(totalCount) + source.id);
+      const checksum = generateHash(String(existingCount) + source.id);
       
       await supabase.from('m3u_sync_sources').update({
         last_sync_at: new Date().toISOString(),
         last_sync_status: 'completed',
         last_error: null,
-        entries_count: totalCount || insertedCount,
+        entries_count: existingCount || insertedCount,
         invalid_entries_count: invalidCount,
         file_size_bytes: fileSize,
         checksum,
@@ -468,25 +492,11 @@ async function processSyncInBackground(
           current_chunk: 0,
           total_chunks: totalChunks,
           last_full_sync_duration_ms: duration,
-          total_entries_synced: totalCount,
+          total_entries_synced: existingCount,
         },
       }).eq('id', source.id);
       
-      await supabase.from('m3u_sync_jobs').update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        duration_ms: duration,
-        entries_count: totalCount || insertedCount,
-        invalid_entries_count: invalidCount,
-        file_size_bytes: fileSize,
-        metadata: {
-          chunk: currentChunk,
-          total_chunks: totalChunks,
-          completed: true,
-        },
-      }).eq('id', jobId);
-      
-      console.log(`[M3U-Sync-BG] ✅ All chunks completed for ${source.key}: ${totalCount} entries`);
+      console.log(`[M3U-Sync-BG] ✅ All ${totalChunks} chunks completed for ${source.key}: ${existingCount} entries`);
     }
     
     return { hasMore, nextOffset: newOffset, totalEntries, insertedCount, currentChunk, totalChunks };
