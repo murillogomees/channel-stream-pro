@@ -15,8 +15,9 @@ declare const EdgeRuntime: {
 const R2_PART_SIZE = 5 * 1024 * 1024;       // 5MB (mínimo R2)
 const CHUNK_SIZE = 5 * 1024 * 1024;         // 5MB por chunk de download
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB máximo
-const EXECUTION_TIMEOUT = 45000;            // 45 segundos max por execução
-const FETCH_TIMEOUT = 25000;                // 25s timeout por chunk
+const EXECUTION_TIMEOUT = 55000;            // 55 segundos max por execução (edge limit ~60s)
+const FETCH_TIMEOUT_CHUNK = 30000;          // 30s timeout por chunk com range
+const FETCH_TIMEOUT_FULL = 120000;          // 120s timeout para download completo sem range
 const PROGRESS_UPDATE_INTERVAL = 5000;      // 5 segundos
 
 let r2Client: AwsClient | null = null;
@@ -446,7 +447,7 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
   // Arquivos pequenos (<10MB) - upload direto
   if (contentLength > 0 && contentLength < 10 * 1024 * 1024) {
     console.log(`⚡ [VOD] Upload direto (arquivo pequeno)`);
-    const response = await fetch(channel.stream_url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+    const response = await fetch(channel.stream_url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_CHUNK) });
     if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
     const data = new Uint8Array(await response.arrayBuffer());
     await uploadToR2Simple(r2Key, data, contentType);
@@ -519,9 +520,12 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
 
       console.log(`📥 [VOD] Chunk ${rangeStart}-${rangeEnd} (${((rangeEnd - rangeStart + 1) / 1048576).toFixed(1)}MB)`);
 
+      // Usar timeout maior para downloads sem suporte a range
+      const fetchTimeout = supportsRanges ? FETCH_TIMEOUT_CHUNK : FETCH_TIMEOUT_FULL;
+      
       const response = await fetch(channel.stream_url, { 
         headers,
-        signal: AbortSignal.timeout(FETCH_TIMEOUT) 
+        signal: AbortSignal.timeout(fetchTimeout) 
       });
       
       if (!response.ok && response.status !== 206) {
@@ -699,9 +703,9 @@ async function downloadHLS(channel: any, downloadId: string, supabase: any): Pro
     const seg = segments[i];
     let success = false;
     
-    for (let retry = 0; retry < 2; retry++) {
+    for (let retry = 0; retry < 3; retry++) {
       try {
-        const res = await fetch(seg.url, { signal: AbortSignal.timeout(20000) });
+        const res = await fetch(seg.url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_CHUNK) });
         if (!res.ok) throw new Error(`${res.status}`);
         const data = await res.arrayBuffer();
         totalBytes += data.byteLength;
@@ -715,7 +719,8 @@ async function downloadHLS(channel: any, downloadId: string, supabase: any): Pro
         success = true;
         break;
       } catch (e) {
-        if (retry === 1) console.error(`❌ Segment ${seg.index} failed`);
+        if (retry === 2) console.error(`❌ Segment ${seg.index} failed after 3 retries`);
+        await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
       }
     }
 
