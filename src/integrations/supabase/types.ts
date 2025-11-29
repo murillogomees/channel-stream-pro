@@ -4659,6 +4659,10 @@ export type Database = {
         Args: { p_bytes?: number; p_duration_ms?: number; p_url: string }
         Returns: undefined
       }
+      record_streaming_metric: {
+        Args: { p_channel_id: string; p_metric_type: string; p_value: number }
+        Returns: undefined
+      }
       release_playlist_sync_lock: {
         Args: { p_key: string; p_locked_by: string }
         Returns: boolean
