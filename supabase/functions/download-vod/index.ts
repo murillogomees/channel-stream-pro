@@ -25,38 +25,44 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('authorization');
     const cronSecret = req.headers.get('x-supabase-cron-secret');
+    const internalSecret = req.headers.get('x-internal-secret');
     const expectedCronSecret = Deno.env.get('CRON_SECRET');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    // Permitir tanto auth de admin quanto cron secret
+    // Permitir: cron secret, internal secret (service-to-service), ou admin auth
     const isCronRequest = cronSecret === expectedCronSecret;
+    const isInternalRequest = internalSecret === expectedCronSecret;
+    const isServiceRoleRequest = authHeader?.includes(serviceRoleKey || '');
 
-    if (!isCronRequest && authHeader) {
-      const supabaseAuth = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
+    if (!isCronRequest && !isInternalRequest && !isServiceRoleRequest) {
+      if (authHeader) {
+        const supabaseAuth = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+        );
 
-      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-      if (authError || !user) {
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+        if (authError || !user) {
+          return new Response(
+            JSON.stringify({ error: 'Token inválido' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { data: isAdmin } = await supabaseAuth.rpc('is_admin', { uid: user.id });
+        if (!isAdmin) {
+          return new Response(
+            JSON.stringify({ error: 'Acesso negado' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
         return new Response(
-          JSON.stringify({ error: 'Token inválido' }),
+          JSON.stringify({ error: 'Autenticação necessária' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      const { data: isAdmin } = await supabaseAuth.rpc('is_admin', { uid: user.id });
-      if (!isAdmin) {
-        return new Response(
-          JSON.stringify({ error: 'Acesso negado' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } else if (!isCronRequest) {
-      return new Response(
-        JSON.stringify({ error: 'Autenticação necessária' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     const body = await req.json().catch(() => ({}));

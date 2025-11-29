@@ -166,7 +166,10 @@ serve(async (req) => {
 
     // 5. Limpar downloads antigos (em background)
     EdgeRuntime.waitUntil(
-      supabaseService.rpc('cleanup_old_vod_downloads').catch(console.error)
+      (async () => {
+        const { error } = await supabaseService.rpc('cleanup_old_vod_downloads');
+        if (error) console.error('[ScheduleVOD] Cleanup error:', error);
+      })()
     );
 
     console.log(`✅ [ScheduleVOD] ${channelIds.length} VODs agendados para download`);
@@ -198,20 +201,29 @@ serve(async (req) => {
  */
 async function triggerBatchDownload(
   channelIds: string[],
-  supabase: any
+  _supabase: any
 ): Promise<void> {
   try {
     console.log(`🚀 [ScheduleVOD] Disparando batch de ${channelIds.length} downloads`);
     
-    const response = await supabase.functions.invoke('download-vod', {
-      body: { 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': cronSecret || '',
+      },
+      body: JSON.stringify({ 
         batch: true,
         channelIds 
-      }
+      })
     });
 
-    if (response.error) {
-      console.error(`❌ [ScheduleVOD] Erro no batch:`, response.error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ [ScheduleVOD] Erro no batch: ${response.status} - ${errorText}`);
     } else {
       console.log(`✅ [ScheduleVOD] Batch iniciado com sucesso`);
     }
@@ -221,10 +233,18 @@ async function triggerBatchDownload(
     // Fallback: invocar individualmente
     console.log(`⚠️ [ScheduleVOD] Tentando downloads individuais...`);
     
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    
     for (const channelId of channelIds.slice(0, 5)) { // Limitar fallback
       try {
-        await supabase.functions.invoke('download-vod', {
-          body: { channelId }
+        await fetch(`${supabaseUrl}/functions/v1/download-vod`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': cronSecret || '',
+          },
+          body: JSON.stringify({ channelId })
         });
       } catch {
         console.error(`❌ [ScheduleVOD] Falha individual: ${channelId}`);
