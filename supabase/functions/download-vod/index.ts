@@ -267,10 +267,20 @@ serve(async (req) => {
     // Verificar se já foi enviado ao R2
     if (channel.r2_uploaded) {
       console.log(`⚠️ [VOD] Conteúdo já enviado ao R2: ${channel.name}`);
+      
+      // Corrigir URL se tiver https:// duplicado
+      let fixedUrl = channel.r2_url;
+      if (fixedUrl && fixedUrl.includes('https://https://')) {
+        fixedUrl = fixedUrl.replace('https://https://', 'https://');
+        // Atualizar URL corrigida no banco
+        await supabaseService.from('m3u_channels').update({ r2_url: fixedUrl }).eq('id', channelId);
+        console.log(`🔧 [VOD] URL corrigida: ${fixedUrl}`);
+      }
+      
       return new Response(JSON.stringify({ 
         error: 'Conteúdo já enviado ao R2', 
         alreadyUploaded: true,
-        r2Url: channel.r2_url 
+        r2Url: fixedUrl 
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -479,8 +489,11 @@ async function processVODDownload(
     
     console.log(`✅ [VOD] Download concluído, finalizando...`);
 
-    const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN');
+    let r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN');
     if (!r2Domain) throw new Error('R2_PUBLIC_DOMAIN não configurado');
+    
+    // Remover protocolo se já existir para evitar duplicação
+    r2Domain = r2Domain.replace(/^https?:\/\//, '');
     
     const urlPath = new URL(channel.stream_url).pathname;
     const ext = urlPath.split('.').pop() || 'mp4';
@@ -914,8 +927,9 @@ async function downloadHLSVOD(channel: any, downloadId: string, supabase: any): 
 
   // Reescrever manifest
   let newManifest = manifestContent;
+  const cleanDomain = r2Domain.replace(/^https?:\/\//, '');
   for (const seg of segments) {
-    newManifest = newManifest.replace(seg.line, `https://${r2Domain}/vod/${channel.id}/segment_${seg.index.toString().padStart(6, '0')}.ts`);
+    newManifest = newManifest.replace(seg.line, `https://${cleanDomain}/vod/${channel.id}/segment_${seg.index.toString().padStart(6, '0')}.ts`);
   }
   await uploadToR2Simple(`vod/${channel.id}/playlist.m3u8`, new TextEncoder().encode(newManifest), 'application/vnd.apple.mpegurl', 'public, max-age=3600');
   
