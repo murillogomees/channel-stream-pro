@@ -601,7 +601,7 @@ async function downloadLargeFile(
   }
 }
 
-// Streaming para quando não há suporte a ranges
+// Streaming para quando não há suporte a ranges - com reconexão
 async function downloadStreamingMode(
   channel: any, 
   downloadId: string, 
@@ -609,130 +609,159 @@ async function downloadStreamingMode(
   uploadId: string,
   existingParts: { partNumber: number; etag: string }[],
   startPartNumber: number,
-  knownSize: number
+  knownSize: number,
+  maxRetries: number = 3
 ): Promise<void> {
-  console.log(`📥 [Streaming] Download sem ranges (retry habilitado)...`);
+  console.log(`📥 [Streaming] Download sem ranges (max ${maxRetries} tentativas)...`);
   
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
   const r2Key = `vod/${channel.id}/video.${ext}`;
   
-  // Usar fetchWithRetry para a conexão inicial
-  const response = await fetchWithRetry(channel.stream_url);
+  let attemptCount = 0;
+  let lastError: Error | null = null;
   
-  if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
-  
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Não foi possível criar reader');
-  
-  const parts = [...existingParts];
-  let partNumber = startPartNumber;
-  let totalBytes = 0;
-  let buffer = new Uint8Array(R2_PART_SIZE);
-  let bufferSize = 0;
-  let lastUpdate = Date.now();
-  const startExecution = Date.now();
-  let consecutiveErrors = 0;
-  
-  try {
-    while (true) {
-      // Verificar timeout
-      if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
-        console.log(`⏸️ [Streaming] Timeout, salvando progresso...`);
-        await supabase.from('vod_downloads').update({
-          status: 'paused',
-          file_size_bytes: totalBytes,
-          metadata: { upload_id: uploadId, parts }
-        }).eq('id', downloadId);
-        scheduleResume(downloadId, supabase);
-        reader.cancel();
-        return;
-      }
-
-      let readResult;
+  while (attemptCount < maxRetries) {
+    attemptCount++;
+    console.log(`🔄 [Streaming] Tentativa ${attemptCount}/${maxRetries}`);
+    
+    // Cada tentativa começa do zero (streaming sem ranges não pode continuar)
+    // Mas mantemos o uploadId para não perder partes já enviadas
+    let parts: { partNumber: number; etag: string }[] = [];
+    let partNumber = 1;
+    let totalBytes = 0;
+    let buffer = new Uint8Array(R2_PART_SIZE);
+    let bufferSize = 0;
+    let lastUpdate = Date.now();
+    const startExecution = Date.now();
+    
+    // Para cada nova tentativa, precisamos de um novo uploadId se o anterior foi abortado
+    let currentUploadId = uploadId;
+    if (attemptCount > 1) {
+      // Abortar upload anterior e começar novo
       try {
-        readResult = await reader.read();
-        consecutiveErrors = 0; // Reset on success
-      } catch (readError: any) {
-        consecutiveErrors++;
-        console.error(`⚠️ [Streaming] Erro de leitura ${consecutiveErrors}/3:`, readError.message);
+        await abortMultipartUpload(r2Key, currentUploadId);
+      } catch (e) {
+        // Ignorar erro ao abortar
+      }
+      currentUploadId = await initiateMultipartUpload(r2Key, 'video/mp4');
+      console.log(`📤 [Streaming] Novo upload ID: ${currentUploadId.substring(0, 20)}...`);
+      
+      // Atualizar metadata com novo uploadId
+      await supabase.from('vod_downloads').update({
+        metadata: { upload_id: currentUploadId, parts: [], start_byte: 0 }
+      }).eq('id', downloadId);
+    }
+    
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    
+    try {
+      // Nova conexão para cada tentativa
+      const response = await fetchWithRetry(channel.stream_url);
+      
+      if (!response.ok) throw new Error(`Download falhou: ${response.status}`);
+      
+      reader = response.body?.getReader() || null;
+      if (!reader) throw new Error('Não foi possível criar reader');
+      
+      let readComplete = false;
+      
+      while (!readComplete) {
+        // Verificar timeout de execução
+        if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
+          console.log(`⏸️ [Streaming] Timeout, salvando progresso...`);
+          await supabase.from('vod_downloads').update({
+            status: 'paused',
+            file_size_bytes: totalBytes,
+            metadata: { upload_id: currentUploadId, parts, needs_restart: true }
+          }).eq('id', downloadId);
+          scheduleResume(downloadId, supabase);
+          reader.cancel();
+          return;
+        }
+
+        const { done, value } = await reader.read();
         
-        if (consecutiveErrors >= 3) {
-          // Salvar progresso antes de falhar
+        if (done) {
+          readComplete = true;
+          break;
+        }
+        
+        // Processar dados
+        let offset = 0;
+        while (offset < value.length) {
+          const remaining = R2_PART_SIZE - bufferSize;
+          const toCopy = Math.min(remaining, value.length - offset);
+          
+          buffer.set(value.slice(offset, offset + toCopy), bufferSize);
+          bufferSize += toCopy;
+          offset += toCopy;
+          totalBytes += toCopy;
+          
+          // Buffer cheio - upload
+          if (bufferSize >= R2_PART_SIZE) {
+            const etag = await uploadPart(r2Key, currentUploadId, partNumber, buffer);
+            parts.push({ partNumber, etag });
+            partNumber++;
+            buffer = new Uint8Array(R2_PART_SIZE);
+            bufferSize = 0;
+          }
+        }
+        
+        // Atualizar progresso a cada 5s
+        if (Date.now() - lastUpdate > 5000) {
+          lastUpdate = Date.now();
+          const progress = knownSize > 0 ? Math.round((totalBytes / knownSize) * 100) : 0;
           await supabase.from('vod_downloads').update({
             file_size_bytes: totalBytes,
             segments_downloaded: parts.length,
-            metadata: { upload_id: uploadId, parts },
-            error_message: `Conexão instável: ${readError.message}`
+            metadata: { upload_id: currentUploadId, parts }
           }).eq('id', downloadId);
-          throw readError;
-        }
-        
-        // Esperar antes de tentar novamente
-        await new Promise(r => setTimeout(r, 1000 * consecutiveErrors));
-        continue;
-      }
-      
-      const { done, value } = readResult;
-      if (done) break;
-      
-      // Processar dados
-      let offset = 0;
-      while (offset < value.length) {
-        const remaining = R2_PART_SIZE - bufferSize;
-        const toCopy = Math.min(remaining, value.length - offset);
-        
-        buffer.set(value.slice(offset, offset + toCopy), bufferSize);
-        bufferSize += toCopy;
-        offset += toCopy;
-        totalBytes += toCopy;
-        
-        // Buffer cheio - upload
-        if (bufferSize >= R2_PART_SIZE) {
-          const etag = await uploadPart(r2Key, uploadId, partNumber, buffer);
-          parts.push({ partNumber, etag });
-          partNumber++;
-          buffer = new Uint8Array(R2_PART_SIZE);
-          bufferSize = 0;
+          console.log(`📈 [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB${knownSize > 0 ? ` (${progress}%)` : ''}`);
         }
       }
       
-      // Atualizar progresso
-      if (Date.now() - lastUpdate > 5000) {
-        lastUpdate = Date.now();
-        const progress = knownSize > 0 ? Math.round((totalBytes / knownSize) * 100) : 0;
-        await supabase.from('vod_downloads').update({
-          file_size_bytes: totalBytes,
-          segments_downloaded: parts.length,
-          metadata: { upload_id: uploadId, parts }
-        }).eq('id', downloadId);
-        console.log(`📈 [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB${knownSize > 0 ? ` (${progress}%)` : ''}`);
+      // Stream completo - finalizar
+      if (bufferSize > 0) {
+        const etag = await uploadPart(r2Key, currentUploadId, partNumber, buffer.slice(0, bufferSize));
+        parts.push({ partNumber, etag });
+      }
+      
+      // Completar multipart
+      console.log(`⬆️ [Streaming] Finalizando com ${parts.length} partes...`);
+      parts.sort((a, b) => a.partNumber - b.partNumber);
+      await completeMultipartUpload(r2Key, currentUploadId, parts);
+      
+      await supabase.from('vod_downloads').update({
+        file_size_bytes: totalBytes,
+        segment_count: parts.length,
+        segments_downloaded: parts.length
+      }).eq('id', downloadId);
+      
+      console.log(`✅ [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB em ${parts.length} partes`);
+      return; // Sucesso!
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`❌ [Streaming] Erro na tentativa ${attemptCount}:`, error.message);
+      
+      // Fechar reader se existir
+      if (reader) {
+        try { reader.cancel(); } catch (e) {}
+      }
+      
+      // Se ainda temos tentativas, aguardar antes de tentar novamente
+      if (attemptCount < maxRetries) {
+        const delay = 2000 * attemptCount; // Exponential backoff
+        console.log(`⏳ [Streaming] Aguardando ${delay}ms antes de reconectar...`);
+        await new Promise(r => setTimeout(r, delay));
       }
     }
-    
-    // Última parte
-    if (bufferSize > 0) {
-      const etag = await uploadPart(r2Key, uploadId, partNumber, buffer.slice(0, bufferSize));
-      parts.push({ partNumber, etag });
-    }
-    
-    // Completar
-    console.log(`⬆️ [Streaming] Finalizando com ${parts.length} partes...`);
-    parts.sort((a, b) => a.partNumber - b.partNumber);
-    await completeMultipartUpload(r2Key, uploadId, parts);
-    
-    await supabase.from('vod_downloads').update({
-      file_size_bytes: totalBytes,
-      segment_count: parts.length,
-      segments_downloaded: parts.length
-    }).eq('id', downloadId);
-    
-    console.log(`✅ [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB em ${parts.length} partes`);
-    
-  } catch (error) {
-    console.error(`❌ [Streaming] Erro:`, error);
-    throw error;
   }
+  
+  // Todas as tentativas falharam
+  console.error(`❌ [Streaming] Todas as ${maxRetries} tentativas falharam`);
+  throw lastError || new Error(`Download falhou após ${maxRetries} tentativas`);
 }
 
 // HLS download (mantido similar)
