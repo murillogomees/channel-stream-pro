@@ -1,15 +1,9 @@
-import * as React from "react";
-import * as ReactDOM from "react-dom/client";
+import React from "react";
+import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
 import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
-
-// Ensure React is globally available for third-party libs
-if (typeof window !== 'undefined') {
-  (window as any).React = React;
-  (window as any).ReactDOM = ReactDOM;
-}
 
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
