@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Play, Heart, MoreVertical, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,11 @@ interface TVContentCardProps {
   className?: string;
 }
 
-export function TVContentCard({
+/**
+ * Memoized TV Content Card - Prevents unnecessary re-renders
+ * Only re-renders when props actually change
+ */
+export const TVContentCard = memo(function TVContentCard({
   id,
   name,
   logo,
@@ -154,4 +158,6 @@ export function TVContentCard({
       </div>
     </div>
   );
-}
+});
+
+export default TVContentCard;
