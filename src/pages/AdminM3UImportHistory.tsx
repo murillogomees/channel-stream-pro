@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useM3UImport } from '@/hooks/useM3UImport';
-import { ArrowLeft, Calendar, Clock, FileText, Filter, Search, Play, Pause, XCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, FileText, Filter, Search, Play, Pause, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -152,6 +152,64 @@ export default function AdminM3UImportHistory() {
     setImportDialogOpen(false);
     resetImport();
     loadSessions(); // Refresh list
+  };
+
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Tem certeza que deseja excluir esta sessão de importação?')) return;
+    
+    try {
+      // Delete related changes first
+      await supabase
+        .from('m3u_import_changes')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      // Delete queue entry
+      await supabase
+        .from('m3u_import_queue')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      // Delete the session
+      const { error } = await supabase
+        .from('m3u_import_sessions')
+        .delete()
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      
+      // Clear selection if deleted
+      if (selectedSession === sessionId) {
+        setSelectedSession(null);
+        setChanges([]);
+      }
+      
+      loadSessions();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    }
+  };
+
+  const handleCancelSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Tem certeza que deseja cancelar esta importação?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('m3u_import_sessions')
+        .update({ 
+          status: 'failed', 
+          error_message: 'Cancelado pelo usuário',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      loadSessions();
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+    }
   };
 
   // Update list when active session changes
@@ -338,21 +396,46 @@ export default function AdminM3UImportHistory() {
                             </p>
                           )}
 
-                          {/* Resume button for paused/processing sessions */}
-                          {(session.status === 'paused' || session.status === 'processing') && session.source_type === 'url' && (
+                          {/* Action buttons */}
+                          <div className="flex gap-2 mt-2">
+                            {/* Resume button for paused/processing sessions */}
+                            {(session.status === 'paused' || session.status === 'processing') && session.source_type === 'url' && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResumeSession(session);
+                                }}
+                              >
+                                <RefreshCw className="h-3 w-3 mr-2" />
+                                Retomar
+                              </Button>
+                            )}
+
+                            {/* Cancel button for active sessions */}
+                            {(session.status === 'processing' || session.status === 'paused') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => handleCancelSession(session.id, e)}
+                              >
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Cancelar
+                              </Button>
+                            )}
+
+                            {/* Delete button for all sessions */}
                             <Button
                               size="sm"
-                              variant="default"
-                              className="w-full mt-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleResumeSession(session);
-                              }}
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => handleDeleteSession(session.id, e)}
                             >
-                              <RefreshCw className="h-3 w-3 mr-2" />
-                              Retomar Importação
+                              <Trash2 className="h-3 w-3" />
                             </Button>
-                          )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
