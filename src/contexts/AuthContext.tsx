@@ -1,6 +1,6 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO
- * @version 2.0.5
+ * @version 2.0.6
  * 
  * Gerencia autenticação e autorização usando:
  * - Supabase Auth para identidade
@@ -8,7 +8,7 @@
  * - public.user_roles para permissões
  */
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from '@/lib/react-shim';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
