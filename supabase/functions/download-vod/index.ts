@@ -420,12 +420,12 @@ async function downloadHLSVOD(channel: any, downloadId: string, supabase: any): 
   console.log(`✅ [HLS] ${downloaded}/${segments.length} segmentos, ${(totalBytes / 1048576).toFixed(1)} MB`);
 }
 
-// NOVA FUNÇÃO: Download direto usando SEMPRE multipart para evitar OOM
+// Download direto usando streaming + multipart para evitar OOM
 async function downloadDirectVOD(channel: any, downloadId: string, supabase: any): Promise<void> {
   console.log(`📥 [Direct] Iniciando download: ${channel.name}`);
   console.log(`📥 [Direct] URL: ${channel.stream_url.substring(0, 80)}...`);
   
-  // Tentar obter tamanho via HEAD, mas não falhar se não funcionar
+  // Tentar obter tamanho via HEAD
   let contentLength = 0;
   let supportsRanges = false;
   
@@ -438,151 +438,15 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
       supportsRanges = headRes.headers.get('accept-ranges') === 'bytes';
       console.log(`📊 [Direct] HEAD OK - Tamanho: ${(contentLength / 1048576).toFixed(1)} MB, Ranges: ${supportsRanges}`);
     } else {
-      console.log(`⚠️ [Direct] HEAD retornou ${headRes.status}, tentando GET parcial...`);
-      // Tentar GET com Range para obter tamanho
-      const rangeRes = await fetchWithTimeout(channel.stream_url + '?t=' + Date.now(), 15000, 'GET');
-      if (rangeRes.ok) {
-        const rangeHeader = rangeRes.headers.get('content-range');
-        if (rangeHeader) {
-          const match = rangeHeader.match(/\/(\d+)$/);
-          if (match) contentLength = parseInt(match[1]);
-        }
-        if (!contentLength) {
-          contentLength = parseInt(rangeRes.headers.get('content-length') || '0');
-        }
-        console.log(`📊 [Direct] GET OK - Tamanho estimado: ${(contentLength / 1048576).toFixed(1)} MB`);
-      }
-      await rangeRes.body?.cancel(); // Cancelar o body para não baixar tudo
+      console.log(`⚠️ [Direct] HEAD retornou ${headRes.status}`);
     }
   } catch (headError: any) {
-    console.log(`⚠️ [Direct] Erro ao obter tamanho: ${headError.message}, continuando sem tamanho conhecido...`);
+    console.log(`⚠️ [Direct] Erro ao obter tamanho: ${headError.message}`);
   }
   
-  // Se não conseguiu tamanho, usar streaming mode
-  if (contentLength === 0) {
-    console.log(`📥 [Direct] Sem tamanho conhecido, usando streaming mode...`);
-    await downloadStreamingMode(channel, downloadId, supabase);
-    return;
-  }
-
-  console.log(`📊 [Direct] Tamanho final: ${(contentLength / 1048576).toFixed(1)} MB`);
-
-  // CRÍTICO: Usar chunks menores (10MB) para evitar estouro de memória
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
-  const totalChunks = Math.ceil(contentLength / CHUNK_SIZE);
-
-  await supabase.from('vod_downloads').update({ 
-    segment_count: totalChunks, 
-    segments_downloaded: 0, 
-    file_size_bytes: contentLength 
-  }).eq('id', downloadId);
-
-  const urlPath = new URL(channel.stream_url).pathname;
-  const ext = urlPath.split('.').pop() || 'mp4';
-  const r2Key = `vod/${channel.id}/video.${ext}`;
-  const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
-
-  console.log(`📥 [Direct] Multipart streaming: ${totalChunks} chunks de ${(CHUNK_SIZE / 1048576).toFixed(0)}MB`);
-  
-  const uploadId = await initiateMultipartUpload(r2Key, contentType);
-  console.log(`🔑 Upload ID: ${uploadId.substring(0, 16)}...`);
-
-  const parts: { partNumber: number; etag: string }[] = [];
-  let downloadedBytes = 0, completedChunks = 0, lastUpdate = Date.now();
-  
-  // Processar 2 chunks por vez para reduzir uso de memória
-  const PARALLEL = 2;
-
-  try {
-    for (let i = 0; i < totalChunks; i += PARALLEL) {
-      const chunkPromises: Promise<{ partNumber: number; etag: string; bytes: number }>[] = [];
-
-      for (let j = 0; j < PARALLEL && i + j < totalChunks; j++) {
-        const idx = i + j;
-        const start = idx * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE - 1, contentLength - 1);
-        chunkPromises.push(downloadAndUploadChunk(channel.stream_url, start, end, r2Key, uploadId, idx + 1));
-      }
-
-      const results = await Promise.all(chunkPromises);
-      for (const r of results) {
-        parts.push({ partNumber: r.partNumber, etag: r.etag });
-        downloadedBytes += r.bytes;
-        completedChunks++;
-      }
-
-      // Atualizar progresso
-      if (Date.now() - lastUpdate > 2000 || completedChunks === totalChunks) {
-        lastUpdate = Date.now();
-        const progress = Math.round((completedChunks / totalChunks) * 100);
-        await supabase.from('vod_downloads').update({ 
-          segments_downloaded: completedChunks, 
-          file_size_bytes: downloadedBytes 
-        }).eq('id', downloadId);
-        console.log(`📈 [Direct] ${progress}% - ${completedChunks}/${totalChunks} chunks (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
-      }
-    }
-
-    // Ordenar parts e finalizar
-    parts.sort((a, b) => a.partNumber - b.partNumber);
-    
-    console.log(`⬆️ [Direct] Finalizando multipart upload...`);
-    await supabase.from('vod_downloads').update({ status: 'processing' }).eq('id', downloadId);
-    
-    await completeMultipartUpload(r2Key, uploadId, parts);
-    console.log(`✅ [Direct] Upload completo: ${(downloadedBytes / 1048576).toFixed(1)} MB em ${totalChunks} chunks`);
-    
-  } catch (error) {
-    console.error(`❌ [Direct] Erro no multipart, abortando...`);
-    await abortMultipartUpload(r2Key, uploadId);
-    throw error;
-  }
-}
-
-// Função otimizada: baixa e faz upload de chunk imediatamente, sem acumular na memória
-async function downloadAndUploadChunk(
-  url: string, 
-  start: number, 
-  end: number, 
-  r2Key: string, 
-  uploadId: string, 
-  partNumber: number
-): Promise<{ partNumber: number; etag: string; bytes: number }> {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      // Download do chunk
-      const res = await fetch(url, {
-        headers: { 
-          'Range': `bytes=${start}-${end}`, 
-          'User-Agent': 'VOD-Downloader/3.0' 
-        },
-        signal: AbortSignal.timeout(180000), // 3 min timeout por chunk
-      });
-      
-      if (!res.ok && res.status !== 206) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      
-      // Ler dados diretamente como Uint8Array
-      const data = new Uint8Array(await res.arrayBuffer());
-      const bytes = data.length;
-      
-      // Upload imediato para R2
-      const etag = await uploadPart(r2Key, uploadId, partNumber, data);
-      
-      // Chunk processado com sucesso
-      return { partNumber, etag, bytes };
-      
-    } catch (e: any) {
-      console.error(`⚠️ Chunk ${partNumber} tentativa ${attempt}/3: ${e.message}`);
-      if (attempt === 3) {
-        throw new Error(`Chunk ${partNumber} falhou após 3 tentativas: ${e.message}`);
-      }
-      // Backoff exponencial
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-    }
-  }
-  throw new Error(`Chunk ${partNumber} falhou`);
+  // SEMPRE usar streaming mode - mais confiável e evita OOM
+  console.log(`📥 [Direct] Usando streaming mode para evitar OOM...`);
+  await downloadStreamingMode(channel, downloadId, supabase, contentLength);
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number, method = 'GET'): Promise<Response> {
@@ -599,19 +463,21 @@ async function fetchWithTimeout(url: string, timeoutMs: number, method = 'GET'):
   }
 }
 
-// Streaming mode: baixa o arquivo inteiro quando não sabemos o tamanho
-async function downloadStreamingMode(channel: any, downloadId: string, supabase: any): Promise<void> {
-  console.log(`📥 [Streaming] Iniciando download sem tamanho conhecido...`);
+// Streaming mode: baixa e faz upload em chunks pequenos para evitar OOM
+async function downloadStreamingMode(channel: any, downloadId: string, supabase: any, knownSize = 0): Promise<void> {
+  console.log(`📥 [Streaming] Iniciando download... ${knownSize > 0 ? `(${(knownSize / 1048576).toFixed(1)} MB esperado)` : '(tamanho desconhecido)'}`);
   
   const urlPath = new URL(channel.stream_url).pathname;
   const ext = urlPath.split('.').pop() || 'mp4';
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
   
-  // Baixar o arquivo em chunks e fazer upload progressivo
+  // CRÍTICO: Usar chunks de 5MB (mínimo para R2 multipart) para evitar OOM
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB - mínimo para multipart
+  
   const response = await fetch(channel.stream_url, {
-    headers: { 'User-Agent': 'VOD-Downloader/3.0' },
-    signal: AbortSignal.timeout(600000), // 10 min timeout total
+    headers: { 'User-Agent': 'VOD-Downloader/4.0' },
+    signal: AbortSignal.timeout(1800000), // 30 min timeout
   });
   
   if (!response.ok) {
@@ -623,18 +489,23 @@ async function downloadStreamingMode(channel: any, downloadId: string, supabase:
     throw new Error('Não foi possível criar reader do stream');
   }
   
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  let lastUpdate = Date.now();
-  const CHUNK_THRESHOLD = 50 * 1024 * 1024; // Fazer upload quando acumular 50MB
+  // Atualizar status
+  if (knownSize > 0) {
+    await supabase.from('vod_downloads').update({ 
+      file_size_bytes: knownSize,
+      segment_count: Math.ceil(knownSize / CHUNK_SIZE)
+    }).eq('id', downloadId);
+  }
   
   const uploadId = await initiateMultipartUpload(r2Key, contentType);
   const parts: { partNumber: number; etag: string }[] = [];
   let partNumber = 1;
-  let currentBuffer: Uint8Array[] = [];
-  let currentBufferSize = 0;
+  let totalBytes = 0;
+  let bufferSize = 0;
+  let buffer: Uint8Array | null = new Uint8Array(CHUNK_SIZE);
+  let lastUpdate = Date.now();
   
-  console.log(`🔑 [Streaming] Upload ID: ${uploadId.substring(0, 16)}...`);
+  console.log(`🔑 [Streaming] Upload ID: ${uploadId.substring(0, 16)}... (chunks de ${(CHUNK_SIZE / 1048576).toFixed(0)}MB)`);
   
   try {
     while (true) {
@@ -642,59 +513,85 @@ async function downloadStreamingMode(channel: any, downloadId: string, supabase:
       
       if (done) break;
       
-      currentBuffer.push(value);
-      currentBufferSize += value.length;
-      totalBytes += value.length;
+      // Copiar dados para buffer
+      const remaining = CHUNK_SIZE - bufferSize;
       
-      // Fazer upload quando acumular threshold
-      if (currentBufferSize >= CHUNK_THRESHOLD) {
-        console.log(`⬆️ [Streaming] Enviando parte ${partNumber} (${(currentBufferSize / 1048576).toFixed(1)} MB)...`);
+      if (value.length <= remaining) {
+        // Cabe tudo no buffer atual
+        buffer!.set(value, bufferSize);
+        bufferSize += value.length;
+        totalBytes += value.length;
+      } else {
+        // Precisa dividir
+        const firstPart = value.slice(0, remaining);
+        buffer!.set(firstPart, bufferSize);
+        bufferSize = CHUNK_SIZE;
+        totalBytes += firstPart.length;
         
-        // Concatenar chunks do buffer
-        const combined = new Uint8Array(currentBufferSize);
-        let offset = 0;
-        for (const chunk of currentBuffer) {
-          combined.set(chunk, offset);
-          offset += chunk.length;
-        }
-        
-        const etag = await uploadPart(r2Key, uploadId, partNumber, combined);
+        // Buffer cheio - fazer upload
+        console.log(`⬆️ [Streaming] Parte ${partNumber} (${(bufferSize / 1048576).toFixed(1)} MB)...`);
+        const etag = await uploadPart(r2Key, uploadId, partNumber, buffer!.slice(0, bufferSize));
         parts.push({ partNumber, etag });
         partNumber++;
         
-        // Limpar buffer
-        currentBuffer = [];
-        currentBufferSize = 0;
+        // Resetar buffer e copiar resto
+        const secondPart = value.slice(remaining);
+        buffer = new Uint8Array(CHUNK_SIZE);
+        buffer.set(secondPart, 0);
+        bufferSize = secondPart.length;
+        totalBytes += secondPart.length;
+      }
+      
+      // Upload quando buffer cheio
+      if (bufferSize >= CHUNK_SIZE) {
+        console.log(`⬆️ [Streaming] Parte ${partNumber} (${(bufferSize / 1048576).toFixed(1)} MB)...`);
+        const etag = await uploadPart(r2Key, uploadId, partNumber, buffer!.slice(0, bufferSize));
+        parts.push({ partNumber, etag });
+        partNumber++;
+        
+        // Criar novo buffer (não reutilizar para evitar referências)
+        buffer = new Uint8Array(CHUNK_SIZE);
+        bufferSize = 0;
       }
       
       // Atualizar progresso
-      if (Date.now() - lastUpdate > 3000) {
+      if (Date.now() - lastUpdate > 5000) {
         lastUpdate = Date.now();
+        const progress = knownSize > 0 ? Math.round((totalBytes / knownSize) * 100) : 0;
         await supabase.from('vod_downloads').update({ 
           file_size_bytes: totalBytes,
           segments_downloaded: parts.length
         }).eq('id', downloadId);
-        console.log(`📈 [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB baixados, ${parts.length} partes enviadas`);
+        console.log(`📈 [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB${knownSize > 0 ? ` (${progress}%)` : ''}, ${parts.length} partes`);
       }
     }
     
-    // Enviar último buffer se houver
-    if (currentBufferSize > 0) {
-      console.log(`⬆️ [Streaming] Enviando última parte ${partNumber} (${(currentBufferSize / 1048576).toFixed(1)} MB)...`);
-      
-      const combined = new Uint8Array(currentBufferSize);
-      let offset = 0;
-      for (const chunk of currentBuffer) {
-        combined.set(chunk, offset);
-        offset += chunk.length;
+    // Enviar último buffer se houver (mínimo 5MB para R2)
+    if (bufferSize > 0) {
+      // Se for a única parte OU >= 5MB, fazer upload
+      if (parts.length === 0 || bufferSize >= CHUNK_SIZE) {
+        console.log(`⬆️ [Streaming] Última parte ${partNumber} (${(bufferSize / 1048576).toFixed(1)} MB)...`);
+        const etag = await uploadPart(r2Key, uploadId, partNumber, buffer!.slice(0, bufferSize));
+        parts.push({ partNumber, etag });
+      } else if (bufferSize < CHUNK_SIZE && bufferSize >= 5 * 1024 * 1024) {
+        // Parte >= 5MB, pode enviar
+        console.log(`⬆️ [Streaming] Última parte ${partNumber} (${(bufferSize / 1048576).toFixed(1)} MB)...`);
+        const etag = await uploadPart(r2Key, uploadId, partNumber, buffer!.slice(0, bufferSize));
+        parts.push({ partNumber, etag });
+      } else {
+        // Parte muito pequena - R2 requer mínimo 5MB para partes intermediárias
+        // Mas a última parte pode ser menor, então sempre enviamos
+        console.log(`⬆️ [Streaming] Última parte ${partNumber} (${(bufferSize / 1048576).toFixed(2)} MB - permitido para parte final)...`);
+        const etag = await uploadPart(r2Key, uploadId, partNumber, buffer!.slice(0, bufferSize));
+        parts.push({ partNumber, etag });
       }
-      
-      const etag = await uploadPart(r2Key, uploadId, partNumber, combined);
-      parts.push({ partNumber, etag });
     }
+    
+    // Liberar memória
+    buffer = null;
     
     // Finalizar upload
-    console.log(`⬆️ [Streaming] Finalizando multipart upload...`);
+    console.log(`⬆️ [Streaming] Finalizando multipart upload com ${parts.length} partes...`);
     await supabase.from('vod_downloads').update({ status: 'processing' }).eq('id', downloadId);
     
     parts.sort((a, b) => a.partNumber - b.partNumber);
@@ -702,7 +599,6 @@ async function downloadStreamingMode(channel: any, downloadId: string, supabase:
     
     console.log(`✅ [Streaming] Upload completo: ${(totalBytes / 1048576).toFixed(1)} MB em ${parts.length} partes`);
     
-    // Atualizar tamanho final
     await supabase.from('vod_downloads').update({ 
       file_size_bytes: totalBytes,
       segment_count: parts.length,
@@ -710,6 +606,7 @@ async function downloadStreamingMode(channel: any, downloadId: string, supabase:
     }).eq('id', downloadId);
     
   } catch (error) {
+    buffer = null; // Liberar memória
     console.error(`❌ [Streaming] Erro, abortando multipart...`);
     await abortMultipartUpload(r2Key, uploadId);
     throw error;
