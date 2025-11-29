@@ -53,4 +53,72 @@ Têm código implementado, aguardam dados reais:
 - Apenas 1 tabela para remoção (`activation_keys`)
 - Estrutura de código segue boas práticas
 
+---
+
+## 🔧 ANÁLISE DAS EDGE FUNCTIONS
+
+### ✅ FUNÇÕES UTILIZADAS NO CÓDIGO (21 funções)
+| Função | Arquivo(s) de Uso |
+|--------|-------------------|
+| backup-clients | backupService.ts |
+| check-m3u-health | m3uHealthService.ts |
+| check-playlist-health | playlistHealthService.ts |
+| cleanup-old-vod | AdminVODStorage.tsx |
+| confirm-security-alert | securityWhatsAppAlertService.ts |
+| create-admin-user | AdminClienteForm.tsx, AdminCreateUser.tsx |
+| download-vod | useVODManagement.ts |
+| fetch-m3u-url | useIPTVPlayerAdmin.ts, useIPTVPlayerClient.ts, m3uParser.ts, StreamService.ts |
+| fetch-tmdb | useMovieMetadata.ts, useSeriesMetadata.ts |
+| generate-m3u-file | AdminM3UCustomBuilder.tsx |
+| generate-totp-secret | twoFactorAuthService.ts |
+| list-users | AdminUserRoles.tsx |
+| m3u-playlist | useM3USync.ts |
+| m3u-sync | useM3USync.ts |
+| notify-prospect | prospectNotificationService.ts |
+| playlist-serve | playlistSyncService.ts, useBackendSearch.ts, useIPTVPlayerClient.ts |
+| playlist-sync | playlistSyncService.ts |
+| process-m3u-import | useM3UImport.ts, m3uImportService.ts |
+| schedule-vod-downloads | AdminVODStorage.tsx |
+| stream-proxy | StreamService.ts, VideoPlayer.tsx |
+| verify-totp-token | twoFactorAuthService.ts |
+| whatsapp-webhook | securityWhatsAppAlertService.ts |
+
+### ⏰ FUNÇÕES CRON (12 funções - não chamadas diretamente)
+Executadas via pg_cron, não aparecem no código frontend:
+- alert-inactive-playlists
+- calculate-trending
+- daily-expiration-summary
+- daily-m3u-regeneration
+- escalate-security-alerts ⚠️ (logs mostram "Unauthorized cron attempt")
+- m3u-cron-sync
+- process-notification-queue
+- process-notification-retry-queue
+- schedule-daily-notifications
+- weekly-expiration-summary
+- validate-password-signup (possivelmente cron ou não implementado)
+
+### 🗑️ FUNÇÕES ÓRFÃS NO CONFIG (4 funções)
+Configuradas em `config.toml` mas **NÃO existem** como diretórios:
+
+| Função | Status | Recomendação |
+|--------|--------|--------------|
+| smartone-sync | ❌ Config sem código | 🗑️ REMOVER do config |
+| smartone-test | ❌ Config sem código | 🗑️ REMOVER do config |
+| smartone-webhook | ❌ Config sem código | 🗑️ REMOVER do config |
+| sync-new-client | ❌ Config sem código | 🗑️ REMOVER do config |
+
+---
+
+## 📋 AÇÕES RECOMENDADAS
+
+### Imediato
+1. **Limpar config.toml**: Remover 4 configurações de funções inexistentes
+2. **Verificar escalate-security-alerts**: Logs mostram erro de autenticação CRON
+
+### Baixa Prioridade
+1. Documentar funções CRON e seus schedules
+2. Verificar se validate-password-signup está sendo usado
+
+---
+
 *Auditoria Lovable - 29/11/2025*

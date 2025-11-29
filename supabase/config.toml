@@ -14,22 +14,6 @@ verify_jwt = true
 [functions.notify-prospect]
 verify_jwt = false
 
-# Admin-only function - requires authentication
-[functions.smartone-sync]
-verify_jwt = true
-
-# Admin-only function for testing SmartOne integration - requires authentication
-[functions.smartone-test]
-verify_jwt = true
-
-# Webhook endpoint - kept public with signature verification
-[functions.smartone-webhook]
-verify_jwt = false
-
-# Public endpoint for client registration - kept public with validation
-[functions.sync-new-client]
-verify_jwt = false
-
 # Public endpoint for secure signup with HIBP validation
 [functions.validate-password-signup]
 verify_jwt = false
