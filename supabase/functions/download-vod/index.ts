@@ -211,7 +211,7 @@ serve(async (req) => {
     if (channelError || !channel) throw new Error(`Canal não encontrado: ${channelError?.message}`);
     if (!channel.is_vod) throw new Error('Canal não é VOD');
 
-    const { data: downloadRecord } = await supabaseService.from('vod_downloads').insert({
+    const { data: downloadRecord, error: insertError } = await supabaseService.from('vod_downloads').insert({
       channel_id: channelId,
       original_url: channel.stream_url,
       status: 'queued',
@@ -219,10 +219,15 @@ serve(async (req) => {
       metadata: { chunk_size: CHUNK_SIZE, r2_part_size: R2_PART_SIZE }
     }).select().single();
 
-    console.log(`🎬 [VOD] Download enfileirado: ${channel.name}`);
-    EdgeRuntime.waitUntil(processVODDownload(channel, downloadRecord?.id || '', supabaseService));
+    if (insertError || !downloadRecord?.id) {
+      console.error(`❌ [VOD] Falha ao criar registro: ${insertError?.message}`);
+      throw new Error(`Falha ao criar registro de download: ${insertError?.message || 'ID não retornado'}`);
+    }
 
-    return new Response(JSON.stringify({ success: true, message: 'Download iniciado', channelId, downloadId: downloadRecord?.id }), 
+    console.log(`🎬 [VOD] Download enfileirado: ${channel.name} (ID: ${downloadRecord.id})`);
+    EdgeRuntime.waitUntil(processVODDownload(channel, downloadRecord.id, supabaseService));
+
+    return new Response(JSON.stringify({ success: true, message: 'Download iniciado', channelId, downloadId: downloadRecord.id }), 
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
@@ -243,13 +248,19 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
         try {
           const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
           if (channel?.is_vod && !channel.r2_uploaded) {
-            const { data: downloadRecord } = await supabase.from('vod_downloads').insert({
+            const { data: downloadRecord, error: insertErr } = await supabase.from('vod_downloads').insert({
               channel_id: channelId,
               original_url: channel.stream_url,
               status: 'downloading',
               download_started_at: new Date().toISOString()
             }).select().single();
-            await processVODDownload(channel, downloadRecord?.id || '', supabase);
+            
+            if (insertErr || !downloadRecord?.id) {
+              console.error(`❌ [Batch] Falha ao criar registro para ${channel.name}: ${insertErr?.message}`);
+              return;
+            }
+            
+            await processVODDownload(channel, downloadRecord.id, supabase);
           }
         } catch (err) {
           console.error(`❌ [Batch] Erro ${channelId}:`, err);
