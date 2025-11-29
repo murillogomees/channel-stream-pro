@@ -36,9 +36,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { useM3USync, M3USyncSource, M3USyncJob } from '@/hooks/useM3USync';
+import { useM3USync, M3USyncSource, M3USyncJob, SyncProgress } from '@/hooks/useM3USync';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Progress } from '@/components/ui/progress';
 
 export default function AdminM3USyncContent() {
   const {
@@ -46,6 +47,7 @@ export default function AdminM3USyncContent() {
     stats,
     isLoading,
     isSyncing,
+    syncProgress,
     fetchSources,
     fetchStats,
     fetchSourceJobs,
@@ -53,6 +55,7 @@ export default function AdminM3USyncContent() {
     updateSource,
     deleteSource,
     triggerSync,
+    cancelSync,
     searchEntries,
     getPlaylistUrl,
   } = useM3USync();
@@ -421,9 +424,30 @@ export default function AdminM3USyncContent() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sources.map((source) => (
+              {sources.map((source) => {
+                const progress = syncProgress[source.key];
+                return (
                 <TableRow key={source.id}>
-                  <TableCell className="font-medium">{source.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col gap-1">
+                      <span>{source.name}</span>
+                      {progress && progress.status === 'running' && (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Parte {progress.currentChunk}/{progress.totalChunks}</span>
+                          </div>
+                          <Progress 
+                            value={(progress.entriesProcessed / Math.max(progress.totalEntries, 1)) * 100} 
+                            className="h-1.5 w-24"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {progress.entriesProcessed.toLocaleString()} / {progress.totalEntries.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <code className="text-xs bg-muted px-2 py-1 rounded">{source.key}</code>
                   </TableCell>
@@ -505,12 +529,12 @@ export default function AdminM3USyncContent() {
                         onClick={() => deleteSource(source.id)}
                         className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
               {sources.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
