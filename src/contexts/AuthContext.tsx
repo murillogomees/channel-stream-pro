@@ -1,6 +1,6 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO
- * @version 2.0.2
+ * @version 2.0.3
  * 
  * Gerencia autenticação e autorização usando:
  * - Supabase Auth para identidade
@@ -8,24 +8,24 @@
  * - public.user_roles para permissões
  */
 
-import * as React from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
 import { authLoggingService } from '@/services/authLoggingService';
 
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = React.useState<UnifiedUser | null>(null);
-  const [session, setSession] = React.useState<Session | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const cacheRef = React.useRef<{ userId: string; data: UnifiedUser; timestamp: number } | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<UnifiedUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const cacheRef = useRef<{ userId: string; data: UnifiedUser; timestamp: number } | null>(null);
 
   /**
    * Busca dados completos do usuário: perfil + roles + dados de cliente
    */
-  const fetchUserData = React.useCallback(async (userId: string): Promise<UnifiedUser | null> => {
+  const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
       // Fazer queries em paralelo (3 ao invés de 5+)
       const [profileResult, rolesResult, clienteResult] = await Promise.all([
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /**
    * Atualiza estado de autenticação (otimizado - libera loading ANTES de buscar dados extras)
    */
-  const updateAuthState = React.useCallback(async (currentSession: Session | null) => {
+  const updateAuthState = useCallback(async (currentSession: Session | null) => {
     setSession(currentSession);
     
     if (currentSession?.user) {
@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /**
    * Força atualização dos dados do usuário (invalida cache)
    */
-  const refreshUser = React.useCallback(async () => {
+  const refreshUser = useCallback(async () => {
     if (session?.user) {
       cacheRef.current = null; // Invalidar cache
       const userData = await fetchUserData(session.user.id);
@@ -128,7 +128,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /**
    * Logout (limpa cache e remember me)
    */
-  const signOut = React.useCallback(async () => {
+  const signOut = useCallback(async () => {
     // Registrar logout antes de fazer signOut
     if (user) {
       await authLoggingService.logLogout(user.id, user.email || '').catch(console.error);
@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setSession(null);
   }, [user]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const REMEMBER_ME_KEY = 'iptv_remember_me';
     
     // Timeout de segurança para evitar loading infinito
@@ -224,7 +224,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
  * Hook para acessar contexto de autenticação
  */
 export const useAuth = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
