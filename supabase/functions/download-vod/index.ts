@@ -274,21 +274,52 @@ serve(async (req) => {
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Verificar se já existe download ativo para este canal
-    const { data: activeDownload } = await supabaseService
+    // Verificar se já existe download ativo para este canal - PREVENIR DUPLICADOS
+    const { data: existingDownloads } = await supabaseService
       .from('vod_downloads')
-      .select('id, status')
+      .select('id, status, created_at')
       .eq('channel_id', channelId)
-      .in('status', ['queued', 'downloading', 'paused'])
-      .maybeSingle();
+      .in('status', ['queued', 'downloading', 'processing', 'paused'])
+      .order('created_at', { ascending: false });
 
-    if (activeDownload) {
+    if (existingDownloads && existingDownloads.length > 0) {
+      // Manter apenas o mais recente, deletar os outros (limpeza de duplicados)
+      if (existingDownloads.length > 1) {
+        const duplicateIds = existingDownloads.slice(1).map(d => d.id);
+        console.log(`🗑️ [VOD] Removendo ${duplicateIds.length} downloads duplicados para ${channel.name}`);
+        await supabaseService
+          .from('vod_downloads')
+          .delete()
+          .in('id', duplicateIds);
+      }
+
+      const activeDownload = existingDownloads[0];
       console.log(`⚠️ [VOD] Download já em andamento: ${channel.name} (${activeDownload.status})`);
       return new Response(JSON.stringify({ 
         error: 'Download já em andamento', 
         existingDownload: true,
         downloadId: activeDownload.id,
-        status: activeDownload.status 
+        status: activeDownload.status,
+        duplicatesRemoved: existingDownloads.length - 1
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Verificar também downloads "completed" recentes (últimas 24h) para evitar re-download
+    const { data: recentCompleted } = await supabaseService
+      .from('vod_downloads')
+      .select('id, r2_url')
+      .eq('channel_id', channelId)
+      .eq('status', 'completed')
+      .not('r2_url', 'is', null)
+      .gte('download_completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .maybeSingle();
+
+    if (recentCompleted) {
+      console.log(`⚠️ [VOD] Download completado recentemente: ${channel.name}`);
+      return new Response(JSON.stringify({ 
+        error: 'VOD já foi baixado recentemente', 
+        alreadyUploaded: true,
+        r2Url: recentCompleted.r2_url 
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -329,16 +360,36 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
         try {
           const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
           if (channel?.is_vod && !channel.r2_uploaded) {
-            // Verificar se já existe download ativo
-            const { data: activeDownload } = await supabase
+            // Verificar se já existe download ativo - PREVENIR DUPLICADOS EM BATCH
+            const { data: existingDownloads } = await supabase
               .from('vod_downloads')
-              .select('id, status')
+              .select('id, status, created_at')
               .eq('channel_id', channelId)
-              .in('status', ['queued', 'downloading', 'paused'])
+              .in('status', ['queued', 'downloading', 'processing', 'paused'])
+              .order('created_at', { ascending: false });
+
+            if (existingDownloads && existingDownloads.length > 0) {
+              // Limpeza: remover duplicados, manter apenas o mais recente
+              if (existingDownloads.length > 1) {
+                const duplicateIds = existingDownloads.slice(1).map(d => d.id);
+                console.log(`🗑️ [Batch] Removendo ${duplicateIds.length} duplicados para ${channel.name}`);
+                await supabase.from('vod_downloads').delete().in('id', duplicateIds);
+              }
+              console.log(`⚠️ [Batch] Download já existe para ${channel.name}: ${existingDownloads[0].status}`);
+              return;
+            }
+
+            // Verificar se já completou recentemente
+            const { data: recentCompleted } = await supabase
+              .from('vod_downloads')
+              .select('id')
+              .eq('channel_id', channelId)
+              .eq('status', 'completed')
+              .gte('download_completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
               .maybeSingle();
 
-            if (activeDownload) {
-              console.log(`⚠️ [Batch] Download já existe para ${channel.name}: ${activeDownload.status}`);
+            if (recentCompleted) {
+              console.log(`⚠️ [Batch] VOD ${channel.name} já completado recentemente`);
               return;
             }
 

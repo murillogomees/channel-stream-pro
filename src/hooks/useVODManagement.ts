@@ -502,6 +502,76 @@ export const useVODManagement = () => {
     };
   }, [fetchDownloads, fetchStatistics, fetchHostedVODs, throttledRefresh]);
 
+  // Cleanup de downloads duplicados
+  const cleanupDuplicates = useCallback(async () => {
+    try {
+      // Buscar todos os downloads ativos agrupados por channel_id
+      const { data: allDownloads, error } = await supabase
+        .from('vod_downloads' as any)
+        .select('id, channel_id, status, created_at')
+        .in('status', ['queued', 'downloading', 'processing', 'paused', 'pending'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Agrupar por channel_id e identificar duplicados
+      const byChannel = new Map<string, Array<{ id: string; created_at: string }>>();
+      
+      for (const download of ((allDownloads || []) as unknown as Array<{ id: string; channel_id: string; created_at: string }>)) {
+        if (!byChannel.has(download.channel_id)) {
+          byChannel.set(download.channel_id, []);
+        }
+        byChannel.get(download.channel_id)!.push({ id: download.id, created_at: download.created_at });
+      }
+
+      // Identificar duplicados (manter apenas o mais recente de cada channel)
+      const duplicateIds: string[] = [];
+      
+      for (const [channelId, downloads] of byChannel) {
+        if (downloads.length > 1) {
+          // Ordenar por data (mais recente primeiro) e remover todos exceto o primeiro
+          downloads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          const toRemove = downloads.slice(1).map(d => d.id);
+          duplicateIds.push(...toRemove);
+          console.log(`[VOD Cleanup] Canal ${channelId}: removendo ${toRemove.length} duplicados`);
+        }
+      }
+
+      if (duplicateIds.length === 0) {
+        toast({
+          title: 'Sem duplicados',
+          description: 'Não há downloads duplicados para remover',
+        });
+        return 0;
+      }
+
+      // Deletar duplicados
+      const { error: deleteError } = await supabase
+        .from('vod_downloads' as any)
+        .delete()
+        .in('id', duplicateIds);
+
+      if (deleteError) throw deleteError;
+
+      toast({
+        title: 'Duplicados removidos',
+        description: `${duplicateIds.length} downloads duplicados foram removidos`,
+      });
+
+      await fetchDownloads();
+      await fetchStatistics();
+      
+      return duplicateIds.length;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao limpar duplicados',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return 0;
+    }
+  }, [toast, fetchDownloads, fetchStatistics]);
+
   // Stable refresh function
   const refresh = useCallback(() => {
     fetchDownloads();
@@ -521,6 +591,7 @@ export const useVODManagement = () => {
     deleteVOD,
     detectVODs,
     resetOrphanedDownloads,
+    cleanupDuplicates,
     retryDownload,
     refresh,
   };
