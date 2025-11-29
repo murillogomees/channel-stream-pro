@@ -267,9 +267,38 @@ serve(async (req) => {
       const authHeader = req.headers.get('authorization');
       const cronSecret = Deno.env.get('CRON_SECRET');
       
-      // Allow service role or cron secret
-      const isAuthorized = authHeader?.includes(supabaseKey) || 
-                          authHeader === `Bearer ${cronSecret}`;
+      // Allow service role, cron secret, or authenticated admin user
+      let isAuthorized = authHeader?.includes(supabaseKey) || 
+                         authHeader === `Bearer ${cronSecret}`;
+      
+      // If not already authorized, check if user is authenticated admin
+      if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.replace('Bearer ', '');
+          // Create client with user token to verify
+          const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+            global: { headers: { Authorization: `Bearer ${token}` } }
+          });
+          
+          const { data: { user }, error: authError } = await userClient.auth.getUser();
+          
+          if (!authError && user) {
+            // Check if user has admin role
+            const { data: roles } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id);
+            
+            const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+            if (isAdmin) {
+              isAuthorized = true;
+              console.log(`[M3U-Sync] Authorized admin user: ${user.email}`);
+            }
+          }
+        } catch (e) {
+          console.log('[M3U-Sync] Token verification failed:', e);
+        }
+      }
       
       if (!isAuthorized) {
         console.log('[M3U-Sync] Unauthorized sync attempt');
