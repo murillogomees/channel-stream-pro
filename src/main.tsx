@@ -1,9 +1,10 @@
 /**
  * React 18 Application Entry Point
  * Main entry file for the IPTV application
+ * @version 1.0.1
  */
-import * as React from "react";
-import * as ReactDOM from "react-dom/client";
+import React from "react";
+import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import "./index.css";
