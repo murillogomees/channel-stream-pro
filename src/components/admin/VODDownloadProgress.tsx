@@ -261,17 +261,17 @@ export default function VODDownloadProgress({ downloads, onRetry, onCancel, onCo
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {/* Botão Completar para uploads com muitas partes que travaram */}
-                        {onComplete && partsCount >= 5 && progress >= 80 && (download.status === 'downloading' || download.status === 'paused') && (
+                        {/* Botão Resetar para downloads travados com uploads expirados */}
+                        {onRetry && partsCount >= 5 && (download.status === 'downloading' || download.status === 'paused') && (
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => onComplete(download.id)}
-                            className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
-                            title="Completar upload multipart"
+                            onClick={() => onRetry(download.id)}
+                            className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white"
+                            title="Resetar e reiniciar download do zero"
                           >
-                            <CheckCheck className="h-3 w-3 mr-1" />
-                            Completar
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Resetar
                           </Button>
                         )}
                         
