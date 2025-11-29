@@ -13,15 +13,25 @@ import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
 import { webVitalsService } from "./services/webVitalsService";
 import { streamCacheService } from "./services/streamCacheService";
 
-// Force clear old caches on startup
+// Force clear ALL caches on startup to prevent React duplicate instances
 if ('caches' in window) {
   caches.keys().then(names => {
     names.forEach(name => {
-      if (name.includes('workbox') || name.includes('vite')) {
-        caches.delete(name);
-      }
+      caches.delete(name);
     });
   });
+}
+
+// Clear sessionStorage/localStorage cache markers
+try {
+  sessionStorage.removeItem('vite-cache');
+  Object.keys(sessionStorage).forEach(key => {
+    if (key.includes('vite') || key.includes('deps')) {
+      sessionStorage.removeItem(key);
+    }
+  });
+} catch (e) {
+  // Ignore
 }
 
 // Create a query client for React Query
