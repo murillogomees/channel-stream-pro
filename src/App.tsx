@@ -7,21 +7,24 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 
+// Core pages
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Forbidden = lazy(() => import("./pages/Forbidden"));
 const Login = lazy(() => import("./pages/Login"));
+
+// Admin Hub (novo dashboard consolidado)
+const AdminHub = lazy(() => import("./pages/AdminHub"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminClientes = lazy(() => import("./pages/AdminClientes"));
 const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
 const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
-// Consolidated admin pages
+const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
+
+// Consolidated admin pages (hub pages com tabs)
 const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
-const AdminM3UCustomBuilder = lazy(() => import("./pages/AdminM3UCustomBuilder"));
-const AdminM3UImportHistory = lazy(() => import("./pages/AdminM3UImportHistory"));
 const AdminM3USync = lazy(() => import("./pages/AdminM3USync"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
-const AdminNotificationQueue = lazy(() => import("./pages/AdminNotificationQueue"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
 const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
@@ -31,19 +34,17 @@ const AdminCreateUser = lazy(() => import("./pages/AdminCreateUser"));
 const AdminWhatsAppConfig = lazy(() => import("./pages/AdminWhatsAppConfig"));
 const AdminPlansManager = lazy(() => import("./pages/AdminPlansManager"));
 const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
+const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 
-// Standalone pages
-const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
+// Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
-// AppLogin now redirects to unified Login page
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppProfile = lazy(() => import("./pages/app/AppProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
-const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const TVPlayer = lazy(() => import("./pages/TVPlayer"));
 
 const App = () => (
@@ -98,11 +99,11 @@ const App = () => (
           
           {/* Consolidated Admin Pages */}
           <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
-          <Route path="/admin/m3u-builder" element={<ProtectedRoute requireAdmin><AdminM3UCustomBuilder /></ProtectedRoute>} />
-          <Route path="/admin/m3u-import-history" element={<ProtectedRoute requireAdmin><AdminM3UImportHistory /></ProtectedRoute>} />
+          <Route path="/admin/m3u-builder" element={<Navigate to="/admin/m3u" replace />} />
+          <Route path="/admin/m3u-import-history" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-sync" element={<ProtectedRoute requireAdmin><AdminM3USync /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
-          <Route path="/admin/notification-queue" element={<ProtectedRoute requireAdmin><AdminNotificationQueue /></ProtectedRoute>} />
+          <Route path="/admin/notification-queue" element={<Navigate to="/admin/notifications" replace />} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
           <Route path="/admin/system" element={<ProtectedRoute requireAdmin><AdminSystemSettings /></ProtectedRoute>} />
@@ -112,6 +113,9 @@ const App = () => (
           <Route path="/admin/whatsapp-config" element={<ProtectedRoute requireAdmin><AdminWhatsAppConfig /></ProtectedRoute>} />
           <Route path="/dashboard/plans" element={<ProtectedRoute requireAdmin><AdminPlansManager /></ProtectedRoute>} />
           <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
+          
+          {/* Admin Hub - Novo dashboard consolidado */}
+          <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminHub /></ProtectedRoute>} />
           
           {/* Legacy routes - redirect to consolidated pages */}
           <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
