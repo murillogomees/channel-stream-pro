@@ -6,10 +6,12 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play, Tv, Copy, Link } from 'lucide-react';
+import CloudflareStreamDashboard from '@/components/admin/CloudflareStreamDashboard';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play, Tv, Copy, Link, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -227,11 +229,27 @@ export default function AdminVODStorage() {
       <div>
         <h2 className="text-2xl font-bold mb-2">Gerenciamento de Storage VOD</h2>
         <p className="text-muted-foreground">
-          Monitore o uso de espaço no Cloudflare R2 e gerencie VODs hospedados
+          Monitore e gerencie VODs hospedados no R2 e Cloudflare Stream
         </p>
       </div>
 
-      <Separator />
+      <Tabs defaultValue="r2" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="r2" className="flex items-center gap-2">
+            <HardDrive className="w-4 h-4" />
+            Cloudflare R2
+          </TabsTrigger>
+          <TabsTrigger value="stream" className="flex items-center gap-2">
+            <Zap className="w-4 h-4" />
+            Cloudflare Stream
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="stream" className="mt-6">
+          <CloudflareStreamDashboard />
+        </TabsContent>
+
+        <TabsContent value="r2" className="mt-6 space-y-6">
 
       {/* Card Principal de Download VOD */}
       <Card className="border-2 border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -762,6 +780,8 @@ export default function AdminVODStorage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

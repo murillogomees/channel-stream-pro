@@ -345,6 +345,68 @@ export type Database = {
         }
         Relationships: []
       }
+      cf_stream_uploads: {
+        Row: {
+          cf_stream_uid: string | null
+          channel_id: string
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          metadata: Json | null
+          original_url: string
+          progress_percent: number | null
+          retry_count: number | null
+          started_at: string | null
+          status: string
+          updated_at: string | null
+          upload_type: string | null
+        }
+        Insert: {
+          cf_stream_uid?: string | null
+          channel_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          original_url: string
+          progress_percent?: number | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          upload_type?: string | null
+        }
+        Update: {
+          cf_stream_uid?: string | null
+          channel_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          original_url?: string
+          progress_percent?: number | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          upload_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cf_stream_uploads_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_usage_stats: {
         Row: {
           channel_id: string
@@ -1155,6 +1217,12 @@ export type Database = {
       m3u_channels: {
         Row: {
           category_id: string
+          cf_stream_duration_seconds: number | null
+          cf_stream_size_bytes: number | null
+          cf_stream_status: string | null
+          cf_stream_uid: string | null
+          cf_stream_uploaded_at: string | null
+          cf_stream_url: string | null
           content_type: string | null
           created_at: string | null
           group_title: string | null
@@ -1174,6 +1242,12 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          cf_stream_duration_seconds?: number | null
+          cf_stream_size_bytes?: number | null
+          cf_stream_status?: string | null
+          cf_stream_uid?: string | null
+          cf_stream_uploaded_at?: string | null
+          cf_stream_url?: string | null
           content_type?: string | null
           created_at?: string | null
           group_title?: string | null
@@ -1193,6 +1267,12 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          cf_stream_duration_seconds?: number | null
+          cf_stream_size_bytes?: number | null
+          cf_stream_status?: string | null
+          cf_stream_uid?: string | null
+          cf_stream_uploaded_at?: string | null
+          cf_stream_url?: string | null
           content_type?: string | null
           created_at?: string | null
           group_title?: string | null
@@ -4131,6 +4211,7 @@ export type Database = {
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
+      cleanup_old_cf_stream_uploads: { Args: never; Returns: undefined }
       cleanup_old_import_cache: { Args: never; Returns: undefined }
       cleanup_old_m3u_sync_data: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
@@ -4232,6 +4313,20 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_cf_stream_statistics: {
+        Args: never
+        Returns: {
+          estimated_monthly_cost: number
+          total_duration_hours: number
+          total_vods: number
+          uploads_error: number
+          uploads_processing: number
+          uploads_queued: number
+          uploads_ready: number
+          vods_on_stream: number
+          vods_pending: number
+        }[]
+      }
       get_continue_watching: {
         Args: { p_limit?: number; p_profile_id: string }
         Returns: {
