@@ -17,15 +17,23 @@ serve(async (req) => {
   }
 
   try {
-    // Verificar autenticação via cron secret ou admin
+    // Verificar autenticação via cron secret, service role, ou admin
     const cronSecret = req.headers.get('x-supabase-cron-secret');
     const authHeader = req.headers.get('authorization');
     const expectedSecret = Deno.env.get('CRON_SECRET');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
+    // Verificar diferentes métodos de autorização
     const isCronRequest = cronSecret === expectedSecret;
+    const isServiceRoleRequest = authHeader?.includes(serviceRoleKey || '');
+    // Permitir chamadas internas do pg_cron (vêm com anon key no header)
+    const isPgCronRequest = authHeader?.includes(anonKey || '') && 
+                           req.headers.get('user-agent')?.includes('pg_net');
     let isAdminRequest = false;
 
-    if (!isCronRequest && authHeader) {
+    // Se for chamada do pg_cron ou service role, autorizar
+    if (!isCronRequest && !isServiceRoleRequest && !isPgCronRequest && authHeader) {
       const supabaseAuth = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -38,13 +46,18 @@ serve(async (req) => {
       }
     }
 
-    if (!isCronRequest && !isAdminRequest) {
+    const isAuthorized = isCronRequest || isServiceRoleRequest || isPgCronRequest || isAdminRequest;
+    
+    if (!isAuthorized) {
       console.error('[ScheduleVOD] Unauthorized attempt');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log(`🔐 [ScheduleVOD] Autorizado via: ${isCronRequest ? 'cron_secret' : isServiceRoleRequest ? 'service_role' : isPgCronRequest ? 'pg_cron' : 'admin'}`);
+    
 
     const body = await req.json().catch(() => ({}));
     const { 
