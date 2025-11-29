@@ -152,37 +152,34 @@ export default function AdminM3UListStats() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header responsivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Estatísticas de Listas M3U</h2>
-          <p className="text-muted-foreground">
-            Análise de uso e acesso às listas M3U
-          </p>
+          <h2 className="text-lg sm:text-xl font-semibold">Estatísticas M3U</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Análise de uso das listas</p>
         </div>
-        <div className="flex items-center gap-4">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 dias</SelectItem>
-              <SelectItem value="30">Últimos 30 dias</SelectItem>
-              <SelectItem value="90">Últimos 90 dias</SelectItem>
-              <SelectItem value="365">Último ano</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">7 dias</SelectItem>
+            <SelectItem value="30">30 dias</SelectItem>
+            <SelectItem value="90">90 dias</SelectItem>
+            <SelectItem value="365">1 ano</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Atividade por Tipo */}
+      {/* Gráfico de Pizza - responsivo */}
       <Card>
-        <CardHeader>
-          <CardTitle>Distribuição de Atividades</CardTitle>
-          <CardDescription>Total de ações por tipo no período selecionado</CardDescription>
+        <CardHeader className="p-3 sm:p-4">
+          <CardTitle className="text-base">Distribuição de Atividades</CardTitle>
+          <CardDescription className="text-xs">Total por tipo no período</CardDescription>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+        <CardContent className="p-3 sm:p-4 pt-0">
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={activityByType}
@@ -190,7 +187,7 @@ export default function AdminM3UListStats() {
                 cy="50%"
                 labelLine={false}
                 label={({ name, value }) => `${name}: ${value}`}
-                outerRadius={100}
+                outerRadius={70}
                 fill="hsl(var(--primary))"
                 dataKey="value"
               >
@@ -204,36 +201,29 @@ export default function AdminM3UListStats() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Grid responsivo */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Visualizadas */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Top 10 Mais Visualizadas
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Eye className="h-4 w-4" />
+              Mais Visualizadas
             </CardTitle>
-            <CardDescription>Listas com maior número de visualizações</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {topViewed.map((stat, index) => (
-                <div key={stat.list_id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">{index + 1}</Badge>
-                    <div>
-                      <p className="font-medium">{stat.list_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Última atividade: {format(new Date(stat.last_activity), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
+                <div key={stat.list_id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/50 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">{index + 1}</Badge>
+                    <span className="font-medium text-xs sm:text-sm truncate">{stat.list_name}</span>
                   </div>
-                  <Badge>{stat.total_views} visualizações</Badge>
+                  <Badge className="text-xs flex-shrink-0">{stat.total_views}</Badge>
                 </div>
               ))}
               {topViewed.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhuma visualização no período
-                </p>
+                <p className="text-center text-muted-foreground text-sm py-4">Sem dados</p>
               )}
             </div>
           </CardContent>
@@ -241,33 +231,25 @@ export default function AdminM3UListStats() {
 
         {/* Top Editadas */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5" />
-              Top 10 Mais Editadas
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Edit className="h-4 w-4" />
+              Mais Editadas
             </CardTitle>
-            <CardDescription>Listas com maior número de edições</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {topEdited.map((stat, index) => (
-                <div key={stat.list_id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">{index + 1}</Badge>
-                    <div>
-                      <p className="font-medium">{stat.list_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Última atividade: {format(new Date(stat.last_activity), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
+                <div key={stat.list_id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/50 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">{index + 1}</Badge>
+                    <span className="font-medium text-xs sm:text-sm truncate">{stat.list_name}</span>
                   </div>
-                  <Badge>{stat.total_edits} edições</Badge>
+                  <Badge className="text-xs flex-shrink-0">{stat.total_edits}</Badge>
                 </div>
               ))}
               {topEdited.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhuma edição no período
-                </p>
+                <p className="text-center text-muted-foreground text-sm py-4">Sem dados</p>
               )}
             </div>
           </CardContent>
@@ -275,33 +257,25 @@ export default function AdminM3UListStats() {
 
         {/* Top Exportadas */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Top 10 Mais Exportadas
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Download className="h-4 w-4" />
+              Mais Exportadas
             </CardTitle>
-            <CardDescription>Listas com maior número de exportações</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
               {topExported.map((stat, index) => (
-                <div key={stat.list_id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">{index + 1}</Badge>
-                    <div>
-                      <p className="font-medium">{stat.list_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Última atividade: {format(new Date(stat.last_activity), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
+                <div key={stat.list_id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/50 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">{index + 1}</Badge>
+                    <span className="font-medium text-xs sm:text-sm truncate">{stat.list_name}</span>
                   </div>
-                  <Badge>{stat.total_exports} exportações</Badge>
+                  <Badge className="text-xs flex-shrink-0">{stat.total_exports}</Badge>
                 </div>
               ))}
               {topExported.length === 0 && (
-                <p className="text-center text-muted-foreground py-8 col-span-2">
-                  Nenhuma exportação no período
-                </p>
+                <p className="text-center text-muted-foreground text-sm py-4 col-span-2">Sem dados</p>
               )}
             </div>
           </CardContent>

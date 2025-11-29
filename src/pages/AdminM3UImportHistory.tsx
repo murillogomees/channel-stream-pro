@@ -9,8 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useM3UImport } from '@/hooks/useM3UImport';
-import { ArrowLeft, Calendar, Clock, FileText, Filter, Search, Play, Pause, XCircle, RefreshCw, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, FileText, Filter, Search, Play, Pause, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -40,7 +39,6 @@ interface ImportChange {
 }
 
 export default function AdminM3UImportHistory() {
-  const navigate = useNavigate();
   const [sessions, setSessions] = useState<ImportSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [changes, setChanges] = useState<ImportChange[]>([]);
@@ -234,90 +232,78 @@ export default function AdminM3UImportHistory() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/admin/m3u-management')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Histórico de Importações M3U</h1>
-          <p className="text-muted-foreground">
-            Timeline completa de todas as importações realizadas
-          </p>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header responsivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1">
+          <h2 className="text-lg sm:text-xl font-semibold">Histórico de Importações</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Timeline de importações M3U</p>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Stats Grid - 2x2 no mobile, 5 colunas no desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total de Importações</CardTitle>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Total</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium">OK</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">{stats.completed}</div>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-green-500">{stats.completed}</div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Falhadas</CardTitle>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Falhas</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">{stats.failed}</div>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-red-500">{stats.failed}</div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Canais Importados</CardTitle>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Canais</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalChannels}</div>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold">{stats.totalChannels}</div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Conflitos Resolvidos</CardTitle>
+        <Card className="col-span-2 sm:col-span-1">
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Conflitos</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{stats.totalConflicts}</div>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-yellow-500">{stats.totalConflicts}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3">
+      {/* Filtros responsivos */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por lista ou URL..."
+            placeholder="Buscar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[200px]">
-            <Filter className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-full sm:w-[140px] h-9">
+            <Filter className="h-3.5 w-3.5 mr-2" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os Status</SelectItem>
-            <SelectItem value="completed">Concluído</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="completed">OK</SelectItem>
             <SelectItem value="processing">Processando</SelectItem>
             <SelectItem value="failed">Falhou</SelectItem>
             <SelectItem value="paused">Pausado</SelectItem>
@@ -325,114 +311,71 @@ export default function AdminM3UImportHistory() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Grid responsivo - stack no mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Sessions List */}
         <Card>
-          <CardHeader>
-            <CardTitle>Sessões de Importação</CardTitle>
-            <CardDescription>
-              {filteredSessions.length} importação(ões) encontrada(s)
-            </CardDescription>
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="text-sm sm:text-base">Sessões</CardTitle>
+            <CardDescription className="text-xs">{filteredSessions.length} importação(ões)</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[600px] pr-4">
-              <div className="space-y-3">
+          <CardContent className="p-2 sm:p-4 pt-0">
+            <ScrollArea className="h-[400px] sm:h-[500px] pr-2">
+              <div className="space-y-2">
                 {loading ? (
                   <p className="text-sm text-muted-foreground text-center py-8">Carregando...</p>
                 ) : filteredSessions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma importação encontrada
-                  </p>
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma importação</p>
                 ) : (
                   filteredSessions.map((session) => (
                     <Card
                       key={session.id}
-                      className={`cursor-pointer transition-all ${
-                        selectedSession === session.id ? 'ring-2 ring-primary' : ''
-                      }`}
+                      className={`cursor-pointer transition-all ${selectedSession === session.id ? 'ring-2 ring-primary' : ''}`}
                       onClick={() => setSelectedSession(session.id)}
                     >
-                      <CardContent className="p-4">
+                      <CardContent className="p-3">
                         <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h4 className="font-medium">{session.list_name}</h4>
-                              <p className="text-xs text-muted-foreground">
-                                {session.source_type === 'url' ? '🔗 URL' : '📋 Colado'}
-                                {session.source_url && ` • ${session.source_url.substring(0, 40)}...`}
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate">{session.list_name}</h4>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {session.source_type === 'url' ? '🔗' : '📋'} {session.source_url ? session.source_url.substring(0, 30) + '...' : 'Colado'}
                               </p>
                             </div>
                             {getStatusBadge(session.status)}
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
                               <FileText className="h-3 w-3" />
-                              {session.processed_channels || 0}/{session.total_channels || 0} canais
-                            </div>
-                            <div className="flex items-center gap-1">
+                              {session.processed_channels || 0}/{session.total_channels || 0}
+                            </span>
+                            <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {format(new Date(session.created_at), 'dd/MM/yy HH:mm', { locale: ptBR })}
-                            </div>
+                              {format(new Date(session.created_at), 'dd/MM HH:mm', { locale: ptBR })}
+                            </span>
                           </div>
 
-                          {/* Progress bar for incomplete sessions */}
                           {(session.status === 'processing' || session.status === 'paused') && session.total_channels > 0 && (
-                            <Progress 
-                              value={(session.processed_channels / session.total_channels) * 100} 
-                              className="h-2"
-                            />
-                          )}
-
-                          {session.conflicts_detected > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {session.conflicts_detected} conflito(s) • {session.conflict_resolution_mode || 'manual'}
-                            </Badge>
+                            <Progress value={(session.processed_channels / session.total_channels) * 100} className="h-1.5" />
                           )}
 
                           {session.error_message && (
-                            <p className="text-xs text-destructive">
-                              ⚠️ {session.error_message}
-                            </p>
+                            <p className="text-xs text-destructive truncate">⚠️ {session.error_message}</p>
                           )}
 
-                          {/* Action buttons */}
-                          <div className="flex gap-2 mt-2">
-                            {/* Resume button for paused/processing sessions */}
+                          <div className="flex gap-1 pt-1">
                             {(session.status === 'paused' || session.status === 'processing') && session.source_type === 'url' && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="flex-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResumeSession(session);
-                                }}
-                              >
-                                <RefreshCw className="h-3 w-3 mr-2" />
-                                Retomar
+                              <Button size="sm" variant="default" className="flex-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleResumeSession(session); }}>
+                                <RefreshCw className="h-3 w-3 mr-1" />Retomar
                               </Button>
                             )}
-
-                            {/* Cancel button for active sessions */}
                             {(session.status === 'processing' || session.status === 'paused') && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => handleCancelSession(session.id, e)}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Cancelar
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => handleCancelSession(session.id, e)}>
+                                <XCircle className="h-3 w-3" />
                               </Button>
                             )}
-
-                            {/* Delete button for all sessions */}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => handleDeleteSession(session.id, e)}
-                            >
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:text-destructive" onClick={(e) => handleDeleteSession(session.id, e)}>
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -448,22 +391,22 @@ export default function AdminM3UImportHistory() {
 
         {/* Changes Timeline */}
         <Card>
-          <CardHeader>
-            <CardTitle>Detalhes da Importação</CardTitle>
-            <CardDescription>
-              {selectedSession ? `${changes.length} mudança(s) detectada(s)` : 'Selecione uma sessão'}
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="text-sm sm:text-base">Detalhes</CardTitle>
+            <CardDescription className="text-xs">
+              {selectedSession ? `${changes.length} mudança(s)` : 'Selecione uma sessão'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-4 pt-0">
             {!selectedSession ? (
-              <div className="flex items-center justify-center h-[600px] text-muted-foreground">
+              <div className="flex items-center justify-center h-[400px] sm:h-[500px] text-muted-foreground">
                 <div className="text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Selecione uma sessão para ver os detalhes</p>
+                  <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Selecione uma sessão</p>
                 </div>
               </div>
             ) : (
-              <ScrollArea className="h-[600px] pr-4">
+              <ScrollArea className="h-[400px] sm:h-[500px] pr-2">
                 <div className="space-y-2">
                   {changes.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
