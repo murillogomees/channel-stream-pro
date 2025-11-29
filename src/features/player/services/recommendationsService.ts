@@ -305,6 +305,7 @@ class RecommendationsService {
 
   /**
    * Get recommendations based on user's watch history categories
+   * Content is properly segregated by type (movies with movies, series with series, live with live)
    */
   async getRecommendationsByHistory(
     allChannels: Channel[],
@@ -325,11 +326,21 @@ class RecommendationsService {
         return this.getDefaultRecommendationsFromChannels(allChannels, limit);
       }
 
-      const categoryStats = new Map<string, WatchHistorySummary>();
+      // Track stats per content type AND category
+      interface TypeCategoryStat {
+        contentType: string;
+        category: string;
+        count: number;
+        lastWatched: string;
+      }
+      
+      const typeStats = new Map<string, TypeCategoryStat>();
       
       for (const item of watchProgress) {
         const category = item.content_category || 'Geral';
-        const existing = categoryStats.get(category);
+        const type = item.content_type || 'movie';
+        const key = `${type}:${category}`;
+        const existing = typeStats.get(key);
         
         if (existing) {
           existing.count++;
@@ -337,7 +348,8 @@ class RecommendationsService {
             existing.lastWatched = item.updated_at;
           }
         } else {
-          categoryStats.set(category, {
+          typeStats.set(key, {
+            contentType: type,
             category,
             count: 1,
             lastWatched: item.updated_at || new Date().toISOString(),
@@ -345,25 +357,38 @@ class RecommendationsService {
         }
       }
 
-      const topCategories = Array.from(categoryStats.values())
+      const topStats = Array.from(typeStats.values())
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
       const groups: RecommendationGroup[] = [];
       const watchedIds = new Set(watchProgress.map(w => w.content_name.toLowerCase()));
 
-      for (const catStat of topCategories) {
-        const categoryChannels = allChannels.filter(
-          ch => ch.group_title?.toLowerCase() === catStat.category.toLowerCase() ||
-                ch.category_name?.toLowerCase() === catStat.category.toLowerCase()
-        );
+      for (const stat of topStats) {
+        // Filter channels that match BOTH category AND content type
+        const matchingChannels = allChannels.filter(ch => {
+          const chType = this.detectContentType(ch);
+          const chCategory = (ch.group_title || ch.category_name || '').toLowerCase();
+          
+          // Match content type strictly
+          const typeMatches = 
+            (stat.contentType === 'movie' && chType === 'movie') ||
+            (stat.contentType === 'episode' && chType === 'episode') ||
+            (stat.contentType === 'live' && chType === 'live');
+            
+          // Match category loosely
+          const categoryMatches = chCategory.includes(stat.category.toLowerCase()) ||
+                                  stat.category.toLowerCase().includes(chCategory);
+          
+          return typeMatches && categoryMatches;
+        });
 
-        if (categoryChannels.length > 0) {
-          const unwatched = categoryChannels.filter(
+        if (matchingChannels.length > 0) {
+          const unwatched = matchingChannels.filter(
             ch => !watchedIds.has(ch.name.toLowerCase())
           );
 
-          const items: RecommendationItem[] = unwatched.slice(0, Math.ceil(limit / topCategories.length)).map((ch, idx) => ({
+          const items: RecommendationItem[] = unwatched.slice(0, Math.ceil(limit / topStats.length)).map((ch, idx) => ({
             id: ch.id,
             content_id: ch.id,
             content_type: this.detectContentType(ch) as ContentType,
@@ -375,10 +400,13 @@ class RecommendationsService {
           }));
 
           if (items.length > 0) {
+            const typeLabel = stat.contentType === 'movie' ? 'filmes' 
+              : stat.contentType === 'episode' ? 'séries' : 'canais';
+              
             groups.push({
               type: 'because_watched',
-              title: `Porque você assistiu ${catStat.category}`,
-              source_content: catStat.category,
+              title: `Mais ${typeLabel} de ${stat.category}`,
+              source_content: stat.category,
               items,
             });
           }
@@ -450,7 +478,8 @@ class RecommendationsService {
   }
 
   /**
-   * Get personalized "For You" mix
+   * Get personalized "For You" mix - separated by content type
+   * Returns content grouped by type, prioritizing user's preferred types
    */
   async getForYouMix(
     allChannels: Channel[],
@@ -476,21 +505,53 @@ class RecommendationsService {
         categoryPreference.set(c, (categoryPreference.get(c) || 0) + 1);
       }
 
-      const scored = allChannels.map(ch => {
-        let score = Math.random() * 10;
-        
-        const category = ch.group_title || ch.category_name || 'Geral';
+      // Separate channels by type first
+      const movieChannels: Channel[] = [];
+      const seriesChannels: Channel[] = [];
+      const liveChannels: Channel[] = [];
+      
+      for (const ch of allChannels) {
         const type = this.detectContentType(ch);
-        
+        if (type === 'movie') movieChannels.push(ch);
+        else if (type === 'episode') seriesChannels.push(ch);
+        else liveChannels.push(ch);
+      }
+
+      // Score and sort each type separately
+      const scoreChannel = (ch: Channel) => {
+        let score = Math.random() * 10;
+        const category = ch.group_title || ch.category_name || 'Geral';
         score += (categoryPreference.get(category) || 0) * 5;
-        score += (typePreference.get(type) || 0) * 3;
-        
-        return { channel: ch, score };
+        return score;
+      };
+
+      const topMovies = movieChannels
+        .map(ch => ({ channel: ch, score: scoreChannel(ch) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.ceil(limit / 3));
+
+      const topSeries = seriesChannels
+        .map(ch => ({ channel: ch, score: scoreChannel(ch) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.ceil(limit / 3));
+
+      const topLive = liveChannels
+        .map(ch => ({ channel: ch, score: scoreChannel(ch) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.ceil(limit / 3));
+
+      // Prioritize by user preference
+      const allScored = [...topMovies, ...topSeries, ...topLive];
+      allScored.sort((a, b) => {
+        const typeA = this.detectContentType(a.channel);
+        const typeB = this.detectContentType(b.channel);
+        const prefA = typePreference.get(typeA) || 0;
+        const prefB = typePreference.get(typeB) || 0;
+        if (prefA !== prefB) return prefB - prefA;
+        return b.score - a.score;
       });
 
-      scored.sort((a, b) => b.score - a.score);
-
-      return scored.slice(0, limit).map((item) => ({
+      return allScored.slice(0, limit).map((item) => ({
         id: item.channel.id,
         content_id: item.channel.id,
         content_type: this.detectContentType(item.channel) as ContentType,
@@ -510,58 +571,127 @@ class RecommendationsService {
   // ============================================================================
 
   private getDefaultRecommendationsFromChannels(channels: Channel[], limit: number): RecommendationGroup[] {
-    const categoryMap = new Map<string, Channel[]>();
+    // Separate channels by type first
+    const movieChannels: Channel[] = [];
+    const seriesChannels: Channel[] = [];
+    const liveChannels: Channel[] = [];
     
     for (const ch of channels) {
-      const cat = ch.group_title || ch.category_name || 'Geral';
-      if (!categoryMap.has(cat)) {
-        categoryMap.set(cat, []);
-      }
-      categoryMap.get(cat)!.push(ch);
+      const type = this.detectContentType(ch);
+      if (type === 'movie') movieChannels.push(ch);
+      else if (type === 'episode') seriesChannels.push(ch);
+      else liveChannels.push(ch);
     }
 
     const groups: RecommendationGroup[] = [];
+    const perGroup = Math.ceil(limit / 3);
     
-    const topCats = Array.from(categoryMap.entries())
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 4);
-
-    for (const [category, categoryChannels] of topCats) {
-      const items: RecommendationItem[] = categoryChannels.slice(0, Math.ceil(limit / 4)).map((ch, idx) => ({
-        id: ch.id,
-        content_id: ch.id,
-        content_type: this.detectContentType(ch) as ContentType,
-        content_name: ch.name,
-        content_logo: ch.tvg_logo,
-        content_category: category,
-        score: 100 - idx,
-      }));
-
+    // Add Live TV section
+    if (liveChannels.length > 0) {
       groups.push({
         type: 'trending',
-        title: `Populares em ${category}`,
-        items,
+        title: '📺 TV ao Vivo em Alta',
+        items: liveChannels.slice(0, perGroup).map((ch, idx) => ({
+          id: ch.id,
+          content_id: ch.id,
+          content_type: 'live' as ContentType,
+          content_name: ch.name,
+          content_logo: ch.tvg_logo,
+          content_category: ch.group_title || ch.category_name,
+          score: 100 - idx,
+        })),
+      });
+    }
+    
+    // Add Movies section
+    if (movieChannels.length > 0) {
+      groups.push({
+        type: 'trending',
+        title: '🎬 Filmes Populares',
+        items: movieChannels.slice(0, perGroup).map((ch, idx) => ({
+          id: ch.id,
+          content_id: ch.id,
+          content_type: 'movie' as ContentType,
+          content_name: ch.name,
+          content_logo: ch.tvg_logo,
+          content_category: ch.group_title || ch.category_name,
+          score: 100 - idx,
+        })),
+      });
+    }
+    
+    // Add Series section (group by series name)
+    if (seriesChannels.length > 0) {
+      const seriesMap = new Map<string, Channel>();
+      for (const ch of seriesChannels) {
+        const seriesName = this.extractSeriesName(ch.name);
+        if (!seriesMap.has(seriesName)) {
+          seriesMap.set(seriesName, ch);
+        }
+      }
+      
+      groups.push({
+        type: 'trending',
+        title: '📺 Séries Populares',
+        items: Array.from(seriesMap.values()).slice(0, perGroup).map((ch, idx) => ({
+          id: ch.id,
+          content_id: ch.id,
+          content_type: 'episode' as ContentType,
+          content_name: this.extractSeriesName(ch.name),
+          content_logo: ch.tvg_logo,
+          content_category: ch.group_title || ch.category_name,
+          score: 100 - idx,
+        })),
       });
     }
 
     return groups;
   }
 
-  private detectContentType(channel: Channel): string {
+  /**
+   * Detect content type from channel data
+   */
+  detectContentType(channel: Channel): string {
     const url = channel.stream_url?.toLowerCase() || '';
     const name = channel.name?.toLowerCase() || '';
-    const group = channel.group_title?.toLowerCase() || '';
+    const group = (channel.group_title || channel.category_name || '').toLowerCase();
 
-    if (url.includes('/series/') || /S\d+\s*E\d+/i.test(name) || group.includes('série')) {
+    // Series detection - check URL pattern and name patterns
+    const seriesKeywords = ['série', 'series', 'seriado', 'novela', 'temporada', 'season', 'episódio', 'dorama', 'anime'];
+    const movieKeywords = ['filme', 'movie', 'cinema', 'vod filme', 'filmes', 'movies', 'film', 'peliculas', 'lançamento'];
+    const liveKeywords = ['tv', 'live', 'ao vivo', 'canais', 'abertos', 'esportes', 'notícias', '24h', '24 horas'];
+    
+    // URL-based detection (most reliable)
+    if (url.includes('/series/')) {
       return 'episode';
     }
-    if (url.includes('/movie/') || group.includes('filme')) {
+    if (url.includes('/movie/')) {
       return 'movie';
     }
-    if (url.includes('/live/') || group.includes('tv')) {
+    if (url.includes('/live/')) {
       return 'live';
     }
-    return 'movie';
+    
+    // Episode pattern in name
+    if (/S\d{1,2}\s*E\d{1,3}/i.test(name) || /\d{1,2}x\d{1,3}/i.test(name) || /Temporada\s*\d+/i.test(name)) {
+      return 'episode';
+    }
+    
+    // Group/category-based detection
+    const isSeriesCategory = seriesKeywords.some(kw => group.includes(kw)) && 
+                             !movieKeywords.some(kw => group.includes(kw));
+    const isMovieCategory = movieKeywords.some(kw => group.includes(kw)) &&
+                            !seriesKeywords.some(kw => group.includes(kw));
+    const isLiveCategory = liveKeywords.some(kw => group.includes(kw)) &&
+                           !movieKeywords.some(kw => group.includes(kw)) &&
+                           !seriesKeywords.some(kw => group.includes(kw));
+    
+    if (isSeriesCategory) return 'episode';
+    if (isMovieCategory) return 'movie';
+    if (isLiveCategory) return 'live';
+    
+    // Default to live for unknown content (most common in IPTV)
+    return 'live';
   }
 
   private extractSeriesName(episodeName: string): string {

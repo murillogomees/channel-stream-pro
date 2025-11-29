@@ -279,33 +279,92 @@ export function HomeView({
     seriesContinuations.length > 0 || 
     recommendationGroups.length > 0;
 
-  // Default content sections for new users
+  // Helper to detect content type
+  const detectContentType = (channel: Channel): 'movie' | 'episode' | 'live' => {
+    const url = channel.stream_url?.toLowerCase() || '';
+    const name = channel.name?.toLowerCase() || '';
+    const group = (channel.group_title || channel.category_name || '').toLowerCase();
+    
+    const seriesKeywords = ['série', 'series', 'seriado', 'novela', 'temporada', 'season', 'episódio', 'dorama', 'anime'];
+    const movieKeywords = ['filme', 'movie', 'cinema', 'vod filme', 'filmes', 'movies', 'film', 'peliculas', 'lançamento'];
+    
+    // URL-based detection
+    if (url.includes('/series/')) return 'episode';
+    if (url.includes('/movie/')) return 'movie';
+    if (url.includes('/live/')) return 'live';
+    
+    // Episode pattern in name
+    if (/S\d{1,2}\s*E\d{1,3}/i.test(name) || /\d{1,2}x\d{1,3}/i.test(name)) {
+      return 'episode';
+    }
+    
+    // Group/category-based
+    if (seriesKeywords.some(kw => group.includes(kw)) && !movieKeywords.some(kw => group.includes(kw))) {
+      return 'episode';
+    }
+    if (movieKeywords.some(kw => group.includes(kw))) {
+      return 'movie';
+    }
+    
+    return 'live';
+  };
+
+  // Default content sections for new users - PROPERLY SEPARATED BY TYPE
   const defaultSections = useMemo(() => {
     if (hasPersonalizedContent || allChannels.length === 0) return [];
 
-    const sections: { title: string; icon: React.ElementType; channels: Channel[] }[] = [];
+    // Separate channels by content type
+    const movies: Channel[] = [];
+    const series: Channel[] = [];
+    const live: Channel[] = [];
     
-    // Group channels by category
-    const categoryMap = new Map<string, Channel[]>();
     for (const ch of allChannels) {
-      const cat = ch.group_title || ch.category_name || 'Geral';
-      if (!categoryMap.has(cat)) categoryMap.set(cat, []);
-      categoryMap.get(cat)!.push(ch);
+      const type = detectContentType(ch);
+      if (type === 'movie') movies.push(ch);
+      else if (type === 'episode') series.push(ch);
+      else live.push(ch);
     }
 
-    // Get top categories
-    const topCats = Array.from(categoryMap.entries())
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 6);
-
-    for (const [category, channels] of topCats) {
-      const isLive = category.toLowerCase().includes('tv') || category.toLowerCase().includes('live');
-      const isMovie = category.toLowerCase().includes('filme') || category.toLowerCase().includes('movie');
+    const sections: { title: string; icon: React.ElementType; channels: Channel[]; type: string }[] = [];
+    
+    // Add sections in order: Live TV, Movies, Series
+    if (live.length > 0) {
+      sections.push({
+        title: '📺 TV ao Vivo',
+        icon: Tv,
+        channels: live.slice(0, 20),
+        type: 'live',
+      });
+    }
+    
+    if (movies.length > 0) {
+      sections.push({
+        title: '🎬 Filmes',
+        icon: Film,
+        channels: movies.slice(0, 20),
+        type: 'movie',
+      });
+    }
+    
+    if (series.length > 0) {
+      // Group series episodes by series name
+      const seriesMap = new Map<string, Channel>();
+      for (const ch of series) {
+        const seriesName = ch.name
+          .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
+          .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
+          .replace(/\s*Temporada\s*\d+.*/gi, '')
+          .trim();
+        if (!seriesMap.has(seriesName)) {
+          seriesMap.set(seriesName, ch);
+        }
+      }
       
       sections.push({
-        title: category,
-        icon: isLive ? Tv : isMovie ? Film : PlaySquare,
-        channels: channels.slice(0, 20),
+        title: '📺 Séries',
+        icon: PlaySquare,
+        channels: Array.from(seriesMap.values()).slice(0, 20),
+        type: 'episode',
       });
     }
 
