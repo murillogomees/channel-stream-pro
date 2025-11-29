@@ -114,6 +114,40 @@ export function useM3UImport() {
       console.log('[useM3UImport] Poll update:', sessionData.status, sessionData.processedChannels, '/', sessionData.totalChannels);
       setSession(sessionData);
 
+      // Check if continuation is needed (edge function hit CPU limit)
+      if (sessionData.status === 'processing' && sessionData.metadata?.needsContinuation) {
+        const resumeFrom = sessionData.metadata.resumeFromChannel;
+        console.log('[useM3UImport] Continuation needed, resuming from channel:', resumeFrom);
+        
+        // Clear needsContinuation flag before re-invoking
+        await supabase
+          .from('m3u_import_sessions')
+          .update({ metadata: { ...sessionData.metadata, needsContinuation: false } })
+          .eq('id', currentSessionId);
+        
+        // Re-invoke edge function to continue processing
+        try {
+          const { error: invokeError } = await supabase.functions.invoke('process-m3u-import', {
+            body: {
+              sessionId: currentSessionId,
+              sourceType: sessionData.sourceType,
+              sourceUrl: sessionData.sourceUrl,
+              customListId: sessionData.customListId,
+              resumeFromChannel: resumeFrom,
+            },
+          });
+          
+          if (invokeError) {
+            console.error('[useM3UImport] Error continuing import:', invokeError);
+          } else {
+            console.log('[useM3UImport] Continuation invoked successfully');
+            toast.info(`Continuando importação... (${resumeFrom} canais processados)`);
+          }
+        } catch (err) {
+          console.error('[useM3UImport] Error invoking continuation:', err);
+        }
+      }
+
       if (sessionData.status === 'completed') {
         toast.success(`Importação concluída! ${sessionData.processedChannels} canais importados.`);
         setIsImporting(false);
@@ -124,7 +158,7 @@ export function useM3UImport() {
         setIsImporting(false);
         cleanup();
       }
-    }, 1500); // Poll every 1.5 seconds for faster updates
+    }, 2000); // Poll every 2 seconds
   }, [fetchSessionFromDb, cleanup]);
 
   /**
