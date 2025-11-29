@@ -29,7 +29,7 @@ const EXPONENTIAL_LIMITS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
-  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload, cancelDownload, channelNames, pauseAllDownloads, resumeAllDownloads } = useVODManagement();
+  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs, resetOrphanedDownloads, retryDownload, cancelDownload, completeUpload, channelNames, pauseAllDownloads, resumeAllDownloads } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
@@ -704,7 +704,7 @@ export default function AdminVODStorage() {
       </div>
 
       {/* Lista Completa de Downloads */}
-      <VODDownloadProgress downloads={downloads} onRetry={retryDownload} onCancel={cancelDownload} channelNames={channelNames} />
+      <VODDownloadProgress downloads={downloads} onRetry={retryDownload} onCancel={cancelDownload} onComplete={completeUpload} channelNames={channelNames} />
 
       {/* Informações e Dicas */}
       <Card>
