@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,8 @@ import {
   Upload,
   DollarSign,
   Film,
-  Zap
+  Zap,
+  Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -35,9 +36,30 @@ export function CloudflareStreamDashboard() {
   const [channelNames, setChannelNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [runningScheduler, setRunningScheduler] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadChannelNames = useCallback(async (channelIds: string[]) => {
+    if (channelIds.length === 0) return;
+    
+    const uniqueIds = [...new Set(channelIds)];
+    const missingIds = uniqueIds.filter(id => !channelNames[id]);
+    
+    if (missingIds.length === 0) return;
+    
+    const { data: channels } = await supabase
+      .from('m3u_channels')
+      .select('id, name')
+      .in('id', missingIds);
+
+    if (channels) {
+      const names: Record<string, string> = { ...channelNames };
+      channels.forEach(c => { names[c.id] = c.name; });
+      setChannelNames(names);
+    }
+  }, [channelNames]);
+
+  const loadData = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const [stats, recentUploads] = await Promise.all([
         getStreamStatistics(),
@@ -47,33 +69,79 @@ export function CloudflareStreamDashboard() {
       setStatistics(stats);
       setUploads(recentUploads);
 
-      // Load channel names
       if (recentUploads.length > 0) {
-        const channelIds = [...new Set(recentUploads.map(u => u.channel_id))];
-        const { data: channels } = await supabase
-          .from('m3u_channels')
-          .select('id, name')
-          .in('id', channelIds);
-
-        if (channels) {
-          const names: Record<string, string> = {};
-          channels.forEach(c => { names[c.id] = c.name; });
-          setChannelNames(names);
-        }
+        await loadChannelNames(recentUploads.map(u => u.channel_id));
       }
     } catch (error) {
       console.error('Error loading Stream data:', error);
-      toast.error('Erro ao carregar dados do Stream');
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadChannelNames]);
 
+  // Initial load
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
   }, []);
+
+  // Realtime subscription for uploads
+  useEffect(() => {
+    const channel = supabase
+      .channel('cf-stream-uploads-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cf_stream_uploads'
+        },
+        async (payload) => {
+          console.log('[CF-Dashboard] Realtime update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newUpload = payload.new as StreamUpload;
+            setUploads(prev => [newUpload, ...prev.slice(0, 49)]);
+            await loadChannelNames([newUpload.channel_id]);
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedUpload = payload.new as StreamUpload;
+            setUploads(prev => 
+              prev.map(u => u.id === updatedUpload.id ? updatedUpload : u)
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id;
+            setUploads(prev => prev.filter(u => u.id !== deletedId));
+          }
+          
+          // Refresh statistics on changes
+          const stats = await getStreamStatistics();
+          if (stats) setStatistics(stats);
+        }
+      )
+      .subscribe((status) => {
+        setIsLive(status === 'SUBSCRIBED');
+        console.log('[CF-Dashboard] Subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadChannelNames]);
+
+  // Polling for statistics every 10 seconds when there are active uploads
+  useEffect(() => {
+    const hasActiveUploads = uploads.some(u => 
+      ['processing', 'uploading', 'queued'].includes(u.status)
+    );
+
+    if (!hasActiveUploads) return;
+
+    const interval = setInterval(async () => {
+      const stats = await getStreamStatistics();
+      if (stats) setStatistics(stats);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [uploads]);
 
   const handleRunScheduler = async () => {
     setRunningScheduler(true);
@@ -81,7 +149,7 @@ export function CloudflareStreamDashboard() {
       const result = await runScheduler();
       if (result.success) {
         toast.success(`Scheduler executado: ${result.result?.newUploads || 0} novos uploads`);
-        loadData();
+        loadData(false);
       } else {
         toast.error(result.error || 'Erro ao executar scheduler');
       }
@@ -90,14 +158,27 @@ export function CloudflareStreamDashboard() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (upload: StreamUpload) => {
+    const status = upload.status;
+    const progress = upload.progress_percent || 0;
+    
     switch (status) {
       case 'ready':
         return <Badge className="bg-emerald-500/20 text-emerald-400"><CheckCircle2 className="w-3 h-3 mr-1" />Pronto</Badge>;
       case 'processing':
-        return <Badge className="bg-blue-500/20 text-blue-400"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processando</Badge>;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-20">
+              <Progress value={progress} className="h-2" />
+            </div>
+            <Badge className="bg-blue-500/20 text-blue-400">
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              {progress.toFixed(0)}%
+            </Badge>
+          </div>
+        );
       case 'uploading':
-        return <Badge className="bg-yellow-500/20 text-yellow-400"><Upload className="w-3 h-3 mr-1" />Enviando</Badge>;
+        return <Badge className="bg-yellow-500/20 text-yellow-400"><Upload className="w-3 h-3 mr-1 animate-pulse" />Enviando</Badge>;
       case 'queued':
         return <Badge className="bg-gray-500/20 text-gray-400"><Clock className="w-3 h-3 mr-1" />Na fila</Badge>;
       case 'error':
@@ -106,6 +187,12 @@ export function CloudflareStreamDashboard() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  // Calculate active processing stats
+  const processingUploads = uploads.filter(u => u.status === 'processing');
+  const avgProgress = processingUploads.length > 0
+    ? processingUploads.reduce((acc, u) => acc + (u.progress_percent || 0), 0) / processingUploads.length
+    : 0;
 
   if (loading && !statistics) {
     return (
@@ -124,7 +211,15 @@ export function CloudflareStreamDashboard() {
             <Cloud className="w-6 h-6 text-orange-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">Cloudflare Stream</h2>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              Cloudflare Stream
+              {isLive && (
+                <span className="flex items-center gap-1 text-xs text-emerald-400">
+                  <Activity className="w-3 h-3 animate-pulse" />
+                  Live
+                </span>
+              )}
+            </h2>
             <p className="text-sm text-muted-foreground">
               Distribuição de VODs com adaptive bitrate
             </p>
@@ -134,7 +229,7 @@ export function CloudflareStreamDashboard() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={loadData}
+            onClick={() => loadData(false)}
             disabled={loading}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -178,11 +273,15 @@ export function CloudflareStreamDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={processingUploads.length > 0 ? 'ring-2 ring-blue-500/30' : ''}>
           <CardHeader className="pb-2">
             <CardDescription>Em Processamento</CardDescription>
             <CardTitle className="text-2xl flex items-center gap-2">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              {processingUploads.length > 0 ? (
+                <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              ) : (
+                <Clock className="w-5 h-5 text-blue-400" />
+              )}
               {(statistics?.uploads_queued || 0) + (statistics?.uploads_processing || 0)}
             </CardTitle>
           </CardHeader>
@@ -190,6 +289,14 @@ export function CloudflareStreamDashboard() {
             <div className="text-xs text-muted-foreground">
               {statistics?.uploads_queued || 0} na fila, {statistics?.uploads_processing || 0} processando
             </div>
+            {processingUploads.length > 0 && (
+              <div className="mt-2">
+                <Progress value={avgProgress} className="h-1.5" />
+                <p className="text-xs text-blue-400 mt-1">
+                  Média: {avgProgress.toFixed(0)}%
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -239,7 +346,14 @@ export function CloudflareStreamDashboard() {
       {/* Recent Uploads */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Uploads Recentes</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            Uploads Recentes
+            {processingUploads.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {processingUploads.length} ativo{processingUploads.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>Últimos 50 uploads para o Cloudflare Stream</CardDescription>
         </CardHeader>
         <CardContent>
@@ -253,29 +367,35 @@ export function CloudflareStreamDashboard() {
                 uploads.map((upload) => (
                   <div 
                     key={upload.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                      upload.status === 'processing' 
+                        ? 'bg-blue-500/10 border border-blue-500/20' 
+                        : 'bg-muted/50 hover:bg-muted'
+                    }`}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Play className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
                           {channelNames[upload.channel_id] || upload.channel_id}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(upload.created_at), { 
-                            addSuffix: true,
-                            locale: ptBR 
-                          })}
-                        </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>
+                            {formatDistanceToNow(new Date(upload.created_at), { 
+                              addSuffix: true,
+                              locale: ptBR 
+                            })}
+                          </span>
+                          {upload.error_message && (
+                            <span className="text-red-400 truncate max-w-[200px]" title={upload.error_message}>
+                              {upload.error_message}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      {upload.status === 'processing' && upload.progress_percent > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {upload.progress_percent}%
-                        </span>
-                      )}
-                      {getStatusBadge(upload.status)}
+                      {getStatusBadge(upload)}
                     </div>
                   </div>
                 ))

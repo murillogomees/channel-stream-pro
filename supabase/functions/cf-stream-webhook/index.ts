@@ -55,7 +55,6 @@ serve(async (req) => {
   try {
     // Try to parse the body, but handle empty/invalid bodies gracefully
     let payload: StreamWebhookPayload = {};
-    const contentType = req.headers.get("content-type") || "";
     
     try {
       const bodyText = await req.text();
@@ -90,6 +89,13 @@ serve(async (req) => {
     const { uid, readyToStream, status, meta, duration, size } = payload;
     const statusState = status?.state || "unknown";
     const channelId = meta?.channel_id;
+    
+    // Extract progress percentage from pctComplete
+    const progressPercent = status?.pctComplete 
+      ? parseFloat(status.pctComplete) 
+      : (readyToStream ? 100 : 0);
+
+    console.log(`[CF-Webhook] Processing ${uid} - State: ${statusState}, Progress: ${progressPercent}%`);
 
     // Generate playback URL
     const playbackUrl = readyToStream 
@@ -128,10 +134,12 @@ serve(async (req) => {
       console.error("[CF-Webhook] Failed to update channel:", channelError);
     }
 
-    // Update upload record
+    // Update upload record with progress percentage
     const uploadUpdateData: Record<string, unknown> = {
       status: readyToStream ? "ready" : statusState === "error" ? "error" : "processing",
+      progress_percent: progressPercent,
       metadata: payload,
+      updated_at: new Date().toISOString(),
     };
 
     if (status?.errorReasonText) {
@@ -140,19 +148,25 @@ serve(async (req) => {
 
     if (readyToStream) {
       uploadUpdateData.completed_at = new Date().toISOString();
+      uploadUpdateData.progress_percent = 100;
     }
 
-    await supabase
+    const { error: uploadError } = await supabase
       .from("cf_stream_uploads")
       .update(uploadUpdateData)
       .eq("cf_stream_uid", uid);
 
-    console.log(`[CF-Webhook] Updated ${uid} - Status: ${statusState}, Ready: ${readyToStream}`);
+    if (uploadError) {
+      console.error("[CF-Webhook] Failed to update upload record:", uploadError);
+    }
+
+    console.log(`[CF-Webhook] Updated ${uid} - Status: ${statusState}, Progress: ${progressPercent}%, Ready: ${readyToStream}`);
 
     return new Response(JSON.stringify({ 
       success: true,
       uid,
       status: statusState,
+      progress: progressPercent,
       readyToStream,
     }), {
       status: 200,
