@@ -24,6 +24,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
+import { connectionService } from "@/services/connectionService";
+import { useQualityPersistence } from "@/hooks/useQualityPersistence";
 
 // =============================================================================
 // TYPES
@@ -76,41 +78,20 @@ const MPEGTS_CONFIG: mpegts.Config = {
 };
 
 // =============================================================================
-// HLS.JS CONFIGURATION - OPTIMIZED FOR ZERO BUFFERING
+// HLS.JS BASE CONFIGURATION - OPTIMIZED FOR ZERO BUFFERING
 // =============================================================================
-const HLS_CONFIG: Partial<Hls['config']> = {
+const HLS_BASE_CONFIG: Partial<Hls['config']> = {
   // Worker e performance
   enableWorker: true,
-  lowLatencyMode: false, // Desabilitado para estabilidade
   
   // Buffer settings - ZERO BUFFERING: mínimo necessário
-  maxBufferLength: 15, // Reduzido para início instantâneo
-  maxMaxBufferLength: 45, // Limite máximo menor
   maxBufferSize: 20 * 1000 * 1000, // 20MB
   maxBufferHole: 0.5, // Mais tolerante a holes
-  backBufferLength: 10, // Buffer traseiro mínimo
-  
-  // ABR (Adaptive Bitrate) - ULTRA FAST START
-  startLevel: 0, // Começar com qualidade mais baixa
-  abrEwmaDefaultEstimate: 2000000, // 2Mbps - estimativa otimista
-  abrBandWidthFactor: 0.9, // Muito agressivo no ABR
-  abrBandWidthUpFactor: 0.7, // Subir qualidade bem rápido
-  abrMaxWithRealBitrate: true, // Usar bitrate real para ABR
   
   // Timeouts - ULTRA FAST: menores para falhar/retry rápido
   manifestLoadingTimeOut: 8000,
   levelLoadingTimeOut: 8000,
   fragLoadingTimeOut: 15000,
-  
-  // Retries - agressivo para IPTV instável
-  manifestLoadingMaxRetry: 6,
-  levelLoadingMaxRetry: 6,
-  fragLoadingMaxRetry: 8,
-  
-  // Retry delays - mínimos para recuperação instantânea
-  manifestLoadingRetryDelay: 200,
-  levelLoadingRetryDelay: 200,
-  fragLoadingRetryDelay: 200,
   
   // FAST START: Progressive loading
   progressive: true,
@@ -121,11 +102,90 @@ const HLS_CONFIG: Partial<Hls['config']> = {
   // Smooth switching
   testBandwidth: true,
   
-  // Caputo para evitar stalls
+  // Cap para evitar stalls
   capLevelToPlayerSize: true,
   capLevelOnFPSDrop: true,
   fpsDroppedMonitoringPeriod: 3000,
   fpsDroppedMonitoringThreshold: 0.1,
+};
+
+// =============================================================================
+// LOW LATENCY HLS CONFIG (~2-3s delay for live)
+// =============================================================================
+const LOW_LATENCY_CONFIG: Partial<Hls['config']> = {
+  lowLatencyMode: true,
+  liveSyncDuration: 3,
+  liveMaxLatencyDuration: 5,
+  liveSyncDurationCount: 3,
+  liveBackBufferLength: 10,
+  maxBufferLength: 10,
+  maxMaxBufferLength: 20,
+  backBufferLength: 5,
+};
+
+// =============================================================================
+// CONNECTION-BASED CONFIGS
+// =============================================================================
+const getConnectionConfig = (quality: string): Partial<Hls['config']> => {
+  switch (quality) {
+    case 'poor':
+      return {
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
+        startLevel: 0,
+        abrEwmaDefaultEstimate: 500000,
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.5,
+        fragLoadingMaxRetry: 10,
+        manifestLoadingMaxRetry: 8,
+        fragLoadingRetryDelay: 500,
+        levelLoadingRetryDelay: 500,
+        manifestLoadingRetryDelay: 500,
+      };
+    case 'fair':
+      return {
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+        startLevel: 0,
+        abrEwmaDefaultEstimate: 1500000,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.6,
+        fragLoadingMaxRetry: 8,
+        manifestLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 300,
+        levelLoadingRetryDelay: 300,
+        manifestLoadingRetryDelay: 300,
+      };
+    case 'excellent':
+      return {
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        startLevel: -1,
+        abrEwmaDefaultEstimate: 5000000,
+        abrBandWidthFactor: 0.95,
+        abrBandWidthUpFactor: 0.8,
+        fragLoadingMaxRetry: 4,
+        manifestLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 100,
+        levelLoadingRetryDelay: 100,
+        manifestLoadingRetryDelay: 100,
+      };
+    default: // 'good'
+      return {
+        maxBufferLength: 20,
+        maxMaxBufferLength: 45,
+        startLevel: 0,
+        abrEwmaDefaultEstimate: 2000000,
+        abrBandWidthFactor: 0.9,
+        abrBandWidthUpFactor: 0.7,
+        abrMaxWithRealBitrate: true,
+        fragLoadingMaxRetry: 6,
+        manifestLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 200,
+        levelLoadingRetryDelay: 200,
+        manifestLoadingRetryDelay: 200,
+      };
+  }
 };
 
 // =============================================================================
@@ -148,12 +208,16 @@ export default function UniversalPlayer({
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryAttempts = useRef(0);
 
+  // Quality persistence hook
+  const { preference: qualityPreference, isLoaded: qualityLoaded } = useQualityPersistence();
+
   // State
   const [showUI, setShowUI] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [connectionQuality, setConnectionQuality] = useState<string>('good');
 
   // ===========================================================================
   // UI AUTO-HIDE
@@ -505,20 +569,56 @@ export default function UniversalPlayer({
 
     console.log('[Player] Using hls.js engine');
     
-    const hls = new Hls({
-      ...HLS_CONFIG,
+    // Get connection info for adaptive config
+    const connInfo = connectionService.getConnectionInfo();
+    const quality = connInfo.quality;
+    setConnectionQuality(quality);
+    console.log('[Player] Connection quality:', quality, '| Downlink:', connInfo.downlink, 'Mbps');
+    
+    // Build optimized config based on connection + user preferences
+    const connectionConfig = getConnectionConfig(quality);
+    const hlsConfig: Partial<Hls['config']> = {
+      ...HLS_BASE_CONFIG,
+      ...connectionConfig,
       debug: false,
       xhrSetup: (xhr: XMLHttpRequest, loadingUrl: string) => {
         console.log('[Player] Loading:', loadingUrl.substring(0, 60) + '...');
       },
-    });
+    };
+
+    // Apply low latency mode if user preference
+    if (qualityPreference.lowLatency) {
+      Object.assign(hlsConfig, LOW_LATENCY_CONFIG);
+      console.log('[Player] Low latency mode ENABLED');
+    }
+
+    // Apply user's saved quality preference
+    if (qualityPreference.mode === 'manual' && qualityPreference.levelIndex >= 0) {
+      hlsConfig.startLevel = qualityPreference.levelIndex;
+      console.log('[Player] Using saved quality level:', qualityPreference.levelIndex);
+    }
+
+    // Apply max bitrate cap if set
+    if (qualityPreference.maxBitrate) {
+      hlsConfig.abrEwmaDefaultEstimate = Math.min(
+        hlsConfig.abrEwmaDefaultEstimate || 2000000,
+        qualityPreference.maxBitrate
+      );
+    }
+    
+    const hls = new Hls(hlsConfig);
     hlsRef.current = hls;
 
     // Load source
     hls.loadSource(url);
     hls.attachMedia(video);
     
-    console.log('[Player] HLS source attached');
+    console.log('[Player] HLS source attached with config:', {
+      quality,
+      lowLatency: qualityPreference.lowLatency,
+      startLevel: hlsConfig.startLevel,
+      maxBuffer: hlsConfig.maxBufferLength,
+    });
 
     // Manifest parsed = ready to play
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -614,7 +714,7 @@ export default function UniversalPlayer({
         hlsRef.current = null;
       }
     };
-  }, [url, autoplay, onReady, onError]);
+  }, [url, autoplay, onReady, onError, qualityPreference.lowLatency, qualityPreference.mode, qualityPreference.levelIndex, qualityPreference.maxBitrate]);
 
   // Cleanup timer on unmount
   useEffect(() => {
