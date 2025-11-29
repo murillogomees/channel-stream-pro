@@ -423,15 +423,53 @@ async function downloadHLSVOD(channel: any, downloadId: string, supabase: any): 
 // NOVA FUNÇÃO: Download direto usando SEMPRE multipart para evitar OOM
 async function downloadDirectVOD(channel: any, downloadId: string, supabase: any): Promise<void> {
   console.log(`📥 [Direct] Iniciando download: ${channel.name}`);
+  console.log(`📥 [Direct] URL: ${channel.stream_url.substring(0, 80)}...`);
   
-  const headRes = await fetchWithTimeout(channel.stream_url, 30000, 'HEAD');
-  const contentLength = parseInt(headRes.headers.get('content-length') || '0');
+  // Tentar obter tamanho via HEAD, mas não falhar se não funcionar
+  let contentLength = 0;
+  let supportsRanges = false;
   
-  console.log(`📊 [Direct] Tamanho: ${(contentLength / 1048576).toFixed(1)} MB`);
+  try {
+    console.log(`🔍 [Direct] Verificando tamanho do arquivo...`);
+    const headRes = await fetchWithTimeout(channel.stream_url, 15000, 'HEAD');
+    
+    if (headRes.ok) {
+      contentLength = parseInt(headRes.headers.get('content-length') || '0');
+      supportsRanges = headRes.headers.get('accept-ranges') === 'bytes';
+      console.log(`📊 [Direct] HEAD OK - Tamanho: ${(contentLength / 1048576).toFixed(1)} MB, Ranges: ${supportsRanges}`);
+    } else {
+      console.log(`⚠️ [Direct] HEAD retornou ${headRes.status}, tentando GET parcial...`);
+      // Tentar GET com Range para obter tamanho
+      const rangeRes = await fetchWithTimeout(channel.stream_url + '?t=' + Date.now(), 15000, 'GET');
+      if (rangeRes.ok) {
+        const rangeHeader = rangeRes.headers.get('content-range');
+        if (rangeHeader) {
+          const match = rangeHeader.match(/\/(\d+)$/);
+          if (match) contentLength = parseInt(match[1]);
+        }
+        if (!contentLength) {
+          contentLength = parseInt(rangeRes.headers.get('content-length') || '0');
+        }
+        console.log(`📊 [Direct] GET OK - Tamanho estimado: ${(contentLength / 1048576).toFixed(1)} MB`);
+      }
+      await rangeRes.body?.cancel(); // Cancelar o body para não baixar tudo
+    }
+  } catch (headError: any) {
+    console.log(`⚠️ [Direct] Erro ao obter tamanho: ${headError.message}, continuando sem tamanho conhecido...`);
+  }
+  
+  // Se não conseguiu tamanho, usar streaming mode
+  if (contentLength === 0) {
+    console.log(`📥 [Direct] Sem tamanho conhecido, usando streaming mode...`);
+    await downloadStreamingMode(channel, downloadId, supabase);
+    return;
+  }
+
+  console.log(`📊 [Direct] Tamanho final: ${(contentLength / 1048576).toFixed(1)} MB`);
 
   // CRÍTICO: Usar chunks menores (10MB) para evitar estouro de memória
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks (antes era 50MB)
-  const totalChunks = contentLength > 0 ? Math.ceil(contentLength / CHUNK_SIZE) : 1;
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+  const totalChunks = Math.ceil(contentLength / CHUNK_SIZE);
 
   await supabase.from('vod_downloads').update({ 
     segment_count: totalChunks, 
@@ -444,8 +482,6 @@ async function downloadDirectVOD(channel: any, downloadId: string, supabase: any
   const r2Key = `vod/${channel.id}/video.${ext}`;
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
-  // SEMPRE usar multipart upload para evitar estouro de memória
-  // Mesmo arquivos pequenos usam chunks para streaming
   console.log(`📥 [Direct] Multipart streaming: ${totalChunks} chunks de ${(CHUNK_SIZE / 1048576).toFixed(0)}MB`);
   
   const uploadId = await initiateMultipartUpload(r2Key, contentType);
@@ -560,5 +596,122 @@ async function fetchWithTimeout(url: string, timeoutMs: number, method = 'GET'):
     });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+// Streaming mode: baixa o arquivo inteiro quando não sabemos o tamanho
+async function downloadStreamingMode(channel: any, downloadId: string, supabase: any): Promise<void> {
+  console.log(`📥 [Streaming] Iniciando download sem tamanho conhecido...`);
+  
+  const urlPath = new URL(channel.stream_url).pathname;
+  const ext = urlPath.split('.').pop() || 'mp4';
+  const r2Key = `vod/${channel.id}/video.${ext}`;
+  const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
+  
+  // Baixar o arquivo em chunks e fazer upload progressivo
+  const response = await fetch(channel.stream_url, {
+    headers: { 'User-Agent': 'VOD-Downloader/3.0' },
+    signal: AbortSignal.timeout(600000), // 10 min timeout total
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Download falhou: HTTP ${response.status}`);
+  }
+  
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Não foi possível criar reader do stream');
+  }
+  
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  let lastUpdate = Date.now();
+  const CHUNK_THRESHOLD = 50 * 1024 * 1024; // Fazer upload quando acumular 50MB
+  
+  const uploadId = await initiateMultipartUpload(r2Key, contentType);
+  const parts: { partNumber: number; etag: string }[] = [];
+  let partNumber = 1;
+  let currentBuffer: Uint8Array[] = [];
+  let currentBufferSize = 0;
+  
+  console.log(`🔑 [Streaming] Upload ID: ${uploadId.substring(0, 16)}...`);
+  
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+      
+      currentBuffer.push(value);
+      currentBufferSize += value.length;
+      totalBytes += value.length;
+      
+      // Fazer upload quando acumular threshold
+      if (currentBufferSize >= CHUNK_THRESHOLD) {
+        console.log(`⬆️ [Streaming] Enviando parte ${partNumber} (${(currentBufferSize / 1048576).toFixed(1)} MB)...`);
+        
+        // Concatenar chunks do buffer
+        const combined = new Uint8Array(currentBufferSize);
+        let offset = 0;
+        for (const chunk of currentBuffer) {
+          combined.set(chunk, offset);
+          offset += chunk.length;
+        }
+        
+        const etag = await uploadPart(r2Key, uploadId, partNumber, combined);
+        parts.push({ partNumber, etag });
+        partNumber++;
+        
+        // Limpar buffer
+        currentBuffer = [];
+        currentBufferSize = 0;
+      }
+      
+      // Atualizar progresso
+      if (Date.now() - lastUpdate > 3000) {
+        lastUpdate = Date.now();
+        await supabase.from('vod_downloads').update({ 
+          file_size_bytes: totalBytes,
+          segments_downloaded: parts.length
+        }).eq('id', downloadId);
+        console.log(`📈 [Streaming] ${(totalBytes / 1048576).toFixed(1)} MB baixados, ${parts.length} partes enviadas`);
+      }
+    }
+    
+    // Enviar último buffer se houver
+    if (currentBufferSize > 0) {
+      console.log(`⬆️ [Streaming] Enviando última parte ${partNumber} (${(currentBufferSize / 1048576).toFixed(1)} MB)...`);
+      
+      const combined = new Uint8Array(currentBufferSize);
+      let offset = 0;
+      for (const chunk of currentBuffer) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      const etag = await uploadPart(r2Key, uploadId, partNumber, combined);
+      parts.push({ partNumber, etag });
+    }
+    
+    // Finalizar upload
+    console.log(`⬆️ [Streaming] Finalizando multipart upload...`);
+    await supabase.from('vod_downloads').update({ status: 'processing' }).eq('id', downloadId);
+    
+    parts.sort((a, b) => a.partNumber - b.partNumber);
+    await completeMultipartUpload(r2Key, uploadId, parts);
+    
+    console.log(`✅ [Streaming] Upload completo: ${(totalBytes / 1048576).toFixed(1)} MB em ${parts.length} partes`);
+    
+    // Atualizar tamanho final
+    await supabase.from('vod_downloads').update({ 
+      file_size_bytes: totalBytes,
+      segment_count: parts.length,
+      segments_downloaded: parts.length
+    }).eq('id', downloadId);
+    
+  } catch (error) {
+    console.error(`❌ [Streaming] Erro, abortando multipart...`);
+    await abortMultipartUpload(r2Key, uploadId);
+    throw error;
   }
 }
