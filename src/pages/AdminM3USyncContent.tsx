@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { 
   RefreshCw, Plus, Trash2, Play, Search, 
   Clock, CheckCircle, XCircle, AlertTriangle, FileText,
-  Copy, Loader2
+  Copy, Loader2, Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,7 @@ export default function AdminM3USyncContent() {
   } = useM3USync();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showJobsDialog, setShowJobsDialog] = useState(false);
   const [selectedSource, setSelectedSource] = useState<M3USyncSource | null>(null);
   const [jobs, setJobs] = useState<M3USyncJob[]>([]);
@@ -67,6 +68,13 @@ export default function AdminM3USyncContent() {
 
   const [newSource, setNewSource] = useState({
     key: '',
+    name: '',
+    source_url: '',
+    sync_interval_minutes: 30,
+  });
+
+  const [editSource, setEditSource] = useState({
+    id: '',
     name: '',
     source_url: '',
     sync_interval_minutes: 30,
@@ -99,6 +107,41 @@ export default function AdminM3USyncContent() {
     const sourceJobs = await fetchSourceJobs(source.id);
     setJobs(sourceJobs);
     setShowJobsDialog(true);
+  };
+
+  const handleEditSource = (source: M3USyncSource) => {
+    setEditSource({
+      id: source.id,
+      name: source.name,
+      source_url: source.source_url,
+      sync_interval_minutes: source.sync_interval_minutes,
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editSource.name || !editSource.source_url) {
+      toast({
+        title: 'Erro',
+        description: 'Preencha todos os campos obrigatórios',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const result = await updateSource(editSource.id, {
+      name: editSource.name,
+      source_url: editSource.source_url,
+      sync_interval_minutes: editSource.sync_interval_minutes,
+    });
+    
+    if (result) {
+      setShowEditDialog(false);
+      toast({
+        title: 'Sucesso',
+        description: 'Fonte atualizada com sucesso',
+      });
+    }
   };
 
   const handleSearch = async () => {
@@ -451,6 +494,14 @@ export default function AdminM3USyncContent() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleEditSource(source)}
+                        title="Editar fonte"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => deleteSource(source.id)}
                         className="text-destructive hover:text-destructive"
                       >
@@ -533,6 +584,65 @@ export default function AdminM3USyncContent() {
               </TableBody>
             </Table>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Source Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Fonte M3U</DialogTitle>
+            <DialogDescription>
+              Atualize os dados da fonte de playlist
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input
+                placeholder="Minha Playlist Principal"
+                value={editSource.name}
+                onChange={(e) => setEditSource({ ...editSource, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>URL da Fonte</Label>
+              <Textarea
+                placeholder="https://exemplo.com/playlist.m3u"
+                value={editSource.source_url}
+                onChange={(e) => setEditSource({ ...editSource, source_url: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Intervalo de Sincronização</Label>
+              <Select
+                value={editSource.sync_interval_minutes.toString()}
+                onValueChange={(v) => setEditSource({ ...editSource, sync_interval_minutes: parseInt(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15 minutos</SelectItem>
+                  <SelectItem value="30">30 minutos</SelectItem>
+                  <SelectItem value="60">1 hora</SelectItem>
+                  <SelectItem value="180">3 horas</SelectItem>
+                  <SelectItem value="360">6 horas</SelectItem>
+                  <SelectItem value="720">12 horas</SelectItem>
+                  <SelectItem value="1440">24 horas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Salvar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
