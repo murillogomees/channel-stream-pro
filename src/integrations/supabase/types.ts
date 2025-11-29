@@ -1673,12 +1673,14 @@ export type Database = {
       }
       m3u_sync_entries: {
         Row: {
+          content_type: string | null
           created_at: string | null
           duration: number | null
           entry_hash: string
           group_title: string | null
           id: string
           is_valid: boolean | null
+          is_vod: boolean | null
           metadata: Json | null
           raw_extinf: string | null
           source_id: string
@@ -1691,12 +1693,14 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          content_type?: string | null
           created_at?: string | null
           duration?: number | null
           entry_hash: string
           group_title?: string | null
           id?: string
           is_valid?: boolean | null
+          is_vod?: boolean | null
           metadata?: Json | null
           raw_extinf?: string | null
           source_id: string
@@ -1709,12 +1713,14 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          content_type?: string | null
           created_at?: string | null
           duration?: number | null
           entry_hash?: string
           group_title?: string | null
           id?: string
           is_valid?: boolean | null
+          is_vod?: boolean | null
           metadata?: Json | null
           raw_extinf?: string | null
           source_id?: string
@@ -4033,6 +4039,14 @@ export type Database = {
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       detect_vod_channels: {
+        Args: never
+        Returns: {
+          live_count: number
+          updated_count: number
+          vod_count: number
+        }[]
+      }
+      detect_vod_from_sync_entries: {
         Args: never
         Returns: {
           live_count: number
