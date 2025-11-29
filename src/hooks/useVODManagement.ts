@@ -288,7 +288,34 @@ export const useVODManagement = () => {
     try {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       
-      // Marcar downloads travados como failed
+      // Primeiro, verificar downloads que estão em 100% mas não completaram
+      const { data: stuck100, error: stuck100Error } = await supabase
+        .from('vod_downloads' as any)
+        .select('id, channel_id, segment_count, segments_downloaded')
+        .in('status', ['downloading', 'processing'])
+        .lt('updated_at', fiveMinutesAgo);
+      
+      if (!stuck100Error && stuck100) {
+        // Filtrar os que estão em 100%
+        const stuckAt100 = (stuck100 as any[]).filter(d => 
+          d.segment_count > 0 && d.segments_downloaded >= d.segment_count
+        );
+        
+        for (const download of stuckAt100) {
+          console.log(`[VOD] Download ${download.id} travado em 100%, reiniciando...`);
+          
+          // Marcar como failed com mensagem específica
+          await supabase
+            .from('vod_downloads' as any)
+            .update({ 
+              status: 'failed', 
+              error_message: 'Reiniciado automaticamente - download travou em 100%' 
+            })
+            .eq('id', download.id);
+        }
+      }
+      
+      // Marcar outros downloads travados como failed
       const { data: orphaned, error } = await supabase
         .from('vod_downloads' as any)
         .update({ 
@@ -301,7 +328,7 @@ export const useVODManagement = () => {
 
       if (error) throw error;
 
-      const count = orphaned?.length || 0;
+      const count = (orphaned?.length || 0) + ((stuck100 as any[])?.filter(d => d.segment_count > 0 && d.segments_downloaded >= d.segment_count).length || 0);
       
       if (count > 0) {
         toast({

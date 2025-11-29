@@ -250,6 +250,8 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
 
 async function processVODDownload(channel: any, downloadId: string, supabase: any): Promise<void> {
   const startTime = Date.now();
+  let finalStatus = 'failed';
+  let finalError = '';
 
   try {
     if (!downloadId) {
@@ -261,10 +263,17 @@ async function processVODDownload(channel: any, downloadId: string, supabase: an
     console.log(`📥 [VOD] Iniciando: ${channel.name} (ID: ${downloadId})`);
 
     const isHLS = channel.stream_url.includes('.m3u8');
-    if (isHLS) {
-      await downloadHLSVOD(channel, downloadId, supabase);
-    } else {
-      await downloadDirectVOD(channel, downloadId, supabase);
+    
+    try {
+      if (isHLS) {
+        await downloadHLSVOD(channel, downloadId, supabase);
+      } else {
+        await downloadDirectVOD(channel, downloadId, supabase);
+      }
+      console.log(`✅ [VOD] Download concluído, iniciando finalização...`);
+    } catch (downloadError: any) {
+      console.error(`❌ [VOD] Erro durante download: ${downloadError.message}`);
+      throw downloadError;
     }
 
     const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN');
@@ -272,13 +281,16 @@ async function processVODDownload(channel: any, downloadId: string, supabase: an
       throw new Error('R2_PUBLIC_DOMAIN não configurado');
     }
     
+    const urlPath = new URL(channel.stream_url).pathname;
+    const ext = urlPath.split('.').pop() || 'mp4';
     const r2Url = isHLS 
       ? `https://${r2Domain}/vod/${channel.id}/playlist.m3u8` 
-      : `https://${r2Domain}/vod/${channel.id}/video.mp4`;
+      : `https://${r2Domain}/vod/${channel.id}/video.${ext}`;
 
-    console.log(`⬆️ [VOD] Atualizando canal e finalizando download...`);
+    console.log(`⬆️ [VOD] Finalizando download - URL: ${r2Url}`);
     
-    // Atualizar canal
+    // Atualizar canal - CRÍTICO: fazer em transação separada para garantir
+    console.log(`⬆️ [VOD] Atualizando canal m3u_channels...`);
     const { error: channelError } = await supabase
       .from('m3u_channels')
       .update({ 
@@ -290,40 +302,62 @@ async function processVODDownload(channel: any, downloadId: string, supabase: an
     
     if (channelError) {
       console.error(`⚠️ [VOD] Erro ao atualizar canal: ${channelError.message}`);
+      // Não falhar completamente se só o canal falhar
+    } else {
+      console.log(`✅ [VOD] Canal atualizado com sucesso`);
     }
     
-    // Marcar download como completo
-    const { error: downloadError } = await supabase
+    // Marcar download como completo - CRÍTICO
+    console.log(`⬆️ [VOD] Marcando download como completed...`);
+    const { error: downloadError, data: updatedDownload } = await supabase
       .from('vod_downloads')
       .update({ 
         status: 'completed', 
         r2_url: r2Url, 
-        download_completed_at: new Date().toISOString() 
+        download_completed_at: new Date().toISOString(),
+        error_message: null // Limpar qualquer erro anterior
       })
-      .eq('id', downloadId);
+      .eq('id', downloadId)
+      .select()
+      .single();
     
     if (downloadError) {
-      console.error(`⚠️ [VOD] Erro ao finalizar download: ${downloadError.message}`);
+      console.error(`❌ [VOD] CRÍTICO - Erro ao finalizar download: ${downloadError.message}`);
+      // Tentar novamente uma vez
+      const { error: retryError } = await supabase
+        .from('vod_downloads')
+        .update({ status: 'completed', r2_url: r2Url, download_completed_at: new Date().toISOString() })
+        .eq('id', downloadId);
+      
+      if (retryError) {
+        console.error(`❌ [VOD] Retry também falhou: ${retryError.message}`);
+        throw new Error(`Falha ao salvar status completed: ${downloadError.message}`);
+      }
     }
 
+    finalStatus = 'completed';
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ [VOD] Concluído: ${channel.name} em ${duration}s - ${r2Url}`);
+    console.log(`✅ [VOD] SUCESSO: ${channel.name} em ${duration}s - ${r2Url}`);
     
   } catch (error: any) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.error(`❌ [VOD] Falha: ${channel.name} após ${duration}s - ${error.message}`);
-    
-    // Garantir que o status seja atualizado para failed
-    try {
-      await supabase
-        .from('vod_downloads')
-        .update({ 
-          status: 'failed', 
-          error_message: error.message?.substring(0, 500) || 'Erro desconhecido'
-        })
-        .eq('id', downloadId);
-    } catch (updateError) {
-      console.error(`❌ [VOD] Erro ao salvar status de falha:`, updateError);
+    finalError = error.message?.substring(0, 500) || 'Erro desconhecido';
+    console.error(`❌ [VOD] Falha: ${channel.name} após ${duration}s - ${finalError}`);
+  } finally {
+    // SEMPRE garantir que o status final seja salvo
+    if (finalStatus !== 'completed') {
+      try {
+        console.log(`⚠️ [VOD] Salvando status de falha: ${finalError}`);
+        await supabase
+          .from('vod_downloads')
+          .update({ 
+            status: 'failed', 
+            error_message: finalError || 'Processo encerrado sem completar'
+          })
+          .eq('id', downloadId);
+      } catch (updateError: any) {
+        console.error(`❌ [VOD] Erro ao salvar status de falha:`, updateError.message);
+      }
     }
   }
 }
