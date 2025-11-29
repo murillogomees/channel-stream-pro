@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2 } from 'lucide-react';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
@@ -17,6 +18,7 @@ export default function AdminVODStorage() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
   const [isResettingOrphans, setIsResettingOrphans] = useState(false);
+  const [downloadLimit, setDownloadLimit] = useState<string>('50');
 
   // Filtrar downloads por status
   const activeDownloads = downloads.filter(d => ['downloading', 'processing', 'queued'].includes(d.status));
@@ -24,13 +26,15 @@ export default function AdminVODStorage() {
   const failedDownloads = downloads.filter(d => d.status === 'failed');
   const pendingDownloads = downloads.filter(d => d.status === 'pending');
 
-  const handleStartDownloads = async () => {
+  const handleStartDownloads = async (limit?: number) => {
     try {
       setIsStartingDownloads(true);
       
+      const actualLimit = limit || parseInt(downloadLimit);
+      
       const { data, error } = await supabase.functions.invoke('schedule-vod-downloads', {
         body: { 
-          limit: 50,
+          limit: actualLimit,
           priority: 'size' // menores primeiro para resultados rápidos
         }
       });
@@ -136,18 +140,102 @@ export default function AdminVODStorage() {
 
       <Separator />
 
-      {/* Ações Rápidas */}
-      <div className="flex flex-wrap gap-3">
-        <Button
-          onClick={handleStartDownloads}
-          disabled={isStartingDownloads || (statistics?.vods_pending || 0) === 0}
-          variant="default"
-          className="bg-green-600 hover:bg-green-700"
-        >
-          <Rocket className="w-4 h-4 mr-2" />
-          {isStartingDownloads ? 'Iniciando...' : `Baixar VODs para R2 (${statistics?.vods_pending || 0} pendentes)`}
-        </Button>
+      {/* Card Principal de Download VOD */}
+      <Card className="border-2 border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <CloudDownload className="h-6 w-6 text-primary" />
+            </div>
+            Download de VODs para R2
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Baixe VODs para o Cloudflare R2 CDN para melhor performance e disponibilidade
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4 p-4 bg-background/50 rounded-lg border">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm font-medium">VODs Pendentes</span>
+              </div>
+              <p className="text-3xl font-bold text-primary">{statistics?.vods_pending?.toLocaleString() || 0}</p>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-medium">VODs no R2</span>
+              </div>
+              <p className="text-3xl font-bold text-green-500">{statistics?.vods_uploaded?.toLocaleString() || 0}</p>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Download className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium">Em Andamento</span>
+              </div>
+              <p className="text-3xl font-bold text-blue-500">{statistics?.downloads_in_progress || 0}</p>
+            </div>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Quantidade:</span>
+              <Select value={downloadLimit} onValueChange={setDownloadLimit}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Quantidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 VODs</SelectItem>
+                  <SelectItem value="25">25 VODs</SelectItem>
+                  <SelectItem value="50">50 VODs</SelectItem>
+                  <SelectItem value="100">100 VODs</SelectItem>
+                  <SelectItem value="200">200 VODs</SelectItem>
+                  <SelectItem value="500">500 VODs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              onClick={() => handleStartDownloads()}
+              disabled={isStartingDownloads || (statistics?.vods_pending || 0) === 0}
+              size="lg"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg"
+            >
+              {isStartingDownloads ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Iniciando Downloads...
+                </>
+              ) : (
+                <>
+                  <Rocket className="w-5 h-5 mr-2" />
+                  Baixar {downloadLimit} VODs para R2
+                </>
+              )}
+            </Button>
+
+            <Button
+              onClick={refresh}
+              disabled={isLoading}
+              variant="outline"
+              size="lg"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
+
+          {(statistics?.vods_pending || 0) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              💡 Downloads automáticos acontecem a cada 30 minutos via cron job. Use o botão acima para iniciar manualmente.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ações Secundárias */}
+      <div className="flex flex-wrap gap-3">
         <Button
           onClick={handleDetectVODs}
           disabled={isDetecting}
@@ -177,15 +265,6 @@ export default function AdminVODStorage() {
             {isResettingOrphans ? 'Resetando...' : `Resetar Travados (${activeDownloads.length})`}
           </Button>
         )}
-        
-        <Button
-          onClick={refresh}
-          disabled={isLoading}
-          variant="ghost"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </Button>
       </div>
 
       {/* Estatísticas */}
