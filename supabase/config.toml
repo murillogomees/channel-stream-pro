@@ -49,8 +49,9 @@ verify_jwt = false
 [functions.fetch-m3u-url]
 verify_jwt = false
 
+# VOD download - public for internal calls with auth verification inside
 [functions.download-vod]
-verify_jwt = true
+verify_jwt = false
 
 [functions.schedule-vod-downloads]
 verify_jwt = false
