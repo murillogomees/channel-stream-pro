@@ -3,12 +3,13 @@
  * Player com layout estilo YouTube: vídeo no topo + detalhes embaixo
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   SkipBack, SkipForward, X, Radio, Film, Clock, Calendar,
   Signal, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp,
-  Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users, Loader2
+  Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users, Loader2,
+  Tv
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
@@ -34,6 +36,14 @@ interface ContentMetadata {
   duration_minutes?: number;
   poster_url?: string;
   backdrop_url?: string;
+}
+
+interface SeriesEpisode {
+  id: string;
+  name: string;
+  stream_url: string;
+  tvg_logo?: string;
+  category_name?: string;
 }
 
 interface YouTubeStylePlayerProps {
@@ -55,6 +65,9 @@ interface YouTubeStylePlayerProps {
   initialTime?: number;
   // Content metadata
   metadata?: ContentMetadata;
+  // Series episodes
+  seriesEpisodes?: SeriesEpisode[];
+  onPlayEpisode?: (episode: SeriesEpisode) => void;
 }
 
 // Stream type detection
@@ -91,6 +104,8 @@ export default function YouTubeStylePlayer({
   onPlaybackComplete,
   initialTime = 0,
   metadata,
+  seriesEpisodes = [],
+  onPlayEpisode,
 }: YouTubeStylePlayerProps) {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -863,13 +878,15 @@ export default function YouTubeStylePlayer({
           {showDetails && (
             <ScrollArea className="lg:hidden flex-1 min-h-0 max-h-[40vh]">
               <div className="p-4">
-                <StreamDetailsPanel 
+              <StreamDetailsPanel 
                   title={title}
                   category={category}
                   streamInfo={streamInfo}
                   connectionStatus={connectionStatus}
                   metadata={displayMetadata}
                   isLoadingMetadata={isLoadingMetadata}
+                  seriesEpisodes={seriesEpisodes}
+                  onPlayEpisode={onPlayEpisode}
                 />
               </div>
             </ScrollArea>
@@ -888,6 +905,8 @@ export default function YouTubeStylePlayer({
                 connectionStatus={connectionStatus}
                 metadata={displayMetadata}
                 isLoadingMetadata={isLoadingMetadata}
+                seriesEpisodes={seriesEpisodes}
+                onPlayEpisode={onPlayEpisode}
               />
             </div>
           </ScrollArea>
@@ -906,6 +925,19 @@ interface StreamDetailsPanelProps {
   connectionStatus: 'connected' | 'connecting' | 'error';
   metadata?: ContentMetadata;
   isLoadingMetadata?: boolean;
+  seriesEpisodes?: SeriesEpisode[];
+  onPlayEpisode?: (episode: SeriesEpisode) => void;
+}
+
+// Helper to parse season/episode from name
+function parseEpisodeInfo(name: string): { season: number; episode: number } | null {
+  const match = name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) ||
+               name.match(/(\d{1,2})x(\d{1,3})/i) ||
+               name.match(/Temporada\s*(\d+).*?Ep[is]*[óo]*d?i?o?\s*(\d+)/i);
+  if (match) {
+    return { season: parseInt(match[1]), episode: parseInt(match[2]) };
+  }
+  return null;
 }
 
 function StreamDetailsPanel({ 
@@ -916,8 +948,46 @@ function StreamDetailsPanel({
   connectionStatus,
   metadata,
   isLoadingMetadata,
+  seriesEpisodes = [],
+  onPlayEpisode,
 }: StreamDetailsPanelProps) {
+  const [selectedSeason, setSelectedSeason] = useState(1);
   const rating = metadata?.tmdb_rating || metadata?.imdb_rating;
+
+  // Parse all episodes and extract seasons
+  const { availableSeasons, episodesBySeason } = useMemo(() => {
+    const episodeMap = new Map<number, Array<SeriesEpisode & { episodeNum: number }>>();
+    const seasons = new Set<number>();
+
+    seriesEpisodes.forEach(ep => {
+      const info = parseEpisodeInfo(ep.name);
+      if (info) {
+        seasons.add(info.season);
+        const existing = episodeMap.get(info.season) || [];
+        existing.push({ ...ep, episodeNum: info.episode });
+        episodeMap.set(info.season, existing);
+      }
+    });
+
+    // Sort episodes within each season
+    episodeMap.forEach((eps, season) => {
+      episodeMap.set(season, eps.sort((a, b) => a.episodeNum - b.episodeNum));
+    });
+
+    return {
+      availableSeasons: Array.from(seasons).sort((a, b) => a - b),
+      episodesBySeason: episodeMap,
+    };
+  }, [seriesEpisodes]);
+
+  // Auto-select first available season
+  useEffect(() => {
+    if (availableSeasons.length > 0 && !availableSeasons.includes(selectedSeason)) {
+      setSelectedSeason(availableSeasons[0]);
+    }
+  }, [availableSeasons, selectedSeason]);
+
+  const currentSeasonEpisodes = episodesBySeason.get(selectedSeason) || [];
 
   return (
     <div className="space-y-3">
@@ -1092,6 +1162,71 @@ function StreamDetailsPanel({
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Series Episodes */}
+      {seriesEpisodes.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader className="p-3 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Tv className="w-4 h-4 flex-shrink-0" />
+                Episódios
+              </CardTitle>
+              {availableSeasons.length > 1 && (
+                <Select 
+                  value={String(selectedSeason)} 
+                  onValueChange={(v) => setSelectedSeason(parseInt(v))}
+                >
+                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                    <SelectValue placeholder="Temporada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSeasons.map((season) => (
+                      <SelectItem key={season} value={String(season)}>
+                        Temporada {season}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            {availableSeasons.length === 1 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Temporada {availableSeasons[0]} • {currentSeasonEpisodes.length} episódios
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+              {currentSeasonEpisodes.length > 0 ? (
+                currentSeasonEpisodes.map((ep) => (
+                  <button
+                    key={ep.id}
+                    onClick={() => onPlayEpisode?.(ep)}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 rounded bg-primary/20 flex items-center justify-center">
+                      <Play className="w-3 h-3 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs truncate">
+                        Episódio {ep.episodeNum}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {ep.name}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Nenhum episódio encontrado para esta temporada
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
