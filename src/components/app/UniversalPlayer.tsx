@@ -54,60 +54,78 @@ interface PlayerError {
 }
 
 // =============================================================================
-// MPEGTS.JS CONFIGURATION
+// MPEGTS.JS CONFIGURATION - OPTIMIZED FOR ZERO BUFFERING
 // =============================================================================
 const MPEGTS_CONFIG: mpegts.Config = {
   enableWorker: true,
   enableStashBuffer: true,
-  stashInitialSize: 384 * 1024,
+  stashInitialSize: 128 * 1024, // Reduzido para início mais rápido
   liveBufferLatencyChasing: true,
+  liveBufferLatencyMaxLatency: 1.5, // Max 1.5s de latência
+  liveBufferLatencyMinRemain: 0.3, // Min 0.3s no buffer
   liveSync: true,
   autoCleanupSourceBuffer: true,
-  autoCleanupMaxBackwardDuration: 30,
-  autoCleanupMinBackwardDuration: 10,
+  autoCleanupMaxBackwardDuration: 20, // Reduzido
+  autoCleanupMinBackwardDuration: 5, // Reduzido
+  fixAudioTimestampGap: true, // Corrigir gaps de áudio
+  accurateSeek: false, // Desabilitar para performance
+  seekType: 'range',
+  lazyLoad: false, // Carregar imediatamente
+  lazyLoadMaxDuration: 0,
+  deferLoadAfterSourceOpen: false, // Não adiar carregamento
 };
 
 // =============================================================================
-// HLS.JS CONFIGURATION - OPTIMIZED FOR FAST START
+// HLS.JS CONFIGURATION - OPTIMIZED FOR ZERO BUFFERING
 // =============================================================================
 const HLS_CONFIG: Partial<Hls['config']> = {
   // Worker e performance
   enableWorker: true,
   lowLatencyMode: false, // Desabilitado para estabilidade
   
-  // Buffer settings - FAST START: menor buffer inicial
-  maxBufferLength: 20, // Reduzido para início mais rápido
-  maxMaxBufferLength: 60,
-  maxBufferSize: 30 * 1000 * 1000, // 30MB
-  maxBufferHole: 0.3, // Mais tolerante a holes
-  backBufferLength: 15, // Reduzido
+  // Buffer settings - ZERO BUFFERING: mínimo necessário
+  maxBufferLength: 15, // Reduzido para início instantâneo
+  maxMaxBufferLength: 45, // Limite máximo menor
+  maxBufferSize: 20 * 1000 * 1000, // 20MB
+  maxBufferHole: 0.5, // Mais tolerante a holes
+  backBufferLength: 10, // Buffer traseiro mínimo
   
-  // ABR (Adaptive Bitrate) - FAST START
-  startLevel: 0, // Começar com qualidade mais baixa para início instantâneo
-  abrEwmaDefaultEstimate: 1500000, // 1.5Mbps - estimativa otimista
-  abrBandWidthFactor: 0.8, // Mais agressivo no ABR
-  abrBandWidthUpFactor: 0.6, // Subir qualidade mais rápido
+  // ABR (Adaptive Bitrate) - ULTRA FAST START
+  startLevel: 0, // Começar com qualidade mais baixa
+  abrEwmaDefaultEstimate: 2000000, // 2Mbps - estimativa otimista
+  abrBandWidthFactor: 0.9, // Muito agressivo no ABR
+  abrBandWidthUpFactor: 0.7, // Subir qualidade bem rápido
+  abrMaxWithRealBitrate: true, // Usar bitrate real para ABR
   
-  // Timeouts - FAST START: menores para falhar rápido
-  manifestLoadingTimeOut: 10000,
-  levelLoadingTimeOut: 10000,
-  fragLoadingTimeOut: 20000,
+  // Timeouts - ULTRA FAST: menores para falhar/retry rápido
+  manifestLoadingTimeOut: 8000,
+  levelLoadingTimeOut: 8000,
+  fragLoadingTimeOut: 15000,
   
   // Retries - agressivo para IPTV instável
-  manifestLoadingMaxRetry: 4,
-  levelLoadingMaxRetry: 4,
-  fragLoadingMaxRetry: 6,
+  manifestLoadingMaxRetry: 6,
+  levelLoadingMaxRetry: 6,
+  fragLoadingMaxRetry: 8,
   
-  // Retry delays - menores para recuperação rápida
-  manifestLoadingRetryDelay: 300,
-  levelLoadingRetryDelay: 300,
-  fragLoadingRetryDelay: 300,
+  // Retry delays - mínimos para recuperação instantânea
+  manifestLoadingRetryDelay: 200,
+  levelLoadingRetryDelay: 200,
+  fragLoadingRetryDelay: 200,
   
   // FAST START: Progressive loading
   progressive: true,
   
-  // FAST START: Start fragment prefetch
+  // FAST START: Prefetch
   startFragPrefetch: true,
+  
+  // Smooth switching
+  testBandwidth: true,
+  
+  // Caputo para evitar stalls
+  capLevelToPlayerSize: true,
+  capLevelOnFPSDrop: true,
+  fpsDroppedMonitoringPeriod: 3000,
+  fpsDroppedMonitoringThreshold: 0.1,
 };
 
 // =============================================================================
@@ -515,19 +533,46 @@ export default function UniversalPlayer({
       }
     });
 
-    // Error handling with recovery
+    // Fragment loading - track progress
+    hls.on(Hls.Events.FRAG_LOADED, () => {
+      // Reset loading state when fragments are coming in
+      if (isLoading) {
+        setIsLoading(false);
+      }
+    });
+
+    // Level switching for quality adaptation
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+      console.log('[Player] Quality switched to level:', data.level);
+    });
+
+    // Error handling with aggressive recovery
     hls.on(Hls.Events.ERROR, (_, data) => {
       console.error('[Player] HLS error:', data.type, data.details, 'fatal:', data.fatal);
 
+      // Handle buffer stall specifically
+      if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+        console.warn('[Player] Buffer stall detected, recovering...');
+        if (hls.liveSyncPosition) {
+          video.currentTime = hls.liveSyncPosition;
+        }
+        hls.startLoad();
+        return;
+      }
+
       if (!data.fatal) {
-        // Non-fatal: hls.js handles internally
+        // Non-fatal: hls.js handles internally, but help with buffer issues
+        if (data.details === Hls.ErrorDetails.BUFFER_APPEND_ERROR) {
+          console.warn('[Player] Buffer append error, flushing...');
+          hls.recoverMediaError();
+        }
         return;
       }
 
       // Fatal error: attempt recovery
       recoveryAttempts.current++;
       
-      if (recoveryAttempts.current > 3) {
+      if (recoveryAttempts.current > 5) { // Increased from 3 to 5
         console.error('[Player] Max recovery attempts reached');
         setHasError(true);
         setErrorMessage('Falha ao carregar stream');
@@ -538,12 +583,19 @@ export default function UniversalPlayer({
       switch (data.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
           console.log('[Player] Network error, attempting recovery...');
-          hls.startLoad();
+          setTimeout(() => hls.startLoad(), 500); // Small delay before retry
           break;
           
         case Hls.ErrorTypes.MEDIA_ERROR:
           console.log('[Player] Media error, attempting recovery...');
           hls.recoverMediaError();
+          // If still issues, try swap audio codec
+          setTimeout(() => {
+            if (recoveryAttempts.current > 2) {
+              hls.swapAudioCodec();
+              hls.recoverMediaError();
+            }
+          }, 1000);
           break;
           
         default:
