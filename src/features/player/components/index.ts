@@ -6,6 +6,7 @@ export { TVHeroCarousel } from './TVHeroCarousel';
 export { ContinueWatchingRow } from './ContinueWatchingRow';
 export { Top10Row } from './Top10Row';
 export { ContentRow } from './ContentRow';
+export { HomeView } from './HomeView';
 
 // Live TV components
 export { LiveTVView } from './LiveTVView';
