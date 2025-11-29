@@ -426,6 +426,13 @@ export const useVODManagement = () => {
     };
   }, [fetchDownloads, fetchStatistics, fetchHostedVODs, throttledRefresh]);
 
+  // Stable refresh function
+  const refresh = useCallback(() => {
+    fetchDownloads();
+    fetchStatistics();
+    fetchHostedVODs();
+  }, [fetchDownloads, fetchStatistics, fetchHostedVODs]);
+
   return {
     downloads,
     hostedVODs,
@@ -438,10 +445,6 @@ export const useVODManagement = () => {
     detectVODs,
     resetOrphanedDownloads,
     retryDownload,
-    refresh: () => {
-      fetchDownloads();
-      fetchStatistics();
-      fetchHostedVODs();
-    },
+    refresh,
   };
 };
