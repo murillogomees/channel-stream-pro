@@ -11,7 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
 import CloudflareStreamDashboard from '@/components/admin/CloudflareStreamDashboard';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play, Tv, Copy, Link, Zap } from 'lucide-react';
+import StreamingPolicyDashboard from '@/components/admin/StreamingPolicyDashboard';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play, Tv, Copy, Link, Zap, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -234,7 +235,7 @@ export default function AdminVODStorage() {
       </div>
 
       <Tabs defaultValue="r2" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-xl">
           <TabsTrigger value="r2" className="flex items-center gap-2">
             <HardDrive className="w-4 h-4" />
             Cloudflare R2
@@ -243,10 +244,18 @@ export default function AdminVODStorage() {
             <Zap className="w-4 h-4" />
             Cloudflare Stream
           </TabsTrigger>
+          <TabsTrigger value="policies" className="flex items-center gap-2">
+            <Layers className="w-4 h-4" />
+            Policy Engine
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="stream" className="mt-6">
           <CloudflareStreamDashboard />
+        </TabsContent>
+
+        <TabsContent value="policies" className="mt-6">
+          <StreamingPolicyDashboard />
         </TabsContent>
 
         <TabsContent value="r2" className="mt-6 space-y-6">

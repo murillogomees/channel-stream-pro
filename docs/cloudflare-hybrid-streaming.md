@@ -12,15 +12,35 @@ Este documento descreve a estratégia híbrida de streaming que utiliza:
 ## Arquitetura
 
 ```
-[Ingest Live Critical] --> Origin (SRT/RTMP) --> Player (edge proxied)
-                                 \
-                                  -> Opcional: Cloudflare Stream Recording (backup)
-
-[VOD Upload] ----> Cloudflare Stream (transcode) --> Cloudflare CDN --> Player (signed URLs)
-
-[Agile/Other] ----> Origin (R2) --> Edge Cache --> Player (signed URLs)
-
-Policy Engine (Supabase) <---- metrics & usage stats ---> Admin Dashboard
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PLAYER REQUEST                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     EDGE ROUTER (Cloudflare Worker)                  │
+│  /play/:channelId → Policy Decision → Route to best source          │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+            ┌───────────┐   ┌───────────┐   ┌───────────┐
+            │ Cloudflare│   │   R2 CDN  │   │  Origin   │
+            │  Stream   │   │           │   │  Server   │
+            └───────────┘   └───────────┘   └───────────┘
+                    │               │               │
+                    └───────────────┴───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │      POLICY ENGINE            │
+                    │    (Supabase Database)        │
+                    │  ┌─────────────────────────┐  │
+                    │  │ streaming_policies      │  │
+                    │  │ channel_routing_overrides│ │
+                    │  │ streaming_metrics       │  │
+                    │  └─────────────────────────┘  │
+                    └───────────────────────────────┘
 ```
 
 ## Componentes Implementados
