@@ -281,7 +281,8 @@ async function uploadToR2(slug: string, content: string): Promise<string> {
     throw new Error(`R2 upload failed: ${response.status} - ${errorText}`);
   }
 
-  const publicDomain = R2_PUBLIC_DOMAIN || `${R2_BUCKET}.r2.dev`;
+  // Remove https:// prefix if present to avoid duplication
+  const publicDomain = (R2_PUBLIC_DOMAIN || `${R2_BUCKET}.r2.dev`).replace(/^https?:\/\//, '');
   return `https://${publicDomain}/${fileName}`;
 }
 
