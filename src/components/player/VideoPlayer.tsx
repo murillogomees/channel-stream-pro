@@ -36,6 +36,7 @@ import { QualityBadge } from "./QualityBadge";
 import { useVisibilityOptimization } from "@/hooks/useVisibilityOptimization";
 import { usePlayerErrorRecovery } from "@/hooks/usePlayerErrorRecovery";
 import { useAdvancedHlsConfig } from "@/hooks/useAdvancedHlsConfig";
+import { onPlayerOpen, onPlayerClose } from "@/services/downloadPriorityService";
 
 // =============================================================================
 // TYPES
@@ -445,6 +446,20 @@ export function VideoPlayer({
       }
     };
   }, [initPlayer]);
+
+  // ---------------------------------------------------------------------------
+  // Download Priority Management - Pause downloads when player opens
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    // Pausar downloads quando player abre
+    onPlayerOpen();
+    
+    return () => {
+      // Retomar downloads quando player fecha
+      onPlayerClose();
+    };
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Video Event Handlers

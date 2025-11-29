@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
+import { onPlayerOpen, onPlayerClose } from '@/services/downloadPriorityService';
 
 interface VideoPlayerProps {
   url: string;
@@ -128,6 +129,14 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
         setIsLoading(false);
       }
     }
+  }, []);
+
+  // Download Priority Management - Pause downloads when player opens
+  useEffect(() => {
+    onPlayerOpen();
+    return () => {
+      onPlayerClose();
+    };
   }, []);
 
   const initPlayer = useCallback(() => {
