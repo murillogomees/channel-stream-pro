@@ -518,14 +518,109 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
         headers['Range'] = `bytes=${rangeStart}-${rangeEnd}`;
       }
 
+      // Para servidores sem suporte a Range, usar streaming
+      if (!supportsRanges && downloadedBytes === 0) {
+        console.log(`📥 [VOD] Iniciando download via streaming (sem Range support)`);
+        
+        const response = await fetch(channel.stream_url);
+        if (!response.ok) {
+          throw new Error(`Download falhou: ${response.status}`);
+        }
+        
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Não foi possível obter stream reader');
+        }
+        
+        try {
+          while (true) {
+            // Verificar timeout de execução
+            if (Date.now() - startExecution > EXECUTION_TIMEOUT) {
+              console.log(`⏸️ [VOD] Timeout durante streaming, pausando em ${(downloadedBytes / 1048576).toFixed(1)}MB`);
+              reader.cancel();
+              
+              // Upload buffer pendente
+              if (buffer.length >= R2_PART_SIZE) {
+                const partData = buffer.slice(0, R2_PART_SIZE);
+                const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
+                parts.push({ partNumber, etag });
+                downloadedBytes += R2_PART_SIZE;
+              }
+              
+              await supabase.from('vod_downloads').update({
+                status: 'paused',
+                file_size_bytes: downloadedBytes,
+                segments_downloaded: parts.length,
+                metadata: { 
+                  upload_id: uploadId, 
+                  parts, 
+                  downloaded_bytes: downloadedBytes,
+                  content_length: contentLength,
+                  supports_ranges: false,
+                  streaming_interrupted: true
+                }
+              }).eq('id', downloadId);
+              
+              scheduleResumeImmediate(downloadId);
+              throw new Error('PAUSE_FOR_RESUME');
+            }
+            
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              console.log(`📦 [VOD] Stream completo: ${(downloadedBytes / 1048576).toFixed(1)}MB`);
+              break;
+            }
+            
+            if (value) {
+              // Adicionar ao buffer
+              const newBuffer = new Uint8Array(buffer.length + value.length);
+              newBuffer.set(buffer);
+              newBuffer.set(value, buffer.length);
+              buffer = newBuffer;
+              downloadedBytes += value.length;
+              
+              // Upload quando buffer atingir tamanho mínimo
+              while (buffer.length >= R2_PART_SIZE) {
+                const partData = buffer.slice(0, R2_PART_SIZE);
+                console.log(`⬆️ [VOD] Parte ${partNumber}: ${(partData.length / 1048576).toFixed(1)}MB`);
+                
+                const etag = await uploadPart(r2Key, uploadId, partNumber, partData);
+                parts.push({ partNumber, etag });
+                buffer = buffer.slice(R2_PART_SIZE);
+                partNumber++;
+              }
+              
+              // Atualizar progresso periodicamente
+              if (Date.now() - lastUpdate > PROGRESS_UPDATE_INTERVAL) {
+                lastUpdate = Date.now();
+                await supabase.from('vod_downloads').update({
+                  file_size_bytes: downloadedBytes,
+                  segments_downloaded: parts.length,
+                  metadata: { 
+                    upload_id: uploadId, 
+                    parts, 
+                    downloaded_bytes: downloadedBytes,
+                    supports_ranges: false
+                  }
+                }).eq('id', downloadId);
+                console.log(`📈 [VOD] Streaming: ${(downloadedBytes / 1048576).toFixed(1)}MB, ${parts.length} partes`);
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        
+        // Upload buffer restante e finalizar
+        break;
+      }
+
       console.log(`📥 [VOD] Chunk ${rangeStart}-${rangeEnd} (${((rangeEnd - rangeStart + 1) / 1048576).toFixed(1)}MB)`);
 
-      // Usar timeout maior para downloads sem suporte a range
-      const fetchTimeout = supportsRanges ? FETCH_TIMEOUT_CHUNK : FETCH_TIMEOUT_FULL;
-      
       const response = await fetch(channel.stream_url, { 
         headers,
-        signal: AbortSignal.timeout(fetchTimeout) 
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_CHUNK) 
       });
       
       if (!response.ok && response.status !== 206) {
@@ -534,15 +629,14 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
 
       const chunkData = new Uint8Array(await response.arrayBuffer());
       
-      // Se não suporta ranges, baixou o arquivo inteiro
-      if (!supportsRanges || response.status === 200) {
-        console.log(`📦 [VOD] Download completo: ${(chunkData.length / 1048576).toFixed(1)}MB`);
+      // Se retornou 200 ao invés de 206, servidor não suportou Range
+      if (response.status === 200) {
+        console.log(`📦 [VOD] Servidor ignorou Range, recebeu: ${(chunkData.length / 1048576).toFixed(1)}MB`);
         
         // Upload direto se for pequeno
         if (chunkData.length < 10 * 1024 * 1024) {
           await uploadToR2Simple(r2Key, chunkData, contentType);
         } else {
-          // Multipart para arquivo grande baixado de uma vez
           await uploadLargeBuffer(r2Key, uploadId, chunkData, parts, partNumber);
         }
         
