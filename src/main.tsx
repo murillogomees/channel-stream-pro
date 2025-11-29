@@ -1,8 +1,15 @@
-import { createRoot } from "react-dom/client";
+import * as React from "react";
+import * as ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
 import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
+
+// Ensure React is globally available for third-party libs
+if (typeof window !== 'undefined') {
+  (window as any).React = React;
+  (window as any).ReactDOM = ReactDOM;
+}
 
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
@@ -14,8 +21,8 @@ registerServiceWorker();
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
-console.error = (...args: any[]) => {
-  const errorMessage = args[0]?.toString() || '';
+console.error = (...args: unknown[]) => {
+  const errorMessage = String(args[0] || '');
   
   // Suprimir todos os erros relacionados ao WebSocket do Realtime
   if (
@@ -30,8 +37,8 @@ console.error = (...args: any[]) => {
   originalConsoleError.apply(console, args);
 };
 
-console.warn = (...args: any[]) => {
-  const warnMessage = args[0]?.toString() || '';
+console.warn = (...args: unknown[]) => {
+  const warnMessage = String(args[0] || '');
   
   // Suprimir avisos do WebSocket do Realtime
   if (
@@ -44,9 +51,14 @@ console.warn = (...args: any[]) => {
   originalConsoleWarn.apply(console, args);
 };
 
-createRoot(document.getElementById("root")!).render(
-  <App />
-);
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
 
 // Screen Orientation API - lock landscape when player goes fullscreen
 if ('screen' in window && 'orientation' in screen) {
@@ -58,10 +70,10 @@ if ('screen' in window && 'orientation' in screen) {
     
     if (isFullscreen && isVideoPlayer) {
       // Lock to landscape in fullscreen video
-      (screen.orientation as any).lock?.('landscape').catch(() => {});
+      (screen.orientation as ScreenOrientation & { lock?: (orientation: string) => Promise<void> }).lock?.('landscape').catch(() => {});
     } else if (!isFullscreen) {
       // Unlock orientation when exiting fullscreen
-      (screen.orientation as any).unlock?.();
+      (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
     }
   });
 }

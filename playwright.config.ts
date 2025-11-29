@@ -1,3 +1,4 @@
+// @ts-nocheck - Playwright config runs outside app context
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -9,14 +10,14 @@ import { defineConfig, devices } from '@playwright/test';
  */
 
 export default defineConfig({
-  testDir: './',
+  testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
-    ['html', { outputFolder: '../../../report/playwright-report' }],
-    ['json', { outputFile: '../../../report/test-results.json' }],
+    ['html', { outputFolder: 'report/playwright-report' }],
+    ['json', { outputFile: 'report/test-results.json' }],
   ],
   
   use: {

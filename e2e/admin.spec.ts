@@ -2,9 +2,10 @@
  * E2E Tests - Admin Dashboard
  * 
  * Testes end-to-end para validar fluxos do painel administrativo
- * Execute com: npx playwright test src/tests/e2e/admin.spec.ts
+ * Execute com: npx playwright test e2e/admin.spec.ts
  */
 
+// @ts-nocheck - These tests run in Playwright context, not the app build
 import { test, expect, Page } from '@playwright/test';
 
 // ========================================
@@ -44,10 +45,7 @@ test.describe('Admin Hub', () => {
     await page.goto(`${BASE_URL}/admin`);
     await waitForPageLoad(page);
     
-    // Verify page title
     await expect(page.locator('h1')).toContainText('Admin Hub');
-    
-    // Verify categories are rendered
     await expect(page.locator('[data-testid="category-card"]')).toHaveCount(6);
   });
 
@@ -55,10 +53,7 @@ test.describe('Admin Hub', () => {
     await page.goto(`${BASE_URL}/admin`);
     await waitForPageLoad(page);
     
-    // Type in search
     await page.fill('input[placeholder*="Buscar"]', 'M3U');
-    
-    // Verify filtered results
     await expect(page.locator('[data-testid="category-card"]')).toBeVisible();
   });
 
@@ -66,10 +61,7 @@ test.describe('Admin Hub', () => {
     await page.goto(`${BASE_URL}/admin`);
     await waitForPageLoad(page);
     
-    // Click on M3U category
     await page.click('text=Gestão M3U');
-    
-    // Verify navigation
     await expect(page).toHaveURL(`${BASE_URL}/admin/m3u`);
   });
 });
@@ -87,10 +79,7 @@ test.describe('M3U Management', () => {
     await page.goto(`${BASE_URL}/admin/m3u`);
     await waitForPageLoad(page);
     
-    // Verify page header
     await expect(page.locator('h1')).toContainText('Gestão de M3U');
-    
-    // Verify tabs are present
     await expect(page.locator('[role="tablist"]')).toBeVisible();
   });
 
@@ -98,11 +87,9 @@ test.describe('M3U Management', () => {
     await page.goto(`${BASE_URL}/admin/m3u`);
     await waitForPageLoad(page);
     
-    // Click on Builder tab
     await page.click('button:has-text("Builder")');
     await waitForPageLoad(page);
     
-    // Verify tab content changed
     await expect(page.locator('[role="tabpanel"]')).toBeVisible();
   });
 });
@@ -222,14 +209,5 @@ test.describe('Access Control', () => {
   test('should redirect unauthenticated users to login', async ({ page }) => {
     await page.goto(`${BASE_URL}/admin`);
     await expect(page).toHaveURL(/login/);
-  });
-
-  test('should show 403 for non-admin users', async ({ page }) => {
-    // Login as regular user (if applicable)
-    // This test should be customized based on your auth system
-    await page.goto(`${BASE_URL}/login`);
-    // ... login as non-admin
-    // await page.goto(`${BASE_URL}/admin`);
-    // await expect(page).toHaveURL(`${BASE_URL}/403`);
   });
 });
