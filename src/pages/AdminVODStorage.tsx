@@ -159,9 +159,12 @@ export default function AdminVODStorage() {
       setIsDetecting(true);
       const result = await detectVODs();
       
+      // Recarregar também as entradas CDN
+      await loadCdnEntries();
+      
       toast({
         title: 'Detecção concluída',
-        description: `${result.updated_count} canais marcados como VOD. Total: ${result.vod_count} VODs, ${result.live_count} Live`,
+        description: `Encontrados ${result.vod_count} VODs e ${result.live_count} Lives nas entradas CDN`,
       });
     } catch (error: any) {
       toast({

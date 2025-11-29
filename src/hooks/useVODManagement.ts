@@ -134,12 +134,13 @@ export const useVODManagement = () => {
     }
   }, [fetchDownloads, fetchStatistics, fetchHostedVODs]);
 
-  // Detectar VODs automaticamente
+  // Detectar VODs automaticamente a partir das entradas CDN
   const detectVODs = useCallback(async (): Promise<VODDetectionResult> => {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase.rpc('detect_vod_channels' as any);
+      // Usar a nova função que detecta a partir das entradas CDN (m3u_sync_entries)
+      const { data, error } = await supabase.rpc('detect_vod_from_sync_entries' as any);
       
       if (error) throw error;
       
@@ -150,7 +151,7 @@ export const useVODManagement = () => {
       
       return result as VODDetectionResult;
     } catch (error: any) {
-      console.error('Error detecting VODs:', error);
+      console.error('Error detecting VODs from CDN entries:', error);
       throw error;
     } finally {
       setIsLoading(false);
