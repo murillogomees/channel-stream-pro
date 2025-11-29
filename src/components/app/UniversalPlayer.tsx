@@ -68,38 +68,46 @@ const MPEGTS_CONFIG: mpegts.Config = {
 };
 
 // =============================================================================
-// HLS.JS CONFIGURATION
+// HLS.JS CONFIGURATION - OPTIMIZED FOR FAST START
 // =============================================================================
 const HLS_CONFIG: Partial<Hls['config']> = {
   // Worker e performance
   enableWorker: true,
   lowLatencyMode: false, // Desabilitado para estabilidade
   
-  // Buffer settings - otimizado para IPTV
-  maxBufferLength: 30,
+  // Buffer settings - FAST START: menor buffer inicial
+  maxBufferLength: 20, // Reduzido para início mais rápido
   maxMaxBufferLength: 60,
   maxBufferSize: 30 * 1000 * 1000, // 30MB
-  maxBufferHole: 0.5,
-  backBufferLength: 30,
+  maxBufferHole: 0.3, // Mais tolerante a holes
+  backBufferLength: 15, // Reduzido
   
-  // ABR (Adaptive Bitrate)
-  startLevel: -1, // Auto
-  abrEwmaDefaultEstimate: 500000,
+  // ABR (Adaptive Bitrate) - FAST START
+  startLevel: 0, // Começar com qualidade mais baixa para início instantâneo
+  abrEwmaDefaultEstimate: 1500000, // 1.5Mbps - estimativa otimista
+  abrBandWidthFactor: 0.8, // Mais agressivo no ABR
+  abrBandWidthUpFactor: 0.6, // Subir qualidade mais rápido
   
-  // Timeouts - tolerantes para IPTV
-  manifestLoadingTimeOut: 15000,
-  levelLoadingTimeOut: 15000,
-  fragLoadingTimeOut: 25000,
+  // Timeouts - FAST START: menores para falhar rápido
+  manifestLoadingTimeOut: 10000,
+  levelLoadingTimeOut: 10000,
+  fragLoadingTimeOut: 20000,
   
   // Retries - agressivo para IPTV instável
   manifestLoadingMaxRetry: 4,
   levelLoadingMaxRetry: 4,
   fragLoadingMaxRetry: 6,
   
-  // Retry delays
-  manifestLoadingRetryDelay: 500,
-  levelLoadingRetryDelay: 500,
-  fragLoadingRetryDelay: 500,
+  // Retry delays - menores para recuperação rápida
+  manifestLoadingRetryDelay: 300,
+  levelLoadingRetryDelay: 300,
+  fragLoadingRetryDelay: 300,
+  
+  // FAST START: Progressive loading
+  progressive: true,
+  
+  // FAST START: Start fragment prefetch
+  startFragPrefetch: true,
 };
 
 // =============================================================================
