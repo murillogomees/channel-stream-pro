@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -7,7 +7,7 @@ export interface VODDownload {
   channel_id: string;
   original_url: string;
   r2_url: string | null;
-  status: 'pending' | 'downloading' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'downloading' | 'processing' | 'completed' | 'failed' | 'queued';
   file_size_bytes: number | null;
   segment_count: number;
   segments_downloaded: number;
@@ -16,6 +16,15 @@ export interface VODDownload {
   error_message: string | null;
   retry_count: number;
   created_at: string;
+}
+
+export interface HostedVOD {
+  id: string;
+  name: string;
+  stream_url: string;
+  r2_url: string;
+  r2_uploaded_at: string;
+  group_title: string | null;
 }
 
 export interface VODStatistics {
@@ -37,8 +46,10 @@ export interface VODDetectionResult {
 export const useVODManagement = () => {
   const { toast } = useToast();
   const [downloads, setDownloads] = useState<VODDownload[]>([]);
+  const [hostedVODs, setHostedVODs] = useState<HostedVOD[]>([]);
   const [statistics, setStatistics] = useState<VODStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const lastUpdateRef = useRef<number>(0);
 
   // Carregar downloads
   const fetchDownloads = useCallback(async () => {
@@ -47,12 +58,30 @@ export const useVODManagement = () => {
         .from('vod_downloads' as any)
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
       setDownloads((data || []) as unknown as VODDownload[]);
     } catch (error: any) {
       console.error('Error fetching VOD downloads:', error);
+    }
+  }, []);
+
+  // Carregar VODs hospedados no R2
+  const fetchHostedVODs = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('m3u_channels')
+        .select('id, name, stream_url, r2_url, r2_uploaded_at, group_title')
+        .eq('r2_uploaded', true)
+        .not('r2_url', 'is', null)
+        .order('r2_uploaded_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setHostedVODs((data || []) as HostedVOD[]);
+    } catch (error: any) {
+      console.error('Error fetching hosted VODs:', error);
     }
   }, []);
 
@@ -69,6 +98,17 @@ export const useVODManagement = () => {
       console.error('Error fetching VOD statistics:', error);
     }
   }, []);
+
+  // Throttled refresh para evitar muitas chamadas
+  const throttledRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastUpdateRef.current > 1000) { // Max 1 update per second
+      lastUpdateRef.current = now;
+      fetchDownloads();
+      fetchStatistics();
+      fetchHostedVODs();
+    }
+  }, [fetchDownloads, fetchStatistics, fetchHostedVODs]);
 
   // Detectar VODs automaticamente
   const detectVODs = useCallback(async (): Promise<VODDetectionResult> => {
@@ -242,9 +282,11 @@ export const useVODManagement = () => {
   useEffect(() => {
     fetchDownloads();
     fetchStatistics();
+    fetchHostedVODs();
 
-    const channel = supabase
-      .channel('vod-downloads-changes')
+    // Canal para updates de vod_downloads
+    const downloadsChannel = supabase
+      .channel('vod-downloads-realtime')
       .on(
         'postgres_changes' as any,
         {
@@ -252,20 +294,49 @@ export const useVODManagement = () => {
           schema: 'public',
           table: 'vod_downloads',
         },
-        () => {
-          fetchDownloads();
-          fetchStatistics();
+        (payload: any) => {
+          console.log('[VOD Realtime] Download update:', payload.eventType);
+          throttledRefresh();
         }
       )
       .subscribe();
 
+    // Canal para updates de m3u_channels (quando r2_uploaded muda)
+    const channelsChannel = supabase
+      .channel('vod-channels-realtime')
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'm3u_channels',
+          filter: 'is_vod=eq.true',
+        },
+        (payload: any) => {
+          if (payload.new?.r2_uploaded !== payload.old?.r2_uploaded) {
+            console.log('[VOD Realtime] Channel R2 status changed');
+            throttledRefresh();
+          }
+        }
+      )
+      .subscribe();
+
+    // Polling de backup a cada 10 segundos para garantir sincronização
+    const pollInterval = setInterval(() => {
+      fetchDownloads();
+      fetchStatistics();
+    }, 10000);
+
     return () => {
-      channel.unsubscribe();
+      downloadsChannel.unsubscribe();
+      channelsChannel.unsubscribe();
+      clearInterval(pollInterval);
     };
-  }, [fetchDownloads, fetchStatistics]);
+  }, [fetchDownloads, fetchStatistics, fetchHostedVODs, throttledRefresh]);
 
   return {
     downloads,
+    hostedVODs,
     statistics,
     isLoading,
     downloadChannel,
@@ -276,6 +347,7 @@ export const useVODManagement = () => {
     refresh: () => {
       fetchDownloads();
       fetchStatistics();
+      fetchHostedVODs();
     },
   };
 };

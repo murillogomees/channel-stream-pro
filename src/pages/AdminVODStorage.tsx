@@ -3,18 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Play, Rocket } from 'lucide-react';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
-  const { downloads, statistics, isLoading, refresh, detectVODs } = useVODManagement();
+  const { downloads, hostedVODs, statistics, isLoading, refresh, detectVODs } = useVODManagement();
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
+
+  // Filtrar downloads por status
+  const activeDownloads = downloads.filter(d => ['downloading', 'processing', 'queued'].includes(d.status));
+  const completedDownloads = downloads.filter(d => d.status === 'completed');
+  const failedDownloads = downloads.filter(d => d.status === 'failed');
+  const pendingDownloads = downloads.filter(d => d.status === 'pending');
 
   const handleStartDownloads = async () => {
     try {
@@ -241,7 +248,154 @@ export default function AdminVODStorage() {
         </Card>
       </div>
 
-      {/* Lista de Downloads */}
+      {/* Downloads Ativos em Tempo Real */}
+      {activeDownloads.length > 0 && (
+        <Card className="border-blue-500/50 bg-blue-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-blue-600">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Downloads em Execução ({activeDownloads.length})
+            </CardTitle>
+            <CardDescription>Atualizando em tempo real</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {activeDownloads.map((download) => {
+                const progress = download.segment_count > 0 
+                  ? Math.round((download.segments_downloaded / download.segment_count) * 100)
+                  : 0;
+                return (
+                  <div key={download.id} className="bg-background rounded-lg p-3 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <span className="text-sm font-medium truncate max-w-[200px]">
+                          {download.channel_id.slice(0, 8)}...
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {download.status === 'queued' ? 'Na fila' : 
+                           download.status === 'downloading' ? 'Baixando' : 'Processando'}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {download.segments_downloaded}/{download.segment_count} segmentos
+                      </span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+                      <span>{progress}%</span>
+                      {download.file_size_bytes && (
+                        <span>{(download.file_size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Grid com VODs Hospedados e Falhos */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* VODs Hospedados no R2 */}
+        <Card className="border-green-500/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-green-600">
+              <Cloud className="h-5 w-5" />
+              VODs Hospedados no R2 ({hostedVODs.length})
+            </CardTitle>
+            <CardDescription>Últimos VODs enviados para o CDN</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {hostedVODs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Cloud className="h-12 w-12 mb-2 opacity-50" />
+                  <p className="text-sm">Nenhum VOD hospedado ainda</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {hostedVODs.map((vod) => (
+                    <div key={vod.id} className="bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{vod.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{vod.group_title}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          {vod.r2_url && (
+                            <a 
+                              href={vod.r2_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Hospedado em {new Date(vod.r2_uploaded_at).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Downloads com Falha */}
+        <Card className="border-red-500/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Downloads com Falha ({failedDownloads.length})
+            </CardTitle>
+            <CardDescription>Requerem atenção ou retry</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {failedDownloads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mb-2 opacity-50 text-green-500" />
+                  <p className="text-sm">Nenhum download com falha</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {failedDownloads.map((download) => (
+                    <div key={download.id} className="bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            Canal {download.channel_id.slice(0, 12)}...
+                          </p>
+                          <p className="text-xs text-destructive mt-1 line-clamp-2">
+                            {download.error_message || 'Erro desconhecido'}
+                          </p>
+                        </div>
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                          {download.retry_count}/3 tentativas
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lista Completa de Downloads */}
       <VODDownloadProgress downloads={downloads} />
 
       {/* Informações e Dicas */}
