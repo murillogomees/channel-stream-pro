@@ -681,16 +681,16 @@ export default function YouTubeStylePlayer({
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Player Section */}
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Video Container */}
+          {/* Video Container - Fixed aspect ratio, pillarbox for vertical content */}
           <div 
             ref={containerRef}
-            className="relative bg-black aspect-video lg:aspect-auto lg:flex-1 w-full"
+            className="relative bg-black aspect-video w-full max-w-full mx-auto lg:flex-1 lg:max-h-[calc(100vh-10rem)]"
             onMouseMove={resetUITimer}
             onClick={togglePlay}
           >
             <video
               ref={videoRef}
-              className="w-full h-full object-contain"
+              className="absolute inset-0 w-full h-full object-contain"
               playsInline
               controls={false}
             />
