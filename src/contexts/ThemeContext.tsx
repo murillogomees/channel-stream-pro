@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import type { FC, ReactNode } from 'react';
+import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,18 +10,18 @@ interface ThemeContextType {
   isSyncing: boolean;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
 
-export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [theme, setThemeState] = useState<Theme>(() => {
+  const [theme, setThemeState] = React.useState<Theme>(() => {
     const stored = localStorage.getItem('app-theme') as Theme;
     return stored || 'dark';
   });
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   // Load theme from database when user logs in
-  useEffect(() => {
+  React.useEffect(() => {
     if (user?.id) {
       loadThemeFromDatabase();
     }
@@ -65,7 +64,7 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Remove todas as classes de tema
     document.documentElement.classList.remove('dark', 'light', 'sepia', 'high-contrast');
     
@@ -89,7 +88,7 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
 };
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
+  const context = React.useContext(ThemeContext);
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
