@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-v5 - Fixed React deduplication
+// Cache bust: 2025-11-29-v6 - Force single React with explicit path aliases
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -134,15 +134,15 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force single React instance for all imports
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: [
       "react", 
       "react-dom",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
-      "@radix-ui/react-primitive",
-      "@radix-ui/react-context",
-      "@tanstack/react-virtual",
     ],
   },
   optimizeDeps: {
@@ -151,8 +151,8 @@ export default defineConfig(({ mode }) => ({
       "react-dom", 
       "react/jsx-runtime",
       "react-router-dom",
-      "@tanstack/react-virtual",
     ],
+    exclude: [],
     force: true,
   },
   build: {
