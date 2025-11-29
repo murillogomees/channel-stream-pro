@@ -514,6 +514,82 @@ export function useM3USyncEditor() {
     [selectedSourceId, entries],
   );
 
+  // Generate M3U content from entries
+  const generateM3UContent = useCallback((): string => {
+    let m3uContent = '#EXTM3U\n\n';
+    
+    // Sort entries by group_title and then by title
+    const sortedEntries = [...entries].sort((a, b) => {
+      const groupCompare = (a.group_title || '').localeCompare(b.group_title || '');
+      if (groupCompare !== 0) return groupCompare;
+      return a.title.localeCompare(b.title);
+    });
+
+    for (const entry of sortedEntries) {
+      const tvgId = entry.tvg_id ? ` tvg-id="${entry.tvg_id}"` : '';
+      const tvgName = entry.tvg_name ? ` tvg-name="${entry.tvg_name}"` : '';
+      const tvgLogo = entry.tvg_logo ? ` tvg-logo="${entry.tvg_logo}"` : '';
+      const groupTitle = entry.group_title ? ` group-title="${entry.group_title}"` : '';
+
+      m3uContent += `#EXTINF:-1${tvgId}${tvgName}${tvgLogo}${groupTitle},${entry.title}\n`;
+      m3uContent += `${entry.stream_url}\n\n`;
+    }
+
+    return m3uContent;
+  }, [entries]);
+
+  // Generate M3U and upload to CDN
+  const generateM3UCDN = useCallback(async (): Promise<{ success: boolean; cdnUrl?: string; error?: string }> => {
+    if (!selectedSourceId || entries.length === 0) {
+      return { success: false, error: 'Nenhuma fonte selecionada ou sem entradas' };
+    }
+
+    try {
+      // Get source info for slug
+      const { data: source } = await supabase
+        .from('m3u_sync_sources')
+        .select('key, name')
+        .eq('id', selectedSourceId)
+        .single();
+
+      if (!source) {
+        return { success: false, error: 'Fonte não encontrada' };
+      }
+
+      // Generate M3U content
+      const m3uContent = generateM3UContent();
+      const fileSize = new TextEncoder().encode(m3uContent).length;
+
+      // Call edge function to upload to R2
+      const { data, error } = await supabase.functions.invoke('generate-m3u-from-sync', {
+        body: {
+          sourceId: selectedSourceId,
+          sourceKey: source.key,
+          sourceName: source.name,
+          m3uContent,
+          entriesCount: entries.length,
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'M3U CDN gerada com sucesso',
+        description: `${entries.length.toLocaleString()} entradas • ${(fileSize / 1024).toFixed(1)} KB`,
+      });
+
+      return { success: true, cdnUrl: data?.cdnUrl };
+    } catch (error: any) {
+      console.error('[M3USyncEditor] Error generating M3U CDN:', error);
+      toast({
+        title: 'Erro ao gerar M3U CDN',
+        description: error.message || 'Falha no upload',
+        variant: 'destructive',
+      });
+      return { success: false, error: error.message };
+    }
+  }, [selectedSourceId, entries, generateM3UContent]);
+
   // Statistics
   const stats = useMemo(
     () => ({
@@ -546,5 +622,7 @@ export function useM3USyncEditor() {
     deleteEntry,
     renameCategory,
     moveCategoryToClass,
+    generateM3UContent,
+    generateM3UCDN,
   };
 }
