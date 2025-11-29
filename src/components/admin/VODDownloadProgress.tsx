@@ -59,8 +59,15 @@ export default function VODDownloadProgress({ downloads, onRetry }: VODDownloadP
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'N/A';
+    const gb = bytes / (1024 * 1024 * 1024);
+    if (gb >= 1) return `${gb.toFixed(2)} GB`;
     const mb = bytes / (1024 * 1024);
     return mb >= 1 ? `${mb.toFixed(2)} MB` : `${(bytes / 1024).toFixed(2)} KB`;
+  };
+
+  const isLargeFile = (bytes: number | null) => {
+    if (!bytes) return false;
+    return bytes > 500 * 1024 * 1024; // > 500MB
   };
 
   const formatDate = (dateString: string | null) => {
@@ -125,14 +132,20 @@ export default function VODDownloadProgress({ downloads, onRetry }: VODDownloadP
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
-                        {download.segments_downloaded} / {download.segment_count} segmentos
+                        {formatFileSize(download.file_size_bytes)} 
+                        {download.segment_count > 1 && ` • ${download.segments_downloaded}/${download.segment_count} chunks`}
                       </span>
-                      <span>{calculateProgress(download)}%</span>
+                      <span className="font-mono">{calculateProgress(download)}%</span>
                     </div>
                     <Progress 
                       value={calculateProgress(download)} 
-                      indicatorClassName="bg-primary"
+                      className={isLargeFile(download.file_size_bytes) ? 'h-3' : 'h-2'}
                     />
+                    {isLargeFile(download.file_size_bytes) && (
+                      <p className="text-xs text-amber-500">
+                        ⚠️ Arquivo grande - download pode demorar vários minutos
+                      </p>
+                    )}
                   </div>
                 )}
 
