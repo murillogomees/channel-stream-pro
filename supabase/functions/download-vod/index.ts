@@ -346,7 +346,12 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
   const startTime = Date.now();
   
   try {
-    await supabase.from('vod_downloads').update({ status: 'downloading' }).eq('id', downloadId);
+    // Marcar início imediato para evitar órfãos
+    await supabase.from('vod_downloads').update({ 
+      status: 'downloading',
+      updated_at: new Date().toISOString()
+    }).eq('id', downloadId);
+    
     console.log(`📥 [VOD] Processando: ${channel.name}`);
 
     const isHLS = channel.stream_url.includes('.m3u8');
@@ -393,7 +398,8 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
     if (!error.message?.includes('PAUSE_FOR_RESUME')) {
       await supabase.from('vod_downloads').update({ 
         status: 'failed', 
-        error_message: error.message?.substring(0, 200) 
+        error_message: error.message?.substring(0, 200),
+        updated_at: new Date().toISOString()
       }).eq('id', downloadId);
     }
   }
@@ -406,20 +412,22 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
   const contentType = ext === 'mp4' ? 'video/mp4' : `video/${ext}`;
 
   // Obter tamanho total do arquivo
-  let contentLength = 0;
-  let supportsRanges = false;
+  let contentLength = resumeMetadata?.content_length || 0;
+  let supportsRanges = resumeMetadata?.supports_ranges || false;
   
-  try {
-    const headRes = await fetch(channel.stream_url, { 
-      method: 'HEAD', 
-      signal: AbortSignal.timeout(10000) 
-    });
-    if (headRes.ok) {
-      contentLength = parseInt(headRes.headers.get('content-length') || '0');
-      supportsRanges = headRes.headers.get('accept-ranges') === 'bytes';
+  if (!contentLength) {
+    try {
+      const headRes = await fetch(channel.stream_url, { 
+        method: 'HEAD', 
+        signal: AbortSignal.timeout(10000) 
+      });
+      if (headRes.ok) {
+        contentLength = parseInt(headRes.headers.get('content-length') || '0');
+        supportsRanges = headRes.headers.get('accept-ranges') === 'bytes';
+      }
+    } catch (e) {
+      console.log(`⚠️ [VOD] HEAD falhou, tentando download direto`);
     }
-  } catch (e) {
-    console.log(`⚠️ [VOD] HEAD falhou, tentando download direto`);
   }
 
   if (contentLength > MAX_FILE_SIZE) {
@@ -427,6 +435,13 @@ async function downloadFileChunked(channel: any, downloadId: string, supabase: a
   }
 
   console.log(`📊 [VOD] Tamanho: ${contentLength > 0 ? (contentLength / 1048576).toFixed(1) + 'MB' : 'desconhecido'}, Ranges: ${supportsRanges}`);
+
+  // Atualizar progresso imediatamente para evitar detecção como órfão
+  await supabase.from('vod_downloads').update({
+    file_size_bytes: contentLength || null,
+    updated_at: new Date().toISOString(),
+    metadata: { started: true, content_length: contentLength, supports_ranges: supportsRanges }
+  }).eq('id', downloadId);
 
   // Arquivos pequenos (<10MB) - upload direto
   if (contentLength > 0 && contentLength < 10 * 1024 * 1024) {
