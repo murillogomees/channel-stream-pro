@@ -44,12 +44,17 @@ export interface VODDetectionResult {
 }
 
 export const useVODManagement = () => {
-  const { toast } = useToast();
+  // All useState hooks first (stable order)
   const [downloads, setDownloads] = useState<VODDownload[]>([]);
   const [hostedVODs, setHostedVODs] = useState<HostedVOD[]>([]);
   const [statistics, setStatistics] = useState<VODStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Then useRef
   const lastUpdateRef = useRef<number>(0);
+  
+  // Then other hooks
+  const { toast } = useToast();
 
   // Carregar downloads
   const fetchDownloads = useCallback(async () => {
