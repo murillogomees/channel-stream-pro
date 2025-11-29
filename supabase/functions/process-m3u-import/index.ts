@@ -125,21 +125,54 @@ async function processFromUrl(
   resumeFrom: number,
   knownTotalChannels: number
 ) {
-  const downloadUrl = convertGoogleDriveUrl(payload.sourceUrl!);
+  let downloadUrl = convertGoogleDriveUrl(payload.sourceUrl!);
   console.log('[ProcessM3U] Streaming from:', downloadUrl);
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000);
   
+  // Helper function to try fetch with different protocols
+  async function tryFetch(url: string): Promise<Response> {
+    try {
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 
+          'Accept': '*/*',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        redirect: 'follow',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response;
+    } catch (error: any) {
+      // If HTTPS fails with SSL error, try HTTP
+      if (url.startsWith('https://') && 
+          (error.message?.includes('InvalidContentType') || 
+           error.message?.includes('certificate') ||
+           error.message?.includes('SSL') ||
+           error.message?.includes('TLS') ||
+           error.message?.includes('corrupt message'))) {
+        console.log('[ProcessM3U] HTTPS failed, trying HTTP...');
+        const httpUrl = url.replace('https://', 'http://');
+        const httpResponse = await fetch(httpUrl, { 
+          signal: controller.signal,
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 
+            'Accept': '*/*',
+          },
+          redirect: 'follow',
+        });
+        if (!httpResponse.ok) throw new Error(`HTTP ${httpResponse.status}`);
+        return httpResponse;
+      }
+      throw error;
+    }
+  }
+  
   try {
-    const response = await fetch(downloadUrl, { 
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' },
-      redirect: 'follow',
-    });
+    const response = await tryFetch(downloadUrl);
     clearTimeout(timeoutId);
-    
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
     const contentType = response.headers.get('content-type') || '';
     
@@ -149,10 +182,7 @@ async function processFromUrl(
       if (htmlContent.includes('confirm=') || htmlContent.includes('download_warning')) {
         const confirmMatch = htmlContent.match(/confirm=([^&"]+)/);
         if (confirmMatch) {
-          const retryResponse = await fetch(`${downloadUrl}&confirm=${confirmMatch[1]}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            redirect: 'follow',
-          });
+          const retryResponse = await tryFetch(`${downloadUrl}&confirm=${confirmMatch[1]}`);
           if (!retryResponse.ok) throw new Error('Google Drive inaccessible');
           
           // Process the retry response with streaming
