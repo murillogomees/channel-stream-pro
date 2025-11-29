@@ -266,30 +266,11 @@ const AdminDashboard = () => {
               badge="Consolidado"
             />
             <NavCard
-              title="Gestão M3U"
-              description="Gerencie playlists, canais e VOD"
+              title="Gestão M3U & Playlists"
+              description="Listas, sincronização, builder, VOD e relatórios"
               icon={<ListVideo className="h-5 w-5" />}
               path="/admin/m3u"
               badge="Consolidado"
-            />
-            <NavCard
-              title="M3U Builder"
-              description="Construtor personalizado de listas M3U"
-              icon={<Hammer className="h-5 w-5" />}
-              path="/admin/m3u-builder"
-            />
-            <NavCard
-              title="Histórico de Importação"
-              description="Veja o histórico de importações M3U"
-              icon={<History className="h-5 w-5" />}
-              path="/admin/m3u-import-history"
-            />
-            <NavCard
-              title="M3U Sync"
-              description="Sincronização automática de playlists externas"
-              icon={<RefreshCw className="h-5 w-5" />}
-              path="/admin/m3u-sync"
-              badge="Novo"
             />
           </div>
         </section>
