@@ -1,7 +1,7 @@
 /**
  * Cloudflare Stream Service
  * 
- * Gerencia uploads e playback de VODs via Cloudflare Stream
+ * Gerencia uploads, playback e URLs assinadas de VODs via Cloudflare Stream
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,13 @@ export interface PlaybackUrls {
   embed: string;
 }
 
+export interface SignedPlaybackUrl {
+  url: string;
+  signed: boolean;
+  expiresAt?: number;
+  expiresIn?: number;
+}
+
 /**
  * Inicia upload de um VOD para o Cloudflare Stream
  */
@@ -58,7 +65,7 @@ export async function uploadToStream(channelId: string): Promise<{ success: bool
 /**
  * Verifica o status de um upload no Stream
  */
-export async function checkStreamStatus(cfStreamUid: string): Promise<{ status: string; isReady: boolean; duration?: number }> {
+export async function checkStreamStatus(cfStreamUid: string): Promise<{ status: string; isReady: boolean; progress?: number; duration?: number }> {
   try {
     const { data, error } = await supabase.functions.invoke('cf-stream-upload', {
       body: { action: 'check_status', cf_stream_uid: cfStreamUid }
@@ -102,6 +109,30 @@ export async function getPlaybackUrls(cfStreamUid: string): Promise<PlaybackUrls
     return data;
   } catch (error: any) {
     console.error('[CloudflareStream] Playback URL error:', error);
+    return null;
+  }
+}
+
+/**
+ * Obtém URL assinada para playback seguro de VOD
+ */
+export async function getSignedPlaybackUrl(
+  cfStreamUid: string, 
+  expiresInSeconds: number = 3600
+): Promise<SignedPlaybackUrl | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('cf-stream-upload', {
+      body: { 
+        action: 'get_signed_url', 
+        cf_stream_uid: cfStreamUid,
+        expires_in_seconds: expiresInSeconds
+      }
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    console.error('[CloudflareStream] Signed URL error:', error);
     return null;
   }
 }
@@ -172,13 +203,41 @@ export function getOptimizedStreamUrl(channel: {
   return { url: channel.stream_url, source: 'original' };
 }
 
+/**
+ * Subscribe to upload changes (realtime)
+ */
+export function subscribeToUploads(
+  callback: (payload: { eventType: string; new?: StreamUpload; old?: { id: string } }) => void
+) {
+  return supabase
+    .channel('cf-stream-uploads')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'cf_stream_uploads'
+      },
+      (payload) => {
+        callback({
+          eventType: payload.eventType,
+          new: payload.new as StreamUpload,
+          old: payload.old as { id: string }
+        });
+      }
+    )
+    .subscribe();
+}
+
 export default {
   uploadToStream,
   checkStreamStatus,
   scheduleBatchUpload,
   getPlaybackUrls,
+  getSignedPlaybackUrl,
   getStreamStatistics,
   getRecentUploads,
   runScheduler,
   getOptimizedStreamUrl,
+  subscribeToUploads,
 };

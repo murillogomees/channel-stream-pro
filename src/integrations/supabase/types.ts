@@ -407,6 +407,47 @@ export type Database = {
           },
         ]
       }
+      channel_routing_overrides: {
+        Row: {
+          channel_id: string
+          created_at: string | null
+          expires_at: string | null
+          force_origin: boolean | null
+          id: string
+          reason: string | null
+          strategy: string
+          updated_at: string | null
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string | null
+          expires_at?: string | null
+          force_origin?: boolean | null
+          id?: string
+          reason?: string | null
+          strategy: string
+          updated_at?: string | null
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string | null
+          expires_at?: string | null
+          force_origin?: boolean | null
+          id?: string
+          reason?: string | null
+          strategy?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_routing_overrides_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_usage_stats: {
         Row: {
           channel_id: string
@@ -3407,6 +3448,104 @@ export type Database = {
           },
         ]
       }
+      stream_signing_keys: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          key_id: string
+          secret_key: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_id: string
+          secret_key: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_id?: string
+          secret_key?: string
+        }
+        Relationships: []
+      }
+      streaming_metrics: {
+        Row: {
+          channel_id: string | null
+          id: string
+          metadata: Json | null
+          metric_type: string
+          recorded_at: string | null
+          value: number
+        }
+        Insert: {
+          channel_id?: string | null
+          id?: string
+          metadata?: Json | null
+          metric_type: string
+          recorded_at?: string | null
+          value: number
+        }
+        Update: {
+          channel_id?: string | null
+          id?: string
+          metadata?: Json | null
+          metric_type?: string
+          recorded_at?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "streaming_metrics_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      streaming_policies: {
+        Row: {
+          conditions: Json | null
+          content_type: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          strategy: string
+          updated_at: string | null
+        }
+        Insert: {
+          conditions?: Json | null
+          content_type: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          strategy?: string
+          updated_at?: string | null
+        }
+        Update: {
+          conditions?: Json | null
+          content_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          strategy?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -4325,6 +4464,17 @@ export type Database = {
           uploads_ready: number
           vods_on_stream: number
           vods_pending: number
+        }[]
+      }
+      get_channel_routing_strategy: {
+        Args: { p_channel_id: string }
+        Returns: {
+          cf_stream_url: string
+          force_origin: boolean
+          origin_url: string
+          r2_url: string
+          source: string
+          strategy: string
         }[]
       }
       get_continue_watching: {

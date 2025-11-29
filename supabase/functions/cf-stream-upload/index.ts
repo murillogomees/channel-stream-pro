@@ -8,15 +8,69 @@ const corsHeaders = {
 
 const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
 const CLOUDFLARE_STREAM_API_TOKEN = Deno.env.get("CLOUDFLARE_STREAM_API_TOKEN");
+const CLOUDFLARE_STREAM_SIGNING_KEY = Deno.env.get("CLOUDFLARE_STREAM_SIGNING_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface UploadRequest {
-  action: "upload" | "check_status" | "schedule_batch" | "get_playback_url";
+  action: "upload" | "check_status" | "schedule_batch" | "get_playback_url" | "get_signed_url";
   channel_id?: string;
   channel_ids?: string[];
   cf_stream_uid?: string;
   batch_size?: number;
+  expires_in_seconds?: number;
+}
+
+// HMAC-SHA256 signing for Cloudflare Stream tokens
+async function signToken(payload: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const messageData = encoder.encode(payload);
+  
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign("HMAC", key, messageData);
+  const signatureArray = Array.from(new Uint8Array(signature));
+  return signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Generate signed playback URL for VOD security
+async function generateSignedPlaybackUrl(
+  cfStreamUid: string, 
+  expiresInSeconds: number = 3600
+): Promise<{ signedUrl: string; expiresAt: number } | null> {
+  if (!CLOUDFLARE_STREAM_SIGNING_KEY) {
+    console.log("[CF-Stream] No signing key configured, returning unsigned URL");
+    return null;
+  }
+
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const tokenPayload = JSON.stringify({
+    sub: cfStreamUid,
+    kid: CLOUDFLARE_ACCOUNT_ID,
+    exp: expiresAt,
+    accessRules: [
+      { type: "any", action: "allow" }
+    ]
+  });
+
+  // Base64URL encode the payload
+  const base64Payload = btoa(tokenPayload)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const signature = await signToken(base64Payload, CLOUDFLARE_STREAM_SIGNING_KEY);
+  
+  const signedUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${cfStreamUid}/manifest/video.m3u8?token=${base64Payload}.${signature}`;
+  
+  return { signedUrl, expiresAt };
 }
 
 serve(async (req) => {
@@ -78,6 +132,9 @@ serve(async (req) => {
       case "get_playback_url":
         return await handleGetPlaybackUrl(body.cf_stream_uid!);
       
+      case "get_signed_url":
+        return await handleGetSignedUrl(body.cf_stream_uid!, body.expires_in_seconds);
+      
       default:
         return new Response(JSON.stringify({ error: "Invalid action" }), {
           status: 400,
@@ -134,6 +191,7 @@ async function handleUpload(supabase: any, channelId: string) {
       channel_id: channelId,
       original_url: channel.stream_url,
       status: "uploading",
+      progress_percent: 0,
       started_at: new Date().toISOString(),
     })
     .select()
@@ -148,7 +206,7 @@ async function handleUpload(supabase: any, channelId: string) {
   }
 
   try {
-    // Upload to Cloudflare Stream via URL copy
+    // Upload to Cloudflare Stream via URL copy with signed URLs enabled
     const cfResponse = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/stream/copy`,
       {
@@ -163,7 +221,7 @@ async function handleUpload(supabase: any, channelId: string) {
             name: channel.name,
             channel_id: channelId,
           },
-          requireSignedURLs: false,
+          requireSignedURLs: CLOUDFLARE_STREAM_SIGNING_KEY ? true : false,
           allowedOrigins: ["*"],
         }),
       }
@@ -180,6 +238,7 @@ async function handleUpload(supabase: any, channelId: string) {
         .update({
           status: "error",
           error_message: errorMsg,
+          progress_percent: 0,
         })
         .eq("id", uploadRecord.id);
 
@@ -191,6 +250,9 @@ async function handleUpload(supabase: any, channelId: string) {
 
     const streamUid = cfData.result.uid;
     const streamStatus = cfData.result.status?.state || "downloading";
+    const pctComplete = cfData.result.status?.pctComplete 
+      ? parseFloat(cfData.result.status.pctComplete) 
+      : 0;
 
     // Update upload record
     await supabase
@@ -198,6 +260,7 @@ async function handleUpload(supabase: any, channelId: string) {
       .update({
         cf_stream_uid: streamUid,
         status: streamStatus === "ready" ? "ready" : "processing",
+        progress_percent: pctComplete,
         metadata: cfData.result,
       })
       .eq("id", uploadRecord.id);
@@ -218,6 +281,7 @@ async function handleUpload(supabase: any, channelId: string) {
       success: true,
       cf_stream_uid: streamUid,
       status: streamStatus,
+      progress: pctComplete,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -229,6 +293,7 @@ async function handleUpload(supabase: any, channelId: string) {
       .update({
         status: "error",
         error_message: error.message,
+        progress_percent: 0,
       })
       .eq("id", uploadRecord.id);
 
@@ -263,6 +328,20 @@ async function handleCheckStatus(supabase: any, cfStreamUid: string) {
   const result = cfData.result;
   const status = result.status?.state || "unknown";
   const isReady = status === "ready";
+  const pctComplete = result.status?.pctComplete 
+    ? parseFloat(result.status.pctComplete) 
+    : (isReady ? 100 : 0);
+
+  // Update upload record with progress
+  await supabase
+    .from("cf_stream_uploads")
+    .update({
+      status: isReady ? "ready" : status === "error" ? "error" : "processing",
+      progress_percent: pctComplete,
+      metadata: result,
+      ...(isReady && { completed_at: new Date().toISOString() }),
+    })
+    .eq("cf_stream_uid", cfStreamUid);
 
   // Update channel if ready
   if (isReady) {
@@ -277,20 +356,12 @@ async function handleCheckStatus(supabase: any, cfStreamUid: string) {
         cf_stream_size_bytes: result.size || null,
       })
       .eq("cf_stream_uid", cfStreamUid);
-
-    await supabase
-      .from("cf_stream_uploads")
-      .update({
-        status: "ready",
-        completed_at: new Date().toISOString(),
-        metadata: result,
-      })
-      .eq("cf_stream_uid", cfStreamUid);
   }
 
   return new Response(JSON.stringify({
     cf_stream_uid: cfStreamUid,
     status,
+    progress: pctComplete,
     duration: result.duration,
     size: result.size,
     playback: result.playback,
@@ -347,6 +418,7 @@ async function handleScheduleBatch(supabase: any, batchSize: number) {
         channel_id: vod.id,
         original_url: vod.stream_url,
         status: "queued",
+        progress_percent: 0,
       });
       results.push({ id: vod.id, name: vod.name, status: "queued" });
     } catch (err) {
@@ -375,6 +447,33 @@ async function handleGetPlaybackUrl(cfStreamUid: string) {
     dash: dashUrl,
     thumbnail: thumbnailUrl,
     embed: `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${cfStreamUid}/iframe`,
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handleGetSignedUrl(cfStreamUid: string, expiresInSeconds: number = 3600) {
+  console.log(`[CF-Stream] Generating signed URL for: ${cfStreamUid}`);
+  
+  const result = await generateSignedPlaybackUrl(cfStreamUid, expiresInSeconds);
+  
+  if (!result) {
+    // Return unsigned URL if signing is not configured
+    const unsignedUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${cfStreamUid}/manifest/video.m3u8`;
+    return new Response(JSON.stringify({
+      url: unsignedUrl,
+      signed: false,
+      message: "Signing key not configured, returning unsigned URL"
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  return new Response(JSON.stringify({
+    url: result.signedUrl,
+    signed: true,
+    expiresAt: result.expiresAt,
+    expiresIn: expiresInSeconds,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
