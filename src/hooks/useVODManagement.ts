@@ -166,6 +166,25 @@ export const useVODManagement = () => {
         body: { channelId }
       });
 
+      // Verificar respostas de duplicidade (retornadas no data mesmo com status 409)
+      if (data?.alreadyUploaded) {
+        toast({
+          title: 'VOD já enviado',
+          description: `"${channelName}" já foi enviado ao R2`,
+          variant: 'default',
+        });
+        return data;
+      }
+
+      if (data?.existingDownload) {
+        toast({
+          title: 'Download em andamento',
+          description: `"${channelName}" já está sendo processado (${data.status})`,
+          variant: 'default',
+        });
+        return data;
+      }
+
       if (error) throw error;
 
       toast({
@@ -179,6 +198,17 @@ export const useVODManagement = () => {
       
       return data;
     } catch (error: any) {
+      // Também verificar no erro se é duplicidade
+      const errorData = error?.context?.json;
+      if (errorData?.alreadyUploaded || errorData?.existingDownload) {
+        toast({
+          title: errorData?.alreadyUploaded ? 'VOD já enviado' : 'Download em andamento',
+          description: `"${channelName}" ${errorData?.alreadyUploaded ? 'já foi enviado ao R2' : 'já está sendo processado'}`,
+          variant: 'default',
+        });
+        return errorData;
+      }
+      
       toast({
         title: 'Erro ao iniciar download',
         description: error.message,
