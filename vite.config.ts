@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
+// Cache bust timestamp: 1764397800000
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -161,6 +162,13 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom", "react-router-dom"],
     exclude: [],
+    force: true, // Force rebuild of deps
+    esbuildOptions: {
+      // Ensure single React instance
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(mode),
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 1000,
