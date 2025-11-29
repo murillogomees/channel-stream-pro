@@ -461,25 +461,52 @@ async function downloadHLSVODStreaming(
 
 /**
  * Download de stream direto com streaming e progresso real
+ * LIMITE: Arquivos até 500MB (edge functions têm timeout)
  */
 async function downloadDirectVODStreaming(
   channel: any,
   downloadId: string,
   supabase: any
 ): Promise<void> {
-  console.log(`📥 [VOD Direct] Baixando: ${channel.name}`);
+  console.log(`📥 [VOD Direct] Verificando: ${channel.name}`);
+
+  // HEAD request primeiro para obter tamanho sem baixar
+  const headResponse = await fetchWithTimeout(channel.stream_url, 30000, 'HEAD');
+  const contentLength = parseInt(headResponse.headers.get('content-length') || '0');
+  
+  // Limite de 500MB para edge functions (timeout ~150s)
+  const MAX_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+  
+  if (contentLength > MAX_SIZE_BYTES) {
+    const sizeMB = (contentLength / 1024 / 1024).toFixed(0);
+    const limitMB = (MAX_SIZE_BYTES / 1024 / 1024).toFixed(0);
+    
+    await supabase
+      .from('vod_downloads')
+      .update({
+        status: 'failed',
+        error_message: `Arquivo muito grande (${sizeMB}MB). Limite: ${limitMB}MB. VODs grandes requerem processamento manual ou use HLS.`,
+        file_size_bytes: contentLength,
+        segment_count: 1,
+        segments_downloaded: 0
+      })
+      .eq('id', downloadId);
+    
+    throw new Error(`Arquivo muito grande: ${sizeMB}MB (limite: ${limitMB}MB)`);
+  }
+
+  console.log(`📥 [VOD Direct] Baixando: ${channel.name} (${(contentLength / 1024 / 1024).toFixed(1)}MB)`);
 
   const response = await fetchWithTimeout(channel.stream_url, 300000); // 5 min timeout
   if (!response.ok) {
     throw new Error(`Falha ao baixar: ${response.status}`);
   }
 
-  const contentLength = parseInt(response.headers.get('content-length') || '0');
+  // Para arquivos menores, usar chunks virtuais baseados em 5MB cada
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+  const VIRTUAL_CHUNKS = contentLength > 0 ? Math.max(1, Math.ceil(contentLength / CHUNK_SIZE)) : 10;
   
-  // Para arquivos grandes, usar 100 chunks virtuais para mostrar progresso
-  const VIRTUAL_CHUNKS = contentLength > 100 * 1024 * 1024 ? 100 : 10;
-  const chunkSize = contentLength > 0 ? Math.ceil(contentLength / VIRTUAL_CHUNKS) : 10 * 1024 * 1024;
-  
+  // Atualizar progresso inicial
   await supabase
     .from('vod_downloads')
     .update({
@@ -489,6 +516,8 @@ async function downloadDirectVODStreaming(
       status: 'downloading'
     })
     .eq('id', downloadId);
+
+  console.log(`📊 [VOD Direct] ${VIRTUAL_CHUNKS} chunks virtuais (${(CHUNK_SIZE / 1024 / 1024).toFixed(0)}MB cada)`);
 
   // Streaming download com progresso
   const reader = response.body?.getReader();
@@ -510,16 +539,16 @@ async function downloadDirectVODStreaming(
       chunks.push(value);
       downloadedBytes += value.length;
       
-      // Calcular chunks completos
+      // Calcular chunks completos baseado em bytes
       const currentChunks = Math.min(
         VIRTUAL_CHUNKS,
-        Math.floor((downloadedBytes / contentLength) * VIRTUAL_CHUNKS)
+        Math.floor(downloadedBytes / CHUNK_SIZE)
       );
       
-      // Atualizar progresso a cada 2s ou quando houver mudança significativa
+      // Atualizar progresso a cada 2s ou quando houver mudança de chunk
       const now = Date.now();
       if (currentChunks > reportedChunks || now - lastProgressUpdate > 2000) {
-        reportedChunks = currentChunks;
+        reportedChunks = Math.max(currentChunks, 1);
         lastProgressUpdate = now;
         
         await supabase
@@ -531,7 +560,7 @@ async function downloadDirectVODStreaming(
           .eq('id', downloadId);
         
         const percent = contentLength > 0 ? Math.round((downloadedBytes / contentLength) * 100) : 0;
-        console.log(`📈 [VOD Direct] ${channel.name}: ${percent}% (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
+        console.log(`📈 [VOD Direct] ${channel.name}: ${percent}% - ${reportedChunks}/${VIRTUAL_CHUNKS} chunks (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
       }
     }
   }
@@ -582,14 +611,15 @@ async function downloadDirectVODStreaming(
 }
 
 /**
- * Fetch com timeout
+ * Fetch com timeout e suporte a método customizado
  */
-async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs: number, method: string = 'GET'): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
+      method,
       signal: controller.signal,
       headers: {
         'User-Agent': 'VOD-Downloader/1.0',
