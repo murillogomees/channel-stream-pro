@@ -154,9 +154,10 @@ serve(async (req) => {
       );
     }
 
-    // 3. Filtrar VODs com muitas falhas
+    // 3. Filtrar VODs com muitas falhas E que já estão em download
     const vodIds = pendingVODs.map(v => v.id);
     
+    // Buscar downloads com muitas falhas
     const { data: failedDownloads } = await supabaseService
       .from('vod_downloads')
       .select('channel_id, retry_count')
@@ -166,8 +167,23 @@ serve(async (req) => {
 
     const blockedIds = new Set(failedDownloads?.map(f => f.channel_id) || []);
 
+    // Buscar VODs que JÁ ESTÃO em download (prevenir duplicados)
+    const { data: activeDownloads } = await supabaseService
+      .from('vod_downloads')
+      .select('id, channel_id, status')
+      .in('channel_id', vodIds)
+      .in('status', ['queued', 'downloading', 'processing', 'paused']);
+
+    const alreadyDownloadingIds = new Set(activeDownloads?.map(d => d.channel_id) || []);
+    
+    // Se encontrou duplicados ativos, logar
+    if (alreadyDownloadingIds.size > 0) {
+      console.log(`⚠️ [ScheduleVOD] ${alreadyDownloadingIds.size} VODs já em download, ignorando`);
+    }
+
+    // Filtrar: remover bloqueados E já em download
     const eligibleVODs = pendingVODs
-      .filter(v => !blockedIds.has(v.id))
+      .filter(v => !blockedIds.has(v.id) && !alreadyDownloadingIds.has(v.id))
       .slice(0, availableSlots);
 
     if (eligibleVODs.length === 0) {
