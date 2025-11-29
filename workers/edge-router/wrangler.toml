@@ -1,0 +1,32 @@
+# Cloudflare Worker Configuration
+# Deploy: npx wrangler deploy
+
+name = "stream-edge-router"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Routes - adjust to your domain
+# routes = [
+#   { pattern = "stream.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# Environment variables (set via wrangler secret or dashboard)
+# Required:
+#   SUPABASE_URL_VAR - Your Supabase project URL
+#   SUPABASE_ANON_KEY_VAR - Your Supabase anon key
+#   CF_ACCOUNT_ID - Your Cloudflare account ID
+#   CF_STREAM_SIGNING_KEY - (Optional) Signing key for secure playback
+
+[vars]
+# Non-sensitive defaults (override in dashboard)
+CACHE_TTL = "60000"
+MAX_CONCURRENT = "100"
+
+# Development environment
+[env.dev]
+name = "stream-edge-router-dev"
+
+# Production environment  
+[env.production]
+name = "stream-edge-router"
+# routes = [{ pattern = "stream.yourdomain.com/*", zone_name = "yourdomain.com" }]
