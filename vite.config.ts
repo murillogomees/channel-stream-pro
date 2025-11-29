@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Cache bust: 2025-11-29-v7 - Fix React import consistency
+// Cache bust: 2025-11-29-v8 - Force rebuild all Radix with single React
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -137,12 +137,26 @@ export default defineConfig(({ mode }) => ({
       // Force single React instance for all imports
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
+      "react/jsx-dev-runtime": path.resolve(__dirname, "./node_modules/react/jsx-dev-runtime"),
     },
     dedupe: [
       "react", 
       "react-dom",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-toast",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-select",
+      "@radix-ui/react-accordion",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-label",
+      "@radix-ui/react-slot",
     ],
   },
   optimizeDeps: {
@@ -150,9 +164,23 @@ export default defineConfig(({ mode }) => ({
       "react", 
       "react-dom", 
       "react/jsx-runtime",
+      "react/jsx-dev-runtime",
       "react-router-dom",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-toast",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-select",
     ],
     exclude: [],
+    esbuildOptions: {
+      // Ensure all deps use the same React
+      define: {
+        global: 'globalThis',
+      },
+    },
     force: true,
   },
   build: {
