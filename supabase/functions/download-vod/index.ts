@@ -264,6 +264,34 @@ serve(async (req) => {
     if (channelError || !channel) throw new Error(`Canal não encontrado: ${channelError?.message}`);
     if (!channel.is_vod) throw new Error('Canal não é VOD');
 
+    // Verificar se já foi enviado ao R2
+    if (channel.r2_uploaded) {
+      console.log(`⚠️ [VOD] Conteúdo já enviado ao R2: ${channel.name}`);
+      return new Response(JSON.stringify({ 
+        error: 'Conteúdo já enviado ao R2', 
+        alreadyUploaded: true,
+        r2Url: channel.r2_url 
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Verificar se já existe download ativo para este canal
+    const { data: activeDownload } = await supabaseService
+      .from('vod_downloads')
+      .select('id, status')
+      .eq('channel_id', channelId)
+      .in('status', ['queued', 'downloading', 'paused'])
+      .maybeSingle();
+
+    if (activeDownload) {
+      console.log(`⚠️ [VOD] Download já em andamento: ${channel.name} (${activeDownload.status})`);
+      return new Response(JSON.stringify({ 
+        error: 'Download já em andamento', 
+        existingDownload: true,
+        downloadId: activeDownload.id,
+        status: activeDownload.status 
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const { data: downloadRecord, error: insertError } = await supabaseService.from('vod_downloads').insert({
       channel_id: channelId,
       original_url: channel.stream_url,
@@ -301,6 +329,19 @@ async function processBatchDownloads(channelIds: string[], supabase: any): Promi
         try {
           const { data: channel } = await supabase.from('m3u_channels').select('*').eq('id', channelId).maybeSingle();
           if (channel?.is_vod && !channel.r2_uploaded) {
+            // Verificar se já existe download ativo
+            const { data: activeDownload } = await supabase
+              .from('vod_downloads')
+              .select('id, status')
+              .eq('channel_id', channelId)
+              .in('status', ['queued', 'downloading', 'paused'])
+              .maybeSingle();
+
+            if (activeDownload) {
+              console.log(`⚠️ [Batch] Download já existe para ${channel.name}: ${activeDownload.status}`);
+              return;
+            }
+
             const { data: downloadRecord, error: insertErr } = await supabase.from('vod_downloads').insert({
               channel_id: channelId,
               original_url: channel.stream_url,
