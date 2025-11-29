@@ -72,12 +72,12 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 2. Resetar downloads travados (>10 min sem atualização)
+    // 2. Resetar downloads travados (>5 min sem atualização)
     const { data: stuckDownloads } = await supabase
       .from('vod_downloads')
       .select('id')
-      .in('status', ['downloading', 'processing'])
-      .lt('updated_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      .in('status', ['downloading', 'processing', 'queued'])
+      .lt('updated_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
 
     if (stuckDownloads && stuckDownloads.length > 0) {
       console.log(`🔄 [ScheduleVOD] Resetando ${stuckDownloads.length} downloads travados`);
