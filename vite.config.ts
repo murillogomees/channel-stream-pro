@@ -3,9 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
-import { visualizer } from "rollup-plugin-visualizer";
 
-// Cache bust: 2025-11-29-v4 - Added bundle analyzer
+// Cache bust: 2025-11-29-v5 - Fixed React deduplication
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -15,14 +14,6 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
-    // Bundle analyzer - generates stats.html on build
-    mode === "production" && visualizer({
-      filename: "dist/stats.html",
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-      template: "treemap", // sunburst, treemap, network
-    }),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,
@@ -151,6 +142,7 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-dev-runtime",
       "@radix-ui/react-primitive",
       "@radix-ui/react-context",
+      "@tanstack/react-virtual",
     ],
   },
   optimizeDeps: {
@@ -159,6 +151,7 @@ export default defineConfig(({ mode }) => ({
       "react-dom", 
       "react/jsx-runtime",
       "react-router-dom",
+      "@tanstack/react-virtual",
     ],
     force: true,
   },
