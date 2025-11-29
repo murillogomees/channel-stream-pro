@@ -27,7 +27,6 @@ const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 
 // Consolidated admin pages (hub pages com tabs)
 const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
-const AdminM3USync = lazy(() => import("./pages/AdminM3USync"));
 const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
@@ -105,7 +104,7 @@ const App = () => (
           <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
           <Route path="/admin/m3u-builder" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/m3u-import-history" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-sync" element={<ProtectedRoute requireAdmin><AdminM3USync /></ProtectedRoute>} />
+          <Route path="/admin/m3u-sync" element={<Navigate to="/admin/m3u" replace />} />
           <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/notification-queue" element={<Navigate to="/admin/notifications" replace />} />
           <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />

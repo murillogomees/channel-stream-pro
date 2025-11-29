@@ -9,6 +9,7 @@ import AdminM3UImportHistory from "./AdminM3UImportHistory";
 import AdminM3UListStats from "./AdminM3UListStats";
 import AdminM3UUsageReport from "./AdminM3UUsageReport";
 import AdminVODStorage from "./AdminVODStorage";
+import AdminM3USyncContent from "./AdminM3USyncContent";
 
 export default function AdminM3UManagement() {
   return (
@@ -24,6 +25,9 @@ export default function AdminM3UManagement() {
           <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
             <TabsTrigger value="lists" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Listas
+            </TabsTrigger>
+            <TabsTrigger value="sync" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              Sincronização
             </TabsTrigger>
             <TabsTrigger value="custom" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Dashboard
@@ -49,6 +53,10 @@ export default function AdminM3UManagement() {
 
         <TabsContent value="lists" className="space-y-4 mt-4">
           <AdminM3ULists />
+        </TabsContent>
+
+        <TabsContent value="sync" className="space-y-4 mt-4">
+          <AdminM3USyncContent />
         </TabsContent>
 
         <TabsContent value="custom" className="space-y-4 mt-4">
