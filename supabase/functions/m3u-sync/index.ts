@@ -261,8 +261,8 @@ serve(async (req) => {
       });
     }
     
-    // POST /sync - Trigger sync
-    if (req.method === 'POST' && path === '/sync') {
+    // POST /sync or POST / - Trigger sync
+    if (req.method === 'POST' && (path === '/sync' || path === '' || path === '/')) {
       // Verify authorization
       const authHeader = req.headers.get('authorization');
       const cronSecret = Deno.env.get('CRON_SECRET');
