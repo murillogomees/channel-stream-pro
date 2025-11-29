@@ -153,9 +153,9 @@
     <!-- Cache buster script - runs BEFORE React to prevent duplicate instances -->
     <script>
       (function() {
-        var CACHE_VERSION = 'v4';
+        var CACHE_VERSION = 'v5-fresh';
         var storageKey = 'app_cache_version';
-        var lastVersion = sessionStorage.getItem(storageKey);
+        var lastVersion = localStorage.getItem(storageKey);
         
         // Clear all service worker caches
         if ('caches' in window) {
@@ -164,12 +164,22 @@
           });
         }
         
-        // Force reload if version changed
-        if (lastVersion && lastVersion !== CACHE_VERSION) {
-          sessionStorage.setItem(storageKey, CACHE_VERSION);
-          location.reload(true);
-        } else {
-          sessionStorage.setItem(storageKey, CACHE_VERSION);
+        // Unregister all service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            registrations.forEach(function(registration) {
+              registration.unregister();
+            });
+          });
+        }
+        
+        // Force hard reload if version changed
+        if (lastVersion !== CACHE_VERSION) {
+          localStorage.setItem(storageKey, CACHE_VERSION);
+          if (lastVersion) {
+            // Only reload if there was a previous version (not first visit)
+            window.location.href = window.location.href.split('?')[0] + '?cb=' + Date.now();
+          }
         }
       })();
     </script>
