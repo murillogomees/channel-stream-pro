@@ -1,51 +1,57 @@
+/**
+ * ResponsivePageHeader - Header responsivo para páginas admin
+ * Adapta ações para mobile com menu dropdown
+ */
+
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ReactNode } from "react";
 
-interface ActionButton {
+interface ActionItem {
   label: string;
   icon?: ReactNode;
   onClick: () => void;
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost";
-  /** Ação principal (sempre visível) */
   primary?: boolean;
 }
 
-interface PageHeaderProps {
+interface ResponsivePageHeaderProps {
   title: string;
   description?: string;
   backTo?: string;
-  /** ReactNode para ações customizadas (retrocompatível) */
-  actions?: ReactNode;
-  /** Array de ações com suporte mobile (novo) */
-  actionButtons?: ActionButton[];
-  /** Badge ao lado do título */
+  /** Ações principais (botões no desktop, menu no mobile) */
+  actions?: ActionItem[];
+  /** Conteúdo customizado para área de ações */
+  customActions?: ReactNode;
+  /** Badges ou indicadores ao lado do título */
   badge?: ReactNode;
 }
 
-export function PageHeader({ 
+export function ResponsivePageHeader({ 
   title, 
   description, 
-  backTo = "/admin/dashboard", 
+  backTo = "/admin/dashboard",
   actions,
-  actionButtons,
+  customActions,
   badge,
-}: PageHeaderProps) {
+}: ResponsivePageHeaderProps) {
   const navigate = useNavigate();
 
-  const primaryActions = actionButtons?.filter(a => a.primary) || [];
-  const secondaryActions = actionButtons?.filter(a => !a.primary) || [];
+  const primaryActions = actions?.filter(a => a.primary) || [];
+  const secondaryActions = actions?.filter(a => !a.primary) || [];
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+    <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
+      {/* Top row: Back + Title + Actions */}
+      <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+        {/* Back button */}
         <Button
           variant="ghost"
           size="icon"
@@ -54,30 +60,26 @@ export function PageHeader({
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="min-w-0 flex-1">
+
+        {/* Title area */}
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold truncate">{title}</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold truncate">
+              {title}
+            </h1>
             {badge}
           </div>
           {description && (
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{description}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">
+              {description}
+            </p>
           )}
         </div>
-      </div>
 
-      {/* Ações customizadas (retrocompatível) */}
-      {actions && (
-        <div className="flex items-center gap-2 flex-shrink-0 pl-11 sm:pl-0 flex-wrap">
-          {actions}
-        </div>
-      )}
-
-      {/* Ações com botões (novo sistema) */}
-      {actionButtons && actionButtons.length > 0 && (
-        <>
-          {/* Desktop: Todos os botões visíveis */}
+        {/* Desktop actions */}
+        {actions && actions.length > 0 && (
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-            {actionButtons.map((action, idx) => (
+            {actions.map((action, idx) => (
               <Button
                 key={idx}
                 variant={action.variant || (action.primary ? "default" : "outline")}
@@ -90,9 +92,12 @@ export function PageHeader({
               </Button>
             ))}
           </div>
+        )}
 
-          {/* Mobile: Primary + Dropdown */}
-          <div className="flex sm:hidden items-center gap-2 flex-shrink-0 pl-11">
+        {/* Mobile actions - Primary as button, rest in dropdown */}
+        {actions && actions.length > 0 && (
+          <div className="flex sm:hidden items-center gap-2 flex-shrink-0">
+            {/* Show first primary action as button */}
             {primaryActions.length > 0 && (
               <Button
                 variant="default"
@@ -101,9 +106,11 @@ export function PageHeader({
                 className="h-9"
               >
                 {primaryActions[0].icon}
-                <span className="ml-1.5">{primaryActions[0].label}</span>
+                <span className="ml-1.5 hidden xs:inline">{primaryActions[0].label}</span>
               </Button>
             )}
+
+            {/* Dropdown for other actions */}
             {(secondaryActions.length > 0 || primaryActions.length > 1) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -113,14 +120,14 @@ export function PageHeader({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   {primaryActions.slice(1).map((action, idx) => (
-                    <DropdownMenuItem key={`p-${idx}`} onClick={action.onClick}>
+                    <DropdownMenuItem key={`primary-${idx}`} onClick={action.onClick}>
                       {action.icon && <span className="mr-2">{action.icon}</span>}
                       {action.label}
                     </DropdownMenuItem>
                   ))}
                   {secondaryActions.map((action, idx) => (
                     <DropdownMenuItem 
-                      key={`s-${idx}`} 
+                      key={`secondary-${idx}`} 
                       onClick={action.onClick}
                       className={action.variant === "destructive" ? "text-destructive" : ""}
                     >
@@ -132,8 +139,13 @@ export function PageHeader({
               </DropdownMenu>
             )}
           </div>
-        </>
-      )}
+        )}
+
+        {/* Custom actions */}
+        {customActions}
+      </div>
     </div>
   );
 }
+
+export default ResponsivePageHeader;
