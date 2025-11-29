@@ -1,5 +1,6 @@
 /**
  * Main App Component
+ * @version 2.0.1
  */
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
