@@ -1,15 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useVODManagement } from '@/hooks/useVODManagement';
 import VODDownloadProgress from '@/components/admin/VODDownloadProgress';
-import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play } from 'lucide-react';
+import { HardDrive, TrendingUp, Download, CheckCircle2, Clock, XCircle, Trash2, Wand2, RefreshCw, Rocket, Cloud, ExternalLink, Loader2, CloudDownload, Pause, Play, Tv, Copy, Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface CdnEntry {
+  id: string;
+  key: string;
+  name: string;
+  cdn_url: string;
+  cdn_entries_count: number;
+  entries_count: number;
+  enabled: boolean;
+}
+
+// Valores exponenciais para download: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
+const EXPONENTIAL_LIMITS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
 
 export default function AdminVODStorage() {
   const { toast } = useToast();
@@ -19,13 +35,58 @@ export default function AdminVODStorage() {
   const [isStartingDownloads, setIsStartingDownloads] = useState(false);
   const [isResettingOrphans, setIsResettingOrphans] = useState(false);
   const [isPausingDownloads, setIsPausingDownloads] = useState(false);
-  const [downloadLimit, setDownloadLimit] = useState<string>('50');
+  const [downloadLimit, setDownloadLimit] = useState<string>('8');
+  const [cdnEntries, setCdnEntries] = useState<CdnEntry[]>([]);
+  const [isLoadingCdn, setIsLoadingCdn] = useState(true);
+
+  // Carregar CDN entries do m3u_sync_sources
+  useEffect(() => {
+    loadCdnEntries();
+  }, []);
+
+  const loadCdnEntries = async () => {
+    try {
+      setIsLoadingCdn(true);
+      const { data, error } = await supabase
+        .from('m3u_sync_sources')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const entries = (data || [])
+        .filter((s: any) => s.metadata?.cdn_url)
+        .map((s: any) => ({
+          id: s.id,
+          key: s.key,
+          name: s.name,
+          cdn_url: s.metadata?.cdn_url as string,
+          cdn_entries_count: s.metadata?.cdn_entries_count as number || 0,
+          entries_count: s.entries_count || 0,
+          enabled: s.enabled,
+        }));
+
+      setCdnEntries(entries);
+    } catch (error) {
+      console.error('Erro ao carregar CDN entries:', error);
+    } finally {
+      setIsLoadingCdn(false);
+    }
+  };
+
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    toast({ title: 'URL copiada!' });
+  };
 
   // Filtrar downloads por status
   const activeDownloads = downloads.filter(d => ['downloading', 'processing', 'queued', 'paused'].includes(d.status));
   const completedDownloads = downloads.filter(d => d.status === 'completed');
   const failedDownloads = downloads.filter(d => d.status === 'failed');
   const pendingDownloads = downloads.filter(d => d.status === 'pending');
+
+  // Total de entradas CDN disponíveis para VOD
+  const totalCdnEntries = cdnEntries.reduce((sum, e) => sum + e.cdn_entries_count, 0);
 
   const handleStartDownloads = async (limit?: number) => {
     try {
@@ -215,12 +276,11 @@ export default function AdminVODStorage() {
                   <SelectValue placeholder="Quantidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10">10 VODs</SelectItem>
-                  <SelectItem value="25">25 VODs</SelectItem>
-                  <SelectItem value="50">50 VODs</SelectItem>
-                  <SelectItem value="100">100 VODs</SelectItem>
-                  <SelectItem value="200">200 VODs</SelectItem>
-                  <SelectItem value="500">500 VODs</SelectItem>
+                  {EXPONENTIAL_LIMITS.map((limit) => (
+                    <SelectItem key={limit} value={limit.toString()}>
+                      {limit} VOD{limit > 1 ? 's' : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -319,6 +379,87 @@ export default function AdminVODStorage() {
           </Button>
         )}
       </div>
+
+      {/* CDN Entries - Fontes para VOD */}
+      <Card className="border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-3 text-lg">
+            <div className="p-2 bg-cyan-500/20 rounded-lg">
+              <Link className="h-5 w-5 text-cyan-500" />
+            </div>
+            Entradas CDN Disponíveis
+            <Badge variant="secondary" className="ml-auto">{totalCdnEntries.toLocaleString()} entradas</Badge>
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Fontes M3U sincronizadas - os VODs detectados serão baixados destas listas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingCdn ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : cdnEntries.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Tv className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Nenhuma fonte CDN sincronizada</p>
+              <p className="text-xs">Sincronize uma fonte M3U na aba Editor</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fonte</TableHead>
+                    <TableHead>Chave</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Entradas</TableHead>
+                    <TableHead className="text-right">URL CDN</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cdnEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium">{entry.name}</TableCell>
+                      <TableCell>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">{entry.key}</code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={entry.enabled ? 'default' : 'secondary'} className="text-xs">
+                          {entry.enabled ? 'Ativa' : 'Inativa'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{entry.cdn_entries_count.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7" 
+                            onClick={() => handleCopyUrl(entry.cdn_url)}
+                            title="Copiar URL"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7" 
+                            onClick={() => window.open(entry.cdn_url, '_blank')}
+                            title="Abrir URL"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Estatísticas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
