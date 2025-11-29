@@ -131,7 +131,7 @@ export function useM3USyncEditor() {
     setSelectedSourceId(sourceId);
 
     try {
-      const PAGE_SIZE = 10000;
+      const PAGE_SIZE = 1000;
       let allData: any[] = [];
       let page = 0;
       let hasMore = true;
