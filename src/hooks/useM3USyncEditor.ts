@@ -114,25 +114,52 @@ export function useM3USyncEditor() {
   const [selectedClass, setSelectedClass] = useState<ContentClass | 'all'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Load entries from a source
-  const loadEntries = useCallback(async (sourceId: string, limit = 50000) => {
+  // Load ALL entries from a source using pagination
+  const loadEntries = useCallback(async (sourceId: string) => {
     setIsLoading(true);
     setSelectedSourceId(sourceId);
     
     try {
-      const { data, error } = await supabase
-        .from('m3u_sync_entries')
-        .select('*')
-        .eq('source_id', sourceId)
-        .eq('is_valid', true)
-        .order('group_title')
-        .order('title')
-        .limit(limit);
+      const PAGE_SIZE = 1000;
+      let allData: any[] = [];
+      let page = 0;
+      let hasMore = true;
       
-      if (error) throw error;
+      // Fetch all entries using pagination
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        
+        const { data, error } = await supabase
+          .from('m3u_sync_entries')
+          .select('*')
+          .eq('source_id', sourceId)
+          .eq('is_valid', true)
+          .order('group_title')
+          .order('title')
+          .range(from, to);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+          
+          // Show loading progress
+          if (hasMore) {
+            toast({
+              title: 'Carregando...',
+              description: `${allData.length.toLocaleString()} entradas carregadas...`,
+            });
+          }
+        } else {
+          hasMore = false;
+        }
+      }
       
       // Process entries
-      const processedEntries: M3UEntry[] = (data || []).map(entry => ({
+      const processedEntries: M3UEntry[] = allData.map(entry => ({
         ...entry,
         content_class: classifyContent(entry.group_title),
         parent_category: extractParentCategory(entry.group_title),
