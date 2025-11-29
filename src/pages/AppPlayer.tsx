@@ -394,6 +394,62 @@ export default function AppPlayer() {
     return streamService.getPlayableUrl(channel);
   }, []);
 
+  // Helper to extract series name from episode name
+  const extractSeriesName = useCallback((name: string): string => {
+    return name
+      .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
+      .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
+      .replace(/\s*-\s*Temporada\s*\d+.*/gi, '')
+      .replace(/\s*Temporada\s*\d+.*/gi, '')
+      .replace(/\s*Season\s*\d+.*/gi, '')
+      .replace(/\s*T\d+\s*E?\d*.*/gi, '')
+      .replace(/\s*Ep[is]*[óo]*d?i?o?\s*\d+.*/gi, '')
+      .replace(/\s*\(\d{4}\)/g, '')
+      .replace(/\s*\[.*?\]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }, []);
+
+  // Get related episodes for the current playing channel (for series)
+  const relatedSeriesEpisodes = useMemo(() => {
+    if (!playerChannel) return [];
+    
+    // Check if it's a series by looking at the URL or name pattern
+    const isSeries = playerChannel.stream_url?.includes('/series/') ||
+                     /S\d{1,2}\s*E\d{1,3}/i.test(playerChannel.name) ||
+                     /\d{1,2}x\d{1,3}/i.test(playerChannel.name) ||
+                     /Temporada\s*\d+/i.test(playerChannel.name);
+    
+    if (!isSeries) return [];
+    
+    const seriesName = extractSeriesName(playerChannel.name);
+    if (!seriesName) return [];
+    
+    // Find all episodes from the same series
+    const episodes = allChannels.filter(ch => {
+      const chSeriesName = extractSeriesName(ch.name);
+      return chSeriesName === seriesName && ch.id !== playerChannel.id;
+    });
+    
+    // Include current episode and sort
+    return [playerChannel, ...episodes].sort((a, b) => {
+      const matchA = a.name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) || a.name.match(/(\d{1,2})x(\d{1,3})/i);
+      const matchB = b.name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) || b.name.match(/(\d{1,2})x(\d{1,3})/i);
+      
+      if (matchA && matchB) {
+        const seasonDiff = parseInt(matchA[1]) - parseInt(matchB[1]);
+        if (seasonDiff !== 0) return seasonDiff;
+        return parseInt(matchA[2]) - parseInt(matchB[2]);
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [playerChannel, allChannels, extractSeriesName]);
+
+  // Handle playing a different episode
+  const handlePlayEpisode = useCallback((episode: any) => {
+    setPlayerChannel(episode);
+  }, []);
+
   // Handle play
   const handlePlay = (channel: any) => {
     setPlayerChannel(channel);
@@ -702,6 +758,8 @@ export default function AppPlayer() {
           onError={(err) => console.error('Player error:', err)}
           isFavorite={isFavorite(playerChannel.id)}
           onToggleFavorite={() => toggleFavorite(playerChannel.id)}
+          seriesEpisodes={relatedSeriesEpisodes}
+          onPlayEpisode={handlePlayEpisode}
           onTimeUpdate={(time, dur) => {
             // Track watch progress
             if (time > 10 && dur > 0) {
