@@ -33,6 +33,9 @@ import { streamOptimizer, detectStreamType } from "@/services/streamOptimizer";
 import { useABR } from "@/hooks/useABR";
 import { QualitySelector } from "./QualitySelector";
 import { QualityBadge } from "./QualityBadge";
+import { useVisibilityOptimization } from "@/hooks/useVisibilityOptimization";
+import { usePlayerErrorRecovery } from "@/hooks/usePlayerErrorRecovery";
+import { useAdvancedHlsConfig } from "@/hooks/useAdvancedHlsConfig";
 
 // =============================================================================
 // TYPES
@@ -187,6 +190,36 @@ export function VideoPlayer({
   // Analytics tracking
   const analytics = useStreamAnalytics(channelId, userId);
 
+  // Advanced HLS config based on device/network
+  const { getConfig: getAdvancedHlsConfig, videoProps } = useAdvancedHlsConfig({
+    streamType: isVOD ? 'vod' : 'live',
+  });
+
+  // Visibility optimization - reduces quality when tab hidden
+  useVisibilityOptimization(videoRef, hlsRef, {
+    pauseWhenHidden: isVOD, // Only pause VOD, not live
+    reduceQualityWhenHidden: true,
+    stopLoadWhenHidden: false,
+  });
+
+  // Advanced error recovery with exponential backoff
+  const errorRecovery = usePlayerErrorRecovery({
+    maxNetworkRetries: 6,
+    maxMediaRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 30000,
+    onFatalError: (error) => {
+      setError('Stream indisponível. Tente outro canal.');
+      setLoading(false);
+      analytics.recordError(error.details, error.type);
+      onError?.(error.details);
+    },
+    onFallback: () => {
+      // Could implement fallback URL logic here
+      console.log('[VideoPlayer] Fallback triggered');
+    },
+  });
+
   // ABR Hook
   const abr = useABR({
     onQualityChange: (level) => {
@@ -289,8 +322,9 @@ export function VideoPlayer({
 
     // HLS.js for HLS streams
     if (Hls.isSupported() && isHls) {
-      console.log('[VideoPlayer] Using HLS.js with optimized config');
-      const hls = new Hls(getHlsConfig());
+      console.log('[VideoPlayer] Using HLS.js with advanced optimized config');
+      const hlsConfig = getAdvancedHlsConfig();
+      const hls = new Hls(hlsConfig);
       hlsRef.current = hls;
 
       hls.loadSource(url);
@@ -305,7 +339,7 @@ export function VideoPlayer({
         const startupMs = Date.now() - startupTimeRef.current;
         console.log('[VideoPlayer] Manifest parsed in', startupMs, 'ms, levels:', data.levels.length);
         setLoading(false);
-        retryCount.current = 0;
+        errorRecovery.resetStats(); // Reset error stats on successful load
         analytics.recordStartup(startupMs);
         onReady?.();
         
@@ -328,30 +362,21 @@ export function VideoPlayer({
         }
       });
 
+      // Advanced error handling with exponential backoff
       hls.on(Hls.Events.ERROR, (_, data) => {
-        console.error('[VideoPlayer] HLS Error:', data.type, data.details);
+        console.error('[VideoPlayer] HLS Error:', data.type, data.details, 'Fatal:', data.fatal);
         
-        if (!data.fatal) return;
+        // Use advanced error recovery
+        const recovered = errorRecovery.handleHlsError(hls, {
+          type: data.type,
+          details: data.details,
+          fatal: data.fatal,
+          response: data.response as { code: number } | undefined,
+        });
 
-        analytics.recordError(data.details, data.type);
-
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          if (retryCount.current < maxRetries) {
-            retryCount.current++;
-            console.log(`[VideoPlayer] Network error, retry ${retryCount.current}/${maxRetries}`);
-            setTimeout(() => hls.startLoad(), 1000 * retryCount.current);
-          } else {
-            setError('Erro de conexão. Verifique sua internet.');
-            setLoading(false);
-            onError?.('Network error');
-          }
-        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          console.log('[VideoPlayer] Media error, recovering...');
-          hls.recoverMediaError();
-        } else {
-          setError('Stream indisponível');
-          setLoading(false);
-          onError?.('Stream unavailable');
+        if (!recovered && data.fatal) {
+          // Error recovery failed, already handled by onFatalError callback
+          console.log('[VideoPlayer] Error recovery failed');
         }
       });
 
@@ -563,13 +588,14 @@ export function VideoPlayer({
       onClick={showOverlay}
       tabIndex={0}
     >
-      {/* Video element */}
+      {/* Video element with optimized preload */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
         muted={muted}
         onClick={togglePlay}
+        {...videoProps}
       />
 
       {/* Loading spinner */}

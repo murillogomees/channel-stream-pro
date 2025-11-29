@@ -203,7 +203,7 @@ export function useAdvancedHlsConfig(options: AdvancedHlsConfigOptions = {}) {
       abrEwmaSlowVoD: 9.0,
     };
 
-    // Merge todas as configs
+  // Merge todas as configs
     return {
       ...baseConfig,
       ...deviceConfig,
@@ -213,7 +213,19 @@ export function useAdvancedHlsConfig(options: AdvancedHlsConfigOptions = {}) {
     };
   }, [streamType, lowLatency, maxBitrate, playerSize]);
 
-  return config;
+  // Video element props for optimized loading
+  const videoProps = useMemo(() => ({
+    preload: 'metadata' as const,
+  }), []);
+
+  // Function to get the config (useful for lazy initialization)
+  const getConfig = () => config;
+
+  return {
+    config,
+    getConfig,
+    videoProps,
+  };
 }
 
 /**
