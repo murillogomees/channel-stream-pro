@@ -85,9 +85,12 @@ export default function AdminM3UCustomBuilder() {
       refreshCategories();
       refreshChannels();
       refreshLists();
-      // Clear form after successful import
-      setImportUrl('');
-      setImportContent('');
+      // Clear form only after a delay to avoid clearing during import
+      const timer = setTimeout(() => {
+        setImportUrl('');
+        setImportContent('');
+      }, 1500);
+      return () => clearTimeout(timer);
     }
   }, [importSession?.status]);
 
