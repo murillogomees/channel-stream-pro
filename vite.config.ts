@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Cache bust: 2025-11-29-v2
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -134,14 +135,28 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom"],
+    dedupe: [
+      "react", 
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@radix-ui/react-primitive",
+      "@radix-ui/react-context",
+    ],
   },
   optimizeDeps: {
     include: [
       "react", 
       "react-dom", 
       "react/jsx-runtime",
+      "react-router-dom",
     ],
+    esbuildOptions: {
+      // Force single React instance
+      define: {
+        global: 'globalThis',
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 1000,
