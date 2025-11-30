@@ -15,16 +15,19 @@ export default function CheckoutFailure() {
 
   const paymentId = searchParams.get("payment_id");
   const status = searchParams.get("status");
+  const collectionStatus = searchParams.get("collection_status");
+  const paymentType = searchParams.get("payment_type");
+  const merchantOrderId = searchParams.get("merchant_order_id");
+  const preferenceId = searchParams.get("preference_id");
 
-  const getErrorMessage = () => {
-    switch (status) {
-      case "rejected":
-        return "Seu pagamento foi recusado. Por favor, verifique os dados do cartão ou tente outro método de pagamento.";
-      case "cancelled":
-        return "O pagamento foi cancelado. Você pode tentar novamente quando quiser.";
-      default:
-        return "Não foi possível processar seu pagamento. Por favor, tente novamente.";
-    }
+  // Build status code for internal team
+  const getStatusCode = () => {
+    const codes = [];
+    if (status) codes.push(`status=${status}`);
+    if (collectionStatus) codes.push(`collection=${collectionStatus}`);
+    if (paymentType) codes.push(`type=${paymentType}`);
+    if (merchantOrderId) codes.push(`order=${merchantOrderId}`);
+    return codes.length > 0 ? codes.join(' | ') : 'unknown';
   };
 
   return (
@@ -55,7 +58,11 @@ export default function CheckoutFailure() {
               <XCircle className="h-10 w-10 text-destructive" />
             </motion.div>
             <CardTitle className="text-2xl">Pagamento não concluído</CardTitle>
-            <CardDescription>{getErrorMessage()}</CardDescription>
+            <CardDescription className="space-y-2">
+              <span className="block text-xs font-mono text-muted-foreground/80 bg-muted/50 rounded px-2 py-1">
+                [{getStatusCode()}]
+              </span>
+            </CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-8">
             {paymentId && (
