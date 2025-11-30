@@ -4455,13 +4455,20 @@ export type Database = {
       get_cf_stream_statistics: {
         Args: never
         Returns: {
+          avg_retry_count: number
+          errors_last_24h: number
           estimated_monthly_cost: number
+          max_retry_reached: number
+          success_rate: number
           total_duration_hours: number
           total_vods: number
           uploads_error: number
+          uploads_last_24h: number
           uploads_processing: number
           uploads_queued: number
           uploads_ready: number
+          uploads_retry_scheduled: number
+          uploads_uploading: number
           vods_on_stream: number
           vods_pending: number
         }[]

@@ -11,11 +11,15 @@ export interface StreamUpload {
   channel_id: string;
   original_url: string;
   cf_stream_uid: string | null;
-  status: 'queued' | 'uploading' | 'processing' | 'ready' | 'error';
+  status: 'queued' | 'uploading' | 'processing' | 'ready' | 'error' | 'retry_scheduled' | 'downloading';
   progress_percent: number;
   error_message: string | null;
+  retry_count: number;
+  max_retries: number;
   created_at: string;
   updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -27,8 +31,15 @@ export interface StreamStatistics {
   uploads_processing: number;
   uploads_ready: number;
   uploads_error: number;
+  uploads_retry_scheduled: number;
+  uploads_uploading: number;
   total_duration_hours: number;
   estimated_monthly_cost: number;
+  avg_retry_count: number;
+  success_rate: number;
+  uploads_last_24h: number;
+  errors_last_24h: number;
+  max_retry_reached: number;
 }
 
 export interface PlaybackUrls {
@@ -43,6 +54,16 @@ export interface SignedPlaybackUrl {
   signed: boolean;
   expiresAt?: number;
   expiresIn?: number;
+}
+
+export interface CriticalFailure {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  error_message: string;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -160,7 +181,7 @@ export async function getRecentUploads(limit: number = 50): Promise<StreamUpload
     const { data, error } = await supabase
       .from('cf_stream_uploads')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(limit);
 
     if (error) throw error;
@@ -168,6 +189,83 @@ export async function getRecentUploads(limit: number = 50): Promise<StreamUpload
   } catch (error: any) {
     console.error('[CloudflareStream] List uploads error:', error);
     return [];
+  }
+}
+
+/**
+ * Obtém falhas críticas (uploads que falharam múltiplas vezes)
+ */
+export async function getCriticalFailures(minRetries: number = 3): Promise<CriticalFailure[]> {
+  try {
+    const { data: uploads, error: uploadsError } = await supabase
+      .from('cf_stream_uploads')
+      .select('id, channel_id, error_message, retry_count, created_at, updated_at')
+      .eq('status', 'error')
+      .gte('retry_count', minRetries)
+      .order('retry_count', { ascending: false })
+      .limit(50);
+
+    if (uploadsError) throw uploadsError;
+    if (!uploads || uploads.length === 0) return [];
+
+    // Get channel names
+    const channelIds = [...new Set(uploads.map(u => u.channel_id))];
+    const { data: channels } = await supabase
+      .from('m3u_channels')
+      .select('id, name')
+      .in('id', channelIds);
+
+    const channelMap = new Map(channels?.map(c => [c.id, c.name]) || []);
+
+    return uploads.map(u => ({
+      ...u,
+      channel_name: channelMap.get(u.channel_id) || u.channel_id
+    }));
+  } catch (error: any) {
+    console.error('[CloudflareStream] Critical failures error:', error);
+    return [];
+  }
+}
+
+/**
+ * Reseta um upload com erro para retry
+ */
+export async function resetUploadForRetry(uploadId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('cf_stream_uploads')
+      .update({
+        status: 'queued',
+        retry_count: 0,
+        error_message: null,
+        cf_stream_uid: null,
+        started_at: null
+      })
+      .eq('id', uploadId);
+
+    if (error) throw error;
+    return true;
+  } catch (error: any) {
+    console.error('[CloudflareStream] Reset upload error:', error);
+    return false;
+  }
+}
+
+/**
+ * Remove upload permanentemente
+ */
+export async function deleteUpload(uploadId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('cf_stream_uploads')
+      .delete()
+      .eq('id', uploadId);
+
+    if (error) throw error;
+    return true;
+  } catch (error: any) {
+    console.error('[CloudflareStream] Delete upload error:', error);
+    return false;
   }
 }
 
@@ -237,6 +335,9 @@ export default {
   getSignedPlaybackUrl,
   getStreamStatistics,
   getRecentUploads,
+  getCriticalFailures,
+  resetUploadForRetry,
+  deleteUpload,
   runScheduler,
   getOptimizedStreamUrl,
   subscribeToUploads,

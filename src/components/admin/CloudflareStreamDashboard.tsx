@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Cloud, 
   Play, 
@@ -13,10 +14,11 @@ import {
   Loader2,
   RefreshCw,
   Upload,
-  DollarSign,
   Film,
   Zap,
-  Activity
+  Activity,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -29,6 +31,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import CloudflareStreamStats from './CloudflareStreamStats';
+import CloudflareStreamAlerts from './CloudflareStreamAlerts';
 
 export function CloudflareStreamDashboard() {
   const [statistics, setStatistics] = useState<StreamStatistics | null>(null);
@@ -37,6 +41,8 @@ export function CloudflareStreamDashboard() {
   const [loading, setLoading] = useState(true);
   const [runningScheduler, setRunningScheduler] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('uploads');
 
   const loadChannelNames = useCallback(async (channelIds: string[]) => {
     if (channelIds.length === 0) return;
@@ -130,7 +136,7 @@ export function CloudflareStreamDashboard() {
   // Polling for statistics every 10 seconds when there are active uploads
   useEffect(() => {
     const hasActiveUploads = uploads.some(u => 
-      ['processing', 'uploading', 'queued'].includes(u.status)
+      ['processing', 'uploading', 'queued', 'retry_scheduled'].includes(u.status)
     );
 
     if (!hasActiveUploads) return;
@@ -161,28 +167,41 @@ export function CloudflareStreamDashboard() {
   const getStatusBadge = (upload: StreamUpload) => {
     const status = upload.status;
     const progress = upload.progress_percent || 0;
+    const retries = upload.retry_count || 0;
     
     switch (status) {
       case 'ready':
-        return <Badge className="bg-emerald-500/20 text-emerald-400"><CheckCircle2 className="w-3 h-3 mr-1" />Pronto</Badge>;
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-0"><CheckCircle2 className="w-3 h-3 mr-1" />Pronto</Badge>;
       case 'processing':
         return (
           <div className="flex items-center gap-2">
-            <div className="w-20">
-              <Progress value={progress} className="h-2" />
+            <div className="w-16">
+              <Progress value={progress} className="h-1.5" />
             </div>
-            <Badge className="bg-blue-500/20 text-blue-400">
+            <Badge className="bg-blue-500/20 text-blue-400 border-0">
               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               {progress.toFixed(0)}%
             </Badge>
           </div>
         );
       case 'uploading':
-        return <Badge className="bg-yellow-500/20 text-yellow-400"><Upload className="w-3 h-3 mr-1 animate-pulse" />Enviando</Badge>;
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-0"><Upload className="w-3 h-3 mr-1 animate-pulse" />Enviando</Badge>;
       case 'queued':
-        return <Badge className="bg-gray-500/20 text-gray-400"><Clock className="w-3 h-3 mr-1" />Na fila</Badge>;
+        return <Badge className="bg-gray-500/20 text-gray-400 border-0"><Clock className="w-3 h-3 mr-1" />Na fila</Badge>;
+      case 'retry_scheduled':
+        return (
+          <Badge className="bg-orange-500/20 text-orange-400 border-0">
+            <RotateCcw className="w-3 h-3 mr-1" />
+            Retry {retries}
+          </Badge>
+        );
       case 'error':
-        return <Badge className="bg-red-500/20 text-red-400"><AlertCircle className="w-3 h-3 mr-1" />Erro</Badge>;
+        return (
+          <Badge className="bg-red-500/20 text-red-400 border-0">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Erro {retries > 0 && `(${retries}x)`}
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -251,159 +270,99 @@ export function CloudflareStreamDashboard() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>VODs no Stream</CardDescription>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <Film className="w-5 h-5 text-emerald-400" />
-              {statistics?.vods_on_stream?.toLocaleString() || 0}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              de {statistics?.total_vods?.toLocaleString() || 0} VODs totais
-            </div>
-            {statistics && statistics.total_vods > 0 && (
-              <Progress 
-                value={(statistics.vods_on_stream / statistics.total_vods) * 100} 
-                className="mt-2 h-1"
-              />
-            )}
-          </CardContent>
-        </Card>
+      <CloudflareStreamStats statistics={statistics} loading={loading} />
 
-        <Card className={processingUploads.length > 0 ? 'ring-2 ring-blue-500/30' : ''}>
-          <CardHeader className="pb-2">
-            <CardDescription>Em Processamento</CardDescription>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              {processingUploads.length > 0 ? (
-                <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              ) : (
-                <Clock className="w-5 h-5 text-blue-400" />
-              )}
-              {(statistics?.uploads_queued || 0) + (statistics?.uploads_processing || 0)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              {statistics?.uploads_queued || 0} na fila, {statistics?.uploads_processing || 0} processando
-            </div>
-            {processingUploads.length > 0 && (
-              <div className="mt-2">
-                <Progress value={avgProgress} className="h-1.5" />
-                <p className="text-xs text-blue-400 mt-1">
-                  Média: {avgProgress.toFixed(0)}%
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Horas de Conteúdo</CardDescription>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <Clock className="w-5 h-5 text-purple-400" />
-              {statistics?.total_duration_hours?.toLocaleString() || 0}h
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              Duração total no Stream
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Custo Estimado</CardDescription>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-yellow-400" />
-              ${statistics?.estimated_monthly_cost?.toFixed(2) || '0.00'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              /mês (storage apenas)
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Errors Alert */}
-      {(statistics?.uploads_error || 0) > 0 && (
-        <Card className="border-red-500/50 bg-red-500/5">
-          <CardContent className="flex items-center gap-3 py-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <span className="text-sm">
-              {statistics?.uploads_error} uploads com erro. Verifique os logs.
-            </span>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recent Uploads */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+      {/* Tabs for Uploads and Alerts */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="uploads" className="flex items-center gap-2">
+            <Film className="w-4 h-4" />
             Uploads Recentes
             {processingUploads.length > 0 && (
               <Badge variant="secondary" className="text-xs">
-                {processingUploads.length} ativo{processingUploads.length !== 1 ? 's' : ''}
+                {processingUploads.length}
               </Badge>
             )}
-          </CardTitle>
-          <CardDescription>Últimos 50 uploads para o Cloudflare Stream</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-2">
-              {uploads.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nenhum upload encontrado
-                </div>
-              ) : (
-                uploads.map((upload) => (
-                  <div 
-                    key={upload.id}
-                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                      upload.status === 'processing' 
-                        ? 'bg-blue-500/10 border border-blue-500/20' 
-                        : 'bg-muted/50 hover:bg-muted'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <Play className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {channelNames[upload.channel_id] || upload.channel_id}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>
-                            {formatDistanceToNow(new Date(upload.created_at), { 
-                              addSuffix: true,
-                              locale: ptBR 
-                            })}
-                          </span>
-                          {upload.error_message && (
-                            <span className="text-red-400 truncate max-w-[200px]" title={upload.error_message}>
-                              {upload.error_message}
-                            </span>
-                          )}
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Alertas
+            {alertCount > 0 && (
+              <Badge variant="destructive" className="text-xs">
+                {alertCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="uploads" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Uploads Recentes</CardTitle>
+              <CardDescription>Últimos 50 uploads para o Cloudflare Stream</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {uploads.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhum upload encontrado
+                    </div>
+                  ) : (
+                    uploads.map((upload) => (
+                      <div 
+                        key={upload.id}
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          upload.status === 'processing' 
+                            ? 'bg-blue-500/10 border border-blue-500/20' 
+                            : upload.status === 'retry_scheduled'
+                            ? 'bg-orange-500/10 border border-orange-500/20'
+                            : upload.status === 'error'
+                            ? 'bg-red-500/5 border border-red-500/10'
+                            : 'bg-muted/50 hover:bg-muted'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Play className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">
+                              {channelNames[upload.channel_id] || upload.channel_id}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>
+                                {formatDistanceToNow(new Date(upload.updated_at), { 
+                                  addSuffix: true,
+                                  locale: ptBR 
+                                })}
+                              </span>
+                              {upload.error_message && (
+                                <span className="text-red-400 truncate max-w-[250px]" title={upload.error_message}>
+                                  {upload.error_message}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {getStatusBadge(upload)}
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {getStatusBadge(upload)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="alerts" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <CloudflareStreamAlerts onAlertCountChange={setAlertCount} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
