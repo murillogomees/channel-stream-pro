@@ -11,7 +11,7 @@ interface CreateUserRequest {
   password: string;
   nome: string;
   telefone?: string;
-  role?: 'admin' | 'client'; // Tipo de usuário a ser criado
+  role?: 'admin' | 'super_admin' | 'client';
 }
 
 Deno.serve(async (req) => {
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Anon client using the caller's JWT (same pattern as list-users function)
+    // Anon client using the caller's JWT
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
@@ -90,10 +90,10 @@ Deno.serve(async (req) => {
     const isAdmin = userRoles?.some(r => r.role === 'admin') || isSuperAdmin;
 
     // Permission check:
-    // - super_admin can create any type of user
+    // - super_admin can create any type of user (admin, super_admin, client)
     // - admin can only create client users
-    if (role === 'admin' && !isSuperAdmin) {
-      console.log('User is not super_admin, cannot create admin users:', user.id);
+    if ((role === 'admin' || role === 'super_admin') && !isSuperAdmin) {
+      console.log('User is not super_admin, cannot create admin/super_admin users:', user.id);
       return new Response(
         JSON.stringify({ error: 'Forbidden: Only super admins can create admin users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -156,25 +156,35 @@ Deno.serve(async (req) => {
     }
 
     // Note: The trigger handle_new_user_role already assigns 'client' role automatically
-    // For admin users, we need to explicitly add the admin role
-    if (role === 'admin') {
+    // For admin/super_admin users, we need to explicitly add the role
+    if (role === 'admin' || role === 'super_admin') {
       const { error: roleError } = await serviceClient
         .from('user_roles')
         .insert({
           user_id: newUser.user.id,
-          role: 'admin',
+          role: role,
         });
 
       if (roleError) {
-        console.error('Error assigning admin role in create-admin-user:', roleError);
+        console.error(`Error assigning ${role} role in create-admin-user:`, roleError);
         return new Response(
           JSON.stringify({
-            error: 'User created but failed to assign admin role',
+            error: `User created but failed to assign ${role} role`,
             details: roleError.message,
             userId: newUser.user.id,
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Also add admin role for super_admin (they need both)
+      if (role === 'super_admin') {
+        await serviceClient
+          .from('user_roles')
+          .insert({
+            user_id: newUser.user.id,
+            role: 'admin',
+          });
       }
     }
 
