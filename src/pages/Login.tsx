@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft, Smartphone, Monitor, Gamepad2, Tablet, Tv, Chrome } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,15 +29,6 @@ const loginSchema = z.object({
 });
 
 type ViewMode = "login" | "plans";
-
-const deviceIcons = [
-  { icon: Smartphone, label: "Celular" },
-  { icon: Monitor, label: "Computador" },
-  { icon: Gamepad2, label: "Video Game" },
-  { icon: Tablet, label: "Tablet" },
-  { icon: Tv, label: "Android TV" },
-  { icon: Chrome, label: "Fire Stick" }
-];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -269,7 +260,7 @@ export default function Login() {
     <motion.div
       className={cn(
         "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
-        "p-4 sm:p-6 w-full max-w-[340px] sm:max-w-lg mx-2 sm:mx-4"
+        "p-4 sm:p-5 w-full max-w-[320px] sm:max-w-md mx-2 sm:mx-4"
       )}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -277,29 +268,15 @@ export default function Login() {
       transition={{ duration: 0.3 }}
     >
       {/* Plans Header */}
-      <div className="text-center mb-4 sm:mb-6">
-        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-3">
-          <Crown className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Quero me cadastrar</h2>
-        <p className="text-muted-foreground text-xs sm:text-sm mt-1.5 max-w-[280px] mx-auto">
-          Escolha o plano perfeito para você
-        </p>
+      <div className="text-center mb-3 sm:mb-4">
+        <h2 className="text-lg sm:text-xl font-bold text-foreground">Quero me cadastrar</h2>
       </div>
 
-      {/* Device Icons - Compact */}
-      <div className="flex justify-center gap-2 sm:gap-3 mb-4 sm:mb-5">
-        {deviceIcons.slice(0, 5).map(device => (
-          <div 
-            key={device.label} 
-            className="flex flex-col items-center gap-0.5 hover:scale-110 transition-transform"
-            title={device.label}
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-muted/60 flex items-center justify-center">
-              <device.icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-primary" />
-            </div>
-          </div>
-        ))}
+      {/* Devices Banner */}
+      <div className="bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 mb-4 text-center">
+        <p className="text-[10px] sm:text-xs text-primary font-medium">
+          📱 Celular • 💻 PC • 📺 Smart TV • 🎮 Video Game • Fire Stick
+        </p>
       </div>
 
       {/* Plans Grid */}
