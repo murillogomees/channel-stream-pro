@@ -42,10 +42,16 @@ const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const AdminSmartCache = lazy(() => import("./pages/AdminSmartCache"));
 const AdminTranscodeQueue = lazy(() => import("./pages/AdminTranscodeQueue"));
 const AdminCdn = lazy(() => import("./pages/AdminCdn"));
+const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
+
+// Checkout pages
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
+const CheckoutFailure = lazy(() => import("./pages/CheckoutFailure"));
+const CheckoutPending = lazy(() => import("./pages/CheckoutPending"));
 
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
@@ -85,6 +91,11 @@ const App = () => (
           <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
           <Route path="/login" element={<Login />} />
           <Route path="/install" element={<Navigate to="/app/install" replace />} />
+          
+          {/* Checkout pages */}
+          <Route path="/checkout/success" element={<CheckoutSuccess />} />
+          <Route path="/checkout/failure" element={<CheckoutFailure />} />
+          <Route path="/checkout/pending" element={<CheckoutPending />} />
           
           {/* Legacy routes - redirect to unified profile */}
           <Route path="/conta" element={<Navigate to="/app/profile" replace />} />
@@ -138,6 +149,7 @@ const App = () => (
           <Route path="/dashboard/plans" element={<ProtectedRoute requireAdmin><AdminPlansManager /></ProtectedRoute>} />
           <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
           <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
+          <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
           
           {/* Admin Hub - Novo dashboard consolidado */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminHub /></ProtectedRoute>} />

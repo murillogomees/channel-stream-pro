@@ -2434,6 +2434,42 @@ export type Database = {
           },
         ]
       }
+      mercado_pago_webhooks: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          data_id: string | null
+          error_message: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          processed: boolean | null
+          raw_payload: Json
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          data_id?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          processed?: boolean | null
+          raw_payload: Json
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          data_id?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          processed?: boolean | null
+          raw_payload?: Json
+        }
+        Relationships: []
+      }
       metrics_snapshots: {
         Row: {
           average_connection_time: number | null
@@ -2785,6 +2821,81 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          external_reference: string | null
+          id: string
+          mercado_pago_payment_id: string | null
+          mercado_pago_preference_id: string | null
+          metadata: Json | null
+          paid_at: string | null
+          payer_email: string | null
+          payment_method: string | null
+          payment_type: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          external_reference?: string | null
+          id?: string
+          mercado_pago_payment_id?: string | null
+          mercado_pago_preference_id?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payer_email?: string | null
+          payment_method?: string | null
+          payment_type?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          external_reference?: string | null
+          id?: string
+          mercado_pago_payment_id?: string | null
+          mercado_pago_preference_id?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payer_email?: string | null
+          payment_method?: string | null
+          payment_type?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permission_diagnostics: {
         Row: {
           auth_context_is_admin: boolean | null
@@ -2841,6 +2952,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      playback_tokens: {
+        Row: {
+          content_id: string | null
+          content_type: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          last_used_at: string | null
+          max_uses: number | null
+          permissions: Json | null
+          revoked_at: string | null
+          token_hash: string
+          use_count: number | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          last_used_at?: string | null
+          max_uses?: number | null
+          permissions?: Json | null
+          revoked_at?: string | null
+          token_hash: string
+          use_count?: number | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          last_used_at?: string | null
+          max_uses?: number | null
+          permissions?: Json | null
+          revoked_at?: string | null
+          token_hash?: string
+          use_count?: number | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playback_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       player_analytics: {
         Row: {
@@ -4458,6 +4628,72 @@ export type Database = {
         }
         Relationships: []
       }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          id: string
+          mercado_pago_customer_id: string | null
+          mercado_pago_subscription_id: string | null
+          metadata: Json | null
+          plan_id: string | null
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_end: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          mercado_pago_customer_id?: string | null
+          mercado_pago_subscription_id?: string | null
+          metadata?: Json | null
+          plan_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_end?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          mercado_pago_customer_id?: string | null
+          mercado_pago_subscription_id?: string | null
+          metadata?: Json | null
+          plan_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_end?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_watchlist: {
         Row: {
           content_category: string | null
@@ -5281,6 +5517,16 @@ export type Database = {
           views_24h: number
         }[]
       }
+      get_subscription_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          can_play: boolean
+          expires_at: string
+          has_subscription: boolean
+          plan_name: string
+          status: Database["public"]["Enums"]["subscription_status"]
+        }[]
+      }
       get_top_threat_ips: {
         Args: { _limit?: number }
         Returns: {
@@ -5308,6 +5554,7 @@ export type Database = {
           vods_uploaded: number
         }[]
       }
+      has_active_subscription: { Args: { p_user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -5472,6 +5719,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      validate_playback_token: {
+        Args: { p_ip_address?: string; p_token_hash: string }
+        Returns: {
+          error_message: string
+          permissions: Json
+          user_id: string
+          valid: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "client" | "admin" | "super_admin"
@@ -5503,10 +5759,23 @@ export type Database = {
         | "Indicação"
         | "Website"
         | "Outro"
+      payment_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "refunded"
+        | "cancelled"
+        | "in_process"
       plano_cliente: "Mensal" | "Trimestral" | "Semestral" | "Anual"
       quality_ladder_preset: "basic" | "standard" | "premium" | "ultra"
       situacao_cliente: "Testando" | "Ativo" | "Devendo" | "Inativo" | "Lead"
       smartone_status: "nao_enviado" | "pendente" | "criado" | "erro"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "canceled"
+        | "expired"
+        | "past_due"
       transcode_job_status:
         | "queued"
         | "processing"
@@ -5668,10 +5937,25 @@ export const Constants = {
         "Website",
         "Outro",
       ],
+      payment_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "refunded",
+        "cancelled",
+        "in_process",
+      ],
       plano_cliente: ["Mensal", "Trimestral", "Semestral", "Anual"],
       quality_ladder_preset: ["basic", "standard", "premium", "ultra"],
       situacao_cliente: ["Testando", "Ativo", "Devendo", "Inativo", "Lead"],
       smartone_status: ["nao_enviado", "pendente", "criado", "erro"],
+      subscription_status: [
+        "trial",
+        "active",
+        "canceled",
+        "expired",
+        "past_due",
+      ],
       transcode_job_status: [
         "queued",
         "processing",
