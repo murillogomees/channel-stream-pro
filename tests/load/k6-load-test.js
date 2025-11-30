@@ -13,10 +13,36 @@ import { check, sleep, group } from 'k6';
 import { Counter, Rate, Trend, Gauge } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 
-// ============= Configuration =============
+// ============= Environment Variables =============
+// Usage: k6 run -e SUPABASE_URL=https://your-project.supabase.co -e SUPABASE_ANON_KEY=your-key tests/load/k6-load-test.js
+//
+// Available environment variables:
+// - SUPABASE_URL: Supabase project URL (required for production)
+// - SUPABASE_ANON_KEY: Supabase anon key (required for production)
+// - TARGET_VUS: Target number of virtual users (default: 1000)
+// - TEST_DURATION: Test duration (default: 5m)
+// - RAMP_UP_TIME: Ramp up time (default: 30s)
+// - VOD_RATIO: Ratio of VOD vs Live traffic 0-1 (default: 0.7)
+// - ENABLE_SPIKE_TEST: Enable spike test scenario (default: true)
+// - ENVIRONMENT: Test environment name (default: staging)
+
 const BASE_URL = __ENV.SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 const ANON_KEY = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak';
 const EDGE_FUNCTIONS_URL = `${BASE_URL}/functions/v1`;
+
+// Configurable test parameters
+const TARGET_VUS = parseInt(__ENV.TARGET_VUS) || 1000;
+const TEST_DURATION = __ENV.TEST_DURATION || '5m';
+const RAMP_UP_TIME = __ENV.RAMP_UP_TIME || '30s';
+const VOD_RATIO = parseFloat(__ENV.VOD_RATIO) || 0.7;
+const ENABLE_SPIKE_TEST = __ENV.ENABLE_SPIKE_TEST !== 'false';
+const ENVIRONMENT = __ENV.ENVIRONMENT || 'staging';
+
+// Threshold configuration via env vars
+const P50_LATENCY = parseInt(__ENV.P50_LATENCY) || 500;
+const P95_LATENCY = parseInt(__ENV.P95_LATENCY) || 2000;
+const P99_LATENCY = parseInt(__ENV.P99_LATENCY) || 5000;
+const MAX_ERROR_RATE = parseFloat(__ENV.MAX_ERROR_RATE) || 0.05;
 
 // ============= Custom Metrics =============
 const rebufferEvents = new Counter('rebuffer_events');
@@ -31,52 +57,63 @@ const activeViewers = new Gauge('active_viewers');
 const qualitySwitches = new Counter('quality_switches');
 
 // ============= Test Scenarios =============
-export const options = {
-  scenarios: {
-    // Scenario 1: Ramping VUs for warm-up
-    warmup: {
-      executor: 'ramping-vus',
-      startVUs: 0,
-      stages: [
-        { duration: '30s', target: 100 },
-        { duration: '1m', target: 500 },
-        { duration: '2m', target: 1000 },
-        { duration: '1m', target: 500 },
-        { duration: '30s', target: 0 },
-      ],
-      gracefulRampDown: '30s',
-    },
-    
-    // Scenario 2: Constant load test
-    constant_load: {
-      executor: 'constant-vus',
-      vus: 500,
-      duration: '5m',
-      startTime: '5m',
-    },
-    
-    // Scenario 3: Spike test
-    spike_test: {
-      executor: 'ramping-vus',
-      startVUs: 100,
-      stages: [
-        { duration: '10s', target: 1000 },
-        { duration: '30s', target: 1000 },
-        { duration: '10s', target: 100 },
-      ],
-      startTime: '11m',
-    },
+// Dynamic scenario configuration based on environment variables
+const scenarios = {
+  // Scenario 1: Ramping VUs for warm-up
+  warmup: {
+    executor: 'ramping-vus',
+    startVUs: 0,
+    stages: [
+      { duration: RAMP_UP_TIME, target: Math.floor(TARGET_VUS * 0.1) },
+      { duration: '1m', target: Math.floor(TARGET_VUS * 0.5) },
+      { duration: '2m', target: TARGET_VUS },
+      { duration: '1m', target: Math.floor(TARGET_VUS * 0.5) },
+      { duration: RAMP_UP_TIME, target: 0 },
+    ],
+    gracefulRampDown: RAMP_UP_TIME,
   },
   
+  // Scenario 2: Constant load test
+  constant_load: {
+    executor: 'constant-vus',
+    vus: Math.floor(TARGET_VUS * 0.5),
+    duration: TEST_DURATION,
+    startTime: '5m',
+  },
+};
+
+// Conditionally add spike test
+if (ENABLE_SPIKE_TEST) {
+  scenarios.spike_test = {
+    executor: 'ramping-vus',
+    startVUs: Math.floor(TARGET_VUS * 0.1),
+    stages: [
+      { duration: '10s', target: TARGET_VUS },
+      { duration: '30s', target: TARGET_VUS },
+      { duration: '10s', target: Math.floor(TARGET_VUS * 0.1) },
+    ],
+    startTime: '11m',
+  };
+}
+
+export const options = {
+  scenarios,
+  
   thresholds: {
-    http_req_duration: ['p(50)<500', 'p(95)<2000', 'p(99)<5000'],
-    http_req_failed: ['rate<0.05'], // Less than 5% failure rate
+    http_req_duration: [`p(50)<${P50_LATENCY}`, `p(95)<${P95_LATENCY}`, `p(99)<${P99_LATENCY}`],
+    http_req_failed: [`rate<${MAX_ERROR_RATE}`],
     startup_time_ms: ['p(50)<3000', 'p(95)<5000'],
     segment_load_time_ms: ['p(50)<1000', 'p(95)<2000'],
     manifest_load_time_ms: ['p(50)<500', 'p(95)<1000'],
-    cache_hit_rate: ['rate>0.7'], // At least 70% cache hit
+    cache_hit_rate: ['rate>0.7'],
     token_validation_success_rate: ['rate>0.95'],
     rebuffer_events: ['count<100'],
+  },
+  
+  // Tags for better organization in results
+  tags: {
+    environment: ENVIRONMENT,
+    target_vus: String(TARGET_VUS),
   },
 };
 
@@ -115,7 +152,7 @@ function simulateStartup() {
 
 // ============= Test Functions =============
 export default function() {
-  const isVod = Math.random() < 0.7; // 70% VOD, 30% Live
+  const isVod = Math.random() < VOD_RATIO; // Configurable VOD vs Live ratio
   const channelId = getRandomChannelId();
   
   activeViewers.add(1);
@@ -231,21 +268,35 @@ export default function() {
 
 // ============= Lifecycle Hooks =============
 export function setup() {
-  console.log('Starting load test...');
-  console.log(`Target: ${BASE_URL}`);
+  console.log('='.repeat(50));
+  console.log('K6 Load Test - IPTV Streaming Platform');
+  console.log('='.repeat(50));
+  console.log(`Environment: ${ENVIRONMENT}`);
+  console.log(`Target URL: ${BASE_URL}`);
+  console.log(`Target VUs: ${TARGET_VUS}`);
+  console.log(`Test Duration: ${TEST_DURATION}`);
+  console.log(`VOD Ratio: ${VOD_RATIO * 100}%`);
+  console.log(`Spike Test: ${ENABLE_SPIKE_TEST ? 'Enabled' : 'Disabled'}`);
+  console.log(`Thresholds: p50<${P50_LATENCY}ms, p95<${P95_LATENCY}ms, p99<${P99_LATENCY}ms`);
+  console.log('='.repeat(50));
   
   // Verify connectivity
   const healthCheck = http.get(`${BASE_URL}/rest/v1/`, { headers });
   if (healthCheck.status !== 200) {
-    console.warn('Backend may not be fully reachable');
+    console.warn('⚠️ Backend may not be fully reachable');
+  } else {
+    console.log('✓ Backend connectivity verified');
   }
   
-  return { startTime: Date.now() };
+  return { startTime: Date.now(), environment: ENVIRONMENT };
 }
 
 export function teardown(data) {
   const duration = (Date.now() - data.startTime) / 1000;
+  console.log('='.repeat(50));
   console.log(`Load test completed in ${duration.toFixed(2)}s`);
+  console.log(`Environment: ${data.environment}`);
+  console.log('='.repeat(50));
 }
 
 // ============= Custom Summary =============
