@@ -9,15 +9,18 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Configuration - Mirror cf-stream-scheduler
+// Configuration - Aggressive retry for VOD downloads
 const CONFIG = {
   MAX_CONCURRENT_DOWNLOADS: 3,
   BATCH_SIZE: 10,
   DELAY_BETWEEN_DOWNLOADS_MS: 2000,
-  MAX_RETRIES: 5,
-  BASE_RETRY_DELAY_MS: 60000,
+  MAX_RETRIES: 15, // Increased from 5 - keep trying until download succeeds
+  BASE_RETRY_DELAY_MS: 30000, // 30 seconds base (reduced from 60s for faster retry)
   SOURCE_VALIDATION_TIMEOUT_MS: 10000,
-  STUCK_TIMEOUT_MINUTES: 30,
+  STUCK_TIMEOUT_MINUTES: 10, // Reduced from 30 - detect stuck faster
+  DOWNLOADING_STUCK_MINUTES: 8, // If no progress for 8 minutes, consider stuck
+  NO_PROGRESS_TIMEOUT_MINUTES: 5, // If segments_downloaded unchanged for 5 minutes
+  AUTO_RESTART_ON_STUCK: true, // Automatically restart from scratch when stuck
 };
 
 const ERROR_CATEGORIES = {
@@ -165,16 +168,18 @@ serve(async (req) => {
       retriesScheduled: 0,
       sourceValidationFailed: 0,
       resetStuck: 0,
+      vodRestarted: 0,
+      pausedResumed: 0,
       activeJobs: 0,
       errors: [] as string[],
     };
 
     // ========================================
-    // STEP 1: Check status of processing jobs
+    // STEP 1: Check status of processing jobs & vod_downloads
     // ========================================
     const { data: processingJobs } = await supabase
       .from("r2_download_jobs")
-      .select("id, channel_id, status, retry_count, updated_at")
+      .select("id, channel_id, status, retry_count, updated_at, source_url")
       .in("status", ["downloading", "uploading", "processing"])
       .limit(50);
 
@@ -188,9 +193,38 @@ serve(async (req) => {
       const updatedAt = new Date(job.updated_at);
       
       if (updatedAt < stuckThreshold) {
-        const errorCategory = categorizeError('stuck timeout');
+        log('warn', 'Job stuck detected', { jobId: job.id, lastUpdate: job.updated_at, channelId: job.channel_id });
         
-        if (errorCategory.shouldRetry && (job.retry_count || 0) < CONFIG.MAX_RETRIES) {
+        if (CONFIG.AUTO_RESTART_ON_STUCK) {
+          // Kill and restart from scratch
+          log('info', 'Auto-restarting stuck job from scratch', { jobId: job.id });
+          
+          // Reset the vod_download if exists
+          await supabase.from("vod_downloads")
+            .update({
+              status: "queued",
+              segments_downloaded: 0,
+              error_message: `Auto-restart: stuck for ${CONFIG.STUCK_TIMEOUT_MINUTES} minutes`,
+              metadata: { auto_restarted: true, restart_at: new Date().toISOString(), previous_retry: job.retry_count || 0 }
+            })
+            .eq("channel_id", job.channel_id)
+            .in("status", ["downloading", "processing", "paused"]);
+          
+          // Re-queue the job immediately with minimal delay
+          const nextRetry = new Date(Date.now() + 5000); // 5 seconds
+          
+          await supabase.from("r2_download_jobs").update({
+            status: "retry_scheduled",
+            error_message: `Auto-restart after ${CONFIG.STUCK_TIMEOUT_MINUTES}min stuck`,
+            retry_count: (job.retry_count || 0) + 1,
+            next_retry_at: nextRetry.toISOString(),
+          }).eq("id", job.id);
+
+          result.retriesScheduled++;
+          result.resetStuck++;
+          log('info', 'Stuck job auto-restarted', { jobId: job.id, newRetryCount: (job.retry_count || 0) + 1 });
+          
+        } else if ((job.retry_count || 0) < CONFIG.MAX_RETRIES) {
           const nextRetry = calculateNextRetryTime(job.retry_count || 0, 1);
           
           await supabase.from("r2_download_jobs").update({
@@ -202,6 +236,7 @@ serve(async (req) => {
 
           result.retriesScheduled++;
           log('warn', 'Stuck job scheduled for retry', { jobId: job.id, nextRetry: nextRetry.toISOString() });
+          result.resetStuck++;
         } else {
           await supabase.from("r2_download_jobs").update({
             status: "failed",
@@ -209,8 +244,99 @@ serve(async (req) => {
           }).eq("id", job.id);
           
           result.statusError++;
+          result.resetStuck++;
         }
+      }
+    }
+
+    // ========================================
+    // STEP 1.5: Check vod_downloads for stuck processes
+    // ========================================
+    const vodStuckThreshold = new Date(Date.now() - CONFIG.DOWNLOADING_STUCK_MINUTES * 60 * 1000);
+    const noProgressThreshold = new Date(Date.now() - CONFIG.NO_PROGRESS_TIMEOUT_MINUTES * 60 * 1000);
+    
+    const { data: stuckVodDownloads } = await supabase
+      .from("vod_downloads")
+      .select("id, channel_id, status, updated_at, segments_downloaded, metadata, retry_count")
+      .in("status", ["downloading", "processing"])
+      .lt("updated_at", vodStuckThreshold.toISOString())
+      .limit(20);
+
+    for (const vod of stuckVodDownloads || []) {
+      log('warn', 'Stuck vod_download detected', { 
+        vodId: vod.id, 
+        channelId: vod.channel_id, 
+        lastUpdate: vod.updated_at,
+        segments: vod.segments_downloaded
+      });
+      
+      const currentRetry = vod.retry_count || vod.metadata?.connection_retries || 0;
+      
+      if (currentRetry < CONFIG.MAX_RETRIES) {
+        // Reset to queued state - will be picked up and restarted
+        await supabase.from("vod_downloads").update({
+          status: "queued",
+          segments_downloaded: 0, // Reset progress to start fresh
+          error_message: `Auto-restart: no progress for ${CONFIG.DOWNLOADING_STUCK_MINUTES} minutes`,
+          retry_count: currentRetry + 1,
+          metadata: { 
+            auto_restarted: true, 
+            restart_at: new Date().toISOString(),
+            previous_segments: vod.segments_downloaded,
+            previous_retry: currentRetry
+          }
+        }).eq("id", vod.id);
+        
         result.resetStuck++;
+        log('info', 'Stuck vod_download reset for retry', { vodId: vod.id, newRetryCount: currentRetry + 1 });
+        
+        // Trigger download again
+        try {
+          await supabase.functions.invoke('download-vod', {
+            body: { channelId: vod.channel_id }
+          });
+          log('info', 'Download re-triggered for stuck VOD', { channelId: vod.channel_id });
+        } catch (e: any) {
+          log('warn', 'Failed to re-trigger download', { error: e.message });
+        }
+      } else {
+        // Max retries exceeded - mark as failed but allow manual retry
+        await supabase.from("vod_downloads").update({
+          status: "failed",
+          error_message: `Failed after ${currentRetry} auto-restarts. Manual retry available.`,
+        }).eq("id", vod.id);
+        
+        result.statusError++;
+        log('error', 'VOD download max retries exceeded', { vodId: vod.id, retries: currentRetry });
+      }
+    }
+
+    // Also check paused downloads that might have been stuck before pausing
+    const { data: pausedVods } = await supabase
+      .from("vod_downloads")
+      .select("id, channel_id, updated_at, metadata, retry_count")
+      .eq("status", "paused")
+      .lt("updated_at", noProgressThreshold.toISOString())
+      .limit(10);
+
+    for (const vod of pausedVods || []) {
+      const currentRetry = vod.retry_count || 0;
+      if (currentRetry < CONFIG.MAX_RETRIES) {
+        log('info', 'Resuming paused download', { vodId: vod.id, channelId: vod.channel_id });
+        
+        await supabase.from("vod_downloads").update({
+          status: "queued",
+          retry_count: currentRetry + 1,
+          error_message: "Auto-resumed from paused state"
+        }).eq("id", vod.id);
+        
+        try {
+          await supabase.functions.invoke('download-vod', {
+            body: { channelId: vod.channel_id, resume: true, downloadId: vod.id }
+          });
+        } catch (e: any) {
+          log('warn', 'Failed to resume paused download', { error: e.message });
+        }
       }
     }
 
