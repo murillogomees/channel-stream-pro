@@ -31,6 +31,7 @@ export default function AdminPlaylistHealth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [lastResults, setLastResults] = useState<any[] | null>(null);
+  const [checkProgress, setCheckProgress] = useState<{ current: number; total: number } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -81,13 +82,25 @@ export default function AdminPlaylistHealth() {
   const handleRunHealthCheck = async () => {
     setIsRunning(true);
     setLastResults(null);
+    setCheckProgress({ current: 0, total: listsWithHealth.length });
     
     try {
+      // Simular progresso inicial
+      const progressInterval = setInterval(() => {
+        setCheckProgress(prev => {
+          if (!prev || prev.current >= prev.total) return prev;
+          return { ...prev, current: Math.min(prev.current + 1, prev.total) };
+        });
+      }, 500);
+
       const result = await playlistHealthService.runHealthCheck();
+      
+      clearInterval(progressInterval);
+      setCheckProgress({ current: listsWithHealth.length, total: listsWithHealth.length });
       
       if (result.success) {
         toast({
-          title: 'Verificação concluída',
+          title: '✅ Verificação concluída',
           description: result.message,
         });
         
@@ -95,8 +108,13 @@ export default function AdminPlaylistHealth() {
           setLastResults(result.results);
         }
         
-        // Recarregar dados
+        // Recarregar dados imediatamente
         await loadData();
+        
+        // Forçar re-render após pequeno delay para garantir atualização visual
+        setTimeout(() => {
+          loadData();
+        }, 500);
       } else {
         toast({
           title: 'Erro na verificação',
@@ -112,6 +130,7 @@ export default function AdminPlaylistHealth() {
       });
     } finally {
       setIsRunning(false);
+      setTimeout(() => setCheckProgress(null), 1000);
     }
   };
 
@@ -219,54 +238,77 @@ export default function AdminPlaylistHealth() {
           
         <Button onClick={handleRunHealthCheck} disabled={isRunning} size="lg" className="w-full sm:w-auto flex-shrink-0">
           <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-          {isRunning ? 'Verificando...' : 'Verificar'}
+          {isRunning ? 'Verificando...' : 'Verificar Todas'}
         </Button>
       </div>
 
+      {/* Barra de Progresso durante verificação */}
+      {isRunning && checkProgress && (
+        <Card className="border-primary/50 bg-primary/5 animate-pulse">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-4">
+              <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Verificando playlists...</span>
+                  <span className="text-muted-foreground">
+                    {checkProgress.current} / {checkProgress.total}
+                  </span>
+                </div>
+                <Progress 
+                  value={(checkProgress.current / checkProgress.total) * 100} 
+                  className="h-2"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Estatísticas Gerais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card>
+        <Card className={isRunning ? 'animate-pulse opacity-75' : 'transition-all duration-300'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Listas</CardTitle>
             <List className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{listsWithHealth.length}</div>
+            <div className="text-2xl font-bold transition-all duration-500">{listsWithHealth.length}</div>
             <p className="text-xs text-muted-foreground">Listas M3U cadastradas</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={isRunning ? 'animate-pulse opacity-75' : 'transition-all duration-300'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ativas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle className={`h-4 w-4 text-green-500 ${isRunning ? 'animate-spin' : ''}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
+            <div className="text-2xl font-bold text-green-600 transition-all duration-500">{stats?.active || 0}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.total ? Math.round((stats.active / stats.total) * 100) : 0}% do total verificado
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={isRunning ? 'animate-pulse opacity-75' : 'transition-all duration-300'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Inativas</CardTitle>
-            <XCircle className="h-4 w-4 text-orange-500" />
+            <XCircle className={`h-4 w-4 text-orange-500 ${isRunning ? 'animate-spin' : ''}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats?.inactive || 0}</div>
+            <div className="text-2xl font-bold text-orange-600 transition-all duration-500">{stats?.inactive || 0}</div>
             <p className="text-xs text-muted-foreground">Verificar urgente</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={isRunning ? 'animate-pulse opacity-75' : 'transition-all duration-300'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Com Erro</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <AlertCircle className={`h-4 w-4 text-red-500 ${isRunning ? 'animate-spin' : ''}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats?.error || 0}</div>
+            <div className="text-2xl font-bold text-red-600 transition-all duration-500">{stats?.error || 0}</div>
             <p className="text-xs text-muted-foreground">Requerem atenção</p>
           </CardContent>
         </Card>
