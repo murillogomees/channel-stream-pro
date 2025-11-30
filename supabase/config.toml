@@ -179,3 +179,7 @@ verify_jwt = false
 # R2 Upload - content upload to R2
 [functions.r2-upload]
 verify_jwt = false
+
+# R2 Scheduler - intelligent content routing scheduler
+[functions.r2-scheduler]
+verify_jwt = false

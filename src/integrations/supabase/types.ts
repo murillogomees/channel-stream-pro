@@ -625,6 +625,74 @@ export type Database = {
           },
         ]
       }
+      channel_demand_stats: {
+        Row: {
+          avg_watch_duration_seconds: number | null
+          calculated_at: string | null
+          channel_id: string | null
+          concurrent_viewers_current: number | null
+          concurrent_viewers_max_24h: number | null
+          demand_score: number | null
+          id: string
+          last_peak_at: string | null
+          peak_hours: number[] | null
+          total_views: number | null
+          trending_score: number | null
+          views_1h: number | null
+          views_24h: number | null
+          views_30d: number | null
+          views_7d: number | null
+          watch_time_seconds_24h: number | null
+          watch_time_seconds_7d: number | null
+        }
+        Insert: {
+          avg_watch_duration_seconds?: number | null
+          calculated_at?: string | null
+          channel_id?: string | null
+          concurrent_viewers_current?: number | null
+          concurrent_viewers_max_24h?: number | null
+          demand_score?: number | null
+          id?: string
+          last_peak_at?: string | null
+          peak_hours?: number[] | null
+          total_views?: number | null
+          trending_score?: number | null
+          views_1h?: number | null
+          views_24h?: number | null
+          views_30d?: number | null
+          views_7d?: number | null
+          watch_time_seconds_24h?: number | null
+          watch_time_seconds_7d?: number | null
+        }
+        Update: {
+          avg_watch_duration_seconds?: number | null
+          calculated_at?: string | null
+          channel_id?: string | null
+          concurrent_viewers_current?: number | null
+          concurrent_viewers_max_24h?: number | null
+          demand_score?: number | null
+          id?: string
+          last_peak_at?: string | null
+          peak_hours?: number[] | null
+          total_views?: number | null
+          trending_score?: number | null
+          views_1h?: number | null
+          views_24h?: number | null
+          views_30d?: number | null
+          views_7d?: number | null
+          watch_time_seconds_24h?: number | null
+          watch_time_seconds_7d?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_demand_stats_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_routing_overrides: {
         Row: {
           channel_id: string
@@ -998,6 +1066,33 @@ export type Database = {
           tmdb_rating?: number | null
           trailer_url?: string | null
           year?: number | null
+        }
+        Relationships: []
+      }
+      content_routing_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -3142,6 +3237,83 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_download_jobs: {
+        Row: {
+          channel_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          downloaded_bytes: number | null
+          error_category: string | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          metadata: Json | null
+          next_retry_at: string | null
+          original_url: string
+          parts_uploaded: number | null
+          progress_percent: number | null
+          r2_key: string | null
+          r2_url: string | null
+          retry_count: number | null
+          started_at: string | null
+          status: string
+          total_bytes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          downloaded_bytes?: number | null
+          error_category?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          next_retry_at?: string | null
+          original_url: string
+          parts_uploaded?: number | null
+          progress_percent?: number | null
+          r2_key?: string | null
+          r2_url?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          total_bytes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          downloaded_bytes?: number | null
+          error_category?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          next_retry_at?: string | null
+          original_url?: string
+          parts_uploaded?: number | null
+          progress_percent?: number | null
+          r2_key?: string | null
+          r2_url?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          total_bytes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_download_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       r2_storage_objects: {
         Row: {
           access_count: number | null
@@ -4845,6 +5017,16 @@ export type Database = {
           vod_count: number
         }[]
       }
+      determine_content_destination: {
+        Args: { p_channel_id: string }
+        Returns: {
+          destination: string
+          fallback_url: string
+          reason: string
+          resolved_url: string
+          should_download: boolean
+        }[]
+      }
       find_vod_by_hash: {
         Args: { p_sha256: string }
         Returns: {
@@ -4974,6 +5156,26 @@ export type Database = {
           strategy: string
         }[]
       }
+      get_content_routing_stats: {
+        Args: never
+        Returns: {
+          high_demand_channels: number
+          in_r2: number
+          in_stream: number
+          live_count: number
+          movies_count: number
+          origin_only: number
+          r2_jobs_completed: number
+          r2_jobs_failed: number
+          r2_jobs_processing: number
+          r2_jobs_queued: number
+          series_count: number
+          stream_jobs_processing: number
+          stream_jobs_queued: number
+          stream_jobs_ready: number
+          total_vods: number
+        }[]
+      }
       get_continue_watching: {
         Args: { p_limit?: number; p_profile_id: string }
         Returns: {
@@ -5026,6 +5228,18 @@ export type Database = {
         }[]
       }
       get_notification_retry_stats: { Args: never; Returns: Json }
+      get_r2_download_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          channel_id: string
+          channel_name: string
+          demand_score: number
+          group_title: string
+          reason: string
+          stream_url: string
+          views_24h: number
+        }[]
+      }
       get_security_analytics: {
         Args: { _days?: number }
         Returns: {
@@ -5053,6 +5267,18 @@ export type Database = {
           total_buffer_events: number
           total_gb_served: number
           total_streams: number
+        }[]
+      }
+      get_stream_upload_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          channel_id: string
+          channel_name: string
+          demand_score: number
+          group_title: string
+          reason: string
+          stream_url: string
+          views_24h: number
         }[]
       }
       get_top_threat_ips: {
@@ -5197,6 +5423,10 @@ export type Database = {
           title: string
           tvg_logo: string
         }[]
+      }
+      track_channel_view: {
+        Args: { p_channel_id: string; p_watch_seconds?: number }
+        Returns: undefined
       }
       update_transcode_job_status: {
         Args: {
