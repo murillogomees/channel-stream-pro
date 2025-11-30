@@ -255,13 +255,13 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-300 via-slate-200 to-slate-300">
       {/* Header */}
-      <header className="border-b border-slate-300 bg-slate-900/95 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-slate-400/50 bg-slate-900/95 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <button 
             onClick={() => navigate("/")}
-            className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-white hover:text-white/80 transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />
             <span className="hidden sm:inline">Voltar</span>
@@ -276,7 +276,7 @@ export default function Checkout() {
 
           <div className="flex items-center gap-2 text-emerald-400 text-sm">
             <Lock className="h-4 w-4" />
-            <span className="hidden sm:inline">Pagamento Seguro</span>
+            <span className="hidden sm:inline text-white">Pagamento Seguro</span>
           </div>
         </div>
       </header>
@@ -288,10 +288,10 @@ export default function Checkout() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-white drop-shadow-lg mb-2" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.5)' }}>
             Complete seu cadastro
           </h1>
-          <p className="text-slate-600">
+          <p className="text-white/90 drop-shadow-md" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.4)' }}>
             Preencha seus dados e escolha o melhor plano para você
           </p>
         </motion.div>
@@ -318,13 +318,13 @@ export default function Checkout() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Nome */}
                   <div className="sm:col-span-2">
-                    <Label htmlFor="nome" className="text-slate-300 font-medium">Nome Completo *</Label>
+                    <Label htmlFor="nome" className="text-white font-medium">Nome Completo *</Label>
                     <Input
                       id="nome"
                       placeholder="Seu nome completo"
                       value={formData.nome}
                       onChange={(e) => handleInputChange("nome", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-600/70 border-slate-500 text-white placeholder:text-white/70 focus:border-primary focus:ring-primary/20 ${
                         errors.nome ? 'border-red-500' : ''
                       }`}
                     />
@@ -335,13 +335,13 @@ export default function Checkout() {
 
                   {/* CPF */}
                   <div>
-                    <Label htmlFor="cpf" className="text-slate-300 font-medium">CPF *</Label>
+                    <Label htmlFor="cpf" className="text-white font-medium">CPF *</Label>
                     <Input
                       id="cpf"
                       placeholder="000.000.000-00"
                       value={formData.cpf}
                       onChange={(e) => handleInputChange("cpf", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-600/70 border-slate-500 text-white placeholder:text-white/70 focus:border-primary focus:ring-primary/20 ${
                         errors.cpf ? 'border-red-500' : ''
                       }`}
                     />
@@ -352,7 +352,7 @@ export default function Checkout() {
 
                   {/* Telefone */}
                   <div>
-                    <Label htmlFor="telefone" className="text-slate-300 font-medium">
+                    <Label htmlFor="telefone" className="text-white font-medium">
                       WhatsApp *
                       <Phone className="h-3.5 w-3.5 inline ml-1 text-emerald-400" />
                     </Label>
@@ -361,7 +361,7 @@ export default function Checkout() {
                       placeholder="(00) 00000-0000"
                       value={formData.telefone}
                       onChange={(e) => handleInputChange("telefone", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-600/70 border-slate-500 text-white placeholder:text-white/70 focus:border-primary focus:ring-primary/20 ${
                         errors.telefone ? 'border-red-500' : ''
                       }`}
                     />
@@ -372,14 +372,14 @@ export default function Checkout() {
 
                   {/* Email */}
                   <div>
-                    <Label htmlFor="email" className="text-slate-300 font-medium">Email *</Label>
+                    <Label htmlFor="email" className="text-white font-medium">Email *</Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="seu@email.com"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-600/70 border-slate-500 text-white placeholder:text-white/70 focus:border-primary focus:ring-primary/20 ${
                         errors.email ? 'border-red-500' : ''
                       }`}
                     />
@@ -390,17 +390,17 @@ export default function Checkout() {
 
                   {/* Origem */}
                   <div>
-                    <Label htmlFor="origem" className="text-slate-300 font-medium">Como nos conheceu? *</Label>
+                    <Label htmlFor="origem" className="text-white font-medium">Como nos conheceu? *</Label>
                     <Select 
                       value={formData.origem} 
                       onValueChange={(value) => handleInputChange("origem", value)}
                     >
                       <SelectTrigger 
-                        className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white ${
+                        className={`mt-1.5 bg-slate-600/70 border-slate-500 text-white ${
                           errors.origem ? 'border-red-500' : ''
                         }`}
                       >
-                        <SelectValue placeholder="Selecione uma opção" />
+                        <SelectValue placeholder="Selecione uma opção" className="text-white/70" />
                       </SelectTrigger>
                       <SelectContent>
                         {DISCOVERY_OPTIONS.map(option => (
@@ -502,7 +502,7 @@ export default function Checkout() {
                               
                               <div>
                                 <h3 className="font-bold text-orange-400 text-lg">{plan.name}</h3>
-                                <p className="text-sm text-white/80">
+                                <p className="text-sm text-white">
                                   {plan.period_months} {plan.period_months === 1 ? 'mês' : 'meses'} de acesso
                                 </p>
                               </div>
@@ -512,7 +512,7 @@ export default function Checkout() {
                               {/* Preço cheio riscado */}
                               {savings && (
                                 <motion.p 
-                                  className="text-sm text-slate-500 line-through"
+                                  className="text-sm text-white/60 line-through"
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
                                 >
@@ -530,7 +530,7 @@ export default function Checkout() {
                               
                               {/* Preço por mês */}
                               {plan.period_months > 1 && (
-                                <p className="text-xs text-white/50">
+                                <p className="text-xs text-white/70">
                                   R$ {(plan.price / plan.period_months).toFixed(2).replace(".", ",")}/mês
                                 </p>
                               )}
@@ -571,13 +571,13 @@ export default function Checkout() {
                                 className="mt-3 pt-3 border-t border-slate-700/50"
                               >
                                 <div className="grid grid-cols-2 gap-2">
-                                  {plan.features.slice(0, 4).map((feature, i) => (
+                                    {plan.features.slice(0, 4).map((feature, i) => (
                                     <motion.div
                                       key={i}
                                       initial={{ opacity: 0, x: -10 }}
                                       animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.05 }}
-                                      className="flex items-center gap-2 text-sm text-slate-300"
+                                      className="flex items-center gap-2 text-sm text-white"
                                     >
                                       <Check className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
                                       <span className="truncate">{feature}</span>
@@ -596,7 +596,7 @@ export default function Checkout() {
                 {plans.length === 0 && (
                   <div className="text-center py-8">
                     <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                    <p className="text-white/60">Nenhum plano disponível no momento</p>
+                    <p className="text-white">Nenhum plano disponível no momento</p>
                   </div>
                 )}
               </CardContent>
@@ -638,11 +638,11 @@ export default function Checkout() {
                       className="space-y-4"
                     >
                       {/* Plan Info */}
-                      <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700">
+                      <div className="p-4 rounded-xl bg-slate-700/60 border border-slate-600">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-bold text-orange-400 text-lg">{selectedPlan.name}</p>
-                            <p className="text-sm text-white/80">{selectedPlan.period}</p>
+                            <p className="text-sm text-white">{selectedPlan.period}</p>
                           </div>
                         <motion.p 
                             className="text-xl font-bold text-orange-400"
@@ -657,7 +657,7 @@ export default function Checkout() {
 
                       {/* Coupon Input */}
                       <div className="space-y-2">
-                        <Label className="text-slate-300 flex items-center gap-2 font-medium">
+                        <Label className="text-white flex items-center gap-2 font-medium">
                           <Ticket className="h-4 w-4 text-amber-400" />
                           Cupom de desconto
                         </Label>
@@ -665,7 +665,7 @@ export default function Checkout() {
                           <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
                             <div>
                               <p className="font-semibold text-emerald-400">{appliedCoupon.code}</p>
-                              <p className="text-sm text-emerald-400/80">
+                              <p className="text-sm text-white">
                                 {appliedCoupon.discount_type === 'percentage' 
                                   ? `${appliedCoupon.discount_value}% de desconto`
                                   : `R$ ${appliedCoupon.discount_value.toFixed(2)} de desconto`
@@ -676,7 +676,7 @@ export default function Checkout() {
                               variant="ghost" 
                               size="icon" 
                               onClick={handleRemoveCoupon}
-                              className="text-slate-400 hover:text-white"
+                              className="text-white hover:text-white/80"
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -690,13 +690,13 @@ export default function Checkout() {
                                 setCouponCode(e.target.value.toUpperCase());
                                 setCouponError("");
                               }}
-                              className="bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 uppercase"
+                              className="bg-slate-600/70 border-slate-500 text-white placeholder:text-white/70 uppercase"
                             />
                             <Button 
                               variant="secondary"
                               onClick={handleApplyCoupon}
                               disabled={couponLoading}
-                              className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white"
+                              className="shrink-0 bg-slate-600 hover:bg-slate-500 text-white"
                             >
                               {couponLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
                             </Button>
@@ -740,7 +740,7 @@ export default function Checkout() {
                       {/* Subtotal and Coupon Discount */}
                       {appliedCoupon && couponDiscount > 0 && (
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between text-slate-400">
+                          <div className="flex justify-between text-white">
                             <span>Subtotal</span>
                             <span>R$ {selectedPlan.price.toFixed(2).replace(".", ",")}</span>
                           </div>
@@ -786,33 +786,33 @@ export default function Checkout() {
 
                       {/* Security Info */}
                       <div className="space-y-2.5 pt-2">
-                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                        <div className="flex items-center gap-2 text-white text-sm">
                           <Shield className="h-4 w-4 text-emerald-400" />
                           <span>Pagamento 100% seguro</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                        <div className="flex items-center gap-2 text-white text-sm">
                           <Check className="h-4 w-4 text-emerald-400" />
                           <span>Acesso imediato após confirmação</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                        <div className="flex items-center gap-2 text-white text-sm">
                           <CreditCard className="h-4 w-4 text-emerald-400" />
                           <span>Cartão, Pix ou Boleto</span>
                         </div>
                       </div>
 
                       {/* Payment Methods */}
-                      <div className="pt-4 border-t border-slate-700">
-                        <p className="text-xs text-slate-400 text-center mb-3 font-medium">Formas de pagamento aceitas</p>
+                      <div className="pt-4 border-t border-slate-600">
+                        <p className="text-xs text-white text-center mb-3 font-medium">Formas de pagamento aceitas</p>
                         <div className="flex items-center justify-center gap-3">
-                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
                             <span className="text-sm font-bold text-emerald-400">PIX</span>
                           </div>
-                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
-                            <CreditCard className="h-4 w-4 text-slate-300 mr-1.5" />
-                            <span className="text-sm text-slate-300">Cartão</span>
+                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
+                            <CreditCard className="h-4 w-4 text-white mr-1.5" />
+                            <span className="text-sm text-white">Cartão</span>
                           </div>
-                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
-                            <span className="text-sm text-slate-300">Boleto</span>
+                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
+                            <span className="text-sm text-white">Boleto</span>
                           </div>
                         </div>
                       </div>
@@ -823,8 +823,8 @@ export default function Checkout() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                     >
-                      <CreditCard className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-500">Selecione um plano para continuar</p>
+                      <CreditCard className="h-12 w-12 text-white/50 mx-auto mb-3" />
+                      <p className="text-white">Selecione um plano para continuar</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -840,16 +840,16 @@ export default function Checkout() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <div className="inline-flex flex-wrap items-center justify-center gap-4 md:gap-8 text-slate-400 text-sm">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+          <div className="inline-flex flex-wrap items-center justify-center gap-4 md:gap-8 text-white text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/80 border border-slate-700">
               <Shield className="h-5 w-5 text-emerald-400" />
               <span>SSL Seguro</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/80 border border-slate-700">
               <CreditCard className="h-5 w-5 text-blue-400" />
               <span>Mercado Pago</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/80 border border-slate-700">
               <Check className="h-5 w-5 text-emerald-400" />
               <span>Satisfação Garantida</span>
             </div>
