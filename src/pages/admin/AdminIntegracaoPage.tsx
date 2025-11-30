@@ -1,7 +1,7 @@
 /**
  * AdminIntegracaoPage - Hub de integrações
  * Rota: /admin/integracao
- * Abas: WhatsApp, CDN, Transcode, Smart Cache
+ * Abas: Mercado Pago, WhatsApp, CDN, Transcode, Smart Cache
  */
 
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -14,16 +14,24 @@ import AdminSmartCache from "../AdminSmartCache";
 import AdminRLSCoverage from "../AdminRLSCoverage";
 import AdminQADashboard from "../AdminQADashboard";
 import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
+import { MercadoPagoIntegration } from "@/components/admin/mercadopago/MercadoPagoIntegration";
+import { CustomCheckoutBuilder } from "@/components/admin/mercadopago/CustomCheckoutBuilder";
 
 export default function AdminIntegracaoPage() {
   return (
     <AdminShell 
       title="Integrações & Ferramentas"
-      description="WhatsApp, CDN, Transcode e ferramentas de debug"
+      description="Mercado Pago, WhatsApp, CDN e ferramentas de debug"
     >
-      <Tabs defaultValue="whatsapp" className="space-y-4">
+      <Tabs defaultValue="mercadopago" className="space-y-4">
         <ScrollArea className="w-full whitespace-nowrap pb-2">
           <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
+            <TabsTrigger value="mercadopago" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              💳 Mercado Pago
+            </TabsTrigger>
+            <TabsTrigger value="checkout" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              🛒 Checkout
+            </TabsTrigger>
             <TabsTrigger value="whatsapp" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               💬 WhatsApp
             </TabsTrigger>
@@ -48,6 +56,14 @@ export default function AdminIntegracaoPage() {
           </TabsList>
           <ScrollBar orientation="horizontal" className="invisible" />
         </ScrollArea>
+
+        <TabsContent value="mercadopago" className="space-y-4 mt-4">
+          <MercadoPagoIntegration />
+        </TabsContent>
+
+        <TabsContent value="checkout" className="space-y-4 mt-4">
+          <CustomCheckoutBuilder />
+        </TabsContent>
 
         <TabsContent value="whatsapp" className="space-y-4 mt-4">
           <AdminWhatsAppConfig />

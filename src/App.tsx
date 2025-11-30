@@ -37,6 +37,7 @@ const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
 // Checkout pages
+const Checkout = lazy(() => import("./pages/Checkout"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutFailure = lazy(() => import("./pages/CheckoutFailure"));
 const CheckoutPending = lazy(() => import("./pages/CheckoutPending"));
@@ -84,6 +85,7 @@ const App = () => (
             <Route path="/install" element={<Navigate to="/app/install" replace />} />
             
             {/* Checkout pages */}
+            <Route path="/checkout" element={<Checkout />} />
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/failure" element={<CheckoutFailure />} />
             <Route path="/checkout/pending" element={<CheckoutPending />} />
