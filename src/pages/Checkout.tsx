@@ -255,9 +255,9 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f0f23] via-[#1a1a2e] to-[#16213e]">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#12121f] to-[#0d1526]">
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-primary/20 bg-black/40 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <button 
             onClick={() => navigate("/")}
@@ -268,13 +268,13 @@ export default function Checkout() {
           </button>
           
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/30">
               <Tv className="h-5 w-5 text-white" />
             </div>
             <span className="font-bold text-white">IPTV Link</span>
           </div>
 
-          <div className="flex items-center gap-2 text-white/60 text-sm">
+          <div className="flex items-center gap-2 text-emerald-400 text-sm">
             <Lock className="h-4 w-4" />
             <span className="hidden sm:inline">Pagamento Seguro</span>
           </div>
@@ -305,24 +305,26 @@ export default function Checkout() {
             transition={{ delay: 0.1 }}
           >
             {/* User Data Card */}
-            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
-              <CardHeader className="pb-4">
+            <Card className="bg-gradient-to-br from-slate-900/95 to-slate-800/90 border-2 border-slate-700/50 shadow-2xl shadow-black/50 backdrop-blur-sm">
+              <CardHeader className="pb-4 border-b border-slate-700/50">
                 <CardTitle className="text-white flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
+                  <div className="p-2 rounded-lg bg-primary/20">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
                   Dados Pessoais
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Nome */}
                   <div className="sm:col-span-2">
-                    <Label htmlFor="nome" className="text-white/80">Nome Completo *</Label>
+                    <Label htmlFor="nome" className="text-slate-300 font-medium">Nome Completo *</Label>
                     <Input
                       id="nome"
                       placeholder="Seu nome completo"
                       value={formData.nome}
                       onChange={(e) => handleInputChange("nome", e.target.value)}
-                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
                         errors.nome ? 'border-red-500' : ''
                       }`}
                     />
@@ -333,13 +335,13 @@ export default function Checkout() {
 
                   {/* CPF */}
                   <div>
-                    <Label htmlFor="cpf" className="text-white/80">CPF *</Label>
+                    <Label htmlFor="cpf" className="text-slate-300 font-medium">CPF *</Label>
                     <Input
                       id="cpf"
                       placeholder="000.000.000-00"
                       value={formData.cpf}
                       onChange={(e) => handleInputChange("cpf", e.target.value)}
-                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
                         errors.cpf ? 'border-red-500' : ''
                       }`}
                     />
@@ -350,16 +352,16 @@ export default function Checkout() {
 
                   {/* Telefone */}
                   <div>
-                    <Label htmlFor="telefone" className="text-white/80">
+                    <Label htmlFor="telefone" className="text-slate-300 font-medium">
                       WhatsApp *
-                      <Phone className="h-3.5 w-3.5 inline ml-1 text-green-400" />
+                      <Phone className="h-3.5 w-3.5 inline ml-1 text-emerald-400" />
                     </Label>
                     <Input
                       id="telefone"
                       placeholder="(00) 00000-0000"
                       value={formData.telefone}
                       onChange={(e) => handleInputChange("telefone", e.target.value)}
-                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
                         errors.telefone ? 'border-red-500' : ''
                       }`}
                     />
@@ -370,14 +372,14 @@ export default function Checkout() {
 
                   {/* Email */}
                   <div>
-                    <Label htmlFor="email" className="text-white/80">Email *</Label>
+                    <Label htmlFor="email" className="text-slate-300 font-medium">Email *</Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="seu@email.com"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
-                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
                         errors.email ? 'border-red-500' : ''
                       }`}
                     />
@@ -388,13 +390,13 @@ export default function Checkout() {
 
                   {/* Origem */}
                   <div>
-                    <Label htmlFor="origem" className="text-white/80">Como nos conheceu? *</Label>
+                    <Label htmlFor="origem" className="text-slate-300 font-medium">Como nos conheceu? *</Label>
                     <Select 
                       value={formData.origem} 
                       onValueChange={(value) => handleInputChange("origem", value)}
                     >
                       <SelectTrigger 
-                        className={`mt-1.5 bg-white/5 border-white/20 text-white ${
+                        className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white ${
                           errors.origem ? 'border-red-500' : ''
                         }`}
                       >
@@ -417,14 +419,19 @@ export default function Checkout() {
             </Card>
 
             {/* Plans Selection Card */}
-            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
-              <CardHeader className="pb-4">
+            <Card className="bg-gradient-to-br from-slate-900/95 to-slate-800/90 border-2 border-slate-700/50 shadow-2xl shadow-black/50 backdrop-blur-sm">
+              <CardHeader className="pb-4 border-b border-slate-700/50">
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-primary" />
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <Tag className="h-5 w-5 text-amber-400" />
+                  </div>
                   Escolha seu Plano
+                  <Badge className="ml-auto bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 animate-pulse">
+                    Oferta Limitada
+                  </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <div className="space-y-3">
                   <AnimatePresence mode="popLayout">
                     {plans.filter(p => p.is_active).map((plan, index) => {
@@ -451,8 +458,8 @@ export default function Checkout() {
                           onClick={() => setSelectedPlanId(plan.id)}
                           className={`relative cursor-pointer rounded-xl p-4 transition-all duration-300 ${
                             isSelected 
-                              ? 'bg-primary/20 ring-2 ring-primary shadow-lg shadow-primary/20' 
-                              : 'bg-white/5 hover:bg-white/10 border border-white/10'
+                              ? 'bg-gradient-to-r from-primary/30 to-purple-600/20 ring-2 ring-primary shadow-xl shadow-primary/30' 
+                              : 'bg-slate-800/60 hover:bg-slate-800/80 border-2 border-slate-700/50 hover:border-slate-600'
                           }`}
                         >
                           {/* Popular Badge */}
@@ -462,9 +469,9 @@ export default function Checkout() {
                               animate={{ opacity: 1, y: 0 }}
                               className="absolute -top-2.5 left-4"
                             >
-                              <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white border-0 shadow-lg">
+                              <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg">
                                 <Sparkles className="h-3 w-3 mr-1" />
-                                Mais Popular
+                                Melhor Custo-Benefício
                               </Badge>
                             </motion.div>
                           )}
@@ -473,10 +480,10 @@ export default function Checkout() {
                             <div className="flex items-center gap-3">
                               {/* Radio indicator */}
                               <motion.div 
-                                className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                                className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
                                   isSelected 
-                                    ? 'border-primary bg-primary' 
-                                    : 'border-white/30'
+                                    ? 'border-primary bg-primary shadow-lg shadow-primary/50' 
+                                    : 'border-slate-500 bg-slate-700'
                                 }`}
                                 animate={{ scale: isSelected ? 1.1 : 1 }}
                               >
@@ -487,15 +494,15 @@ export default function Checkout() {
                                       animate={{ scale: 1 }}
                                       exit={{ scale: 0 }}
                                     >
-                                      <Check className="h-3 w-3 text-white" />
+                                      <Check className="h-3.5 w-3.5 text-white" />
                                     </motion.div>
                                   )}
                                 </AnimatePresence>
                               </motion.div>
                               
                               <div>
-                                <h3 className="font-semibold text-white">{plan.name}</h3>
-                                <p className="text-sm text-white/60">
+                                <h3 className="font-semibold text-white text-lg">{plan.name}</h3>
+                                <p className="text-sm text-slate-400">
                                   {plan.period_months} {plan.period_months === 1 ? 'mês' : 'meses'} de acesso
                                 </p>
                               </div>
@@ -505,7 +512,7 @@ export default function Checkout() {
                               {/* Preço cheio riscado */}
                               {savings && (
                                 <motion.p 
-                                  className="text-sm text-white/40 line-through"
+                                  className="text-sm text-slate-500 line-through"
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
                                 >
@@ -515,7 +522,7 @@ export default function Checkout() {
                               
                               {/* Preço atual */}
                               <motion.div 
-                                className="text-2xl font-bold text-white"
+                                className={`text-2xl font-bold ${isSelected ? 'text-primary' : 'text-white'}`}
                                 animate={{ scale: isSelected ? 1.05 : 1 }}
                               >
                                 R$ {plan.price.toFixed(2).replace(".", ",")}
@@ -561,7 +568,7 @@ export default function Checkout() {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="mt-3 pt-3 border-t border-white/10"
+                                className="mt-3 pt-3 border-t border-slate-700/50"
                               >
                                 <div className="grid grid-cols-2 gap-2">
                                   {plan.features.slice(0, 4).map((feature, i) => (
@@ -570,9 +577,9 @@ export default function Checkout() {
                                       initial={{ opacity: 0, x: -10 }}
                                       animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.05 }}
-                                      className="flex items-center gap-2 text-sm text-white/70"
+                                      className="flex items-center gap-2 text-sm text-slate-300"
                                     >
-                                      <Check className="h-3 w-3 text-green-400 flex-shrink-0" />
+                                      <Check className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
                                       <span className="truncate">{feature}</span>
                                     </motion.div>
                                   ))}
@@ -603,14 +610,24 @@ export default function Checkout() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="sticky top-24 bg-white/5 border-white/10 backdrop-blur-sm">
-              <CardHeader>
+            <Card className="sticky top-24 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-primary/30 shadow-2xl shadow-primary/20 backdrop-blur-sm overflow-hidden">
+              {/* Urgency Banner */}
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-center">
+                <p className="text-white text-sm font-semibold flex items-center justify-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Preço promocional por tempo limitado!
+                </p>
+              </div>
+              
+              <CardHeader className="border-b border-slate-700/50">
                 <CardTitle className="text-white flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
+                  <div className="p-2 rounded-lg bg-primary/20">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                  </div>
                   Resumo do Pedido
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <AnimatePresence mode="wait">
                   {selectedPlan ? (
                     <motion.div
@@ -621,17 +638,17 @@ export default function Checkout() {
                       className="space-y-4"
                     >
                       {/* Plan Info */}
-                      <div className="p-3 rounded-lg bg-white/5">
+                      <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium text-white">{selectedPlan.name}</p>
-                            <p className="text-sm text-white/60">{selectedPlan.period}</p>
+                            <p className="font-semibold text-white text-lg">{selectedPlan.name}</p>
+                            <p className="text-sm text-slate-400">{selectedPlan.period}</p>
                           </div>
                           <motion.p 
-                            className="text-lg font-bold text-white"
+                            className="text-xl font-bold text-primary"
                             key={selectedPlan.price}
                             initial={{ scale: 1.2, color: "#22c55e" }}
-                            animate={{ scale: 1, color: "#ffffff" }}
+                            animate={{ scale: 1, color: "hsl(var(--primary))" }}
                           >
                             R$ {selectedPlan.price.toFixed(2).replace(".", ",")}
                           </motion.p>
@@ -640,15 +657,15 @@ export default function Checkout() {
 
                       {/* Coupon Input */}
                       <div className="space-y-2">
-                        <Label className="text-white/80 flex items-center gap-2">
-                          <Ticket className="h-4 w-4" />
+                        <Label className="text-slate-300 flex items-center gap-2 font-medium">
+                          <Ticket className="h-4 w-4 text-amber-400" />
                           Cupom de desconto
                         </Label>
                         {appliedCoupon ? (
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
                             <div>
-                              <p className="font-medium text-green-400">{appliedCoupon.code}</p>
-                              <p className="text-sm text-green-400/70">
+                              <p className="font-semibold text-emerald-400">{appliedCoupon.code}</p>
+                              <p className="text-sm text-emerald-400/80">
                                 {appliedCoupon.discount_type === 'percentage' 
                                   ? `${appliedCoupon.discount_value}% de desconto`
                                   : `R$ ${appliedCoupon.discount_value.toFixed(2)} de desconto`
@@ -659,7 +676,7 @@ export default function Checkout() {
                               variant="ghost" 
                               size="icon" 
                               onClick={handleRemoveCoupon}
-                              className="text-white/60 hover:text-white"
+                              className="text-slate-400 hover:text-white"
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -673,13 +690,13 @@ export default function Checkout() {
                                 setCouponCode(e.target.value.toUpperCase());
                                 setCouponError("");
                               }}
-                              className="bg-white/5 border-white/20 text-white placeholder:text-white/40 uppercase"
+                              className="bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 uppercase"
                             />
                             <Button 
-                              variant="outline" 
+                              variant="secondary"
                               onClick={handleApplyCoupon}
                               disabled={couponLoading}
-                              className="shrink-0"
+                              className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white"
                             >
                               {couponLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
                             </Button>
@@ -698,17 +715,17 @@ export default function Checkout() {
                             <motion.div
                               initial={{ opacity: 0, scale: 0.9 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              className="p-3 rounded-lg bg-green-500/10 border border-green-500/20"
+                              className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border border-emerald-500/30"
                             >
-                              <div className="flex items-center gap-2 text-green-400">
+                              <div className="flex items-center gap-2 text-emerald-400">
                                 <Percent className="h-4 w-4" />
-                                <span className="font-medium">Economia no plano:</span>
+                                <span className="font-semibold">Economia no plano:</span>
                               </div>
                               <div className="mt-1 flex items-baseline gap-2">
-                                <span className="text-xl font-bold text-green-400">
+                                <span className="text-2xl font-bold text-emerald-400">
                                   {savings.percent}%
                                 </span>
-                                <span className="text-green-400/70">
+                                <span className="text-emerald-400/80">
                                   (R$ {savings.amount.toFixed(2).replace(".", ",")})
                                 </span>
                               </div>
@@ -718,16 +735,16 @@ export default function Checkout() {
                         return null;
                       })()}
                       
-                      <Separator className="bg-white/10" />
+                      <Separator className="bg-slate-700" />
                       
                       {/* Subtotal and Coupon Discount */}
                       {appliedCoupon && couponDiscount > 0 && (
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between text-white/70">
+                          <div className="flex justify-between text-slate-400">
                             <span>Subtotal</span>
                             <span>R$ {selectedPlan.price.toFixed(2).replace(".", ",")}</span>
                           </div>
-                          <div className="flex justify-between text-green-400">
+                          <div className="flex justify-between text-emerald-400 font-medium">
                             <span>Desconto do cupom</span>
                             <span>-R$ {couponDiscount.toFixed(2).replace(".", ",")}</span>
                           </div>
@@ -735,12 +752,13 @@ export default function Checkout() {
                       )}
                       
                       {/* Total */}
-                      <div className="flex justify-between text-lg font-bold text-white">
-                        <span>Total</span>
+                      <div className="flex justify-between items-center p-4 rounded-xl bg-primary/10 border border-primary/30">
+                        <span className="text-lg font-semibold text-white">Total</span>
                         <motion.span
                           key={finalPrice}
                           initial={{ scale: 1.1 }}
                           animate={{ scale: 1 }}
+                          className="text-2xl font-bold text-primary"
                         >
                           R$ {finalPrice.toFixed(2).replace(".", ",")}
                         </motion.span>
@@ -748,7 +766,7 @@ export default function Checkout() {
 
                       {/* Checkout Button */}
                       <Button 
-                        className="w-full h-12 text-base font-semibold" 
+                        className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-xl shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 hover:scale-[1.02]" 
                         size="lg"
                         onClick={handleCheckout}
                         disabled={isProcessing}
@@ -760,40 +778,41 @@ export default function Checkout() {
                           </>
                         ) : (
                           <>
-                            <CreditCard className="h-5 w-5 mr-2" />
-                            Finalizar Pagamento
+                            <Lock className="h-5 w-5 mr-2" />
+                            FINALIZAR COMPRA
                           </>
                         )}
                       </Button>
 
                       {/* Security Info */}
-                      <div className="space-y-2 pt-2">
-                        <div className="flex items-center gap-2 text-white/60 text-sm">
-                          <Shield className="h-4 w-4 text-green-400" />
+                      <div className="space-y-2.5 pt-2">
+                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                          <Shield className="h-4 w-4 text-emerald-400" />
                           <span>Pagamento 100% seguro</span>
                         </div>
-                        <div className="flex items-center gap-2 text-white/60 text-sm">
-                          <Check className="h-4 w-4 text-green-400" />
+                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                          <Check className="h-4 w-4 text-emerald-400" />
                           <span>Acesso imediato após confirmação</span>
                         </div>
-                        <div className="flex items-center gap-2 text-white/60 text-sm">
-                          <CreditCard className="h-4 w-4 text-green-400" />
+                        <div className="flex items-center gap-2 text-slate-300 text-sm">
+                          <CreditCard className="h-4 w-4 text-emerald-400" />
                           <span>Cartão, Pix ou Boleto</span>
                         </div>
                       </div>
 
                       {/* Payment Methods */}
-                      <div className="pt-4 border-t border-white/10">
-                        <p className="text-xs text-white/40 text-center mb-2">Formas de pagamento</p>
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                            <span className="text-xs text-white/60">PIX</span>
+                      <div className="pt-4 border-t border-slate-700">
+                        <p className="text-xs text-slate-400 text-center mb-3 font-medium">Formas de pagamento aceitas</p>
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                            <span className="text-sm font-bold text-emerald-400">PIX</span>
                           </div>
-                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                            <CreditCard className="h-4 w-4 text-white/60" />
+                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                            <CreditCard className="h-4 w-4 text-slate-300 mr-1.5" />
+                            <span className="text-sm text-slate-300">Cartão</span>
                           </div>
-                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                            <span className="text-[10px] text-white/60">Boleto</span>
+                          <div className="h-10 px-4 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                            <span className="text-sm text-slate-300">Boleto</span>
                           </div>
                         </div>
                       </div>
@@ -804,8 +823,8 @@ export default function Checkout() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                     >
-                      <CreditCard className="h-12 w-12 text-white/20 mx-auto mb-3" />
-                      <p className="text-white/40">Selecione um plano</p>
+                      <CreditCard className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+                      <p className="text-slate-500">Selecione um plano para continuar</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -821,17 +840,17 @@ export default function Checkout() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <div className="inline-flex flex-wrap items-center justify-center gap-4 md:gap-6 text-white/40 text-sm">
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+          <div className="inline-flex flex-wrap items-center justify-center gap-4 md:gap-8 text-slate-400 text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+              <Shield className="h-5 w-5 text-emerald-400" />
               <span>SSL Seguro</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+              <CreditCard className="h-5 w-5 text-blue-400" />
               <span>Mercado Pago</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Check className="h-5 w-5" />
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900/50 border border-slate-800">
+              <Check className="h-5 w-5 text-emerald-400" />
               <span>Satisfação Garantida</span>
             </div>
           </div>
