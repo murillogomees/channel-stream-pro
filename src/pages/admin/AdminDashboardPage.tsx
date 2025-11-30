@@ -59,9 +59,10 @@ interface NavCardProps {
   badge?: string;
   isNew?: boolean;
   isHighlighted?: boolean;
+  compact?: boolean;
 }
 
-const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }: NavCardProps) => {
+const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted, compact }: NavCardProps) => {
   const navigate = useNavigate();
 
   return (
@@ -73,15 +74,15 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }
     >
       {isNew && (
         <div className="absolute top-0 right-0">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-bl-lg flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
             NOVO
           </div>
         </div>
       )}
-      <CardHeader className="pb-3">
+      <CardHeader className={compact ? "p-3 pb-2" : "pb-3"}>
         <div className="flex items-start justify-between">
-          <div className={`p-2 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+          <div className={`${compact ? 'p-1.5' : 'p-2'} rounded-lg transition-all duration-300 group-hover:scale-110 ${
             isHighlighted 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'
@@ -89,11 +90,11 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }
             {icon}
           </div>
           {badge && !isNew && (
-            <Badge variant="secondary" className="animate-fade-in">{badge}</Badge>
+            <Badge variant="secondary" className={`animate-fade-in ${compact ? 'text-[10px] px-1.5 py-0' : ''}`}>{badge}</Badge>
           )}
         </div>
-        <CardTitle className="text-lg mt-4 group-hover:text-primary transition-colors">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle className={`${compact ? 'text-sm mt-2' : 'text-lg mt-4'} group-hover:text-primary transition-colors`}>{title}</CardTitle>
+        <CardDescription className={compact ? 'text-xs line-clamp-1' : ''}>{description}</CardDescription>
       </CardHeader>
     </Card>
   );
@@ -195,130 +196,90 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      <Separator className="my-8" />
+      <Separator className="my-6" />
 
-      {/* Gestão de Clientes */}
-      <section className="mb-8">
+      {/* Módulos Principais - Grid Compacto */}
+      <section className="mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <Users className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Gestão de Clientes</h2>
+          <LayoutDashboard className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Módulos Principais</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <NavCard
             title="Clientes"
-            description="Lista, cadastro e gestão de clientes"
-            icon={<Users className="h-5 w-5" />}
+            description="Gestão de clientes"
+            icon={<Users className="h-4 w-4" />}
             path="/admin/clientes"
             badge="Hub"
+            compact
           />
           <NavCard
-            title="Gestão M3U"
-            description="Listas, sync, builder, VOD e relatórios"
-            icon={<ListVideo className="h-5 w-5" />}
+            title="M3U"
+            description="Playlists e VOD"
+            icon={<ListVideo className="h-4 w-4" />}
             path="/admin/m3u"
             badge="Hub"
+            compact
           />
-          <NavCard
-            title="Usuários & Permissões"
-            description="Roles, auditoria e controle de acesso"
-            icon={<UserCog className="h-5 w-5" />}
-            path="/admin/usuarios"
-            badge="Hub"
-          />
-        </div>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* Notificações & Comunicação */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Notificações & Comunicação</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard
             title="Notificações"
-            description="Central de notificações, templates e automáticas"
-            icon={<Bell className="h-5 w-5" />}
+            description="Templates e automações"
+            icon={<Bell className="h-4 w-4" />}
             path="/admin/notificacoes"
             badge="Hub"
+            compact
           />
-        </div>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* Segurança */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Shield className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Segurança</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard
-            title="Centro de Segurança"
-            description="Alertas, monitor, IP blocking e 2FA"
-            icon={<Shield className="h-5 w-5" />}
+            title="Segurança"
+            description="Alertas e monitor"
+            icon={<Shield className="h-4 w-4" />}
             path="/admin/seguranca"
             badge="Hub"
+            compact
           />
-        </div>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* Sistema */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Cog className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Sistema</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard
-            title="Configurações do Sistema"
-            description="Saúde, backup, customização e variáveis"
-            icon={<Settings2 className="h-5 w-5" />}
+            title="Sistema"
+            description="Config e backup"
+            icon={<Settings2 className="h-4 w-4" />}
             path="/admin/sistema"
             badge="Hub"
+            compact
+          />
+          <NavCard
+            title="Usuários"
+            description="Roles e permissões"
+            icon={<UserCog className="h-4 w-4" />}
+            path="/admin/usuarios"
+            badge="Hub"
+            compact
           />
         </div>
       </section>
 
-      <Separator className="my-8" />
+      <Separator className="my-6" />
 
-      {/* Analytics */}
-      <section className="mb-8">
+      {/* Analytics & Integrações */}
+      <section className="mb-6">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Analytics & Performance</h2>
+          <h2 className="text-lg font-semibold">Analytics & Integrações</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <NavCard
-            title="Analytics Hub"
-            description="Streaming, métricas, conversão e cupons"
-            icon={<BarChart3 className="h-5 w-5" />}
+            title="Analytics"
+            description="Métricas e conversão"
+            icon={<BarChart3 className="h-4 w-4" />}
             path="/admin/analytics"
             badge="Hub"
+            compact
           />
-        </div>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* Integrações */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <GitBranch className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Integrações</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard
             title="Integrações"
-            description="WhatsApp, SmartOne, CDN, Transcode"
-            icon={<GitBranch className="h-5 w-5" />}
+            description="WhatsApp, CDN"
+            icon={<GitBranch className="h-4 w-4" />}
             path="/admin/integracao"
             badge="Hub"
+            compact
           />
         </div>
       </section>
