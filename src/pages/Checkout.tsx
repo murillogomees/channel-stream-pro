@@ -255,9 +255,9 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#12121f] to-[#0d1526]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200">
       {/* Header */}
-      <header className="border-b border-primary/20 bg-black/40 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-slate-300 bg-slate-900/95 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <button 
             onClick={() => navigate("/")}
@@ -288,10 +288,10 @@ export default function Checkout() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">
             Complete seu cadastro
           </h1>
-          <p className="text-white/60">
+          <p className="text-slate-600">
             Preencha seus dados e escolha o melhor plano para você
           </p>
         </motion.div>
@@ -324,7 +324,7 @@ export default function Checkout() {
                       placeholder="Seu nome completo"
                       value={formData.nome}
                       onChange={(e) => handleInputChange("nome", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
                         errors.nome ? 'border-red-500' : ''
                       }`}
                     />
@@ -341,7 +341,7 @@ export default function Checkout() {
                       placeholder="000.000.000-00"
                       value={formData.cpf}
                       onChange={(e) => handleInputChange("cpf", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
                         errors.cpf ? 'border-red-500' : ''
                       }`}
                     />
@@ -361,7 +361,7 @@ export default function Checkout() {
                       placeholder="(00) 00000-0000"
                       value={formData.telefone}
                       onChange={(e) => handleInputChange("telefone", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
                         errors.telefone ? 'border-red-500' : ''
                       }`}
                     />
@@ -379,7 +379,7 @@ export default function Checkout() {
                       placeholder="seu@email.com"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
-                      className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary focus:ring-primary/20 ${
+                      className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 focus:border-primary focus:ring-primary/20 ${
                         errors.email ? 'border-red-500' : ''
                       }`}
                     />
@@ -396,7 +396,7 @@ export default function Checkout() {
                       onValueChange={(value) => handleInputChange("origem", value)}
                     >
                       <SelectTrigger 
-                        className={`mt-1.5 bg-slate-800/80 border-slate-600 text-white ${
+                        className={`mt-1.5 bg-slate-800/90 border-slate-600 text-white ${
                           errors.origem ? 'border-red-500' : ''
                         }`}
                       >
@@ -501,8 +501,8 @@ export default function Checkout() {
                               </motion.div>
                               
                               <div>
-                                <h3 className="font-semibold text-white text-lg">{plan.name}</h3>
-                                <p className="text-sm text-slate-400">
+                                <h3 className="font-bold text-orange-400 text-lg">{plan.name}</h3>
+                                <p className="text-sm text-white/80">
                                   {plan.period_months} {plan.period_months === 1 ? 'mês' : 'meses'} de acesso
                                 </p>
                               </div>
@@ -522,7 +522,7 @@ export default function Checkout() {
                               
                               {/* Preço atual */}
                               <motion.div 
-                                className={`text-2xl font-bold ${isSelected ? 'text-primary' : 'text-white'}`}
+                                className={`text-2xl font-bold ${isSelected ? 'text-orange-400' : 'text-white'}`}
                                 animate={{ scale: isSelected ? 1.05 : 1 }}
                               >
                                 R$ {plan.price.toFixed(2).replace(".", ",")}
@@ -641,14 +641,14 @@ export default function Checkout() {
                       <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-semibold text-white text-lg">{selectedPlan.name}</p>
-                            <p className="text-sm text-slate-400">{selectedPlan.period}</p>
+                            <p className="font-bold text-orange-400 text-lg">{selectedPlan.name}</p>
+                            <p className="text-sm text-white/80">{selectedPlan.period}</p>
                           </div>
-                          <motion.p 
-                            className="text-xl font-bold text-primary"
+                        <motion.p 
+                            className="text-xl font-bold text-orange-400"
                             key={selectedPlan.price}
                             initial={{ scale: 1.2, color: "#22c55e" }}
-                            animate={{ scale: 1, color: "hsl(var(--primary))" }}
+                            animate={{ scale: 1, color: "#fb923c" }}
                           >
                             R$ {selectedPlan.price.toFixed(2).replace(".", ",")}
                           </motion.p>
@@ -690,7 +690,7 @@ export default function Checkout() {
                                 setCouponCode(e.target.value.toUpperCase());
                                 setCouponError("");
                               }}
-                              className="bg-slate-800/80 border-slate-600 text-white placeholder:text-slate-500 uppercase"
+                              className="bg-slate-800/90 border-slate-600 text-white placeholder:text-white/60 uppercase"
                             />
                             <Button 
                               variant="secondary"
@@ -752,13 +752,13 @@ export default function Checkout() {
                       )}
                       
                       {/* Total */}
-                      <div className="flex justify-between items-center p-4 rounded-xl bg-primary/10 border border-primary/30">
+                      <div className="flex justify-between items-center p-4 rounded-xl bg-orange-500/20 border border-orange-500/40">
                         <span className="text-lg font-semibold text-white">Total</span>
                         <motion.span
                           key={finalPrice}
                           initial={{ scale: 1.1 }}
                           animate={{ scale: 1 }}
-                          className="text-2xl font-bold text-primary"
+                          className="text-2xl font-bold text-orange-400"
                         >
                           R$ {finalPrice.toFixed(2).replace(".", ",")}
                         </motion.span>
