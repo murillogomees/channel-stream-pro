@@ -42,6 +42,10 @@ const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutFailure = lazy(() => import("./pages/CheckoutFailure"));
 const CheckoutPending = lazy(() => import("./pages/CheckoutPending"));
 
+// Affiliate pages
+const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const AdminAffiliates = lazy(() => import("./pages/AdminAffiliates"));
+
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
@@ -90,6 +94,9 @@ const App = () => (
             <Route path="/checkout/failure" element={<CheckoutFailure />} />
             <Route path="/checkout/pending" element={<CheckoutPending />} />
             
+            {/* Affiliate Dashboard */}
+            <Route path="/afiliado" element={<ProtectedRoute><AffiliateDashboard /></ProtectedRoute>} />
+            
             {/* ========================================
                 IPTV APP ROUTES - Mobile/TV App
             ======================================== */}
@@ -137,6 +144,7 @@ const App = () => (
             <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
+            <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
             
             {/* ========================================
                 LEGACY REDIRECTS - All old routes redirect to consolidated hubs

@@ -237,6 +237,220 @@ export type Database = {
         }
         Relationships: []
       }
+      affiliate_referrals: {
+        Row: {
+          affiliate_id: string
+          commission_earned: number
+          commission_type: string
+          commission_value: number
+          confirmed_at: string | null
+          coupon_id: string | null
+          created_at: string
+          id: string
+          paid_at: string | null
+          plan_purchased: string | null
+          plan_value: number | null
+          referred_cliente_id: string | null
+          referred_user_id: string | null
+          status: string
+        }
+        Insert: {
+          affiliate_id: string
+          commission_earned?: number
+          commission_type: string
+          commission_value: number
+          confirmed_at?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          plan_purchased?: string | null
+          plan_value?: number | null
+          referred_cliente_id?: string | null
+          referred_user_id?: string | null
+          status?: string
+        }
+        Update: {
+          affiliate_id?: string
+          commission_earned?: number
+          commission_type?: string
+          commission_value?: number
+          confirmed_at?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          plan_purchased?: string | null
+          plan_value?: number | null
+          referred_cliente_id?: string | null
+          referred_user_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_referrals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_referrals_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "discount_coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_referrals_referred_cliente_id_fkey"
+            columns: ["referred_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_referrals_referred_cliente_id_fkey"
+            columns: ["referred_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      affiliate_withdrawals: {
+        Row: {
+          affiliate_id: string
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          status: string
+          transaction_id: string | null
+          withdrawal_type: string
+        }
+        Insert: {
+          affiliate_id: string
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          status?: string
+          transaction_id?: string | null
+          withdrawal_type?: string
+        }
+        Update: {
+          affiliate_id?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          status?: string
+          transaction_id?: string | null
+          withdrawal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_withdrawals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      affiliates: {
+        Row: {
+          available_balance: number
+          cliente_id: string | null
+          commission_type: string
+          commission_value: number
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          status: string
+          total_earnings: number
+          total_referrals: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          available_balance?: number
+          cliente_id?: string | null
+          commission_type?: string
+          commission_value?: number
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          status?: string
+          total_earnings?: number
+          total_referrals?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          available_balance?: number
+          cliente_id?: string | null
+          commission_type?: string
+          commission_value?: number
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          status?: string
+          total_earnings?: number
+          total_referrals?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliates_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliates_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_expiration_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auth_sessions_log: {
         Row: {
           created_at: string
@@ -1162,6 +1376,7 @@ export type Database = {
       }
       coupon_usage: {
         Row: {
+          affiliate_referral_id: string | null
           client_id: string | null
           coupon_id: string | null
           discount_applied: number | null
@@ -1170,6 +1385,7 @@ export type Database = {
           used_at: string | null
         }
         Insert: {
+          affiliate_referral_id?: string | null
           client_id?: string | null
           coupon_id?: string | null
           discount_applied?: number | null
@@ -1178,6 +1394,7 @@ export type Database = {
           used_at?: string | null
         }
         Update: {
+          affiliate_referral_id?: string | null
           client_id?: string | null
           coupon_id?: string | null
           discount_applied?: number | null
@@ -1186,6 +1403,13 @@ export type Database = {
           used_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "coupon_usage_affiliate_referral_id_fkey"
+            columns: ["affiliate_referral_id"]
+            isOneToOne: false
+            referencedRelation: "affiliate_referrals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coupon_usage_client_id_fkey"
             columns: ["client_id"]
@@ -1251,6 +1475,7 @@ export type Database = {
       discount_coupons: {
         Row: {
           active: boolean | null
+          affiliate_id: string | null
           auto_generated: boolean | null
           code: string
           conditions: Json | null
@@ -1267,6 +1492,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          affiliate_id?: string | null
           auto_generated?: boolean | null
           code: string
           conditions?: Json | null
@@ -1283,6 +1509,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          affiliate_id?: string | null
           auto_generated?: boolean | null
           code?: string
           conditions?: Json | null
@@ -1297,7 +1524,15 @@ export type Database = {
           valid_from?: string
           valid_until?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "discount_coupons_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       epg_data: {
         Row: {
@@ -5677,6 +5912,16 @@ export type Database = {
         }[]
       }
       get_transcode_queue_stats: { Args: never; Returns: Json }
+      get_user_subscription_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          can_play: boolean
+          expires_at: string
+          has_subscription: boolean
+          plan_name: string
+          status: string
+        }[]
+      }
       get_vod_statistics: {
         Args: never
         Returns: {

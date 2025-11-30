@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
+import { useCoupons, Coupon } from "@/hooks/useCoupons";
 import { mercadoPagoService } from "@/services/mercadoPagoService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   CreditCard, Shield, Check, Lock, 
   Tv, Loader2, AlertCircle, ArrowLeft, Sparkles,
-  User, Phone, Mail, MapPin, Percent, Tag
+  User, Phone, Mail, MapPin, Percent, Tag, Ticket, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -70,6 +71,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { plans, loading: plansLoading } = useSubscriptionPlans();
+  const { validateCoupon } = useCoupons();
   
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(searchParams.get("plan"));
   const [isProcessing, setIsProcessing] = useState(false);
@@ -81,6 +83,21 @@ export default function Checkout() {
     origem: "",
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
+  // Check for referral code in URL
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      // Auto-apply referral coupon
+      setCouponCode(`AFILIADO-${ref.toUpperCase()}`);
+    }
+  }, [searchParams]);
 
   // Set default plan (highlighted or first one)
   useEffect(() => {
@@ -97,6 +114,49 @@ export default function Checkout() {
     const monthlyPlan = plans.find(p => p.period_months === 1 && p.is_active);
     return monthlyPlan?.price || 0;
   }, [plans]);
+  
+  // Calculate discount from coupon
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupon || !selectedPlan) return 0;
+    
+    if (appliedCoupon.discount_type === 'percentage') {
+      return (selectedPlan.price * appliedCoupon.discount_value) / 100;
+    }
+    return Math.min(appliedCoupon.discount_value, selectedPlan.price);
+  }, [appliedCoupon, selectedPlan]);
+  
+  // Final price after coupon
+  const finalPrice = useMemo(() => {
+    if (!selectedPlan) return 0;
+    return Math.max(0, selectedPlan.price - couponDiscount);
+  }, [selectedPlan, couponDiscount]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError("Digite um código de cupom");
+      return;
+    }
+    
+    setCouponLoading(true);
+    setCouponError("");
+    
+    const coupon = await validateCoupon(couponCode.trim().toUpperCase());
+    
+    if (coupon) {
+      setAppliedCoupon(coupon);
+      toast.success("Cupom aplicado com sucesso!");
+    } else {
+      setCouponError("Cupom inválido ou expirado");
+    }
+    
+    setCouponLoading(false);
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+  };
 
   // Calcular economia em relação ao plano mensal
   const calculateSavings = (plan: SubscriptionPlan) => {
@@ -578,6 +638,58 @@ export default function Checkout() {
                         </div>
                       </div>
 
+                      {/* Coupon Input */}
+                      <div className="space-y-2">
+                        <Label className="text-white/80 flex items-center gap-2">
+                          <Ticket className="h-4 w-4" />
+                          Cupom de desconto
+                        </Label>
+                        {appliedCoupon ? (
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                            <div>
+                              <p className="font-medium text-green-400">{appliedCoupon.code}</p>
+                              <p className="text-sm text-green-400/70">
+                                {appliedCoupon.discount_type === 'percentage' 
+                                  ? `${appliedCoupon.discount_value}% de desconto`
+                                  : `R$ ${appliedCoupon.discount_value.toFixed(2)} de desconto`
+                                }
+                              </p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={handleRemoveCoupon}
+                              className="text-white/60 hover:text-white"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Digite o código"
+                              value={couponCode}
+                              onChange={(e) => {
+                                setCouponCode(e.target.value.toUpperCase());
+                                setCouponError("");
+                              }}
+                              className="bg-white/5 border-white/20 text-white placeholder:text-white/40 uppercase"
+                            />
+                            <Button 
+                              variant="outline" 
+                              onClick={handleApplyCoupon}
+                              disabled={couponLoading}
+                              className="shrink-0"
+                            >
+                              {couponLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                            </Button>
+                          </div>
+                        )}
+                        {couponError && (
+                          <p className="text-sm text-red-400">{couponError}</p>
+                        )}
+                      </div>
+
                       {/* Discount info */}
                       {(() => {
                         const savings = calculateSavings(selectedPlan);
@@ -590,10 +702,10 @@ export default function Checkout() {
                             >
                               <div className="flex items-center gap-2 text-green-400">
                                 <Percent className="h-4 w-4" />
-                                <span className="font-medium">Você está economizando:</span>
+                                <span className="font-medium">Economia no plano:</span>
                               </div>
                               <div className="mt-1 flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-green-400">
+                                <span className="text-xl font-bold text-green-400">
                                   {savings.percent}%
                                 </span>
                                 <span className="text-green-400/70">
@@ -608,15 +720,29 @@ export default function Checkout() {
                       
                       <Separator className="bg-white/10" />
                       
+                      {/* Subtotal and Coupon Discount */}
+                      {appliedCoupon && couponDiscount > 0 && (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between text-white/70">
+                            <span>Subtotal</span>
+                            <span>R$ {selectedPlan.price.toFixed(2).replace(".", ",")}</span>
+                          </div>
+                          <div className="flex justify-between text-green-400">
+                            <span>Desconto do cupom</span>
+                            <span>-R$ {couponDiscount.toFixed(2).replace(".", ",")}</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Total */}
                       <div className="flex justify-between text-lg font-bold text-white">
                         <span>Total</span>
                         <motion.span
-                          key={selectedPlan.price}
+                          key={finalPrice}
                           initial={{ scale: 1.1 }}
                           animate={{ scale: 1 }}
                         >
-                          R$ {selectedPlan.price.toFixed(2).replace(".", ",")}
+                          R$ {finalPrice.toFixed(2).replace(".", ",")}
                         </motion.span>
                       </div>
 
