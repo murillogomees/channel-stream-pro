@@ -10,9 +10,8 @@ import { RecentActivities } from "@/components/admin/RecentActivities";
 import { StatCardSkeleton } from "@/components/admin/CardSkeleton";
 import {
   Users, Bell, Shield, BarChart3, Clock, AlertTriangle,
-  UserCog, Tv, Play, Download, MessageSquare, Cog,
-  ListVideo, Sparkles, LayoutDashboard, CreditCard, 
-  PanelTop, GitBranch, HardDrive, Zap, Settings2
+  UserCog, Tv, Play, Download, Settings2, ListVideo,
+  Sparkles, LayoutDashboard, GitBranch
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useClientesDb } from "@/hooks/useClientesDb";
@@ -59,10 +58,9 @@ interface NavCardProps {
   badge?: string;
   isNew?: boolean;
   isHighlighted?: boolean;
-  compact?: boolean;
 }
 
-const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted, compact }: NavCardProps) => {
+const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }: NavCardProps) => {
   const navigate = useNavigate();
 
   return (
@@ -80,9 +78,9 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted, 
           </div>
         </div>
       )}
-      <CardHeader className={compact ? "p-3 pb-2" : "pb-3"}>
+      <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className={`${compact ? 'p-1.5' : 'p-2'} rounded-lg transition-all duration-300 group-hover:scale-110 ${
+          <div className={`p-3 rounded-lg transition-all duration-300 group-hover:scale-110 ${
             isHighlighted 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'
@@ -90,11 +88,11 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted, 
             {icon}
           </div>
           {badge && !isNew && (
-            <Badge variant="secondary" className={`animate-fade-in ${compact ? 'text-[10px] px-1.5 py-0' : ''}`}>{badge}</Badge>
+            <Badge variant="secondary" className="animate-fade-in">{badge}</Badge>
           )}
         </div>
-        <CardTitle className={`${compact ? 'text-sm mt-2' : 'text-lg mt-4'} group-hover:text-primary transition-colors`}>{title}</CardTitle>
-        <CardDescription className={compact ? 'text-xs line-clamp-1' : ''}>{description}</CardDescription>
+        <CardTitle className="text-lg mt-4 group-hover:text-primary transition-colors">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
     </Card>
   );
@@ -160,119 +158,96 @@ export default function AdminDashboardPage() {
 
       <Separator className="my-8" />
 
-      {/* IPTV Player - DESTACADO */}
+      {/* LINHA 1: Player e Usuário */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <div className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/70 text-primary-foreground px-3 py-1 rounded-full">
             <Tv className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">IPTV Player</h2>
-            <Badge className="bg-white/20 text-white hover:bg-white/30">Novo</Badge>
+            <h2 className="text-lg font-semibold">Player e Usuário</h2>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <NavCard
             title="Player IPTV"
             description="Canais ao vivo, filmes e séries"
-            icon={<Play className="h-4 w-4" />}
+            icon={<Play className="h-5 w-5" />}
             path="/app/player"
             isNew
             isHighlighted
-            compact
-          />
-          <NavCard
-            title="Instalação"
-            description="Guia para dispositivos"
-            icon={<Download className="h-4 w-4" />}
-            path="/app/install"
-            compact
-          />
-        </div>
-      </section>
-
-      <Separator className="my-6" />
-
-      {/* Módulos Principais - Grid Compacto */}
-      <section className="mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <LayoutDashboard className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Módulos Principais</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-          <NavCard
-            title="Clientes"
-            description="Gestão de clientes"
-            icon={<Users className="h-4 w-4" />}
-            path="/admin/clientes"
-            badge="Hub"
-            compact
           />
           <NavCard
             title="M3U"
-            description="Playlists e VOD"
-            icon={<ListVideo className="h-4 w-4" />}
+            description="Playlists e conteúdo VOD"
+            icon={<ListVideo className="h-5 w-5" />}
             path="/admin/m3u"
             badge="Hub"
-            compact
           />
           <NavCard
-            title="Notificações"
-            description="Templates e automações"
-            icon={<Bell className="h-4 w-4" />}
-            path="/admin/notificacoes"
+            title="Clientes"
+            description="Gestão completa de clientes"
+            icon={<Users className="h-5 w-5" />}
+            path="/admin/clientes"
             badge="Hub"
-            compact
-          />
-          <NavCard
-            title="Segurança"
-            description="Alertas e monitor"
-            icon={<Shield className="h-4 w-4" />}
-            path="/admin/seguranca"
-            badge="Hub"
-            compact
-          />
-          <NavCard
-            title="Sistema"
-            description="Config e backup"
-            icon={<Settings2 className="h-4 w-4" />}
-            path="/admin/sistema"
-            badge="Hub"
-            compact
           />
           <NavCard
             title="Usuários"
             description="Roles e permissões"
-            icon={<UserCog className="h-4 w-4" />}
+            icon={<UserCog className="h-5 w-5" />}
             path="/admin/usuarios"
             badge="Hub"
-            compact
+          />
+          <NavCard
+            title="Tutorial de Instalação"
+            description="Guia para dispositivos"
+            icon={<Download className="h-5 w-5" />}
+            path="/app/install"
           />
         </div>
       </section>
 
-      <Separator className="my-6" />
+      <Separator className="my-8" />
 
-      {/* Analytics & Integrações */}
-      <section className="mb-6">
+      {/* LINHA 2: Módulos Principais */}
+      <section className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Analytics & Integrações</h2>
+          <LayoutDashboard className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Módulos Principais</h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <NavCard
-            title="Analytics"
-            description="Métricas e conversão"
-            icon={<BarChart3 className="h-4 w-4" />}
-            path="/admin/analytics"
+            title="Notificações"
+            description="Templates e automações"
+            icon={<Bell className="h-5 w-5" />}
+            path="/admin/notificacoes"
             badge="Hub"
-            compact
           />
           <NavCard
             title="Integrações"
-            description="WhatsApp, CDN"
-            icon={<GitBranch className="h-4 w-4" />}
+            description="WhatsApp, CDN, Mercado Pago"
+            icon={<GitBranch className="h-5 w-5" />}
             path="/admin/integracao"
             badge="Hub"
-            compact
+          />
+          <NavCard
+            title="Analytics"
+            description="Métricas e conversão"
+            icon={<BarChart3 className="h-5 w-5" />}
+            path="/admin/analytics"
+            badge="Hub"
+          />
+          <NavCard
+            title="Segurança"
+            description="Alertas e monitor"
+            icon={<Shield className="h-5 w-5" />}
+            path="/admin/seguranca"
+            badge="Hub"
+          />
+          <NavCard
+            title="Sistema"
+            description="Config e backup"
+            icon={<Settings2 className="h-5 w-5" />}
+            path="/admin/sistema"
+            badge="Hub"
           />
         </div>
       </section>
