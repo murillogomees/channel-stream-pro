@@ -180,10 +180,21 @@ export function StatusChangeTimeline({
                                 showTooltip={false}
                               />
                             </div>
-                            {change.metadata && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {JSON.stringify(change.metadata)}
-                              </p>
+                            {change.metadata && typeof change.metadata === 'object' && Object.keys(change.metadata).length > 0 && (
+                              <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                                {Object.entries(change.metadata).map(([key, value]) => (
+                                  <div key={key} className="flex gap-2">
+                                    <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
+                                    <span className="font-mono">
+                                      {typeof value === 'object' 
+                                        ? Array.isArray(value) 
+                                          ? value.length + ' itens'
+                                          : '...'
+                                        : String(value)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
                           <div className="text-right text-xs text-muted-foreground whitespace-nowrap">
