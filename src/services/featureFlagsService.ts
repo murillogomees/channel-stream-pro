@@ -17,7 +17,12 @@ export type FeatureFlag =
   | 'new_detail_ui'
   | 'new_mylist_ui'
   | 'web_vitals_tracking'
-  | 'tv_optimizations';
+  | 'tv_optimizations'
+  // Migration flags - Fase 8
+  | 'use_cliente_db_only'
+  | 'disable_legacy_routes'
+  | 'consolidated_whatsapp'
+  | 'new_notification_system';
 
 interface FeatureFlagConfig {
   enabled: boolean;
@@ -79,6 +84,27 @@ const DEFAULT_FLAGS: Record<FeatureFlag, FeatureFlagConfig> = {
     enabled: true,
     targetDevices: ['tv'],
     description: 'TV-specific UI and performance optimizations',
+  },
+  // Migration flags - Fase 8
+  use_cliente_db_only: {
+    enabled: false,
+    percentage: 0,
+    description: 'Use ClienteDb instead of legacy Cliente type (migration)',
+  },
+  disable_legacy_routes: {
+    enabled: false,
+    percentage: 0,
+    description: 'Disable redirects to legacy admin routes (migration)',
+  },
+  consolidated_whatsapp: {
+    enabled: true,
+    percentage: 100,
+    description: 'Use consolidated WhatsApp service (migration complete)',
+  },
+  new_notification_system: {
+    enabled: true,
+    percentage: 100,
+    description: 'Use modular notification system (migration complete)',
   },
 };
 
