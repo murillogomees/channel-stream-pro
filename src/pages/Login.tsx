@@ -50,6 +50,10 @@ export default function Login() {
   const [viewMode, setViewMode] = useState<ViewMode>("login");
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Desktop hover/lock states
+  const [hoveredSide, setHoveredSide] = useState<"login" | "plans" | null>(null);
+  const [lockedSide, setLockedSide] = useState<"login" | "plans" | null>(null);
 
   // Detect mobile
   useEffect(() => {
@@ -58,6 +62,34 @@ export default function Login() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Handle mouse movement for desktop
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile || lockedSide) return;
+    const midPoint = window.innerWidth / 2;
+    if (e.clientX < midPoint) {
+      setHoveredSide("login");
+    } else {
+      setHoveredSide("plans");
+    }
+  };
+
+  // Handle click to lock
+  const handleSideClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
+    const midPoint = window.innerWidth / 2;
+    const clickedSide = e.clientX < midPoint ? "login" : "plans";
+    setLockedSide(clickedSide);
+    setHoveredSide(null);
+  };
+
+  // Unlock and switch to other side
+  const switchToOtherSide = (side: "login" | "plans") => {
+    setLockedSide(side);
+  };
+
+  // Get the active side (locked takes priority, then hovered)
+  const activeSide = lockedSide || hoveredSide;
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
@@ -239,12 +271,12 @@ export default function Login() {
         </Button>
       </form>
 
-      {/* Switch Button - Only on Mobile */}
-      {isMobile && (
+      {/* Switch Button - Only on Mobile or when locked */}
+      {(isMobile || lockedSide === "login") && (
         <div className="mt-6 pt-4 border-t border-border/50">
           <Button
             variant="ghost"
-            onClick={switchToPlans}
+            onClick={() => isMobile ? switchToPlans() : switchToOtherSide("plans")}
             className="w-full text-muted-foreground hover:text-foreground"
           >
             Ainda não sou cliente
@@ -357,12 +389,12 @@ export default function Login() {
         </div>
       )}
 
-      {/* Switch Button - Only on Mobile */}
-      {isMobile && (
+      {/* Switch Button - Only on Mobile or when locked */}
+      {(isMobile || lockedSide === "plans") && (
         <div className="mt-4 pt-3 border-t border-border/30">
           <Button
             variant="ghost"
-            onClick={switchToLogin}
+            onClick={() => isMobile ? switchToLogin() : switchToOtherSide("login")}
             className="w-full text-muted-foreground hover:text-foreground h-10 text-sm"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -395,7 +427,11 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 h-screen flex items-center justify-center">
+      <div 
+        className="relative z-10 h-screen flex items-center justify-center"
+        onMouseMove={handleMouseMove}
+        onClick={handleSideClick}
+      >
         {isMobile ? (
           /* Mobile: One card at a time with animation */
           <AnimatePresence mode="wait">
@@ -406,14 +442,49 @@ export default function Login() {
             )}
           </AnimatePresence>
         ) : (
-          /* Desktop/TV: Both cards side by side */
-          <div className="flex items-center justify-center gap-8 w-full max-w-6xl px-4">
-            <div className="flex-1 flex items-center justify-center">
+          /* Desktop/TV: Interactive hover/lock animation */
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Login Card */}
+            <motion.div
+              className="absolute"
+              animate={{
+                x: activeSide === "plans" ? "-30vw" : activeSide === "login" ? "0" : "-15vw",
+                scale: activeSide === "login" ? 1.05 : activeSide === "plans" ? 0.9 : 1,
+                opacity: activeSide === "plans" ? 0.5 : 1,
+                zIndex: activeSide === "login" ? 20 : 10,
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <LoginCard />
-            </div>
-            <div className="flex-1 flex items-center justify-center">
+            </motion.div>
+
+            {/* Plans Card */}
+            <motion.div
+              className="absolute"
+              animate={{
+                x: activeSide === "login" ? "30vw" : activeSide === "plans" ? "0" : "15vw",
+                scale: activeSide === "plans" ? 1.05 : activeSide === "login" ? 0.9 : 1,
+                opacity: activeSide === "login" ? 0.5 : 1,
+                zIndex: activeSide === "plans" ? 20 : 10,
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <PlansCard />
-            </div>
+            </motion.div>
+
+            {/* Hint text when not locked */}
+            {!lockedSide && (
+              <motion.p
+                className="absolute bottom-32 text-muted-foreground text-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.7 }}
+                transition={{ delay: 1 }}
+              >
+                Mova o mouse ou clique para selecionar
+              </motion.p>
+            )}
           </div>
         )}
       </div>
