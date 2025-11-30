@@ -40,6 +40,7 @@ const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const AdminSmartCache = lazy(() => import("./pages/AdminSmartCache"));
 const AdminTranscodeQueue = lazy(() => import("./pages/AdminTranscodeQueue"));
+const AdminCdn = lazy(() => import("./pages/AdminCdn"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
@@ -120,6 +121,7 @@ const App = () => (
           <Route path="/admin/whatsapp-config" element={<ProtectedRoute requireAdmin><AdminWhatsAppConfig /></ProtectedRoute>} />
           <Route path="/dashboard/plans" element={<ProtectedRoute requireAdmin><AdminPlansManager /></ProtectedRoute>} />
           <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
+          <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
           
           {/* Admin Hub - Novo dashboard consolidado */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminHub /></ProtectedRoute>} />
