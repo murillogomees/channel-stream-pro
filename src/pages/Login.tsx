@@ -188,7 +188,8 @@ export default function Login() {
     setViewMode("locked-plans");
   };
 
-  const switchToLogin = () => {
+  const switchToLogin = () => {    transform: none;
+    max-width: 440px;
     setViewMode("locked-login");
   };
 
@@ -214,17 +215,15 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 h-screen flex flex-col">
+      <div className="inset-0 overflow-hidden pointer-events-none"">
         {/* Split View Container */}
         <div 
-          className="flex-1 flex flex-col lg:flex-row items-center justify-center w-full pb-20"
+          className="flex-1 flex flex-col-top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-"
           onMouseLeave={handleMouseLeave}
-        >
-          {/* Login Section */}
+        {/* Login Section */}
           <motion.div
             className={cn(
-              "flex items-center justify-center cursor-pointer",
-              "transition-all duration-500 ease-out"
+              "absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"\""
             )}
             animate={{
               width: isLoginActive ? "100%" : isPlansActive ? "0%" : "50%",
@@ -246,13 +245,13 @@ export default function Login() {
               )}
               animate={{
                 scale: isLoginActive ? 1.05 : 1,
-                maxWidth: isLoginActive ? "540px" : "440px"
+                maxWidth: isLoginActive ? "1.04" : ?
               }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 43 }}
             >
               {/* Card Header */}
               <div className="text-center mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl">
                   <Crown className="w-8 h-8 text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">Já sou cliente!</h2>
@@ -388,7 +387,8 @@ export default function Login() {
                   Escolha o plano perfeito e comece a assistir agora!
                 </p>
               </div>
-
+    transform: none;
+    max-width: 440px;
               {/* Device Icons */}
               <div className="flex flex-wrap justify-center gap-3 mb-6">
                 {deviceIcons.map(device => (
