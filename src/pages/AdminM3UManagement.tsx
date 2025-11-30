@@ -10,6 +10,7 @@ import AdminM3UUsageReport from "./AdminM3UUsageReport";
 import AdminVODStorage from "./AdminVODStorage";
 import AdminM3USyncContent from "./AdminM3USyncContent";
 import AdminM3UContentEditor from "./AdminM3UContentEditor";
+import AdminCFStreamDashboard from "./AdminCFStreamDashboard";
 
 export default function AdminM3UManagement() {
   return (
@@ -47,6 +48,9 @@ export default function AdminM3UManagement() {
             <TabsTrigger value="vod" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               VOD
             </TabsTrigger>
+            <TabsTrigger value="cfstream" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              CF Stream
+            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" className="invisible" />
         </ScrollArea>
@@ -81,6 +85,10 @@ export default function AdminM3UManagement() {
 
         <TabsContent value="vod" className="space-y-4 mt-4">
           <AdminVODStorage />
+        </TabsContent>
+
+        <TabsContent value="cfstream" className="space-y-4 mt-4">
+          <AdminCFStreamDashboard />
         </TabsContent>
       </Tabs>
     </AdminLayout>
