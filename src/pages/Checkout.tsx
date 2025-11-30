@@ -852,18 +852,45 @@ export default function Checkout() {
 
                       {/* Payment Methods */}
                       <div className="pt-4 border-t border-slate-600">
-                        <p className="text-xs text-white text-center mb-3 font-medium">Formas de pagamento aceitas</p>
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
-                            <span className="text-sm font-bold text-emerald-400">PIX</span>
-                          </div>
-                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
-                            <CreditCard className="h-4 w-4 text-white mr-1.5" />
-                            <span className="text-sm text-white">Cartão</span>
-                          </div>
-                          <div className="h-10 px-4 bg-slate-700/70 rounded-lg flex items-center justify-center border border-slate-600">
-                            <span className="text-sm text-white">Boleto</span>
-                          </div>
+                        <p className="text-sm text-white text-center mb-4 font-semibold">Formas de pagamento aceitas</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {/* PIX */}
+                          <motion.div 
+                            className="flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-teal-500/30 to-cyan-500/20 border-2 border-teal-400/50 shadow-lg shadow-teal-500/20"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center mb-2 shadow-lg shadow-teal-500/40">
+                              <span className="text-white font-black text-xs">PIX</span>
+                            </div>
+                            <span className="text-xs text-teal-400 font-semibold">Instantâneo</span>
+                          </motion.div>
+                          
+                          {/* Cartão */}
+                          <motion.div 
+                            className="flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-blue-500/30 to-indigo-500/20 border-2 border-blue-400/50 shadow-lg shadow-blue-500/20"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-2 shadow-lg shadow-blue-500/40">
+                              <CreditCard className="h-5 w-5 text-white" />
+                            </div>
+                            <span className="text-xs text-blue-400 font-semibold">Cartão</span>
+                          </motion.div>
+                          
+                          {/* Boleto */}
+                          <motion.div 
+                            className="flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-orange-500/30 to-amber-500/20 border-2 border-orange-400/50 shadow-lg shadow-orange-500/20"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center mb-2 shadow-lg shadow-orange-500/40">
+                              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2 4h2v16H2V4zm4 0h1v16H6V4zm3 0h2v16H9V4zm4 0h1v16h-1V4zm3 0h2v16h-2V4zm4 0h2v16h-2V4z"/>
+                              </svg>
+                            </div>
+                            <span className="text-xs text-orange-400 font-semibold">Boleto</span>
+                          </motion.div>
                         </div>
                       </div>
                     </motion.div>
