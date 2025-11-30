@@ -196,6 +196,10 @@ verify_jwt = false
 [functions.mercado-pago-checkout]
 verify_jwt = false
 
+# Mercado Pago API test - public endpoint for testing connection
+[functions.mercado-pago-test]
+verify_jwt = false
+
 # ==========================================
 # PLAYBACK ACCESS CONTROL
 # ==========================================
