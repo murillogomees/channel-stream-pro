@@ -5,9 +5,12 @@
  * - VOD → Cloudflare Stream (transcode, CDN, player gerenciado)
  * - Live → Direct origin (low latency)
  * - Agile → Origin with edge cache
+ * 
+ * Sprint 5: Integração com URLs assinadas do CF Stream
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedPlaybackUrl } from "@/services/cloudflareStreamService";
 
 export type StreamingStrategy = 'USE_STREAM' | 'USE_ORIGIN' | 'STREAM_ON_DEMAND';
 export type ContentType = 'live_linear' | 'vod' | 'agile' | 'unknown';
@@ -83,6 +86,7 @@ export function getOptimalPlaybackUrl(decision: RoutingDecision): {
   url: string; 
   source: 'cloudflare_stream' | 'r2' | 'origin';
   useSigned: boolean;
+  cfStreamUid?: string;
 } {
   if (decision.force_origin) {
     return {
@@ -95,10 +99,15 @@ export function getOptimalPlaybackUrl(decision: RoutingDecision): {
   switch (decision.strategy) {
     case 'USE_STREAM':
       if (decision.cf_stream_url) {
+        // Extract UID from CF Stream URL for signed URL generation
+        const uidMatch = decision.cf_stream_url.match(/cloudflarestream\.com\/([a-f0-9]+)\//);
+        const cfStreamUid = uidMatch?.[1];
+        
         return {
           url: decision.cf_stream_url,
           source: 'cloudflare_stream',
-          useSigned: true // VOD content should use signed URLs
+          useSigned: true, // VOD content should use signed URLs
+          cfStreamUid
         };
       }
       // Fallback to R2 or origin if stream not available
@@ -129,6 +138,73 @@ export function getOptimalPlaybackUrl(decision: RoutingDecision): {
         source: 'origin',
         useSigned: false
       };
+  }
+}
+
+/**
+ * Get optimal playback URL with signed URL support
+ * This is the main function to use when playing content
+ */
+export async function getSecurePlaybackUrl(
+  channelId: string,
+  options?: { 
+    expiresInSeconds?: number;
+    skipSigning?: boolean;
+  }
+): Promise<{
+  url: string;
+  source: 'cloudflare_stream' | 'r2' | 'origin';
+  isSigned: boolean;
+  expiresAt?: number;
+}> {
+  const { expiresInSeconds = 7200, skipSigning = false } = options || {};
+  
+  try {
+    // Get routing decision
+    const decision = await getChannelRoutingStrategy(channelId);
+    
+    if (!decision) {
+      console.warn('[PolicyEngine] No routing decision for channel:', channelId);
+      return {
+        url: '',
+        source: 'origin',
+        isSigned: false
+      };
+    }
+
+    const optimal = getOptimalPlaybackUrl(decision);
+    
+    // If CF Stream and signing is enabled, get signed URL
+    if (optimal.source === 'cloudflare_stream' && optimal.useSigned && optimal.cfStreamUid && !skipSigning) {
+      console.log('[PolicyEngine] Getting signed URL for CF Stream:', optimal.cfStreamUid);
+      
+      const signedResult = await getSignedPlaybackUrl(optimal.cfStreamUid, expiresInSeconds);
+      
+      if (signedResult) {
+        return {
+          url: signedResult.url,
+          source: 'cloudflare_stream',
+          isSigned: signedResult.signed,
+          expiresAt: signedResult.expiresAt
+        };
+      }
+      
+      // Fallback to unsigned if signing fails
+      console.warn('[PolicyEngine] Signed URL failed, using unsigned');
+    }
+
+    return {
+      url: optimal.url,
+      source: optimal.source,
+      isSigned: false
+    };
+  } catch (error) {
+    console.error('[PolicyEngine] Error getting secure playback URL:', error);
+    return {
+      url: '',
+      source: 'origin',
+      isSigned: false
+    };
   }
 }
 
@@ -293,6 +369,7 @@ export async function batchSetStrategy(
 export default {
   getChannelRoutingStrategy,
   getOptimalPlaybackUrl,
+  getSecurePlaybackUrl,
   getStreamingPolicies,
   updateStreamingPolicy,
   setChannelOverride,
