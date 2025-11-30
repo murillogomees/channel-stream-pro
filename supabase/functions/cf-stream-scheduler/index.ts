@@ -178,6 +178,16 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     const expectedCronSecret = Deno.env.get("CRON_SECRET");
     
+    // Debug logging (masking sensitive data)
+    log('info', 'Auth check', { 
+      hasCronSecret: !!cronSecret,
+      hasExpectedSecret: !!expectedCronSecret,
+      hasAuthHeader: !!authHeader,
+      cronSecretLength: cronSecret?.length || 0,
+      expectedSecretLength: expectedCronSecret?.length || 0,
+      secretsMatch: cronSecret && expectedCronSecret ? cronSecret === expectedCronSecret : false
+    });
+    
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Authentication - either valid cron secret or admin JWT
@@ -192,7 +202,7 @@ serve(async (req) => {
     // If no valid cron secret, check JWT
     if (!isAuthenticated) {
       if (!authHeader) {
-        log('warn', 'No authentication provided');
+        log('warn', 'No authentication provided - cron secret validation failed');
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
