@@ -30,6 +30,10 @@ export { useLazyLoadContent } from './useLazyLoadContent';
 // Cloudflare Stream Signed URLs
 export { useSignedStreamUrl, clearSignedUrlCache, preloadSignedUrl } from './useSignedStreamUrl';
 
+// Cloudflare Stream Analytics
+export { useCFStreamAnalytics, TIME_RANGES } from './useCFStreamAnalytics';
+export type { ChannelMetrics, AggregatedMetrics, MetricsTimeRange } from './useCFStreamAnalytics';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
