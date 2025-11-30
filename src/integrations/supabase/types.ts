@@ -1347,6 +1347,48 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_flag_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          flag_name: string
+          id: string
+          percentage: number
+          rollback_available: boolean | null
+          target_devices: string[] | null
+          target_users: string[] | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          flag_name: string
+          id?: string
+          percentage?: number
+          rollback_available?: boolean | null
+          target_devices?: string[] | null
+          target_users?: string[] | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          flag_name?: string
+          id?: string
+          percentage?: number
+          rollback_available?: boolean | null
+          target_devices?: string[] | null
+          target_users?: string[] | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       health_snapshots: {
         Row: {
           id: string
@@ -2554,6 +2596,48 @@ export type Database = {
           total_events_sent?: number | null
           total_reconnections?: number | null
           total_uptime?: number | null
+        }
+        Relationships: []
+      }
+      migration_audit: {
+        Row: {
+          duration_ms: number | null
+          error_message: string | null
+          executed_at: string
+          executed_by: string | null
+          id: string
+          metadata: Json | null
+          migration_name: string
+          rollback_available: boolean | null
+          rollback_executed_at: string | null
+          rows_affected: number | null
+          status: string
+        }
+        Insert: {
+          duration_ms?: number | null
+          error_message?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          migration_name: string
+          rollback_available?: boolean | null
+          rollback_executed_at?: string | null
+          rows_affected?: number | null
+          status?: string
+        }
+        Update: {
+          duration_ms?: number | null
+          error_message?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          migration_name?: string
+          rollback_available?: boolean | null
+          rollback_executed_at?: string | null
+          rows_affected?: number | null
+          status?: string
         }
         Relationships: []
       }
@@ -5224,6 +5308,14 @@ export type Database = {
         Returns: Json
       }
       cleanup_cdn_data: { Args: never; Returns: undefined }
+      cleanup_fase8_old_data: {
+        Args: { p_dry_run?: boolean }
+        Returns: {
+          action: string
+          rows_deleted: number
+          table_name: string
+        }[]
+      }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_cf_stream_uploads: { Args: never; Returns: undefined }
@@ -5463,6 +5555,16 @@ export type Database = {
           total_sources: number
         }[]
       }
+      get_migration_status: {
+        Args: never
+        Returns: {
+          description: string
+          enabled: boolean
+          flag_name: string
+          last_updated: string
+          percentage: number
+        }[]
+      }
       get_notification_retry_stats: { Args: never; Returns: Json }
       get_r2_download_candidates: {
         Args: { p_limit?: number }
@@ -5670,6 +5772,10 @@ export type Database = {
           title: string
           tvg_logo: string
         }[]
+      }
+      toggle_feature_flag: {
+        Args: { p_enabled: boolean; p_flag_name: string; p_percentage?: number }
+        Returns: boolean
       }
       track_channel_view: {
         Args: { p_channel_id: string; p_watch_seconds?: number }
