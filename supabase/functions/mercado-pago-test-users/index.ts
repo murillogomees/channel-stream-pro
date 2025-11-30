@@ -20,9 +20,28 @@ serve(async (req) => {
       );
     }
 
-    // Mercado Pago only provides endpoint to CREATE test users, not LIST them
-    // POST /users/test_user creates a new test user
+    // Check if using sandbox token - test user creation requires PRODUCTION token
+    const isSandboxToken = accessToken.startsWith('TEST-');
+
     if (action === 'create') {
+      if (isSandboxToken) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Para criar usuários de teste, você precisa usar o Access Token de PRODUÇÃO (APP_USR-...), não o de sandbox (TEST-...).',
+            info: {
+              reason: 'A API do Mercado Pago exige credenciais de produção para criar usuários de teste.',
+              solution: 'Use o token de produção para criar usuários de teste, depois use-os no ambiente sandbox.',
+              documentation: 'https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/accounts'
+            }
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Create test user with production token
+      console.log('[MercadoPago Test Users] Creating test user with production token');
+      
       const response = await fetch('https://api.mercadopago.com/users/test_user', {
         method: 'POST',
         headers: {
@@ -30,22 +49,30 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          site_id: 'MLB' // Brazil - change based on country
+          site_id: 'MLB' // Brazil
         })
       });
 
       const data = await response.json();
       
       if (response.ok) {
+        console.log('[MercadoPago Test Users] Test user created successfully:', data.id);
         return new Response(
           JSON.stringify({ 
             success: true, 
-            user: data,
-            message: 'Usuário de teste criado com sucesso'
+            user: {
+              id: data.id,
+              nickname: data.nickname,
+              email: data.email,
+              password: data.password,
+              site_status: data.site_status
+            },
+            message: 'Usuário de teste criado com sucesso! Guarde as credenciais.'
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {
+        console.error('[MercadoPago Test Users] Error creating test user:', data);
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -57,13 +84,15 @@ serve(async (req) => {
       }
     }
 
-    // Default: Return info about how test users work
+    // Default: Return helpful information
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'A API do Mercado Pago não fornece endpoint para listar usuários de teste. Use action="create" para criar um novo usuário de teste.',
+        message: 'API de Usuários de Teste do Mercado Pago',
         info: {
-          createEndpoint: 'POST /users/test_user',
+          importante: 'A criação de usuários de teste requer o Access Token de PRODUÇÃO, não o de sandbox.',
+          comoUsar: 'Envie action="create" com o token de produção para criar um novo usuário de teste.',
+          tokenAtual: isSandboxToken ? 'Sandbox (TEST-...)' : 'Produção (APP_USR-...)',
           documentation: 'https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/accounts'
         }
       }),
@@ -73,7 +102,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[MercadoPago Test Users] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: 'Erro ao conectar com Mercado Pago' }),
+      JSON.stringify({ success: false, error: 'Erro ao processar requisição' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
