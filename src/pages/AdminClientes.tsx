@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, Filter, Download } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, Filter, Download, Users, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
 import { Cliente } from '@/types/cliente';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
@@ -102,6 +102,13 @@ export default function AdminClientes() {
   const [filterVencimento, setFilterVencimento] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Criação de contas em massa
+  const [showBatchAuthDialog, setShowBatchAuthDialog] = useState(false);
+  const [batchPassword, setBatchPassword] = useState('');
+  const [showBatchPassword, setShowBatchPassword] = useState(false);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [clientesWithoutAuth, setClientesWithoutAuth] = useState<number>(0);
+
   const filteredClientes = useMemo(() => {
     return clientes.filter(cliente => {
       // Filtro de plano
@@ -147,6 +154,70 @@ export default function AdminClientes() {
 
   const hasActiveFilters = filterPlano !== 'all' || filterOrigem !== 'all' || 
                           filterVencimento !== 'all';
+
+  // Contar clientes sem conta de acesso
+  useEffect(() => {
+    const countWithoutAuth = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('clientes')
+          .select('*', { count: 'exact', head: true })
+          .is('user_id', null)
+          .not('email', 'is', null);
+
+        if (!error && count !== null) {
+          setClientesWithoutAuth(count);
+        }
+      } catch (error) {
+        console.error('Error counting clients without auth:', error);
+      }
+    };
+
+    countWithoutAuth();
+  }, [clientes]);
+
+  // Função para criar contas em massa
+  const handleBatchCreateAuth = async () => {
+    if (!batchPassword || batchPassword.length < 6) {
+      toast({
+        title: 'Erro',
+        description: 'A senha padrão deve ter no mínimo 6 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBatchProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-client-auth-batch', {
+        body: { defaultPassword: batchPassword }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Processo concluído',
+        description: data.message || `${data.summary?.success || 0} contas criadas com sucesso`,
+      });
+
+      // Atualizar contagem
+      setClientesWithoutAuth(data.summary?.failed || 0);
+      setShowBatchAuthDialog(false);
+      setBatchPassword('');
+      
+      // Recarregar lista
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error creating batch auth:', error);
+      toast({
+        title: 'Erro ao criar contas',
+        description: error.message || 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setBatchProcessing(false);
+    }
+  };
 
   // Buscar listas M3U dos clientes
   useEffect(() => {
@@ -375,7 +446,17 @@ export default function AdminClientes() {
               Gerenciar Clientes
             </h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {clientesWithoutAuth > 0 && (
+              <Button 
+                variant="outline"
+                onClick={() => setShowBatchAuthDialog(true)}
+                className="text-amber-600 border-amber-600/50 hover:bg-amber-600/10"
+              >
+                <KeyRound className="mr-2 h-4 w-4" />
+                Criar Contas ({clientesWithoutAuth})
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="icon"
@@ -704,6 +785,83 @@ export default function AdminClientes() {
             >
               {sending ? 'Enviando...' : 'Enviar Arquivo'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Criação de Contas em Massa */}
+      <Dialog open={showBatchAuthDialog} onOpenChange={setShowBatchAuthDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Criar Contas de Acesso em Massa
+            </DialogTitle>
+            <DialogDescription>
+              Isso criará contas de login para {clientesWithoutAuth} cliente(s) que ainda não possuem acesso ao sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-sm text-amber-600">
+                <strong>Atenção:</strong> Todos os clientes receberão a mesma senha inicial. 
+                Recomende que alterem a senha no primeiro acesso.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Senha Padrão Temporária</Label>
+              <div className="relative">
+                <Input
+                  type={showBatchPassword ? 'text' : 'password'}
+                  value={batchPassword}
+                  onChange={(e) => setBatchPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowBatchPassword(!showBatchPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showBatchPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Esta será a senha inicial para todos os clientes. Eles devem alterá-la após o primeiro login.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBatchAuthDialog(false);
+                  setBatchPassword('');
+                }}
+                className="flex-1"
+                disabled={batchProcessing}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleBatchCreateAuth} 
+                disabled={batchProcessing || batchPassword.length < 6}
+                className="flex-1"
+              >
+                {batchProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    Criar {clientesWithoutAuth} Contas
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
