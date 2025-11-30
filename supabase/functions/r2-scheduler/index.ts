@@ -253,14 +253,92 @@ serve(async (req) => {
     log('info', `Active jobs: ${result.activeJobs}, Available slots: ${availableSlots}`);
 
     // ========================================
-    // STEP 4: Auto-queue new candidates (if slots available)
+    // STEP 4: Process CF Stream fallbacks (HIGH PRIORITY)
     // ========================================
+    let usedSlots = 0;
+    
     if (availableSlots > 0) {
+      const { data: fallbackUploads } = await supabase
+        .from("cf_stream_uploads")
+        .select("id, channel_id, original_url, metadata")
+        .eq("status", "needs_r2_fallback")
+        .order("created_at", { ascending: true })
+        .limit(availableSlots);
+
+      for (const upload of fallbackUploads || []) {
+        log('info', 'Processing CF Stream fallback', { channelId: upload.channel_id });
+        
+        // Validate source
+        const validation = await validateSourceUrl(upload.original_url);
+        
+        if (!validation.valid) {
+          log('warn', 'Fallback source validation failed', { 
+            channelId: upload.channel_id, 
+            error: validation.error 
+          });
+          
+          await supabase.from("cf_stream_uploads").update({
+            status: "error",
+            error_message: `R2 fallback failed - source unreachable: ${validation.error}`,
+          }).eq("id", upload.id);
+          
+          result.sourceValidationFailed++;
+          continue;
+        }
+
+        // Create R2 job
+        const { error: insertError } = await supabase
+          .from("r2_download_jobs")
+          .insert({
+            channel_id: upload.channel_id,
+            source_url: upload.original_url,
+            status: "queued",
+            priority: 10, // High priority
+            total_bytes: validation.contentLength || null,
+            metadata: { 
+              cf_upload_id: upload.id,
+              fallback_from_stream: true,
+              original_cf_metadata: upload.metadata,
+            }
+          });
+
+        if (!insertError) {
+          // Update CF upload status
+          await supabase.from("cf_stream_uploads").update({
+            status: "r2_fallback_queued",
+            error_message: "Queued for R2 download",
+          }).eq("id", upload.id);
+
+          // Trigger download-vod function
+          try {
+            await supabase.functions.invoke('download-vod', {
+              body: { channelId: upload.channel_id }
+            });
+            log('info', 'R2 fallback download triggered', { channelId: upload.channel_id });
+          } catch (e: any) {
+            log('warn', 'Failed to trigger fallback download', { error: e.message });
+          }
+
+          result.newJobs++;
+          usedSlots++;
+          log('info', 'R2 fallback job created', { channelId: upload.channel_id });
+        }
+
+        await new Promise(r => setTimeout(r, CONFIG.DELAY_BETWEEN_DOWNLOADS_MS));
+      }
+    }
+
+    // ========================================
+    // STEP 5: Auto-queue new candidates (if slots available)
+    // ========================================
+    const remainingNewSlots = availableSlots - usedSlots;
+    
+    if (remainingNewSlots > 0) {
       // Get R2 candidates
       const { data: candidates } = await supabase
-        .rpc('get_r2_download_candidates', { p_limit: availableSlots * 2 });
+        .rpc('get_r2_download_candidates', { p_limit: remainingNewSlots * 2 });
 
-      for (const candidate of (candidates || []).slice(0, availableSlots)) {
+      for (const candidate of (candidates || []).slice(0, remainingNewSlots)) {
         // Validate source first
         log('info', 'Validating source URL', { channelId: candidate.channel_id });
         const validation = await validateSourceUrl(candidate.stream_url);
@@ -311,7 +389,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 5: Process queued jobs
+    // STEP 6: Process queued jobs
     // ========================================
     if (availableSlots > result.newJobs) {
       const remainingSlots = availableSlots - result.newJobs;
@@ -378,7 +456,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 6: Sync completed vod_downloads to r2_download_jobs
+    // STEP 7: Sync completed vod_downloads to r2_download_jobs
     // ========================================
     const { data: completedVods } = await supabase
       .from("vod_downloads")

@@ -262,7 +262,7 @@ serve(async (req) => {
     // ========================================
     const { data: processingUploads } = await supabase
       .from("cf_stream_uploads")
-      .select("id, cf_stream_uid, channel_id, retry_count")
+      .select("id, cf_stream_uid, channel_id, retry_count, metadata, original_url")
       .eq("status", "processing")
       .limit(50);
 
@@ -311,21 +311,66 @@ serve(async (req) => {
           } else if (isError) {
             const errorMsg = res.status?.errorReasonText || "Encoding failed";
             const errorCategory = categorizeError(errorMsg);
+            const isEncodingError = errorMsg.toLowerCase().includes('unknown cause') || 
+                                    errorMsg.toLowerCase().includes('encoding');
+            const encodingFailures = (upload.metadata?.encoding_failures || 0) + 1;
+            const currentRetries = upload.retry_count || 0;
             
-            if (errorCategory.shouldRetry && (upload.retry_count || 0) < CONFIG.MAX_RETRIES) {
-              // Schedule retry
-              const nextRetry = calculateNextRetryTime(upload.retry_count || 0, errorCategory.delayMultiplier);
+            // After 2 encoding failures, fallback to R2 download instead of retrying Stream
+            if (isEncodingError && encodingFailures >= 2) {
+              log('warn', 'Multiple encoding failures, marking for R2 fallback', { 
+                uid: upload.cf_stream_uid, 
+                encodingFailures,
+              });
+              
+              await supabase.from("cf_stream_uploads").update({
+                status: "needs_r2_fallback",
+                error_message: `CF Stream encoding failed ${encodingFailures}x - queued for R2 download`,
+                metadata: { 
+                  last_cf_uid: upload.cf_stream_uid,
+                  last_error: errorMsg,
+                  error_category: errorCategory.category,
+                  encoding_failures: encodingFailures,
+                  fallback_reason: 'repeated_encoding_failure',
+                },
+              }).eq("id", upload.id);
+              
+              // Also create R2 download job if r2_download_jobs table exists
+              try {
+                await supabase.from("r2_download_jobs").insert({
+                  channel_id: upload.channel_id,
+                  source_url: upload.original_url,
+                  priority: 10, // High priority for fallback
+                  status: 'queued',
+                  metadata: {
+                    cf_upload_id: upload.id,
+                    fallback_from_stream: true,
+                  },
+                });
+                log('info', 'Created R2 fallback job', { channelId: upload.channel_id });
+              } catch (r2Err) {
+                log('warn', 'Could not create R2 job (table may not exist)', { error: r2Err.message });
+              }
+              
+              result.statusError++;
+              
+            } else if (errorCategory.shouldRetry && currentRetries < CONFIG.MAX_RETRIES) {
+              // Schedule retry - keep UID for first retry, clear after
+              const nextRetry = calculateNextRetryTime(currentRetries, errorCategory.delayMultiplier);
+              const shouldKeepUid = currentRetries < 1 && isEncodingError;
               
               await supabase.from("cf_stream_uploads").update({
                 status: "retry_scheduled",
                 error_message: `${errorMsg} (will retry at ${nextRetry.toISOString()})`,
-                retry_count: (upload.retry_count || 0) + 1,
-                cf_stream_uid: null, // Clear UID for new attempt
+                retry_count: currentRetries + 1,
+                cf_stream_uid: shouldKeepUid ? upload.cf_stream_uid : null,
                 metadata: { 
                   last_error: errorMsg,
                   error_category: errorCategory.category,
                   next_retry: nextRetry.toISOString(),
-                  retry_count: (upload.retry_count || 0) + 1,
+                  retry_count: currentRetries + 1,
+                  encoding_failures: isEncodingError ? encodingFailures : 0,
+                  last_cf_uid: upload.cf_stream_uid,
                 },
               }).eq("id", upload.id);
 
@@ -334,6 +379,8 @@ serve(async (req) => {
                 uid: upload.cf_stream_uid, 
                 error: errorMsg,
                 nextRetry: nextRetry.toISOString(),
+                encodingFailures,
+                keptUid: shouldKeepUid,
               });
             } else {
               // Max retries exceeded or permanent error
@@ -344,6 +391,7 @@ serve(async (req) => {
                   last_error: errorMsg, 
                   error_category: errorCategory.category,
                   final_failure: true,
+                  last_cf_uid: upload.cf_stream_uid,
                 },
               }).eq("id", upload.id);
               
