@@ -256,81 +256,41 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-300 via-slate-200 to-slate-300">
-      {/* Header with Security Badges */}
-      <header className="sticky top-0 z-50">
-        {/* Security Trust Bar */}
-        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 py-2">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-center gap-3 md:gap-8 flex-wrap">
-              <motion.div 
-                className="flex items-center gap-2 text-white text-xs md:text-sm font-medium"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <div className="p-1 bg-white/20 rounded-full">
-                  <Shield className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </div>
-                <span>SSL 256-bit</span>
-              </motion.div>
-              <motion.div 
-                className="flex items-center gap-2 text-white text-xs md:text-sm font-medium"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="p-1 bg-white/20 rounded-full">
-                  <Lock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </div>
-                <span>100% Seguro</span>
-              </motion.div>
-              <motion.div 
-                className="flex items-center gap-2 text-white text-xs md:text-sm font-medium"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <div className="p-1 bg-white/20 rounded-full">
-                  <CreditCard className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </div>
-                <span>Mercado Pago</span>
-              </motion.div>
-              <motion.div 
-                className="flex items-center gap-2 text-white text-xs md:text-sm font-medium"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <div className="p-1 bg-white/20 rounded-full">
-                  <Check className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </div>
-                <span>Satisfação Garantida</span>
-              </motion.div>
+      {/* Header */}
+      <header className="border-b border-slate-700/50 bg-background sticky top-0 z-50 backdrop-blur-md">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <button 
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2 text-white hover:text-white/80 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="hidden sm:inline">Voltar</span>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/30">
+              <Tv className="h-5 w-5 text-white" />
             </div>
+            <span className="font-bold text-white">IPTV Link</span>
           </div>
-        </div>
-        
-        {/* Main Header */}
-        <div className="border-b border-slate-400/50 bg-slate-900/98 backdrop-blur-md">
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-            <button 
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 text-white hover:text-white/80 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span className="hidden sm:inline">Voltar</span>
-            </button>
-            
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/30">
-                <Tv className="h-5 w-5 text-white" />
-              </div>
-              <span className="font-bold text-white">IPTV Link</span>
-            </div>
 
+          {/* Security Badges */}
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden md:flex items-center gap-1.5 text-emerald-400 text-xs">
+              <Shield className="h-3.5 w-3.5" />
+              <span>SSL</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-1.5 text-emerald-400 text-xs">
+              <CreditCard className="h-3.5 w-3.5" />
+              <span>Mercado Pago</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-1.5 text-emerald-400 text-xs">
+              <Check className="h-3.5 w-3.5" />
+              <span>Garantia</span>
+            </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40">
               <Lock className="h-4 w-4 text-emerald-400" />
-              <span className="hidden sm:inline text-emerald-400 text-sm font-medium">Compra Protegida</span>
+              <span className="text-emerald-400 text-sm font-medium">Compra Protegida</span>
             </div>
           </div>
         </div>
@@ -338,17 +298,22 @@ export default function Checkout() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
+        {/* Title Card */}
         <motion.div 
-          className="text-center mb-6 md:mb-8"
+          className="mb-6 md:mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl md:text-3xl font-bold text-white drop-shadow-lg mb-2" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.5)' }}>
-            Complete seu cadastro
-          </h1>
-          <p className="text-white/90 drop-shadow-md" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.4)' }}>
-            Preencha seus dados e escolha o melhor plano para você
-          </p>
+          <Card className="bg-gradient-to-br from-slate-900/95 to-slate-800/90 border-2 border-slate-700/50 shadow-2xl shadow-black/50 backdrop-blur-sm">
+            <CardContent className="py-6 text-center">
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                Complete seu cadastro
+              </h1>
+              <p className="text-white/80">
+                Preencha seus dados e escolha o melhor plano para você
+              </p>
+            </CardContent>
+          </Card>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">
