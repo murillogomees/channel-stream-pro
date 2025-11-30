@@ -557,37 +557,31 @@ export default function Login() {
             )}
           </AnimatePresence>
         ) : (
-          /* Desktop/TV: Show only active card */
           <div className="relative w-full h-full flex items-center justify-center">
             {lockedSide ? (
-              /* When locked, show only the locked card without animations */
               lockedSide === "login" ? <LoginCard /> : <PlansCard />
+            ) : hoveredSide ? (
+              hoveredSide === "login" ? <LoginCard /> : <PlansCard />
             ) : (
-              /* When not locked, show both cards with hover positioning */
-              <>
-                <div
-                  className={cn(
-                    "absolute transition-all duration-300",
-                    hoveredSide === "login" ? "opacity-100 scale-100" : "opacity-70 scale-95 -translate-x-[15vw]"
-                  )}
-                >
-                  <LoginCard />
+              <div className="flex flex-col items-center gap-8">
+                <p className="text-muted-foreground text-lg">
+                  Passe o mouse para selecionar uma opção
+                </p>
+                <div className="flex gap-8">
+                  <div className="text-center">
+                    <div className="w-32 h-32 rounded-2xl bg-card/50 border border-border/30 flex items-center justify-center mb-3">
+                      <Crown className="w-12 h-12 text-primary/50" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Já sou cliente</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-32 h-32 rounded-2xl bg-card/50 border border-border/30 flex items-center justify-center mb-3">
+                      <Zap className="w-12 h-12 text-primary/50" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Quero me cadastrar</p>
+                  </div>
                 </div>
-                <div
-                  className={cn(
-                    "absolute transition-all duration-300",
-                    hoveredSide === "plans" ? "opacity-100 scale-100" : "opacity-70 scale-95 translate-x-[15vw]"
-                  )}
-                >
-                  <PlansCard />
-                </div>
-                {/* Hint text when not active */}
-                {!hoveredSide && (
-                  <p className="absolute bottom-32 text-muted-foreground text-sm opacity-70">
-                    Mova o mouse ou clique para selecionar
-                  </p>
-                )}
-              </>
+              </div>
             )}
           </div>
         )}
