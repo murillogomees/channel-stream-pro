@@ -98,6 +98,10 @@ verify_jwt = false
 [functions.create-admin-user]
 verify_jwt = true
 
+# Admin-only function for updating user passwords
+[functions.update-user-password]
+verify_jwt = true
+
 # Backup clients cron job
 [functions.backup-clients]
 verify_jwt = false
