@@ -65,17 +65,34 @@ export default function CheckoutSuccess() {
                 )}
                 
                 <div className="space-y-3">
-                  <Button 
-                    size="lg" 
-                    className="w-full"
-                    onClick={() => navigate("/app/player")}
+                  <motion.div
+                    animate={{ 
+                      scale: [1, 1.02, 1],
+                      boxShadow: [
+                        "0 0 20px rgba(34, 197, 94, 0.3)",
+                        "0 0 40px rgba(34, 197, 94, 0.5)",
+                        "0 0 20px rgba(34, 197, 94, 0.3)"
+                      ]
+                    }}
+                    transition={{ 
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="rounded-lg"
                   >
-                    <Play className="h-5 w-5 mr-2" />
-                    Começar a Assistir
-                  </Button>
+                    <Button 
+                      size="lg" 
+                      className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-lg shadow-xl border-0 py-6"
+                      onClick={() => navigate("/app/player")}
+                    >
+                      <Play className="h-6 w-6 mr-2 fill-white" />
+                      Começar a Assistir
+                    </Button>
+                  </motion.div>
                   
                   <Button 
-                    variant="outline" 
+                    variant="destructive" 
                     className="w-full"
                     onClick={() => navigate("/conta")}
                   >
