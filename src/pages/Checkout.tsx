@@ -503,8 +503,8 @@ export default function Checkout() {
                           onClick={() => setSelectedPlanId(plan.id)}
                           className={`relative cursor-pointer rounded-xl p-4 transition-all duration-300 ${
                             isSelected 
-                              ? 'bg-gradient-to-r from-primary/30 to-purple-600/20 ring-2 ring-primary shadow-xl shadow-primary/30' 
-                              : 'bg-slate-800/60 hover:bg-slate-800/80 border-2 border-slate-700/50 hover:border-slate-600'
+                              ? 'bg-gradient-to-r from-primary/40 to-purple-600/30 ring-2 ring-primary shadow-xl shadow-primary/30' 
+                              : 'bg-slate-600/50 hover:bg-slate-500/60 border-2 border-slate-500/60 hover:border-slate-400/70'
                           }`}
                         >
                           {/* Popular Badge */}
