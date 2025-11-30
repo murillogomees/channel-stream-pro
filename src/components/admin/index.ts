@@ -5,6 +5,8 @@
 
 // Layout
 export { AdminLayout } from './AdminLayout';
+export { AdminShell } from './AdminShell';
+export { AdminHeader } from './AdminHeader';
 export { PageHeader } from './PageHeader';
 export { ResponsivePageHeader } from './ResponsivePageHeader';
 
