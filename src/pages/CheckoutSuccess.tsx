@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, Play, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function CheckoutSuccess() {
@@ -30,14 +30,24 @@ export default function CheckoutSuccess() {
   const status = searchParams.get("status");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+      {/* Background Image with overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: 'url(/images/checkout-success-bg.png)',
+        }}
+      />
+      <div className="absolute inset-0 bg-background/55" />
+      
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
+        className="relative z-10"
       >
-        <Card className="w-full max-w-md text-center">
-          <CardHeader className="space-y-4">
+        <Card className="w-full max-w-md text-center bg-card/95 backdrop-blur-sm border-border/50 shadow-2xl">
+          <CardHeader className="space-y-4 pb-4">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -51,7 +61,7 @@ export default function CheckoutSuccess() {
               Sua assinatura está ativa. Aproveite todo o conteúdo!
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="px-6 pb-8">
             {loading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -59,12 +69,12 @@ export default function CheckoutSuccess() {
             ) : (
               <>
                 {paymentId && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mb-6">
                     ID do pagamento: {paymentId}
                   </p>
                 )}
                 
-                <div className="space-y-3">
+                <div className="flex flex-col items-center gap-4">
                   <motion.div
                     animate={{ 
                       scale: [1, 1.02, 1],
@@ -79,25 +89,23 @@ export default function CheckoutSuccess() {
                       repeat: Infinity,
                       ease: "easeInOut"
                     }}
-                    className="rounded-lg"
+                    className="w-full rounded-xl"
                   >
                     <Button 
                       size="lg" 
-                      className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-lg shadow-xl border-0 py-6"
+                      className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-base shadow-xl border-0 h-14 rounded-xl"
                       onClick={() => navigate("/app/player")}
                     >
-                      <Play className="h-6 w-6 mr-2 fill-white" />
                       Começar a Assistir
                     </Button>
                   </motion.div>
                   
                   <Button 
                     variant="destructive" 
-                    className="w-full"
+                    className="w-full h-11 text-base font-semibold rounded-lg"
                     onClick={() => navigate("/conta")}
                   >
                     Ver Minha Conta
-                    <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
               </>
