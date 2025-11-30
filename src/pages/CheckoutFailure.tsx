@@ -6,7 +6,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { XCircle, RefreshCw, HelpCircle, ArrowLeft } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function CheckoutFailure() {
@@ -28,14 +28,24 @@ export default function CheckoutFailure() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-destructive/5 flex items-center justify-center p-4">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+      {/* Background Image with overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: 'url(/images/checkout-failure-bg.png)',
+        }}
+      />
+      <div className="absolute inset-0 bg-background/55" />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
+        className="relative z-10"
       >
-        <Card className="w-full max-w-md text-center">
-          <CardHeader className="space-y-4">
+        <Card className="w-full max-w-md text-center bg-card/95 backdrop-blur-sm border-border/50 shadow-2xl">
+          <CardHeader className="space-y-4 pb-4">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -47,39 +57,45 @@ export default function CheckoutFailure() {
             <CardTitle className="text-2xl">Pagamento não concluído</CardTitle>
             <CardDescription>{getErrorMessage()}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="px-6 pb-8">
             {paymentId && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mb-6">
                 Referência: {paymentId}
               </p>
             )}
             
-            <div className="space-y-3">
-              <Button 
-                size="lg" 
-                className="w-full"
-                onClick={() => navigate("/planos")}
+            <div className="flex flex-col items-center gap-4">
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.02, 1],
+                  boxShadow: [
+                    "0 0 20px rgba(34, 197, 94, 0.3)",
+                    "0 0 40px rgba(34, 197, 94, 0.5)",
+                    "0 0 20px rgba(34, 197, 94, 0.3)"
+                  ]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="w-full rounded-xl"
               >
-                <RefreshCw className="h-5 w-5 mr-2" />
-                Tentar Novamente
-              </Button>
+                <Button 
+                  size="lg" 
+                  className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-base shadow-xl border-0 h-14 rounded-xl"
+                  onClick={() => navigate("/checkout")}
+                >
+                  Tentar Novamente
+                </Button>
+              </motion.div>
               
               <Button 
-                variant="outline" 
-                className="w-full"
+                variant="destructive" 
+                className="w-full h-11 text-base font-semibold rounded-lg"
                 onClick={() => window.open("https://wa.me/5511999999999?text=Preciso de ajuda com meu pagamento", "_blank")}
               >
-                <HelpCircle className="h-4 w-4 mr-2" />
                 Preciso de Ajuda
-              </Button>
-              
-              <Button 
-                variant="ghost" 
-                className="w-full"
-                onClick={() => navigate("/")}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar ao Início
               </Button>
             </div>
           </CardContent>
