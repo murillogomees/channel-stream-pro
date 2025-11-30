@@ -21,7 +21,9 @@ serve(async (req) => {
     }
 
     // Fetch test users from Mercado Pago API
-    const response = await fetch('https://api.mercadopago.com/users/test_user', {
+    // Note: GET /users/test lists test users, POST /users/test_user creates one
+    const response = await fetch('https://api.mercadopago.com/users/test', {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
