@@ -176,12 +176,23 @@ serve(async (req) => {
   try {
     const cronSecret = req.headers.get("x-supabase-cron-secret");
     const authHeader = req.headers.get("authorization");
+    const expectedCronSecret = Deno.env.get("CRON_SECRET");
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Authentication
-    if (!cronSecret) {
+    // Authentication - either valid cron secret or admin JWT
+    let isAuthenticated = false;
+
+    // Check cron secret first (for automated cron jobs)
+    if (cronSecret && expectedCronSecret && cronSecret === expectedCronSecret) {
+      isAuthenticated = true;
+      log('info', 'Authenticated via CRON_SECRET');
+    }
+
+    // If no valid cron secret, check JWT
+    if (!isAuthenticated) {
       if (!authHeader) {
+        log('warn', 'No authentication provided');
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -192,6 +203,7 @@ serve(async (req) => {
       const { data: { user } } = await supabase.auth.getUser(token);
       
       if (!user) {
+        log('warn', 'Invalid JWT token');
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -200,11 +212,15 @@ serve(async (req) => {
 
       const { data: isAdmin } = await supabase.rpc("is_admin", { uid: user.id });
       if (!isAdmin) {
+        log('warn', 'User is not admin', { userId: user.id });
         return new Response(JSON.stringify({ error: "Admin access required" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      
+      isAuthenticated = true;
+      log('info', 'Authenticated via admin JWT', { userId: user.id });
     }
 
     if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_STREAM_API_TOKEN) {

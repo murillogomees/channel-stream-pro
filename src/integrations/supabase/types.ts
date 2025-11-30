@@ -3049,6 +3049,27 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduler_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          key: string
+          value: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key: string
+          value: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       security_alert_config: {
         Row: {
           alert_name: string
