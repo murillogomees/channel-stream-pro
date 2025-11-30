@@ -519,11 +519,29 @@ export function ContentRoutingDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {config.map((cfg) => (
-              <div key={cfg.config_key} className="p-3 border rounded-lg">
-                <p className="font-medium text-sm">{cfg.config_key}</p>
-                <p className="text-xs text-muted-foreground mt-1">{cfg.description}</p>
+              <div key={cfg.config_key} className="p-4 border rounded-lg space-y-2">
+                <p className="font-semibold text-sm">{cfg.config_key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                {cfg.description && (
+                  <p className="text-xs text-muted-foreground">{cfg.description}</p>
+                )}
+                {cfg.config_value && typeof cfg.config_value === 'object' && (
+                  <div className="mt-2 pt-2 border-t space-y-1">
+                    {Object.entries(cfg.config_value).map(([key, value]) => (
+                      <div key={key} className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-mono text-foreground">
+                          {Array.isArray(value) 
+                            ? value.length + ' itens'
+                            : typeof value === 'boolean'
+                            ? value ? '✓' : '✗'
+                            : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
