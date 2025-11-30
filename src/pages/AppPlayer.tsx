@@ -4,7 +4,7 @@ import { Loader2, Tv, ArrowLeft, Settings, RefreshCw, Database } from 'lucide-re
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
-import YouTubeStylePlayer from '@/components/app/YouTubeStylePlayer';
+import { SecureYouTubePlayer } from '@/components/app/SecureYouTubePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
@@ -710,8 +710,9 @@ export default function AppPlayer() {
 
       {/* Player Dialog */}
       {showPlayerDialog && playerChannel && (
-        <YouTubeStylePlayer
+        <SecureYouTubePlayer
           url={getStreamUrl(playerChannel)}
+          cfStreamUid={playerChannel.cf_stream_uid}
           title={playerChannel.name}
           logo={playerChannel.tvg_logo}
           category={playerChannel.category_name || 'Geral'}

@@ -286,14 +286,24 @@ export async function runScheduler(): Promise<{ success: boolean; result?: any; 
 
 /**
  * Obtém URL de stream otimizada (Stream > R2 > Original)
+ * Inclui cf_stream_uid para integração com URLs assinadas
  */
 export function getOptimizedStreamUrl(channel: {
   cf_stream_url?: string | null;
+  cf_stream_uid?: string | null;
   r2_url?: string | null;
   stream_url: string;
-}): { url: string; source: 'cloudflare_stream' | 'r2' | 'original' } {
+}): { 
+  url: string; 
+  source: 'cloudflare_stream' | 'r2' | 'original';
+  cfStreamUid?: string;
+} {
   if (channel.cf_stream_url) {
-    return { url: channel.cf_stream_url, source: 'cloudflare_stream' };
+    return { 
+      url: channel.cf_stream_url, 
+      source: 'cloudflare_stream',
+      cfStreamUid: channel.cf_stream_uid || undefined
+    };
   }
   if (channel.r2_url) {
     return { url: channel.r2_url, source: 'r2' };

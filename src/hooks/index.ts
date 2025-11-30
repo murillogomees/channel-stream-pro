@@ -27,6 +27,9 @@ export { usePlayerCleanup, cleanupDetachedPlayers } from './usePlayerCleanup';
 export { useDebouncedSearch, useDebouncedValue } from './useDebouncedSearch';
 export { useLazyLoadContent } from './useLazyLoadContent';
 
+// Cloudflare Stream Signed URLs
+export { useSignedStreamUrl, clearSignedUrlCache, preloadSignedUrl } from './useSignedStreamUrl';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
