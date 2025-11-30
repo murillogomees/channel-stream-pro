@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import { SecureYouTubePlayer } from '@/components/app/SecureYouTubePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
-import { useIPTVPlayerAdmin } from '@/hooks/useIPTVPlayerAdmin';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useBackendSearch } from '@/hooks/useBackendSearch';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,26 +38,12 @@ import {
 } from '@/features/player/services';
 import type { WatchProgress, TrendingItem, ContentType, RecommendationItem } from '@/features/player/types';
 
-// Separate component for Client content
-function ClientPlayerContent() {
-  return useIPTVPlayerClient();
-}
-
-// Separate component for Admin content  
-function AdminPlayerContent() {
-  return useIPTVPlayerAdmin(undefined, true);
-}
-
 export default function AppPlayer() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   
-  // FIXED: Use hooks unconditionally, but control which one is active
-  const clientPlayer = useIPTVPlayerClient();
-  const adminPlayer = useIPTVPlayerAdmin(undefined, isAdmin);
-  
-  // Select appropriate player based on role
-  const player = isAdmin ? adminPlayer : clientPlayer;
+  // Unified player - same content for admins and clients
+  const player = useIPTVPlayerClient();
   
   const {
     categories,
@@ -70,18 +55,14 @@ export default function AppPlayer() {
     previousChannel,
   } = player;
   
-  // Role-specific properties
-  const assignedPlaylist = isAdmin ? (adminPlayer as any).selectedList : (clientPlayer as any).assignedPlaylist;
-  const hasPlaylist = isAdmin ? categories.length > 0 : (clientPlayer as any).hasPlaylist;
-  const totalChannels = isAdmin ? (adminPlayer as any).totalChannels : (clientPlayer as any).totalChannels;
-  const loadedChannels = isAdmin ? (adminPlayer as any).loadedChannels : (clientPlayer as any).loadedChannels;
-  const isLoadingMore = isAdmin ? (adminPlayer as any).isLoadingMore : (clientPlayer as any).isLoadingMore;
-  const isCached = !isAdmin && (clientPlayer as any).isCached;
-  const clearCacheAndReload = !isAdmin ? (clientPlayer as any).clearCacheAndReload : undefined;
-  
-  // Admin-specific
-  const availableLists = isAdmin ? (adminPlayer as any).availableLists : [];
-  const selectList = isAdmin ? (adminPlayer as any).selectList : undefined;
+  // Player properties
+  const assignedPlaylist = (player as any).assignedPlaylist;
+  const hasPlaylist = (player as any).hasPlaylist;
+  const totalChannels = (player as any).totalChannels;
+  const loadedChannels = (player as any).loadedChannels;
+  const isLoadingMore = (player as any).isLoadingMore;
+  const isCached = (player as any).isCached;
+  const clearCacheAndReload = (player as any).clearCacheAndReload;
 
   const {
     isFavorite,
@@ -583,27 +564,8 @@ export default function AppPlayer() {
           
           {/* Search bar */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Admin list selector */}
-            {isAdmin && availableLists.length > 0 && (
-              <Select
-                value={assignedPlaylist?.id || ''}
-                onValueChange={(value) => selectList?.(value)}
-              >
-                <SelectTrigger className="w-[140px] sm:w-[180px]">
-                  <SelectValue placeholder="Selecionar lista" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableLists.map((list: any) => (
-                    <SelectItem key={list.id} value={list.id}>
-                      {list.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            
-            {/* Cache indicator and refresh for clients */}
-            {!isAdmin && isCached && (
+            {/* Cache indicator and refresh */}
+            {isCached && (
               <Button
                 variant="ghost"
                 size="icon"

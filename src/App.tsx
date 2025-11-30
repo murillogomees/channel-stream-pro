@@ -205,7 +205,7 @@ const App = () => (
             <Route path="/admin/whatsapp-config" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/cdn" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/transcode-queue" element={<Navigate to="/admin/integracao" replace />} />
-            <Route path="/admin/iptv-test" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/iptv-test" element={<Navigate to="/app/player" replace />} />
             <Route path="/admin/smart-cache" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/rls-coverage" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/qa" element={<Navigate to="/admin/integracao" replace />} />

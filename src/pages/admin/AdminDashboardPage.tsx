@@ -169,29 +169,22 @@ export default function AdminDashboardPage() {
             <Badge className="bg-white/20 text-white hover:bg-white/30">Novo</Badge>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <NavCard
             title="Player IPTV"
-            description="Assista canais ao vivo, filmes e séries"
-            icon={<Play className="h-5 w-5" />}
+            description="Canais ao vivo, filmes e séries"
+            icon={<Play className="h-4 w-4" />}
             path="/app/player"
             isNew
             isHighlighted
+            compact
           />
           <NavCard
-            title="Teste de IPTV"
-            description="Teste streams e debug de canais"
-            icon={<Tv className="h-5 w-5" />}
-            path="/admin/integracao"
-            isNew
-            isHighlighted
-          />
-          <NavCard
-            title="Instalação do App"
-            description="Guia de instalação para dispositivos"
-            icon={<Download className="h-5 w-5" />}
+            title="Instalação"
+            description="Guia para dispositivos"
+            icon={<Download className="h-4 w-4" />}
             path="/app/install"
-            isNew
+            compact
           />
         </div>
       </section>

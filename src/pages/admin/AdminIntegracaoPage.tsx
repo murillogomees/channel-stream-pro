@@ -1,7 +1,7 @@
 /**
  * AdminIntegracaoPage - Hub de integrações
  * Rota: /admin/integracao
- * Abas: WhatsApp, SmartOne, CDN, Transcode, IPTV Test, Smart Cache
+ * Abas: WhatsApp, CDN, Transcode, Smart Cache
  */
 
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -10,7 +10,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminWhatsAppConfig from "../AdminWhatsAppConfig";
 import AdminCdn from "../AdminCdn";
 import AdminTranscodeQueue from "../AdminTranscodeQueue";
-import AdminIPTVTest from "../AdminIPTVTest";
 import AdminSmartCache from "../AdminSmartCache";
 import AdminRLSCoverage from "../AdminRLSCoverage";
 import AdminQADashboard from "../AdminQADashboard";
@@ -33,9 +32,6 @@ export default function AdminIntegracaoPage() {
             </TabsTrigger>
             <TabsTrigger value="transcode" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               🔄 Transcode
-            </TabsTrigger>
-            <TabsTrigger value="iptv" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              📺 IPTV Test
             </TabsTrigger>
             <TabsTrigger value="cache" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               ⚡ Smart Cache
@@ -63,10 +59,6 @@ export default function AdminIntegracaoPage() {
 
         <TabsContent value="transcode" className="space-y-4 mt-4">
           <AdminTranscodeQueue />
-        </TabsContent>
-
-        <TabsContent value="iptv" className="space-y-4 mt-4">
-          <AdminIPTVTest />
         </TabsContent>
 
         <TabsContent value="cache" className="space-y-4 mt-4">
