@@ -246,6 +246,7 @@ export default function Login() {
                     viewMode === "login" && "ring-2 ring-primary/20",
                   )}
                   whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+                  onMouseEnter={() => setViewMode("login")}
                 >
                   {/* Card Header */}
                   <div className="p-6 pb-2 flex flex-col items-center">
@@ -277,7 +278,6 @@ export default function Login() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={isLoading}
-                          onFocus={() => viewMode === "split" && setViewMode("login")}
                           className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
@@ -294,7 +294,6 @@ export default function Login() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={isLoading}
-                            onFocus={() => viewMode === "split" && setViewMode("login")}
                             className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
                           />
                           <button
@@ -394,6 +393,7 @@ export default function Login() {
                     "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6",
                     viewMode === "plans" && "ring-2 ring-primary/20",
                   )}
+                  onMouseEnter={() => setViewMode("plans")}
                 >
                   {/* Plans Header */}
                   <div className="text-center mb-6">
@@ -451,13 +451,7 @@ export default function Login() {
                           whileHover={{ scale: 1.02, y: -4 }}
                           onHoverStart={() => setHoveredPlan(plan.id)}
                           onHoverEnd={() => setHoveredPlan(null)}
-                          onClick={() => {
-                            if (viewMode === "split") {
-                              setViewMode("plans");
-                            } else {
-                              handlePlanSelect(plan);
-                            }
-                          }}
+                          onClick={() => handlePlanSelect(plan)}
                           className={cn(
                             "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300",
                             plan.is_highlighted
@@ -530,24 +524,11 @@ export default function Login() {
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (viewMode === "split") {
-                                setViewMode("plans");
-                              } else {
-                                handlePlanSelect(plan);
-                              }
+                              handlePlanSelect(plan);
                             }}
                           >
-                            {viewMode === "split" ? (
-                              <>
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Ver detalhes
-                              </>
-                            ) : (
-                              <>
-                                <Zap className="w-4 h-4 mr-2" />
-                                {plan.cta_text || "Assinar agora"}
-                              </>
-                            )}
+                            <Zap className="w-4 h-4 mr-2" />
+                            {plan.cta_text || "Assinar agora"}
                           </Button>
                         </motion.div>
                       ))}
