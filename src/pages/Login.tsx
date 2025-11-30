@@ -240,29 +240,27 @@ export default function Login() {
           >
             <motion.div
               className={cn(
-                "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-[400px]",
+                "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6",
                 "transition-all duration-300",
                 isLoginActive && "ring-2 ring-primary/30 shadow-primary/20"
               )}
               animate={{
                 scale: isLoginActive ? 1.05 : 1,
+                maxWidth: isLoginActive ? "540px" : "440px"
               }}
               transition={{ duration: 0.3 }}
             >
               {/* Card Header */}
-              <div className="text-center mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-3">
-                  <Crown className="w-7 h-7 text-primary" />
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">Já sou cliente!</h2>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Acesse sua conta e aproveite
-                </p>
+                <h2 className="text-2xl font-bold text-foreground">Já sou cliente!</h2>
               </div>
 
               {/* Login Form */}
-              <form onSubmit={handleLogin} className="space-y-3">
-                <div className="space-y-1.5">
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
                     Email
                   </Label>
@@ -273,11 +271,11 @@ export default function Login() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     disabled={isLoading}
-                    className="bg-background/50 border-border h-10 rounded-lg focus:ring-2 focus:ring-primary/20"
+                    className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
                     Senha
                   </Label>
@@ -289,58 +287,43 @@ export default function Login() {
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       disabled={isLoading}
-                      className="bg-background/50 border-border h-10 rounded-lg pr-10 focus:ring-2 focus:ring-primary/20"
+                      className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
                     />
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowPassword(!showPassword);
-                      }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 py-1">
+                <div className="flex items-center space-x-2">
                   <Checkbox
                     id="remember-me"
                     checked={rememberMe}
                     onCheckedChange={checked => setRememberMe(checked === true)}
                   />
-                  <Label htmlFor="remember-me" className="text-xs text-muted-foreground cursor-pointer">
+                  <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
                     Continuar conectado por 30 dias
                   </Label>
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full h-10 rounded-lg text-sm font-semibold">
+                <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
                       Entrando...
                     </>
                   ) : (
                     <>
-                      <LogIn className="w-4 h-4 mr-2" />
+                      <LogIn className="w-5 h-5 mr-2" />
                       Entrar
                     </>
                   )}
                 </Button>
               </form>
-
-              {/* Device Icons - Same as plans card */}
-              <div className="flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t border-border/30">
-                {deviceIcons.slice(0, 6).map(device => (
-                  <div key={device.label} className="flex flex-col items-center gap-0.5">
-                    <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
-                      <device.icon className="w-4 h-4 text-primary/70" />
-                    </div>
-                    <span className="text-[9px] text-muted-foreground/70">{device.label}</span>
-                  </div>
-                ))}
-              </div>
 
               {/* Switch Button */}
               <AnimatePresence>
@@ -349,12 +332,12 @@ export default function Login() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="mt-4 pt-3 border-t border-border/50"
+                    className="mt-6 pt-4 border-t border-border/50"
                   >
                     <Button
                       variant="ghost"
                       onClick={switchToPlans}
-                      className="w-full h-9 text-sm text-muted-foreground hover:text-foreground"
+                      className="w-full text-muted-foreground hover:text-foreground"
                     >
                       Ainda não sou cliente
                       <ArrowRight className="w-4 h-4 ml-2" />
@@ -385,45 +368,46 @@ export default function Login() {
           >
             <motion.div
               className={cn(
-                "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-[400px]",
+                "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6",
                 "transition-all duration-300",
                 isPlansActive && "ring-2 ring-primary/30 shadow-primary/20"
               )}
               animate={{
                 scale: isPlansActive ? 1.05 : 1,
+                maxWidth: isPlansActive ? "540px" : "440px"
               }}
               transition={{ duration: 0.3 }}
             >
               {/* Plans Header */}
-              <div className="text-center mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-3">
-                  <Crown className="w-7 h-7 text-primary" />
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">Quero me cadastrar</h2>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Escolha o plano perfeito!
+                <h2 className="text-2xl font-bold text-foreground">Quero me cadastrar</h2>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Escolha o plano perfeito e comece a assistir agora!
                 </p>
               </div>
 
               {/* Device Icons */}
-              <div className="flex flex-wrap justify-center gap-2 mb-4">
+              <div className="flex flex-wrap justify-center gap-3 mb-6">
                 {deviceIcons.map(device => (
-                  <div key={device.label} className="flex flex-col items-center gap-0.5">
-                    <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center">
-                      <device.icon className="w-4 h-4 text-primary/70" />
+                  <div key={device.label} className="flex flex-col items-center gap-1 hover:scale-110 hover:-translate-y-0.5 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                      <device.icon className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="text-[9px] text-muted-foreground/70">{device.label}</span>
+                    <span className="text-[10px] text-muted-foreground">{device.label}</span>
                   </div>
                 ))}
               </div>
 
               {/* Plans Grid */}
               {plansLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {plans.map(plan => (
                     <div
                       key={plan.id}
@@ -434,39 +418,39 @@ export default function Login() {
                       onMouseEnter={() => setHoveredPlan(plan.id)}
                       onMouseLeave={() => setHoveredPlan(null)}
                       className={cn(
-                        "relative cursor-pointer rounded-lg border-2 p-2.5 transition-all duration-300 hover:scale-[1.02]",
+                        "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1",
                         plan.is_highlighted
-                          ? "border-primary bg-primary/5 shadow-md shadow-primary/10"
+                          ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
                           : "border-border/50 bg-background/30 hover:border-primary/50",
                         hoveredPlan === plan.id && "ring-2 ring-primary/20"
                       )}
                     >
                       {/* Highlighted Badge */}
                       {plan.is_highlighted && (
-                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                          <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Star className="w-2.5 h-2.5" />
-                            POPULAR
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            MAIS POPULAR
                           </span>
                         </div>
                       )}
 
                       {/* Savings Badge */}
                       {plan.savings_percent && plan.savings_percent > 0 && (
-                        <div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                           -{plan.savings_percent}%
                         </div>
                       )}
 
-                      <div className="text-center pt-1">
-                        <h3 className="text-sm font-bold text-foreground">{plan.name}</h3>
-                        <div className="flex items-baseline justify-center gap-0.5 mt-1">
-                          <span className="text-lg font-extrabold text-primary">{formatPrice(plan.price)}</span>
-                          <span className="text-[10px] text-muted-foreground">/{plan.period}</span>
+                      <div className="text-center">
+                        <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-2xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
+                          <span className="text-xs text-muted-foreground">/{plan.period}</span>
                         </div>
 
                         {plan.savings_amount && plan.savings_amount > 0 && (
-                          <p className="text-[9px] text-green-500 mt-0.5">
+                          <p className="text-[10px] text-green-500 mt-1">
                             Economize {formatPrice(plan.savings_amount)}
                           </p>
                         )}
@@ -476,7 +460,7 @@ export default function Login() {
                       <Button
                         size="sm"
                         className={cn(
-                          "w-full mt-2 rounded-md text-xs h-8",
+                          "w-full mt-3 rounded-lg text-sm",
                           plan.is_highlighted ? "bg-primary hover:bg-primary/90" : "bg-muted hover:bg-muted/80"
                         )}
                         onClick={e => {
@@ -484,8 +468,8 @@ export default function Login() {
                           handlePlanSelect(plan);
                         }}
                       >
-                        <Zap className="w-3 h-3 mr-1" />
-                        {plan.cta_text || "Assinar"}
+                        <Zap className="w-4 h-4 mr-2" />
+                        {plan.cta_text || "Assinar agora"}
                       </Button>
                     </div>
                   ))}
@@ -499,12 +483,12 @@ export default function Login() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="mt-4 pt-3 border-t border-border/50"
+                    className="mt-6 pt-4 border-t border-border/50"
                   >
                     <Button
                       variant="ghost"
                       onClick={switchToLogin}
-                      className="w-full h-9 text-sm text-muted-foreground hover:text-foreground"
+                      className="w-full text-muted-foreground hover:text-foreground"
                     >
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Já sou cliente
