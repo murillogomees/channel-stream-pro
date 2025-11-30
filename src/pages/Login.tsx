@@ -253,11 +253,7 @@ export default function Login() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                      className={cn(
-                        "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
-                        viewMode === "login" && "ring-2 ring-primary/20",
-                      )}
-                      whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+                      className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center"
                     >
                       <img src="/logo.png" alt="IPTV LINK" className="w-12 h-12 object-contain" />
                     </motion.div>
