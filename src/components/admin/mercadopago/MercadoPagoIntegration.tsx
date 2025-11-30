@@ -140,12 +140,16 @@ export function MercadoPagoIntegration() {
     }
 
     try {
-      const response = await fetch("https://api.mercadopago.com/users/me", {
-        headers: { Authorization: `Bearer ${token}` }
+      // Use edge function proxy to avoid CORS
+      const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/mercado-pago-test", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token })
       });
       
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json();
+      
+      if (data.success) {
         setTestResult(`✅ Conexão OK! Conta: ${data.email} (ID: ${data.id})`);
         toast.success("Conexão com Mercado Pago estabelecida!");
       } else {
