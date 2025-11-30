@@ -78,13 +78,17 @@ export default function Login() {
     }
   };
 
-  // Handle click to lock
+  // Handle click on background to lock (only when not clicking inside cards)
   const handleSideClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isMobile) return;
-    const midPoint = window.innerWidth / 2;
-    const clickedSide = e.clientX < midPoint ? "login" : "plans";
-    setLockedSide(clickedSide);
-    setHoveredSide(null);
+    // Only handle clicks directly on the background, not on cards
+    // Cards handle their own locking via handleLoginCardClick and handlePlansCardClick
+    if (isMobile || lockedSide) return;
+    if (e.target === e.currentTarget) {
+      const midPoint = window.innerWidth / 2;
+      const clickedSide = e.clientX < midPoint ? "login" : "plans";
+      setLockedSide(clickedSide);
+      setHoveredSide(null);
+    }
   };
 
   // Unlock and switch to other side
@@ -189,9 +193,28 @@ export default function Login() {
   const switchToPlans = () => setViewMode("plans");
   const switchToLogin = () => setViewMode("login");
 
+  // Lock login side when clicking inside the card
+  const handleLoginCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!lockedSide) {
+      setLockedSide("login");
+      setHoveredSide(null);
+    }
+  };
+
+  // Lock plans side when clicking inside the card
+  const handlePlansCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!lockedSide) {
+      setLockedSide("plans");
+      setHoveredSide(null);
+    }
+  };
+
   // Login Card Component
   const LoginCard = () => (
     <div
+      onClick={handleLoginCardClick}
       className={cn(
         "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4"
       )}
@@ -292,6 +315,7 @@ export default function Login() {
   
   const PlansCard = () => (
     <div
+      onClick={handlePlansCardClick}
       className={cn(
         "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
         "mx-2 sm:mx-4",
