@@ -1,17 +1,16 @@
 /**
- * PÁGINA DE LOGIN UNIFICADA
+ * PÁGINA DE LOGIN INTERATIVA
  * 
- * Design moderno com animações + funcionalidades completas:
- * - Validação com Zod
- * - Redirecionamento por roles (Admin/Client)
- * - Log de segurança em tentativas falhas
- * - Auto-redirect se já autenticado
+ * Design moderno com tela dividida animada:
+ * - Login form vs Planos de assinatura
+ * - Transições suaves como jogo de escolha
+ * - Modo focado em cada seção
  */
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Loader2, Wifi } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Eye, EyeOff, LogIn, Loader2, Wifi, Tv, Smartphone, Monitor, Gamepad2, Tablet, Chrome, Play, Sparkles, ArrowRight, ArrowLeft, Check, Zap, Crown, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,45 +19,52 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useSubscriptionPlans, SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
+import { cn } from '@/lib/utils';
+
 const REMEMBER_ME_KEY = 'iptv_remember_me';
-const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60 * 1000;
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres')
 });
+
+type ViewMode = 'split' | 'login' | 'plans';
+
+const deviceIcons = [
+  { icon: Smartphone, label: 'Celular' },
+  { icon: Monitor, label: 'Computador' },
+  { icon: Gamepad2, label: 'Video Game' },
+  { icon: Tablet, label: 'Tablet' },
+  { icon: Tv, label: 'Android TV' },
+  { icon: Chrome, label: 'Fire Stick' },
+];
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    isAuthenticated,
-    isAdmin,
-    loading: authLoading,
-    refreshUser,
-    user
-  } = useAuth();
+  const { isAuthenticated, isAdmin, loading: authLoading, refreshUser, user } = useAuth();
+  const { plans, loading: plansLoading } = useSubscriptionPlans();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
 
   // Auto-redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
       const isAdminRole = isAdmin || user.roles?.includes('admin');
       const isClientRole = user.roles?.includes('client');
-      console.log('[Login] Usuário autenticado, redirecionando...', {
-        isAdmin: isAdminRole,
-        isClient: isClientRole
-      });
+      
       let redirectTo: string;
-
-      // Admins SEMPRE vão para o dashboard (ignorar state.from)
       if (isAdminRole) {
         redirectTo = '/dashboard';
       } else {
-        // Para clientes, usar state.from se existir, senão /app/player
         const stateFrom = (location.state as any)?.from?.pathname;
         if (isClientRole) {
           redirectTo = stateFrom || '/app/player';
@@ -66,46 +72,41 @@ export default function Login() {
           redirectTo = stateFrom || '/';
         }
       }
-      navigate(redirectTo, {
-        replace: true
-      });
+      navigate(redirectTo, { replace: true });
     }
   }, [isAuthenticated, isAdmin, authLoading, navigate, location, user]);
+
   const logFailedLogin = async (email: string) => {
     try {
-      const {
-        securityMonitoringService
-      } = await import('@/services/securityMonitoringService');
+      const { securityMonitoringService } = await import('@/services/securityMonitoringService');
       await securityMonitoringService.logFailedLogin(email, undefined, navigator.userAgent, true);
-
-      // Check suspicious IP
-      fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => {
-        import('@/services/suspiciousLoginService').then(module => {
-          module.suspiciousLoginService.checkLogin(data.ip, email);
-        });
-      }).catch(() => {});
+      
+      fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => {
+          import('@/services/suspiciousLoginService').then(module => {
+            module.suspiciousLoginService.checkLogin(data.ip, email);
+          });
+        })
+        .catch(() => {});
     } catch (err) {
       console.error('Erro ao registrar tentativa de login:', err);
     }
   };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
     try {
-      const validatedData = loginSchema.parse({
-        email,
-        password
-      });
-      console.log('[Login] Tentando fazer login com:', validatedData.email);
-      const {
-        data,
-        error
-      } = await supabase.auth.signInWithPassword({
+      const validatedData = loginSchema.parse({ email, password });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
         password: validatedData.password
       });
+      
       if (error) {
-        console.error('[Login] Erro no login:', error);
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Email ou senha incorretos');
           setTimeout(() => logFailedLogin(validatedData.email), 0);
@@ -116,11 +117,10 @@ export default function Login() {
         }
         return;
       }
+      
       if (data.user) {
-        console.log('[Login] Login bem-sucedido:', data.user.id);
         toast.success('Login realizado com sucesso!');
-
-        // Save remember me preference
+        
         if (rememberMe) {
           localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({
             expires: Date.now() + REMEMBER_ME_DURATION,
@@ -129,113 +129,481 @@ export default function Login() {
         } else {
           localStorage.removeItem(REMEMBER_ME_KEY);
         }
-
-        // Force user refresh to load roles
-        console.log('[Login] Forçando refresh do usuário...');
+        
         await refreshUser();
-        console.log('[Login] Refresh concluído');
-
-        // Wait for state update
         await new Promise(resolve => setTimeout(resolve, 300));
-        // useEffect will handle redirect
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        console.error('Login error:', error);
         toast.error('Erro ao fazer login. Tente novamente.');
       }
     } finally {
       setIsLoading(false);
     }
   };
-  return <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Simplified Background */}
+
+  const handlePlanSelect = (plan: SubscriptionPlan) => {
+    // Redirect to checkout
+    navigate(`/checkout?plan=${plan.slug}`);
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden">
+      {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl opacity-40" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl opacity-30" />
+        <motion.div 
+          className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl"
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3]
+          }}
+          transition={{ duration: 8, repeat: Infinity }}
+        />
+        <motion.div 
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"
+          animate={{ 
+            scale: [1.2, 1, 1.2],
+            opacity: [0.2, 0.4, 0.2]
+          }}
+          transition={{ duration: 10, repeat: Infinity }}
+        />
+        <motion.div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl"
+          animate={{ 
+            rotate: [0, 360]
+          }}
+          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
-        {/* Logo Section */}
-        
+      {/* Main Content */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Header with Logo */}
+        <motion.header 
+          className="p-4 md:p-6 flex justify-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <img src="/logo.png" alt="IPTV LINK" className="w-32 md:w-40 h-auto object-contain" />
+        </motion.header>
 
-        {/* Login Card */}
-        <div className="w-full max-w-sm">
-          <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
-            {/* Card Header with Logo */}
-            <div className="p-6 pb-2 flex flex-col items-center">
-              <img src="/logo.png" alt="IPTV LINK" className="w-40 h-20 object-contain mb-3" />
-              
-              <p className="text-muted-foreground text-center text-sm mt-1">
-                TV Online em Alta Definição
-              </p>
-            </div>
-
-            {/* Card Content */}
-            <div className="p-6 pt-4">
-              <form onSubmit={handleLogin} className="space-y-5">
-                {/* Email Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
-                    Email
-                  </Label>
-                  <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading} autoComplete="email" autoCapitalize="none" className="bg-background border-border h-12 rounded-xl" />
-                </div>
-
-                {/* Password Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
-                    Senha
-                  </Label>
-                  <div className="relative">
-                    <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading} autoComplete="current-password" className="bg-background border-border h-12 rounded-xl pr-12" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors">
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
+        {/* Split View Container */}
+        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-4 md:gap-8">
+          
+          {/* Login Section */}
+          <AnimatePresence mode="wait">
+            {(viewMode === 'split' || viewMode === 'login') && (
+              <motion.div
+                key="login-section"
+                className={cn(
+                  "w-full transition-all duration-500",
+                  viewMode === 'split' ? 'lg:w-1/2 max-w-md' : 'max-w-lg'
+                )}
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ 
+                  opacity: 1, 
+                  x: 0,
+                  scale: viewMode === 'login' ? 1.02 : 1
+                }}
+                exit={{ opacity: 0, x: -100, scale: 0.9 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <motion.div 
+                  className={cn(
+                    "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
+                    viewMode === 'login' && "ring-2 ring-primary/20"
+                  )}
+                  whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+                >
+                  {/* Card Header */}
+                  <div className="p-6 pb-2 flex flex-col items-center">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
+                    >
+                      <LogIn className="w-8 h-8 text-primary" />
+                    </motion.div>
+                    <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
+                    <p className="text-muted-foreground text-center text-sm mt-2">
+                      Entre com suas credenciais para acessar
+                    </p>
                   </div>
-                </div>
 
-                {/* Remember Me Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="remember-me" checked={rememberMe} onCheckedChange={checked => setRememberMe(checked === true)} className="data-[state=checked]:bg-primary data-[state=checked]:border-primary" />
-                  <Label htmlFor="remember-me" className="text-sm font-normal text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                    Continuar conectado por 30 dias
-                  </Label>
-                </div>
+                  {/* Login Form */}
+                  <div className="p-6 pt-4">
+                    <form onSubmit={handleLogin} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
+                          Email
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="seu@email.com"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          disabled={isLoading}
+                          onFocus={() => viewMode === 'split' && setViewMode('login')}
+                          className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
 
-                {/* Submit Button */}
-                <div>
-                  <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl text-base font-semibold text-white">
-                    <span className="flex items-center justify-center gap-2">
-                      {isLoading ? <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Entrando...
-                        </> : <>
-                          <LogIn className="w-5 h-5" />
-                          Entrar
-                        </>}
-                    </span>
-                  </Button>
-                </div>
-              </form>
+                      <div className="space-y-2">
+                        <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+                          Senha
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="password"
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            disabled={isLoading}
+                            onFocus={() => viewMode === 'split' && setViewMode('login')}
+                            className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
 
-            </div>
-          </div>
-        </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="remember-me"
+                          checked={rememberMe}
+                          onCheckedChange={checked => setRememberMe(checked === true)}
+                        />
+                        <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
+                          Continuar conectado por 30 dias
+                        </Label>
+                      </div>
 
-        {/* Connection Status */}
-        <div className="mt-6 flex items-center gap-2 text-muted-foreground text-sm">
-          <Wifi className="w-4 h-4 text-green-500" />
-          <span>Conectado</span>
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-12 rounded-xl text-base font-semibold"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                            Entrando...
+                          </>
+                        ) : (
+                          <>
+                            <LogIn className="w-5 h-5 mr-2" />
+                            Entrar
+                          </>
+                        )}
+                      </Button>
+                    </form>
+
+                    {/* Switch to Plans */}
+                    {viewMode === 'login' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 pt-4 border-t border-border/50"
+                      >
+                        <Button
+                          variant="ghost"
+                          onClick={() => setViewMode('split')}
+                          className="w-full text-muted-foreground hover:text-foreground"
+                        >
+                          <ArrowLeft className="w-4 h-4 mr-2" />
+                          Ver planos disponíveis
+                        </Button>
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Divider (only in split mode) */}
+          {viewMode === 'split' && (
+            <motion.div 
+              className="hidden lg:flex flex-col items-center gap-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
+              <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50">
+                ou
+              </span>
+              <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
+            </motion.div>
+          )}
+
+          {/* Plans Section */}
+          <AnimatePresence mode="wait">
+            {(viewMode === 'split' || viewMode === 'plans') && (
+              <motion.div
+                key="plans-section"
+                className={cn(
+                  "w-full transition-all duration-500",
+                  viewMode === 'split' ? 'lg:w-1/2' : 'max-w-5xl'
+                )}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ 
+                  opacity: 1, 
+                  x: 0,
+                  scale: viewMode === 'plans' ? 1.02 : 1
+                }}
+                exit={{ opacity: 0, x: 100, scale: 0.9 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <motion.div 
+                  className={cn(
+                    "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6",
+                    viewMode === 'plans' && "ring-2 ring-primary/20"
+                  )}
+                >
+                  {/* Plans Header */}
+                  <div className="text-center mb-6">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                      className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4"
+                    >
+                      <Crown className="w-8 h-8 text-primary" />
+                    </motion.div>
+                    <h2 className="text-2xl font-bold text-foreground">Quero me cadastrar</h2>
+                    <p className="text-muted-foreground text-sm mt-2">
+                      Escolha o plano perfeito e comece a assistir agora!
+                    </p>
+                  </div>
+
+                  {/* Device Icons */}
+                  <motion.div 
+                    className="flex flex-wrap justify-center gap-3 mb-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    {deviceIcons.map((device, index) => (
+                      <motion.div
+                        key={device.label}
+                        className="flex flex-col items-center gap-1"
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.4 + index * 0.05 }}
+                        whileHover={{ scale: 1.1, y: -2 }}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                          <device.icon className="w-5 h-5 text-primary" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{device.label}</span>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+
+                  {/* Plans Grid */}
+                  {plansLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "grid gap-4",
+                      viewMode === 'plans' ? 'md:grid-cols-3' : 'grid-cols-1'
+                    )}>
+                      {plans.map((plan, index) => (
+                        <motion.div
+                          key={plan.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 + index * 0.1 }}
+                          whileHover={{ scale: 1.02, y: -4 }}
+                          onHoverStart={() => setHoveredPlan(plan.id)}
+                          onHoverEnd={() => setHoveredPlan(null)}
+                          onClick={() => {
+                            if (viewMode === 'split') {
+                              setViewMode('plans');
+                            } else {
+                              handlePlanSelect(plan);
+                            }
+                          }}
+                          className={cn(
+                            "relative cursor-pointer rounded-2xl border-2 p-4 transition-all duration-300",
+                            plan.is_highlighted 
+                              ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" 
+                              : "border-border/50 bg-background/30 hover:border-primary/50",
+                            hoveredPlan === plan.id && "ring-2 ring-primary/20"
+                          )}
+                        >
+                          {/* Highlighted Badge */}
+                          {plan.is_highlighted && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="absolute -top-3 left-1/2 -translate-x-1/2"
+                            >
+                              <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                                <Star className="w-3 h-3" />
+                                MAIS POPULAR
+                              </span>
+                            </motion.div>
+                          )}
+
+                          {/* Savings Badge */}
+                          {plan.savings_percent && plan.savings_percent > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full"
+                            >
+                              -{plan.savings_percent}%
+                            </motion.div>
+                          )}
+
+                          <div className="text-center">
+                            <h3 className="text-lg font-bold text-foreground mb-1">{plan.name}</h3>
+                            <div className="flex items-baseline justify-center gap-1">
+                              <span className="text-3xl font-extrabold text-primary">
+                                {formatPrice(plan.price)}
+                              </span>
+                              <span className="text-sm text-muted-foreground">/{plan.period}</span>
+                            </div>
+                            
+                            {plan.savings_amount && plan.savings_amount > 0 && (
+                              <p className="text-xs text-green-500 mt-1">
+                                Economize {formatPrice(plan.savings_amount)}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Features (show in expanded mode) */}
+                          {viewMode === 'plans' && (
+                            <motion.ul
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="mt-4 space-y-2"
+                            >
+                              {plan.features.slice(0, 4).map((feature, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                  <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                  <span>{feature}</span>
+                                </li>
+                              ))}
+                            </motion.ul>
+                          )}
+
+                          {/* CTA Button */}
+                          <Button
+                            className={cn(
+                              "w-full mt-4 rounded-xl",
+                              plan.is_highlighted 
+                                ? "bg-primary hover:bg-primary/90" 
+                                : "bg-muted hover:bg-muted/80"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (viewMode === 'split') {
+                                setViewMode('plans');
+                              } else {
+                                handlePlanSelect(plan);
+                              }
+                            }}
+                          >
+                            {viewMode === 'split' ? (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Ver detalhes
+                              </>
+                            ) : (
+                              <>
+                                <Zap className="w-4 h-4 mr-2" />
+                                {plan.cta_text || 'Assinar agora'}
+                              </>
+                            )}
+                          </Button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Benefits Banner (expanded mode) */}
+                  {viewMode === 'plans' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Play className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-foreground">Liberação imediata!</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Assine agora e comece a assistir em segundos. O player mais rápido do mercado!
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Switch to Login */}
+                  {viewMode === 'plans' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-6 pt-4 border-t border-border/50"
+                    >
+                      <Button
+                        variant="ghost"
+                        onClick={() => setViewMode('split')}
+                        className="w-full text-muted-foreground hover:text-foreground"
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Já tenho uma conta
+                      </Button>
+                    </motion.div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Footer */}
-        <p className="mt-8 text-xs text-muted-foreground text-center">
-          © 2025 IPTV LINK. Todos os direitos reservados.
-        </p>
+        <motion.footer 
+          className="p-4 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-2">
+            <Wifi className="w-4 h-4 text-green-500" />
+            <span>Conectado</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            © 2025 IPTV LINK. Todos os direitos reservados.
+          </p>
+        </motion.footer>
       </div>
-    </div>;
+    </div>
+  );
 }
