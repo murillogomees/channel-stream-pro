@@ -214,10 +214,10 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className="relative z-10 h-screen flex flex-col">
         {/* Split View Container */}
         <div 
-          className="flex-1 flex flex-col lg:flex-row items-stretch w-full"
+          className="flex-1 flex flex-col lg:flex-row items-center justify-center w-full pb-20"
           onMouseLeave={handleMouseLeave}
         >
           {/* Login Section */}
@@ -500,20 +500,21 @@ export default function Login() {
           </motion.div>
         </div>
 
-        {/* Footer - Always centered and fixed at bottom */}
-        <motion.footer
-          className="absolute bottom-0 left-0 right-0 p-4 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-2">
-            <Wifi className="w-4 h-4 text-green-500" />
-            <span>Conectado</span>
-          </div>
-          <p className="text-xs text-muted-foreground">© 2025 IPTV LINK. Todos os direitos reservados.</p>
-        </motion.footer>
       </div>
+
+      {/* Footer - Always fixed at bottom, outside animation flow */}
+      <motion.footer
+        className="fixed bottom-0 left-0 right-0 z-20 p-4 text-center bg-gradient-to-t from-background to-transparent"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-2">
+          <Wifi className="w-4 h-4 text-green-500" />
+          <span>Conectado</span>
+        </div>
+        <p className="text-xs text-muted-foreground">© 2025 IPTV LINK. Todos os direitos reservados.</p>
+      </motion.footer>
     </div>
   );
 }
