@@ -175,13 +175,37 @@ serve(async (req) => {
   
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Auth check for cron jobs
+  // Auth check - accept cron secret, service key, or authenticated admin
   const authHeader = req.headers.get('authorization');
   const providedSecret = req.headers.get('x-cron-secret');
   
-  const isAuthorized = 
+  let isAuthorized = 
     providedSecret === cronSecret ||
     (authHeader && authHeader.includes(supabaseServiceKey));
+  
+  // Also check for authenticated admin user
+  if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    const { createClient: createAuthClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const authSupabase = createAuthClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    const { data: { user }, error } = await authSupabase.auth.getUser();
+    if (!error && user) {
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile?.role === 'admin') {
+        isAuthorized = true;
+        console.log('[CDN-Prewarm] Admin user authorized:', user.email);
+      }
+    }
+  }
   
   if (!isAuthorized) {
     console.log('[CDN-Prewarm] Unauthorized request');
