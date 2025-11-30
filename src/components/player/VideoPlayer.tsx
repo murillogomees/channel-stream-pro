@@ -17,8 +17,10 @@
  * - Muted-on-start para autoplay seguro
  * - Analytics de performance
  * - Configuração otimizada por dispositivo
+ * - Enhanced ABR (aggressive up-switch, conservative down-switch)
+ * - Resume playback support
  * 
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -33,10 +35,14 @@ import { streamOptimizer, detectStreamType } from "@/services/streamOptimizer";
 import { useABR } from "@/hooks/useABR";
 import { QualitySelector } from "./QualitySelector";
 import { QualityBadge } from "./QualityBadge";
+import { ResumeDialog } from "./ResumeDialog";
 import { useVisibilityOptimization } from "@/hooks/useVisibilityOptimization";
 import { usePlayerErrorRecovery } from "@/hooks/usePlayerErrorRecovery";
 import { useAdvancedHlsConfig } from "@/hooks/useAdvancedHlsConfig";
 import { onPlayerOpen, onPlayerClose } from "@/services/downloadPriorityService";
+import { enhancedABRService } from "@/services/enhancedABRService";
+import { featureFlagsService } from "@/services/featureFlagsService";
+import { playerEventsService } from "@/services/playerEventsService";
 
 // =============================================================================
 // TYPES
@@ -53,6 +59,14 @@ interface VideoPlayerProps {
   channelId?: string;
   /** User ID for analytics */
   userId?: string;
+  /** Content type for resume/analytics */
+  contentType?: 'live' | 'movie' | 'series' | 'episode';
+  /** Resume point in seconds (if available) */
+  resumePoint?: number;
+  /** Callback when resume is accepted */
+  onResumeAccepted?: () => void;
+  /** Callback when resume is declined */
+  onResumeDeclined?: () => void;
   /** Autoplay ao carregar */
   autoPlay?: boolean;
   /** Enable ABR quality selector */
@@ -162,6 +176,10 @@ export function VideoPlayer({
   logo,
   channelId,
   userId,
+  contentType = 'live',
+  resumePoint,
+  onResumeAccepted,
+  onResumeDeclined,
   autoPlay = true,
   enableABR = true,
   showQualityStats = false,
@@ -180,10 +198,16 @@ export function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCount = useRef(0);
   const maxRetries = 3;
   const startupTimeRef = useRef<number>(0);
+  const firstFrameTracked = useRef(false);
+
+  // Feature flags
+  const useEnhancedABRFlag = featureFlagsService.isEnabled('enhanced_abr');
+  const usePlayerAnalyticsFlag = featureFlagsService.isEnabled('player_analytics');
 
   // Detect if VOD content (enables ABR UI)
   const isVOD = detectStreamType(url) === 'vod' || url.includes('/movie/') || url.includes('/series/');
@@ -612,6 +636,27 @@ export function VideoPlayer({
         onClick={togglePlay}
         {...videoProps}
       />
+
+      {/* Resume Dialog */}
+      {resumePoint && resumePoint > 0 && (
+        <ResumeDialog
+          isOpen={showResumeDialog}
+          resumePoint={resumePoint}
+          contentName={title}
+          onResume={() => {
+            setShowResumeDialog(false);
+            if (videoRef.current) {
+              videoRef.current.currentTime = resumePoint;
+            }
+            onResumeAccepted?.();
+          }}
+          onStartOver={() => {
+            setShowResumeDialog(false);
+            onResumeDeclined?.();
+          }}
+          onClose={() => setShowResumeDialog(false)}
+        />
+      )}
 
       {/* Loading spinner */}
       {loading && !error && (

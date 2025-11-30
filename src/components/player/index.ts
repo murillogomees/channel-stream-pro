@@ -10,9 +10,11 @@ export { QualitySelector } from './QualitySelector';
 export { QualityBadge } from './QualityBadge';
 export { ConnectionIndicator } from './ConnectionIndicator';
 export { RecoveryStatus } from './RecoveryStatus';
+export { ResumeDialog } from './ResumeDialog';
 
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
 export { useAdvancedHlsConfig, applyDynamicConfig } from '@/hooks/useAdvancedHlsConfig';
 export { useStreamPreloader } from '@/hooks/useStreamPreloader';
 export { usePlayerErrorRecovery } from '@/hooks/usePlayerErrorRecovery';
+export { useEnhancedPlayer } from '@/hooks/useEnhancedPlayer';

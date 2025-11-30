@@ -1,8 +1,8 @@
 /**
  * Main App Component
- * @version 2.0.1
+ * @version 2.1.0
  */
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { webVitalsService } from "@/services/webVitalsService";
 
 // Core pages
 const Index = lazy(() => import("./pages/Index"));
@@ -52,6 +53,19 @@ const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const AppProfile = lazy(() => import("./pages/app/AppProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const TVPlayer = lazy(() => import("./pages/TVPlayer"));
+const MyList = lazy(() => import("./pages/MyList"));
+
+// Initialize Web Vitals for Lighthouse optimization
+if (typeof window !== 'undefined') {
+  webVitalsService.init((report) => {
+    console.log('[WebVitals] Report:', {
+      score: report.score,
+      lcp: report.metrics.LCP?.value,
+      fid: report.metrics.FID?.value,
+      cls: report.metrics.CLS?.value,
+    });
+  });
+}
 
 const App = () => (
   <AuthProvider>
@@ -89,8 +103,10 @@ const App = () => (
           <Route path="/app/login" element={<Navigate to="/login" replace />} />
           <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
           <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
+          <Route path="/app/mylist" element={<ProtectedRoute><MyList /></ProtectedRoute>} />
           {/* Legacy app routes - redirect to unified pages */}
           <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
+          <Route path="/app/favorites" element={<Navigate to="/app/mylist" replace />} />
           <Route path="/app/account" element={<Navigate to="/app/profile" replace />} />
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />

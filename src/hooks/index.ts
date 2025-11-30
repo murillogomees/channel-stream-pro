@@ -16,6 +16,20 @@ export { useABR } from './useABR';
 export { usePlayerAnalytics } from './usePlayerAnalytics';
 export { useResume } from './useResume';
 
+// Enhanced Player (unified hook)
+export { useEnhancedPlayer } from './useEnhancedPlayer';
+
+// Feature Flags
+export { 
+  useFeatureFlags, 
+  useEnhancedABR, 
+  useSegmentPrefetch as useSegmentPrefetchFlag,
+  useResumeSupport,
+  usePlayerAnalytics as usePlayerAnalyticsFlag,
+  useWebVitalsTracking,
+  useTVOptimizations,
+} from './useFeatureFlags';
+
 // Connection & Network
 export { useConnectionAware } from './useConnectionAware';
 
@@ -53,3 +67,4 @@ export type { PredictionScore, PredictionReason, WarmingStats, CacheStats } from
 export type { ABRTuningConfig, ABRMetrics } from '@/services/enhancedABRService';
 export type { ResumeProgress } from '@/services/resumeService';
 export type { PlayerEventType, PlayerEvent } from '@/services/playerEventsService';
+export type { FeatureFlag } from '@/services/featureFlagsService';
