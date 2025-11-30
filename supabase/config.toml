@@ -183,3 +183,27 @@ verify_jwt = false
 # R2 Scheduler - intelligent content routing scheduler
 [functions.r2-scheduler]
 verify_jwt = false
+
+# ==========================================
+# MERCADO PAGO PAYMENT INTEGRATION
+# ==========================================
+
+# Mercado Pago webhook - public with signature verification
+[functions.mercado-pago-webhook]
+verify_jwt = false
+
+# Mercado Pago checkout - requires user authentication
+[functions.mercado-pago-checkout]
+verify_jwt = false
+
+# ==========================================
+# PLAYBACK ACCESS CONTROL
+# ==========================================
+
+# Playback token generation and validation
+[functions.playback-token]
+verify_jwt = false
+
+# Player events analytics
+[functions.player-events]
+verify_jwt = false
