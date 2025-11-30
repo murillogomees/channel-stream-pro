@@ -361,7 +361,7 @@ export default function Login() {
                 key="plans-section"
                 className={cn(
                   "w-full transition-all duration-500",
-                  viewMode === 'split' ? 'lg:w-1/2' : 'max-w-5xl'
+                  viewMode === 'split' ? 'lg:w-5/12' : 'max-w-4xl'
                 )}
                 initial={{ opacity: 0, x: 50 }}
                 animate={{ 
@@ -424,10 +424,7 @@ export default function Login() {
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                   ) : (
-                    <div className={cn(
-                      "grid gap-4",
-                      viewMode === 'plans' ? 'md:grid-cols-3' : 'grid-cols-1'
-                    )}>
+                    <div className="grid grid-cols-2 gap-3">
                       {plans.map((plan, index) => (
                         <motion.div
                           key={plan.id}
@@ -445,7 +442,7 @@ export default function Login() {
                             }
                           }}
                           className={cn(
-                            "relative cursor-pointer rounded-2xl border-2 p-4 transition-all duration-300",
+                            "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300",
                             plan.is_highlighted 
                               ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" 
                               : "border-border/50 bg-background/30 hover:border-primary/50",
@@ -478,16 +475,16 @@ export default function Login() {
                           )}
 
                           <div className="text-center">
-                            <h3 className="text-lg font-bold text-foreground mb-1">{plan.name}</h3>
+                            <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
                             <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-3xl font-extrabold text-primary">
+                              <span className="text-2xl font-extrabold text-primary">
                                 {formatPrice(plan.price)}
                               </span>
-                              <span className="text-sm text-muted-foreground">/{plan.period}</span>
+                              <span className="text-xs text-muted-foreground">/{plan.period}</span>
                             </div>
                             
                             {plan.savings_amount && plan.savings_amount > 0 && (
-                              <p className="text-xs text-green-500 mt-1">
+                              <p className="text-[10px] text-green-500 mt-1">
                                 Economize {formatPrice(plan.savings_amount)}
                               </p>
                             )}
@@ -498,12 +495,12 @@ export default function Login() {
                             <motion.ul
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: 'auto' }}
-                              className="mt-4 space-y-2"
+                              className="mt-3 space-y-1"
                             >
-                              {plan.features.slice(0, 4).map((feature, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                  <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>{feature}</span>
+                              {plan.features.slice(0, 3).map((feature, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                  <Check className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+                                  <span className="line-clamp-1">{feature}</span>
                                 </li>
                               ))}
                             </motion.ul>
@@ -511,8 +508,9 @@ export default function Login() {
 
                           {/* CTA Button */}
                           <Button
+                            size="sm"
                             className={cn(
-                              "w-full mt-4 rounded-xl",
+                              "w-full mt-3 rounded-lg text-sm",
                               plan.is_highlighted 
                                 ? "bg-primary hover:bg-primary/90" 
                                 : "bg-muted hover:bg-muted/80"
