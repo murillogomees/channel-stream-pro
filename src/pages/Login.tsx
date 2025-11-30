@@ -442,40 +442,48 @@ export default function Login() {
             )}
           </AnimatePresence>
         ) : (
-          /* Desktop/TV: Interactive hover/lock animation */
+          /* Desktop/TV: Show only active card, hide the other */
           <div className="relative w-full h-full flex items-center justify-center">
-            {/* Login Card */}
-            <motion.div
-              className="absolute"
-              animate={{
-                x: activeSide === "plans" ? "-30vw" : activeSide === "login" ? "0" : "-15vw",
-                scale: activeSide === "login" ? 1.05 : activeSide === "plans" ? 0.9 : 1,
-                opacity: activeSide === "plans" ? 0.5 : 1,
-                zIndex: activeSide === "login" ? 20 : 10,
-              }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LoginCard />
-            </motion.div>
+            <AnimatePresence mode="wait">
+              {activeSide === "login" || !activeSide ? (
+                <motion.div
+                  key="login-card"
+                  className="absolute"
+                  initial={{ opacity: 0, scale: 0.9, x: activeSide ? 0 : "-15vw" }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: activeSide === "login" ? 1 : 0.95,
+                    x: activeSide === "login" ? 0 : "-15vw"
+                  }}
+                  exit={{ opacity: 0, scale: 0.9, x: "-30vw" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <LoginCard />
+                </motion.div>
+              ) : null}
 
-            {/* Plans Card */}
-            <motion.div
-              className="absolute"
-              animate={{
-                x: activeSide === "login" ? "30vw" : activeSide === "plans" ? "0" : "15vw",
-                scale: activeSide === "plans" ? 1.05 : activeSide === "login" ? 0.9 : 1,
-                opacity: activeSide === "login" ? 0.5 : 1,
-                zIndex: activeSide === "plans" ? 20 : 10,
-              }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <PlansCard />
-            </motion.div>
+              {activeSide === "plans" || !activeSide ? (
+                <motion.div
+                  key="plans-card"
+                  className="absolute"
+                  initial={{ opacity: 0, scale: 0.9, x: activeSide ? 0 : "15vw" }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: activeSide === "plans" ? 1 : 0.95,
+                    x: activeSide === "plans" ? 0 : "15vw"
+                  }}
+                  exit={{ opacity: 0, scale: 0.9, x: "30vw" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <PlansCard />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
-            {/* Hint text when not locked */}
-            {!lockedSide && (
+            {/* Hint text when not active */}
+            {!activeSide && (
               <motion.p
                 className="absolute bottom-32 text-muted-foreground text-sm"
                 initial={{ opacity: 0 }}
