@@ -124,7 +124,7 @@ export function MercadoPagoIntegration() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testUsers, setTestUsers] = useState<TestUser[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   // Load config on mount
   useEffect(() => {
@@ -190,33 +190,52 @@ export function MercadoPagoIntegration() {
   };
 
   const fetchTestUsers = async () => {
-    const token = config.useSandbox ? config.sandboxAccessToken : config.productionAccessToken;
-    if (!token) {
-      toast.error("Configure o Access Token primeiro");
+    // Mercado Pago não tem endpoint para LISTAR usuários de teste
+    // Apenas para CRIAR novos usuários
+    toast.info("A API do Mercado Pago não fornece endpoint para listar usuários. Use 'Criar Usuário de Teste' para criar um novo.");
+  };
+
+  const createTestUser = async () => {
+    // Test user creation REQUIRES production token
+    if (!config.productionAccessToken) {
+      toast.error("Configure o Access Token de PRODUÇÃO primeiro");
       return;
     }
 
-    setLoadingUsers(true);
+    setCreatingUser(true);
     try {
       const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/mercado-pago-test-users", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: token })
+        body: JSON.stringify({ 
+          accessToken: config.productionAccessToken,
+          action: 'create'
+        })
       });
       
       const data = await response.json();
       
-      if (data.success && data.users) {
-        setTestUsers(data.users);
-        toast.success(`${data.users.length} usuário(s) de teste encontrado(s)`);
+      if (data.success && data.user) {
+        // Add to local list
+        setTestUsers(prev => [...prev, {
+          id: data.user.id,
+          nickname: data.user.nickname,
+          email: data.user.email,
+          password: data.user.password,
+          site_status: data.user.site_status || 'active'
+        }]);
+        toast.success("Usuário de teste criado com sucesso! Guarde as credenciais.");
       } else {
-        toast.error(data.error || "Falha ao buscar usuários de teste");
+        toast.error(data.error || "Falha ao criar usuário de teste");
+        if (data.info?.reason) {
+          console.log('Info:', data.info);
+        }
       }
     } catch (error) {
-      console.error('Error fetching test users:', error);
-      toast.error("Erro ao buscar usuários de teste");
+      console.error('Error creating test user:', error);
+      toast.error("Erro ao criar usuário de teste");
     } finally {
-      setLoadingUsers(false);
+      setCreatingUser(false);
     }
   };
 
@@ -398,24 +417,45 @@ export function MercadoPagoIntegration() {
                 Usuários de Teste
               </CardTitle>
               <CardDescription>
-                Busque os usuários de teste cadastrados na sua conta do Mercado Pago
+                Crie usuários de teste para simular pagamentos no ambiente sandbox
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button onClick={fetchTestUsers} disabled={loadingUsers} className="w-full">
-                {loadingUsers ? (
+              <div className="p-4 bg-blue-500/10 rounded-lg mb-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-1 text-blue-500" />
+                  <div className="text-sm text-blue-600">
+                    <p><strong>Importante:</strong> A criação de usuários de teste requer o <strong>Access Token de PRODUÇÃO</strong> (APP_USR-...), não o de sandbox.</p>
+                    <p className="mt-1">Os usuários criados podem ser usados para testar pagamentos no ambiente sandbox.</p>
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={createTestUser} 
+                disabled={creatingUser || !config.productionAccessToken} 
+                className="w-full"
+                variant={config.productionAccessToken ? "default" : "outline"}
+              >
+                {creatingUser ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <Users className="h-4 w-4 mr-2" />
                 )}
-                {loadingUsers ? "Buscando..." : "Buscar Usuários de Teste"}
+                {creatingUser ? "Criando..." : "Criar Novo Usuário de Teste"}
               </Button>
+
+              {!config.productionAccessToken && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Configure o Access Token de Produção na aba Configuração
+                </p>
+              )}
 
               {testUsers.length > 0 ? (
                 <ScrollArea className="h-[300px]">
                   <div className="space-y-3">
                     {testUsers.map((user) => (
-                      <div key={user.id} className="p-4 border rounded-lg space-y-3">
+                      <div key={user.id} className="p-4 border rounded-lg space-y-3 bg-card">
                         <div className="flex items-center justify-between">
                           <Badge variant="default">
                             {user.nickname || `User ${user.id}`}
@@ -452,6 +492,21 @@ export function MercadoPagoIntegration() {
                               </Button>
                             </div>
                           </div>
+                          {user.password && (
+                            <div>
+                              <Label className="text-xs">Senha</Label>
+                              <div className="flex items-center gap-2 mt-1">
+                                <code className="text-sm bg-muted px-2 py-1 rounded flex-1">{user.password}</code>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost"
+                                  onClick={() => copyToClipboard(user.password!, `user-${user.id}-password`)}
+                                >
+                                  {copiedField === `user-${user.id}-password` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -460,7 +515,8 @@ export function MercadoPagoIntegration() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Clique no botão acima para buscar os usuários de teste</p>
+                  <p>Nenhum usuário de teste criado nesta sessão</p>
+                  <p className="text-xs mt-1">Clique no botão acima para criar um novo</p>
                 </div>
               )}
 
@@ -468,7 +524,7 @@ export function MercadoPagoIntegration() {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-1 text-yellow-500" />
                   <p className="text-sm text-yellow-600">
-                    <strong>Dica:</strong> Para criar novos usuários de teste, acesse o{" "}
+                    <strong>Dica:</strong> Você também pode gerenciar usuários de teste no{" "}
                     <a 
                       href="https://www.mercadopago.com.br/developers/panel/test-users" 
                       target="_blank" 
