@@ -50,24 +50,37 @@ export function useCFStreamUploads() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch uploads with channel info
+      // Fetch uploads
       const { data: uploadsData, error: uploadsError } = await supabase
         .from("cf_stream_uploads")
-        .select(`
-          *,
-          m3u_channels!cf_stream_uploads_channel_id_fkey (
-            name
-          )
-        `)
+        .select("*")
         .order("updated_at", { ascending: false })
         .limit(500);
 
       if (uploadsError) throw uploadsError;
 
+      // Fetch channel names separately for the channel_ids we have
+      const channelIds = [...new Set((uploadsData || []).map((u: any) => u.channel_id).filter(Boolean))];
+      
+      let channelMap: Record<string, string> = {};
+      if (channelIds.length > 0) {
+        const { data: channelsData } = await supabase
+          .from("m3u_channels")
+          .select("id, name")
+          .in("id", channelIds);
+        
+        if (channelsData) {
+          channelMap = channelsData.reduce((acc: Record<string, string>, ch: any) => {
+            acc[ch.id] = ch.name;
+            return acc;
+          }, {});
+        }
+      }
+
       // Map uploads with channel names
       const mappedUploads: Upload[] = (uploadsData || []).map((upload: any) => ({
         ...upload,
-        channel_name: upload.m3u_channels?.name || null,
+        channel_name: channelMap[upload.channel_id] || null,
       }));
 
       setUploads(mappedUploads);
