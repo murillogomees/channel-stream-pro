@@ -207,12 +207,12 @@ export default function Login() {
 
       {/* Main Content - Split View */}
       <div 
-        className="relative z-10 min-h-screen flex pb-24"
+        className="relative z-10 h-screen flex"
         onMouseLeave={handleMouseLeave}
       >
         {/* Login Section */}
         <motion.div
-          className="flex items-center justify-center cursor-pointer transition-all"
+          className="h-full flex items-center justify-center cursor-pointer"
           animate={{
             width: isLoginActive ? "100%" : isPlansActive ? "0%" : "50%",
             opacity: isPlansActive ? 0 : 1,
@@ -336,7 +336,7 @@ export default function Login() {
 
         {/* Plans Section */}
         <motion.div
-          className="flex items-center justify-center cursor-pointer transition-all"
+          className="h-full flex items-center justify-center cursor-pointer"
           animate={{
             width: isPlansActive ? "100%" : isLoginActive ? "0%" : "50%",
             opacity: isLoginActive ? 0 : 1,
