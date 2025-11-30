@@ -751,6 +751,21 @@ export default function AdminClienteForm() {
                   )}
                 </div>
 
+                {/* Alerta para cliente sem conta de acesso */}
+                {id && !hasExistingAuthUser && (
+                  <div className="col-span-full p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <UserPlus className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-medium text-amber-600">Cliente sem conta de acesso</p>
+                        <p className="text-sm text-muted-foreground">
+                          Este cliente ainda não possui login no sistema. Defina uma senha abaixo para criar a conta de acesso.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Campo de senha - apenas para novos clientes ou se não tem auth user */}
                 {(!id || !hasExistingAuthUser) && (
                   <div className="space-y-2">

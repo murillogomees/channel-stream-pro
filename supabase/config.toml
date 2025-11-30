@@ -102,6 +102,10 @@ verify_jwt = true
 [functions.update-user-password]
 verify_jwt = true
 
+# Admin-only function for batch creating client auth accounts
+[functions.create-client-auth-batch]
+verify_jwt = true
+
 # Backup clients cron job
 [functions.backup-clients]
 verify_jwt = false
