@@ -163,3 +163,19 @@ verify_jwt = false
 # Transcode webhook - receives Cloudflare callbacks
 [functions.transcode-webhook]
 verify_jwt = false
+
+# ==========================================
+# R2 CDN INFRASTRUCTURE
+# ==========================================
+
+# CDN Token generation and verification
+[functions.cdn-token]
+verify_jwt = false
+
+# CDN Prewarm - nightly edge cache warming
+[functions.cdn-prewarm]
+verify_jwt = false
+
+# R2 Upload - content upload to R2
+[functions.r2-upload]
+verify_jwt = false

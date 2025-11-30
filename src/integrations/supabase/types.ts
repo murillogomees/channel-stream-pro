@@ -345,6 +345,224 @@ export type Database = {
         }
         Relationships: []
       }
+      cdn_prewarm_jobs: {
+        Row: {
+          avg_prewarm_time_ms: number | null
+          completed_at: string | null
+          created_at: string | null
+          error_log: Json | null
+          failed_assets: number | null
+          id: string
+          job_type: string
+          metadata: Json | null
+          prewarmed_assets: number | null
+          scheduled_at: string | null
+          segments_per_asset: number | null
+          started_at: string | null
+          status: string
+          target_r2_keys: string[]
+          total_assets: number | null
+          total_bytes_prewarmed: number | null
+        }
+        Insert: {
+          avg_prewarm_time_ms?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_log?: Json | null
+          failed_assets?: number | null
+          id?: string
+          job_type?: string
+          metadata?: Json | null
+          prewarmed_assets?: number | null
+          scheduled_at?: string | null
+          segments_per_asset?: number | null
+          started_at?: string | null
+          status?: string
+          target_r2_keys?: string[]
+          total_assets?: number | null
+          total_bytes_prewarmed?: number | null
+        }
+        Update: {
+          avg_prewarm_time_ms?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_log?: Json | null
+          failed_assets?: number | null
+          id?: string
+          job_type?: string
+          metadata?: Json | null
+          prewarmed_assets?: number | null
+          scheduled_at?: string | null
+          segments_per_asset?: number | null
+          started_at?: string | null
+          status?: string
+          target_r2_keys?: string[]
+          total_assets?: number | null
+          total_bytes_prewarmed?: number | null
+        }
+        Relationships: []
+      }
+      cdn_prewarm_predictions: {
+        Row: {
+          calculated_at: string | null
+          channel_id: string | null
+          id: string
+          ml_score: number | null
+          moving_avg_views: number | null
+          peak_hour: number | null
+          predicted_views: number | null
+          priority_rank: number | null
+          r2_key: string | null
+          valid_until: string | null
+          views_30d: number | null
+          views_7d: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          channel_id?: string | null
+          id?: string
+          ml_score?: number | null
+          moving_avg_views?: number | null
+          peak_hour?: number | null
+          predicted_views?: number | null
+          priority_rank?: number | null
+          r2_key?: string | null
+          valid_until?: string | null
+          views_30d?: number | null
+          views_7d?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          channel_id?: string | null
+          id?: string
+          ml_score?: number | null
+          moving_avg_views?: number | null
+          peak_hour?: number | null
+          predicted_views?: number | null
+          priority_rank?: number | null
+          r2_key?: string | null
+          valid_until?: string | null
+          views_30d?: number | null
+          views_7d?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cdn_prewarm_predictions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cdn_rate_limits: {
+        Row: {
+          bandwidth_bytes: number | null
+          block_reason: string | null
+          blocked_until: string | null
+          id: string
+          identifier_type: string
+          identifier_value: string
+          max_bandwidth_per_window: number | null
+          max_requests_per_window: number | null
+          request_count: number | null
+          window_duration_seconds: number | null
+          window_start: string | null
+        }
+        Insert: {
+          bandwidth_bytes?: number | null
+          block_reason?: string | null
+          blocked_until?: string | null
+          id?: string
+          identifier_type: string
+          identifier_value: string
+          max_bandwidth_per_window?: number | null
+          max_requests_per_window?: number | null
+          request_count?: number | null
+          window_duration_seconds?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          bandwidth_bytes?: number | null
+          block_reason?: string | null
+          blocked_until?: string | null
+          id?: string
+          identifier_type?: string
+          identifier_value?: string
+          max_bandwidth_per_window?: number | null
+          max_requests_per_window?: number | null
+          request_count?: number | null
+          window_duration_seconds?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
+      cdn_signed_tokens: {
+        Row: {
+          channel_id: string | null
+          current_uses: number | null
+          expires_at: string
+          id: string
+          ip_restriction: string | null
+          issued_at: string | null
+          max_uses: number | null
+          metadata: Json | null
+          r2_key: string
+          referrer_restriction: string | null
+          revoked_at: string | null
+          token_hash: string
+          token_type: string
+          user_profile_id: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          current_uses?: number | null
+          expires_at: string
+          id?: string
+          ip_restriction?: string | null
+          issued_at?: string | null
+          max_uses?: number | null
+          metadata?: Json | null
+          r2_key: string
+          referrer_restriction?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          token_type?: string
+          user_profile_id?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          current_uses?: number | null
+          expires_at?: string
+          id?: string
+          ip_restriction?: string | null
+          issued_at?: string | null
+          max_uses?: number | null
+          metadata?: Json | null
+          r2_key?: string
+          referrer_restriction?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          token_type?: string
+          user_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cdn_signed_tokens_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cdn_signed_tokens_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cf_stream_uploads: {
         Row: {
           cf_stream_uid: string | null
@@ -2924,6 +3142,83 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_storage_objects: {
+        Row: {
+          access_count: number | null
+          bandwidth_bytes: number | null
+          cache_control: string | null
+          cdn_url: string | null
+          checksum_md5: string | null
+          content_encoding: string | null
+          content_type: string
+          created_at: string | null
+          error_message: string | null
+          expires_at: string | null
+          id: string
+          last_accessed_at: string | null
+          mime_type: string | null
+          r2_bucket: string
+          r2_key: string
+          size_bytes: number | null
+          source_channel_id: string | null
+          source_url: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_count?: number | null
+          bandwidth_bytes?: number | null
+          cache_control?: string | null
+          cdn_url?: string | null
+          checksum_md5?: string | null
+          content_encoding?: string | null
+          content_type: string
+          created_at?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          mime_type?: string | null
+          r2_bucket?: string
+          r2_key: string
+          size_bytes?: number | null
+          source_channel_id?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_count?: number | null
+          bandwidth_bytes?: number | null
+          cache_control?: string | null
+          cdn_url?: string | null
+          checksum_md5?: string | null
+          content_encoding?: string | null
+          content_type?: string
+          created_at?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          mime_type?: string | null
+          r2_bucket?: string
+          r2_key?: string
+          size_bytes?: number | null
+          source_channel_id?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_storage_objects_source_channel_id_fkey"
+            columns: ["source_channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_tracking: {
         Row: {
           created_at: string
@@ -4493,6 +4788,7 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["quality_ladder_preset"]
       }
+      calculate_prewarm_predictions: { Args: never; Returns: number }
       check_and_block_ip: {
         Args: {
           _event_type: string
@@ -4501,6 +4797,10 @@ export type Database = {
           _window_minutes?: number
         }
         Returns: boolean
+      }
+      check_cdn_rate_limit: {
+        Args: { p_request_size?: number; p_type: string; p_value: string }
+        Returns: Json
       }
       check_host_circuit_breaker: {
         Args: { p_url: string }
@@ -4515,6 +4815,7 @@ export type Database = {
         Args: { _email?: string; _ip_address: string }
         Returns: Json
       }
+      cleanup_cdn_data: { Args: never; Returns: undefined }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_cf_stream_uploads: { Args: never; Returns: undefined }
@@ -4551,6 +4852,15 @@ export type Database = {
           file_size_bytes: number
           r2_url: string
         }[]
+      }
+      generate_r2_key: {
+        Args: {
+          p_content_type: string
+          p_env: string
+          p_extension?: string
+          p_id: string
+        }
+        Returns: string
       }
       get_active_sessions: {
         Args: never
@@ -4619,6 +4929,19 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_cdn_stats: {
+        Args: never
+        Returns: {
+          active_tokens: number
+          pending_objects: number
+          prewarm_jobs_today: number
+          ready_objects: number
+          total_access_count: number
+          total_bandwidth_gb: number
+          total_objects: number
+          total_size_gb: number
+        }[]
+      }
       get_cf_stream_statistics: {
         Args: never
         Returns: {
