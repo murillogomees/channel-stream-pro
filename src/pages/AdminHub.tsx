@@ -152,7 +152,7 @@ export default function AdminHub() {
     { title: 'Planos', icon: CreditCard, href: '/dashboard/plans' },
     { title: 'Homepage', icon: FileText, href: '/dashboard/homepage' },
     { title: 'WhatsApp', icon: MessageSquare, href: '/admin/whatsapp-config' },
-    { title: 'IPTV Test', icon: Tv, href: '/admin/iptv-test' },
+    { title: 'Player', icon: Tv, href: '/app/player' },
   ];
 
   const filteredCategories = categories.filter(
