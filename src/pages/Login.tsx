@@ -21,16 +21,11 @@ import {
   Gamepad2,
   Tablet,
   Chrome,
-  Play,
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  Check,
   Zap,
   Crown,
   Star,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -221,362 +216,237 @@ export default function Login() {
         </motion.header>
 
         {/* Split View Container */}
-        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-4 md:gap-8">
+        <div 
+          className="flex-1 flex flex-col lg:flex-row items-stretch justify-center p-4 gap-4 md:gap-6 max-w-6xl mx-auto w-full"
+          onMouseLeave={() => setViewMode("split")}
+        >
           {/* Login Section */}
-          <AnimatePresence mode="wait">
-            {(viewMode === "split" || viewMode === "login") && (
-              <motion.div
-                key="login-section"
-                className={cn(
-                  "w-full transition-all duration-500",
-                  viewMode === "split" ? "lg:w-1/2 max-w-md" : "max-w-lg",
-                )}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{
-                  opacity: 1,
-                  x: 0,
-                  scale: viewMode === "login" ? 1.02 : 1,
-                }}
-                exit={{ opacity: 0, x: -100, scale: 0.9 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-              >
-                <motion.div
-                  className={cn(
-                    "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
-                    viewMode === "login" && "ring-2 ring-primary/20",
-                  )}
-                  whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
-                  onMouseEnter={() => setViewMode("login")}
-                >
-                  {/* Card Header */}
-                  <div className="p-6 pb-2 flex flex-col items-center">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    >
-                      <img src="/logo.png" alt="IPTV LINK" className="w-28 h-auto object-contain" />
-                    </motion.div>
-                    <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
-                    <p className="text-muted-foreground text-center text-sm mt-2">
-                      Entre com suas credenciais para acessar
-                    </p>
-                  </div>
-
-                  {/* Login Form */}
-                  <div className="p-6 pt-4">
-                    <form onSubmit={handleLogin} className="space-y-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
-                          Email
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="seu@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={isLoading}
-                          className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
-                          Senha
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
-                            className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="remember-me"
-                          checked={rememberMe}
-                          onCheckedChange={(checked) => setRememberMe(checked === true)}
-                        />
-                        <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
-                          Continuar conectado por 30 dias
-                        </Label>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full h-12 rounded-xl text-base font-semibold"
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                            Entrando...
-                          </>
-                        ) : (
-                          <>
-                            <LogIn className="w-5 h-5 mr-2" />
-                            Entrar
-                          </>
-                        )}
-                      </Button>
-                    </form>
-
-                    {/* Switch to Plans */}
-                    {viewMode === "login" && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 pt-4 border-t border-border/50"
-                      >
-                        <Button
-                          variant="ghost"
-                          onClick={() => setViewMode("split")}
-                          className="w-full text-muted-foreground hover:text-foreground"
-                        >
-                          <ArrowLeft className="w-4 h-4 mr-2" />
-                          Ver planos disponíveis
-                        </Button>
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
-              </motion.div>
+          <div
+            className={cn(
+              "transition-all duration-500 ease-out flex items-center justify-center",
+              viewMode === "split" && "lg:w-1/2",
+              viewMode === "login" && "lg:w-full",
+              viewMode === "plans" && "lg:w-0 lg:opacity-0 lg:overflow-hidden",
             )}
-          </AnimatePresence>
-
-          {/* Divider (only in split mode) */}
-          {viewMode === "split" && (
-            <motion.div
-              className="hidden lg:flex flex-col items-center gap-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
+            onMouseEnter={() => setViewMode("login")}
+          >
+            <div
+              className={cn(
+                "w-full max-w-md bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300",
+                viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10",
+              )}
             >
-              <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
-              <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50">ou</span>
-              <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
-            </motion.div>
-          )}
+              {/* Card Header */}
+              <div className="p-6 pb-2 flex flex-col items-center">
+                <img src="/logo.png" alt="IPTV LINK" className="w-28 h-auto object-contain mb-2" />
+                <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
+                <p className="text-muted-foreground text-center text-sm mt-2">
+                  Entre com suas credenciais para acessar
+                </p>
+              </div>
+
+              {/* Login Form */}
+              <div className="p-6 pt-4">
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                      className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+                      Senha
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                        className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="remember-me"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    />
+                    <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
+                      Continuar conectado por 30 dias
+                    </Label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full h-12 rounded-xl text-base font-semibold"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        Entrando...
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-5 h-5 mr-2" />
+                        Entrar
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider (only in split mode on desktop) */}
+          <div
+            className={cn(
+              "hidden lg:flex flex-col items-center justify-center gap-4 transition-all duration-500",
+              viewMode !== "split" && "lg:w-0 lg:opacity-0 lg:overflow-hidden",
+            )}
+          >
+            <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
+            <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50 whitespace-nowrap">ou</span>
+            <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
+          </div>
 
           {/* Plans Section */}
-          <AnimatePresence mode="wait">
-            {(viewMode === "split" || viewMode === "plans") && (
-              <motion.div
-                key="plans-section"
-                className={cn("w-full transition-all duration-500", viewMode === "split" ? "lg:w-5/12" : "max-w-4xl")}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{
-                  opacity: 1,
-                  x: 0,
-                  scale: viewMode === "plans" ? 1.02 : 1,
-                }}
-                exit={{ opacity: 0, x: 100, scale: 0.9 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-              >
-                <motion.div
-                  className={cn(
-                    "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6",
-                    viewMode === "plans" && "ring-2 ring-primary/20",
-                  )}
-                  onMouseEnter={() => setViewMode("plans")}
-                >
-                  {/* Plans Header */}
-                  <div className="text-center mb-6">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                      className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4"
-                    >
-                      <Crown className="w-8 h-8 text-primary" />
-                    </motion.div>
-                    <h2 className="text-2xl font-bold text-foreground">Quero me cadastrar</h2>
-                    <p className="text-muted-foreground text-sm mt-2">
-                      Escolha o plano perfeito e comece a assistir agora!
-                    </p>
-                  </div>
-
-                  {/* Device Icons */}
-                  <motion.div
-                    className="flex flex-wrap justify-center gap-3 mb-6"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    {deviceIcons.map((device, index) => (
-                      <motion.div
-                        key={device.label}
-                        className="flex flex-col items-center gap-1"
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.4 + index * 0.05 }}
-                        whileHover={{ scale: 1.1, y: -2 }}
-                      >
-                        <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
-                          <device.icon className="w-5 h-5 text-primary" />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">{device.label}</span>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-
-                  {/* Plans Grid */}
-                  {plansLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {plans.map((plan, index) => (
-                        <motion.div
-                          key={plan.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2 + index * 0.1 }}
-                          whileHover={{ scale: 1.02, y: -4 }}
-                          onHoverStart={() => setHoveredPlan(plan.id)}
-                          onHoverEnd={() => setHoveredPlan(null)}
-                          onClick={() => handlePlanSelect(plan)}
-                          className={cn(
-                            "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300",
-                            plan.is_highlighted
-                              ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                              : "border-border/50 bg-background/30 hover:border-primary/50",
-                            hoveredPlan === plan.id && "ring-2 ring-primary/20",
-                          )}
-                        >
-                          {/* Highlighted Badge */}
-                          {plan.is_highlighted && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="absolute -top-3 left-1/2 -translate-x-1/2"
-                            >
-                              <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                                <Star className="w-3 h-3" />
-                                MAIS POPULAR
-                              </span>
-                            </motion.div>
-                          )}
-
-                          {/* Savings Badge */}
-                          {plan.savings_percent && plan.savings_percent > 0 && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full"
-                            >
-                              -{plan.savings_percent}%
-                            </motion.div>
-                          )}
-
-                          <div className="text-center">
-                            <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
-                            <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-2xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
-                              <span className="text-xs text-muted-foreground">/{plan.period}</span>
-                            </div>
-
-                            {plan.savings_amount && plan.savings_amount > 0 && (
-                              <p className="text-[10px] text-green-500 mt-1">
-                                Economize {formatPrice(plan.savings_amount)}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Features (show in expanded mode) */}
-                          {viewMode === "plans" && (
-                            <motion.ul
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              className="mt-3 space-y-1"
-                            >
-                              {plan.features.slice(0, 3).map((feature, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                  <Check className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span className="line-clamp-1">{feature}</span>
-                                </li>
-                              ))}
-                            </motion.ul>
-                          )}
-
-                          {/* CTA Button */}
-                          <Button
-                            size="sm"
-                            className={cn(
-                              "w-full mt-3 rounded-lg text-sm",
-                              plan.is_highlighted ? "bg-primary hover:bg-primary/90" : "bg-muted hover:bg-muted/80",
-                            )}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePlanSelect(plan);
-                            }}
-                          >
-                            <Zap className="w-4 h-4 mr-2" />
-                            {plan.cta_text || "Assinar agora"}
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Benefits Banner (expanded mode) */}
-                  {viewMode === "plans" && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                          <Play className="w-6 h-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-bold text-foreground">Liberação imediata!</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Assine agora e comece a assistir em segundos. O player mais rápido do mercado!
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Switch to Login */}
-                  {viewMode === "plans" && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-6 pt-4 border-t border-border/50"
-                    >
-                      <Button
-                        variant="ghost"
-                        onClick={() => setViewMode("split")}
-                        className="w-full text-muted-foreground hover:text-foreground"
-                      >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Já tenho uma conta
-                      </Button>
-                    </motion.div>
-                  )}
-                </motion.div>
-              </motion.div>
+          <div
+            className={cn(
+              "transition-all duration-500 ease-out flex items-center justify-center",
+              viewMode === "split" && "lg:w-1/2",
+              viewMode === "plans" && "lg:w-full",
+              viewMode === "login" && "lg:w-0 lg:opacity-0 lg:overflow-hidden",
             )}
-          </AnimatePresence>
+            onMouseEnter={() => setViewMode("plans")}
+          >
+            <div
+              className={cn(
+                "w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300",
+                viewMode === "plans" && "ring-2 ring-primary/20 shadow-primary/10",
+              )}
+            >
+              {/* Plans Header */}
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground">Quero me cadastrar</h2>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Escolha o plano perfeito e comece a assistir agora!
+                </p>
+              </div>
+
+              {/* Device Icons */}
+              <div className="flex flex-wrap justify-center gap-3 mb-6">
+                {deviceIcons.map((device) => (
+                  <div
+                    key={device.label}
+                    className="flex flex-col items-center gap-1 hover:scale-110 hover:-translate-y-0.5 transition-transform"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                      <device.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{device.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Plans Grid */}
+              {plansLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {plans.map((plan) => (
+                    <div
+                      key={plan.id}
+                      onClick={() => handlePlanSelect(plan)}
+                      onMouseEnter={() => setHoveredPlan(plan.id)}
+                      onMouseLeave={() => setHoveredPlan(null)}
+                      className={cn(
+                        "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1",
+                        plan.is_highlighted
+                          ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                          : "border-border/50 bg-background/30 hover:border-primary/50",
+                        hoveredPlan === plan.id && "ring-2 ring-primary/20",
+                      )}
+                    >
+                      {/* Highlighted Badge */}
+                      {plan.is_highlighted && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            MAIS POPULAR
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Savings Badge */}
+                      {plan.savings_percent && plan.savings_percent > 0 && (
+                        <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          -{plan.savings_percent}%
+                        </div>
+                      )}
+
+                      <div className="text-center">
+                        <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-2xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
+                          <span className="text-xs text-muted-foreground">/{plan.period}</span>
+                        </div>
+
+                        {plan.savings_amount && plan.savings_amount > 0 && (
+                          <p className="text-[10px] text-green-500 mt-1">
+                            Economize {formatPrice(plan.savings_amount)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* CTA Button */}
+                      <Button
+                        size="sm"
+                        className={cn(
+                          "w-full mt-3 rounded-lg text-sm",
+                          plan.is_highlighted ? "bg-primary hover:bg-primary/90" : "bg-muted hover:bg-muted/80",
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlanSelect(plan);
+                        }}
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        {plan.cta_text || "Assinar agora"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
