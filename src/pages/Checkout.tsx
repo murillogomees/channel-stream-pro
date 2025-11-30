@@ -1,62 +1,178 @@
 /**
- * Checkout - Página de pagamento customizada
- * Integração completa com Mercado Pago
+ * Checkout - Página de pagamento com cadastro integrado
+ * Usuário se cadastra e paga na mesma página
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
+import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
 import { mercadoPagoService } from "@/services/mercadoPagoService";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  CreditCard, Shield, Check, ChevronRight, Lock, 
-  Tv, Play, Loader2, AlertCircle, ArrowLeft, Sparkles
+  CreditCard, Shield, Check, Lock, 
+  Tv, Loader2, AlertCircle, ArrowLeft, Sparkles,
+  User, Phone, Mail, MapPin, Percent, Tag
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
+// Opções de origem do cadastro
+const DISCOVERY_OPTIONS = [
+  { value: "google", label: "Google" },
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+  { value: "youtube", label: "YouTube" },
+  { value: "indicacao", label: "Indicação de amigo" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "outro", label: "Outro" },
+];
+
+// Máscara para CPF
+const formatCPF = (value: string) => {
+  const numbers = value.replace(/\D/g, "");
+  return numbers
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+    .slice(0, 14);
+};
+
+// Máscara para telefone
+const formatPhone = (value: string) => {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 10) {
+    return numbers
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d)/, "$1-$2");
+  }
+  return numbers
+    .replace(/(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d)/, "$1-$2")
+    .slice(0, 15);
+};
+
+interface FormData {
+  nome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  origem: string;
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { plans, loading: plansLoading } = useSubscriptionPlans();
   
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(searchParams.get("plan"));
   const [isProcessing, setIsProcessing] = useState(false);
-  const [step, setStep] = useState<"plan" | "payment">("plan");
+  const [formData, setFormData] = useState<FormData>({
+    nome: "",
+    cpf: "",
+    email: "",
+    telefone: "",
+    origem: "",
+  });
+  const [errors, setErrors] = useState<Partial<FormData>>({});
 
-  // Redirect to login if not authenticated
+  // Set default plan (highlighted or first one)
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      toast.error("Faça login para continuar");
-      navigate("/login?redirect=/checkout");
-    }
-  }, [authLoading, isAuthenticated, navigate]);
-
-  // Set default plan if only one exists
-  useEffect(() => {
-    if (plans.length === 1 && !selectedPlanId) {
-      setSelectedPlanId(plans[0].id);
+    if (plans.length > 0 && !selectedPlanId) {
+      const highlighted = plans.find(p => p.is_highlighted && p.is_active);
+      setSelectedPlanId(highlighted?.id || plans.find(p => p.is_active)?.id || null);
     }
   }, [plans, selectedPlanId]);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  
+  // Calcular preço base mensal para referência de desconto
+  const baseMonthlyPrice = useMemo(() => {
+    const monthlyPlan = plans.find(p => p.period_months === 1 && p.is_active);
+    return monthlyPlan?.price || 0;
+  }, [plans]);
+
+  // Calcular economia em relação ao plano mensal
+  const calculateSavings = (plan: SubscriptionPlan) => {
+    if (!baseMonthlyPrice || plan.period_months === 1) return null;
+    
+    const fullPrice = baseMonthlyPrice * plan.period_months;
+    const savings = fullPrice - plan.price;
+    const percent = Math.round((savings / fullPrice) * 100);
+    
+    return {
+      amount: savings,
+      percent,
+      fullPrice,
+    };
+  };
+
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    let formattedValue = value;
+    
+    if (field === "cpf") {
+      formattedValue = formatCPF(value);
+    } else if (field === "telefone") {
+      formattedValue = formatPhone(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    setErrors(prev => ({ ...prev, [field]: undefined }));
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Partial<FormData> = {};
+    
+    if (!formData.nome.trim() || formData.nome.trim().length < 3) {
+      newErrors.nome = "Nome completo é obrigatório";
+    }
+    
+    const cpfNumbers = formData.cpf.replace(/\D/g, "");
+    if (cpfNumbers.length !== 11) {
+      newErrors.cpf = "CPF inválido";
+    }
+    
+    if (!formData.email.includes("@") || !formData.email.includes(".")) {
+      newErrors.email = "Email inválido";
+    }
+    
+    const phoneNumbers = formData.telefone.replace(/\D/g, "");
+    if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
+      newErrors.telefone = "Telefone inválido";
+    }
+    
+    if (!formData.origem) {
+      newErrors.origem = "Selecione como nos conheceu";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleCheckout = async () => {
     if (!selectedPlanId) {
       toast.error("Selecione um plano");
       return;
     }
+    
+    if (!validateForm()) {
+      toast.error("Preencha todos os campos corretamente");
+      return;
+    }
 
     setIsProcessing(true);
     try {
-      const checkout = await mercadoPagoService.createCheckout(selectedPlanId);
+      // Aqui você pode enviar os dados do formulário junto com o checkout
+      // Por enquanto, vamos apenas redirecionar para o Mercado Pago
+      const checkout = await mercadoPagoService.createCheckout(selectedPlanId, {
+        // Pass user data as metadata if needed
+      });
       
       // Redirect to Mercado Pago
       const isDev = window.location.hostname === "localhost" || 
@@ -70,7 +186,7 @@ export default function Checkout() {
     }
   };
 
-  if (authLoading || plansLoading) {
+  if (plansLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -81,7 +197,7 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0f23] via-[#1a1a2e] to-[#16213e]">
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
+      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <button 
             onClick={() => navigate("/")}
@@ -106,186 +222,480 @@ export default function Checkout() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="text-center mb-8">
+      <main className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
+        <motion.div 
+          className="text-center mb-6 md:mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Escolha seu plano
+            Complete seu cadastro
           </h1>
           <p className="text-white/60">
-            Acesso ilimitado a todos os canais, filmes e séries
+            Preencha seus dados e escolha o melhor plano para você
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-5 gap-6">
-          {/* Plans Selection */}
-          <div className="md:col-span-3 space-y-4">
-            <AnimatePresence>
-              {plans.filter(p => p.is_active).map((plan, index) => (
-                <motion.div
-                  key={plan.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Card 
-                    className={`cursor-pointer transition-all duration-300 bg-white/5 border-white/10 hover:bg-white/10 ${
-                      selectedPlanId === plan.id 
-                        ? 'ring-2 ring-primary border-primary bg-primary/10' 
-                        : ''
-                    }`}
-                    onClick={() => setSelectedPlanId(plan.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                          <div className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                            selectedPlanId === plan.id 
-                              ? 'border-primary bg-primary' 
-                              : 'border-white/30'
-                          }`}>
-                            {selectedPlanId === plan.id && (
-                              <Check className="h-3 w-3 text-white" />
-                            )}
-                          </div>
-                          
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-white">{plan.name}</h3>
-                              {plan.is_highlighted && (
-                                <Badge className="bg-primary/20 text-primary border-primary/30">
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  Popular
-                                </Badge>
-                              )}
-                            </div>
-                            {plan.savings_percent && (
-                              <p className="text-sm text-green-400 mt-1">Economia de {plan.savings_percent}%</p>
-                            )}
-                            
-                            {plan.features && plan.features.length > 0 && (
-                              <ul className="mt-3 space-y-1">
-                                {plan.features.slice(0, 4).map((feature, i) => (
-                                  <li key={i} className="flex items-center gap-2 text-sm text-white/70">
-                                    <Check className="h-3 w-3 text-green-400" />
-                                    {feature}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-white">
-                            R$ {plan.price.toFixed(2).replace(".", ",")}
-                          </div>
-                          <div className="text-xs text-white/50">
-                            /{plan.period}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-
-            {plans.length === 0 && (
-              <Card className="bg-white/5 border-white/10">
-                <CardContent className="p-8 text-center">
-                  <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                  <p className="text-white/60">Nenhum plano disponível no momento</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Order Summary */}
-          <div className="md:col-span-2">
-            <Card className="sticky top-4 bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">Resumo do Pedido</CardTitle>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Registration Form */}
+          <motion.div 
+            className="lg:col-span-2 space-y-6"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            {/* User Data Card */}
+            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <User className="h-5 w-5 text-primary" />
+                  Dados Pessoais
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {selectedPlan ? (
-                  <>
-                    <div className="flex justify-between text-white/80">
-                      <span>{selectedPlan.name}</span>
-                      <span>R$ {selectedPlan.price.toFixed(2).replace(".", ",")}</span>
-                    </div>
-                    
-                    <Separator className="bg-white/10" />
-                    
-                    <div className="flex justify-between text-lg font-bold text-white">
-                      <span>Total</span>
-                      <span>R$ {selectedPlan.price.toFixed(2).replace(".", ",")}</span>
-                    </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Nome */}
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="nome" className="text-white/80">Nome Completo *</Label>
+                    <Input
+                      id="nome"
+                      placeholder="Seu nome completo"
+                      value={formData.nome}
+                      onChange={(e) => handleInputChange("nome", e.target.value)}
+                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                        errors.nome ? 'border-red-500' : ''
+                      }`}
+                    />
+                    {errors.nome && (
+                      <p className="text-red-400 text-sm mt-1">{errors.nome}</p>
+                    )}
+                  </div>
 
-                    <Button 
-                      className="w-full mt-4" 
-                      size="lg"
-                      onClick={handleCheckout}
-                      disabled={isProcessing}
+                  {/* CPF */}
+                  <div>
+                    <Label htmlFor="cpf" className="text-white/80">CPF *</Label>
+                    <Input
+                      id="cpf"
+                      placeholder="000.000.000-00"
+                      value={formData.cpf}
+                      onChange={(e) => handleInputChange("cpf", e.target.value)}
+                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                        errors.cpf ? 'border-red-500' : ''
+                      }`}
+                    />
+                    {errors.cpf && (
+                      <p className="text-red-400 text-sm mt-1">{errors.cpf}</p>
+                    )}
+                  </div>
+
+                  {/* Telefone */}
+                  <div>
+                    <Label htmlFor="telefone" className="text-white/80">
+                      WhatsApp *
+                      <Phone className="h-3.5 w-3.5 inline ml-1 text-green-400" />
+                    </Label>
+                    <Input
+                      id="telefone"
+                      placeholder="(00) 00000-0000"
+                      value={formData.telefone}
+                      onChange={(e) => handleInputChange("telefone", e.target.value)}
+                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                        errors.telefone ? 'border-red-500' : ''
+                      }`}
+                    />
+                    {errors.telefone && (
+                      <p className="text-red-400 text-sm mt-1">{errors.telefone}</p>
+                    )}
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <Label htmlFor="email" className="text-white/80">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
+                      className={`mt-1.5 bg-white/5 border-white/20 text-white placeholder:text-white/40 ${
+                        errors.email ? 'border-red-500' : ''
+                      }`}
+                    />
+                    {errors.email && (
+                      <p className="text-red-400 text-sm mt-1">{errors.email}</p>
+                    )}
+                  </div>
+
+                  {/* Origem */}
+                  <div>
+                    <Label htmlFor="origem" className="text-white/80">Como nos conheceu? *</Label>
+                    <Select 
+                      value={formData.origem} 
+                      onValueChange={(value) => handleInputChange("origem", value)}
                     >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Processando...
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="h-5 w-5 mr-2" />
-                          Pagar com Mercado Pago
-                        </>
-                      )}
-                    </Button>
+                      <SelectTrigger 
+                        className={`mt-1.5 bg-white/5 border-white/20 text-white ${
+                          errors.origem ? 'border-red-500' : ''
+                        }`}
+                      >
+                        <SelectValue placeholder="Selecione uma opção" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DISCOVERY_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.origem && (
+                      <p className="text-red-400 text-sm mt-1">{errors.origem}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                    {/* Security Info */}
-                    <div className="mt-6 space-y-3">
-                      <div className="flex items-center gap-2 text-white/60 text-sm">
-                        <Shield className="h-4 w-4 text-green-400" />
-                        <span>Pagamento 100% seguro</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-white/60 text-sm">
-                        <Check className="h-4 w-4 text-green-400" />
-                        <span>Acesso imediato após confirmação</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-white/60 text-sm">
-                        <CreditCard className="h-4 w-4 text-green-400" />
-                        <span>Cartão, Pix ou Boleto</span>
-                      </div>
-                    </div>
+            {/* Plans Selection Card */}
+            <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-primary" />
+                  Escolha seu Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <AnimatePresence mode="popLayout">
+                    {plans.filter(p => p.is_active).map((plan, index) => {
+                      const savings = calculateSavings(plan);
+                      const isSelected = selectedPlanId === plan.id;
+                      
+                      return (
+                        <motion.div
+                          key={plan.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ 
+                            opacity: 1, 
+                            scale: 1,
+                            y: isSelected ? -4 : 0,
+                          }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ 
+                            type: "spring", 
+                            stiffness: 400, 
+                            damping: 30,
+                            delay: index * 0.05 
+                          }}
+                          onClick={() => setSelectedPlanId(plan.id)}
+                          className={`relative cursor-pointer rounded-xl p-4 transition-all duration-300 ${
+                            isSelected 
+                              ? 'bg-primary/20 ring-2 ring-primary shadow-lg shadow-primary/20' 
+                              : 'bg-white/5 hover:bg-white/10 border border-white/10'
+                          }`}
+                        >
+                          {/* Popular Badge */}
+                          {plan.is_highlighted && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="absolute -top-2.5 left-4"
+                            >
+                              <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white border-0 shadow-lg">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Mais Popular
+                              </Badge>
+                            </motion.div>
+                          )}
 
-                    {/* Payment Methods */}
-                    <div className="mt-4 pt-4 border-t border-white/10">
-                      <p className="text-xs text-white/40 text-center mb-2">Formas de pagamento</p>
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                          <span className="text-xs text-white/60">PIX</span>
-                        </div>
-                        <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                          <CreditCard className="h-4 w-4 text-white/60" />
-                        </div>
-                        <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
-                          <span className="text-[10px] text-white/60">Boleto</span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              {/* Radio indicator */}
+                              <motion.div 
+                                className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                                  isSelected 
+                                    ? 'border-primary bg-primary' 
+                                    : 'border-white/30'
+                                }`}
+                                animate={{ scale: isSelected ? 1.1 : 1 }}
+                              >
+                                <AnimatePresence>
+                                  {isSelected && (
+                                    <motion.div
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                      exit={{ scale: 0 }}
+                                    >
+                                      <Check className="h-3 w-3 text-white" />
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </motion.div>
+                              
+                              <div>
+                                <h3 className="font-semibold text-white">{plan.name}</h3>
+                                <p className="text-sm text-white/60">
+                                  {plan.period_months} {plan.period_months === 1 ? 'mês' : 'meses'} de acesso
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              {/* Preço cheio riscado */}
+                              {savings && (
+                                <motion.p 
+                                  className="text-sm text-white/40 line-through"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                >
+                                  R$ {savings.fullPrice.toFixed(2).replace(".", ",")}
+                                </motion.p>
+                              )}
+                              
+                              {/* Preço atual */}
+                              <motion.div 
+                                className="text-2xl font-bold text-white"
+                                animate={{ scale: isSelected ? 1.05 : 1 }}
+                              >
+                                R$ {plan.price.toFixed(2).replace(".", ",")}
+                              </motion.div>
+                              
+                              {/* Preço por mês */}
+                              {plan.period_months > 1 && (
+                                <p className="text-xs text-white/50">
+                                  R$ {(plan.price / plan.period_months).toFixed(2).replace(".", ",")}/mês
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Savings Banner */}
+                          <AnimatePresence>
+                            {savings && savings.percent > 0 && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-3 pt-3 border-t border-white/10"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Percent className="h-4 w-4 text-green-400" />
+                                    <span className="text-sm text-green-400 font-medium">
+                                      Economia de {savings.percent}%
+                                    </span>
+                                  </div>
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
+                                    - R$ {savings.amount.toFixed(2).replace(".", ",")}
+                                  </Badge>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Features preview */}
+                          <AnimatePresence>
+                            {isSelected && plan.features && plan.features.length > 0 && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-3 pt-3 border-t border-white/10"
+                              >
+                                <div className="grid grid-cols-2 gap-2">
+                                  {plan.features.slice(0, 4).map((feature, i) => (
+                                    <motion.div
+                                      key={i}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: i * 0.05 }}
+                                      className="flex items-center gap-2 text-sm text-white/70"
+                                    >
+                                      <Check className="h-3 w-3 text-green-400 flex-shrink-0" />
+                                      <span className="truncate">{feature}</span>
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+
+                {plans.length === 0 && (
                   <div className="text-center py-8">
-                    <CreditCard className="h-12 w-12 text-white/20 mx-auto mb-3" />
-                    <p className="text-white/40">Selecione um plano</p>
+                    <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                    <p className="text-white/60">Nenhum plano disponível no momento</p>
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
+          </motion.div>
+
+          {/* Order Summary - Sticky */}
+          <motion.div 
+            className="lg:col-span-1"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="sticky top-24 bg-white/5 border-white/10 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Resumo do Pedido
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <AnimatePresence mode="wait">
+                  {selectedPlan ? (
+                    <motion.div
+                      key={selectedPlan.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="space-y-4"
+                    >
+                      {/* Plan Info */}
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-white">{selectedPlan.name}</p>
+                            <p className="text-sm text-white/60">{selectedPlan.period}</p>
+                          </div>
+                          <motion.p 
+                            className="text-lg font-bold text-white"
+                            key={selectedPlan.price}
+                            initial={{ scale: 1.2, color: "#22c55e" }}
+                            animate={{ scale: 1, color: "#ffffff" }}
+                          >
+                            R$ {selectedPlan.price.toFixed(2).replace(".", ",")}
+                          </motion.p>
+                        </div>
+                      </div>
+
+                      {/* Discount info */}
+                      {(() => {
+                        const savings = calculateSavings(selectedPlan);
+                        if (savings && savings.percent > 0) {
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="p-3 rounded-lg bg-green-500/10 border border-green-500/20"
+                            >
+                              <div className="flex items-center gap-2 text-green-400">
+                                <Percent className="h-4 w-4" />
+                                <span className="font-medium">Você está economizando:</span>
+                              </div>
+                              <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl font-bold text-green-400">
+                                  {savings.percent}%
+                                </span>
+                                <span className="text-green-400/70">
+                                  (R$ {savings.amount.toFixed(2).replace(".", ",")})
+                                </span>
+                              </div>
+                            </motion.div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
+                      <Separator className="bg-white/10" />
+                      
+                      {/* Total */}
+                      <div className="flex justify-between text-lg font-bold text-white">
+                        <span>Total</span>
+                        <motion.span
+                          key={selectedPlan.price}
+                          initial={{ scale: 1.1 }}
+                          animate={{ scale: 1 }}
+                        >
+                          R$ {selectedPlan.price.toFixed(2).replace(".", ",")}
+                        </motion.span>
+                      </div>
+
+                      {/* Checkout Button */}
+                      <Button 
+                        className="w-full h-12 text-base font-semibold" 
+                        size="lg"
+                        onClick={handleCheckout}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-5 w-5 mr-2" />
+                            Finalizar Pagamento
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Security Info */}
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center gap-2 text-white/60 text-sm">
+                          <Shield className="h-4 w-4 text-green-400" />
+                          <span>Pagamento 100% seguro</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-white/60 text-sm">
+                          <Check className="h-4 w-4 text-green-400" />
+                          <span>Acesso imediato após confirmação</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-white/60 text-sm">
+                          <CreditCard className="h-4 w-4 text-green-400" />
+                          <span>Cartão, Pix ou Boleto</span>
+                        </div>
+                      </div>
+
+                      {/* Payment Methods */}
+                      <div className="pt-4 border-t border-white/10">
+                        <p className="text-xs text-white/40 text-center mb-2">Formas de pagamento</p>
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
+                            <span className="text-xs text-white/60">PIX</span>
+                          </div>
+                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
+                            <CreditCard className="h-4 w-4 text-white/60" />
+                          </div>
+                          <div className="h-8 w-12 bg-white/10 rounded flex items-center justify-center">
+                            <span className="text-[10px] text-white/60">Boleto</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      className="text-center py-8"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <CreditCard className="h-12 w-12 text-white/20 mx-auto mb-3" />
+                      <p className="text-white/40">Selecione um plano</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
         {/* Trust Badges */}
-        <div className="mt-12 text-center">
-          <div className="inline-flex items-center gap-6 text-white/40 text-sm">
+        <motion.div 
+          className="mt-8 md:mt-12 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="inline-flex flex-wrap items-center justify-center gap-4 md:gap-6 text-white/40 text-sm">
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
               <span>SSL Seguro</span>
@@ -299,7 +709,7 @@ export default function Checkout() {
               <span>Satisfação Garantida</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       </main>
     </div>
   );

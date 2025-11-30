@@ -172,7 +172,7 @@ export default function Login() {
   };
 
   const handlePlanSelect = (plan: SubscriptionPlan) => {
-    navigate(`/checkout?plan=${plan.slug}`);
+    navigate(`/checkout?plan=${plan.id}`);
   };
 
   const formatPrice = (price: number) => {
