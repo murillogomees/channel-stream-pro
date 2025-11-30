@@ -191,14 +191,10 @@ export default function Login() {
 
   // Login Card Component
   const LoginCard = () => (
-    <motion.div
+    <div
       className={cn(
         "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4"
       )}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
     >
       {/* Card Header */}
       <div className="text-center mb-6">
@@ -288,26 +284,21 @@ export default function Login() {
           </Button>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 
   // Plans Card Component - Expanded when locked on desktop
   const isExpanded = !isMobile && lockedSide === "plans";
   
   const PlansCard = () => (
-    <motion.div
+    <div
       className={cn(
         "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
-        "mx-2 sm:mx-4 transition-all duration-500",
+        "mx-2 sm:mx-4",
         isExpanded 
           ? "p-8 sm:p-10 lg:p-12 w-[95vw] max-w-[1400px]" 
           : "p-4 sm:p-5 w-full max-w-[320px] sm:max-w-md"
       )}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      layout
     >
       {/* Plans Header */}
       <div className={cn(
@@ -353,9 +344,8 @@ export default function Login() {
             : "grid-cols-2"
         )}>
           {plans.map(plan => (
-            <motion.div
+            <div
               key={plan.id}
-              layout
               onClick={(e) => {
                 e.stopPropagation();
                 handlePlanSelect(plan);
@@ -445,12 +435,7 @@ export default function Login() {
 
                 {/* Features - Only show when expanded */}
                 {isExpanded && plan.features && plan.features.length > 0 && (
-                  <motion.div 
-                    className="mt-6 pt-6 border-t border-border/30 flex-1"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                  >
+                  <div className="mt-6 pt-6 border-t border-border/30 flex-1">
                     <ul className="space-y-3 text-left">
                       {plan.features.map((feature, i) => (
                         <li key={i} className="flex items-start gap-3 text-base text-foreground/80">
@@ -459,7 +444,7 @@ export default function Login() {
                         </li>
                       ))}
                     </ul>
-                  </motion.div>
+                  </div>
                 )}
               </div>
 
@@ -484,7 +469,7 @@ export default function Login() {
                 )} />
                 {plan.cta_text || "Assinar Agora"}
               </Button>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -508,7 +493,7 @@ export default function Login() {
           </Button>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 
   return (
@@ -548,56 +533,37 @@ export default function Login() {
             )}
           </AnimatePresence>
         ) : (
-          /* Desktop/TV: Show only active card, hide the other */
+          /* Desktop/TV: Show only active card */
           <div className="relative w-full h-full flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              {activeSide === "login" || !activeSide ? (
-                <motion.div
-                  key="login-card"
-                  className="absolute"
-                  initial={{ opacity: 0, scale: 0.9, x: activeSide ? 0 : "-15vw" }}
-                  animate={{ 
-                    opacity: 1, 
-                    scale: activeSide === "login" ? 1 : 0.95,
-                    x: activeSide === "login" ? 0 : "-15vw"
-                  }}
-                  exit={{ opacity: 0, scale: 0.9, x: "-30vw" }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  onClick={(e) => e.stopPropagation()}
+            {lockedSide ? (
+              /* When locked, show only the locked card without animations */
+              lockedSide === "login" ? <LoginCard /> : <PlansCard />
+            ) : (
+              /* When not locked, show both cards with hover positioning */
+              <>
+                <div
+                  className={cn(
+                    "absolute transition-all duration-300",
+                    hoveredSide === "login" ? "opacity-100 scale-100" : "opacity-70 scale-95 -translate-x-[15vw]"
+                  )}
                 >
                   <LoginCard />
-                </motion.div>
-              ) : null}
-
-              {activeSide === "plans" || !activeSide ? (
-                <motion.div
-                  key="plans-card"
-                  className="absolute"
-                  initial={{ opacity: 0, scale: 0.9, x: activeSide ? 0 : "15vw" }}
-                  animate={{ 
-                    opacity: 1, 
-                    scale: activeSide === "plans" ? 1 : 0.95,
-                    x: activeSide === "plans" ? 0 : "15vw"
-                  }}
-                  exit={{ opacity: 0, scale: 0.9, x: "30vw" }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  onClick={(e) => e.stopPropagation()}
+                </div>
+                <div
+                  className={cn(
+                    "absolute transition-all duration-300",
+                    hoveredSide === "plans" ? "opacity-100 scale-100" : "opacity-70 scale-95 translate-x-[15vw]"
+                  )}
                 >
                   <PlansCard />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            {/* Hint text when not active */}
-            {!activeSide && (
-              <motion.p
-                className="absolute bottom-32 text-muted-foreground text-sm"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.7 }}
-                transition={{ delay: 1 }}
-              >
-                Mova o mouse ou clique para selecionar
-              </motion.p>
+                </div>
+                {/* Hint text when not active */}
+                {!hoveredSide && (
+                  <p className="absolute bottom-32 text-muted-foreground text-sm opacity-70">
+                    Mova o mouse ou clique para selecionar
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
