@@ -191,32 +191,34 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Header with Logo */}
-        <motion.header className="p-4 md:p-6 flex justify-center" initial={{
-        opacity: 0,
-        y: -20
-      }} animate={{
-        opacity: 1,
-        y: 0
+        <motion.div  classNaem="flex -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-ful" initial=C{{
+        scale: [1.2, 1, 1.2],
+        opacity: [0.2, 0.4, 0.2]
       }} transition={{
-        duration: 0.5
+        duration: 10,
+        repeat: Infinity
+      }} />
+      }} transition={{
+        duration: 60,
+        repeat: Infinity,
+        ease: "linear"
       }}>
           
-        </motion.header>
+        </motion.div>
 
         {/* Split View Container */}
         <div className="flex-1 flex flex-col lg:flex-row items-stretch w-full" onMouseLeave={() => setViewMode("split")}>
           {/* Login Section */}
           <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "login" && "lg:w-full", viewMode === "plans" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("login")}>
-            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10")}>
+            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10")} onMouseEnter={() => setViewMode("login")}> 
               {/* Card Header */}
               <div className="text-center mb-6">
-                <img src="/logo.png" alt="IPTV LINK" className="w-28 h-auto object-contain mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
-                <p className="text-muted-foreground text-sm mt-2">
-                  Entre com suas credenciais para acessar
-                </p>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary" />
+                </div>
+               <h2 className="text-2xl font-bold text-foreground">Já sou cliente!</h2>
               </div>
 
               {/* Login Form */}
@@ -264,8 +266,8 @@ export default function Login() {
 
 
           {/* Plans Section */}
-          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "plans" && "lg:w-full", viewMode === "login" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("plans")}>
-            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "plans" && "ring-2 ring-primary/20 shadow-primary/10")}>
+          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "plans" && "lg:w-full", viewMode === "plan" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("plan")}>
+            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "plans" && "ring-2 ring-primary/20 shadow-primary/10")} onMouseEnter={() => setViewMode("plan")}> 
               {/* Plans Header */}
               <div className="text-center mb-6">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
