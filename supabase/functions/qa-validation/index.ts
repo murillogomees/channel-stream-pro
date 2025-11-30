@@ -255,22 +255,38 @@ serve(async (req) => {
           .order('completed_at', { ascending: false })
           .limit(5);
         
-        const avgHitRate = jobs?.reduce((sum, j) => {
-          const rate = j.prewarmed_assets / (j.total_assets || 1);
-          return sum + rate;
-        }, 0) / (jobs?.length || 1);
-        
-        results.push({
-          test: 'cache_performance',
-          status: avgHitRate > 0.7 ? 'pass' : avgHitRate > 0.5 ? 'warn' : 'fail',
-          duration_ms: Date.now() - cacheStart,
-          details: {
-            prewarm_predictions: predictions?.length || 0,
-            completed_jobs: jobs?.length || 0,
-            estimated_hit_rate: (avgHitRate * 100).toFixed(1) + '%',
-            target_hit_rate: '70%',
-          },
-        });
+        // Handle no data case - show as skip instead of fail
+        if (!jobs || jobs.length === 0) {
+          results.push({
+            test: 'cache_performance',
+            status: 'skip',
+            duration_ms: Date.now() - cacheStart,
+            details: {
+              prewarm_predictions: predictions?.length || 0,
+              completed_jobs: 0,
+              estimated_hit_rate: 'N/A',
+              target_hit_rate: '70%',
+              note: 'Nenhum job de prewarm concluído ainda',
+            },
+          });
+        } else {
+          const avgHitRate = jobs.reduce((sum, j) => {
+            const rate = j.prewarmed_assets / (j.total_assets || 1);
+            return sum + rate;
+          }, 0) / jobs.length;
+          
+          results.push({
+            test: 'cache_performance',
+            status: avgHitRate > 0.7 ? 'pass' : avgHitRate > 0.5 ? 'warn' : 'fail',
+            duration_ms: Date.now() - cacheStart,
+            details: {
+              prewarm_predictions: predictions?.length || 0,
+              completed_jobs: jobs.length,
+              estimated_hit_rate: (avgHitRate * 100).toFixed(1) + '%',
+              target_hit_rate: '70%',
+            },
+          });
+        }
       } catch (error) {
         results.push({
           test: 'cache_performance',
