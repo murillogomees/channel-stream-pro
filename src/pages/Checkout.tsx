@@ -551,7 +551,9 @@ export default function Checkout() {
                               </motion.div>
                               
                               <div>
-                              <h3 className="font-bold text-white text-lg">{plan.name}</h3>
+                                <h3 className="font-bold text-xl bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">
+                                  {plan.name}
+                                </h3>
                                 <p className="text-sm text-white/80">
                                   {plan.period_months} {plan.period_months === 1 ? 'mês' : 'meses'} de acesso
                                 </p>
