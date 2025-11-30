@@ -207,3 +207,15 @@ verify_jwt = false
 # Player events analytics
 [functions.player-events]
 verify_jwt = false
+
+# ==========================================
+# QA, PERFORMANCE & SECURITY (Phase 7)
+# ==========================================
+
+# QA Validation - comprehensive system checks
+[functions.qa-validation]
+verify_jwt = false
+
+# Security Audit - pentest and security analysis
+[functions.security-audit]
+verify_jwt = false

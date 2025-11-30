@@ -43,6 +43,7 @@ const AdminSmartCache = lazy(() => import("./pages/AdminSmartCache"));
 const AdminTranscodeQueue = lazy(() => import("./pages/AdminTranscodeQueue"));
 const AdminCdn = lazy(() => import("./pages/AdminCdn"));
 const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
+const AdminQADashboard = lazy(() => import("./pages/AdminQADashboard"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
@@ -150,6 +151,7 @@ const App = () => (
           <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
           <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
           <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
+          <Route path="/admin/qa" element={<ProtectedRoute requireAdmin><AdminQADashboard /></ProtectedRoute>} />
           
           {/* Admin Hub - Novo dashboard consolidado */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminHub /></ProtectedRoute>} />
