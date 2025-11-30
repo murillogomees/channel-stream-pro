@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2025-11-30T00:00:00Z",
+  "project": "IPTVLINK",
+  "files": {
+    "frontend": {
+      "total": 250,
+      "components": 85,
+      "pages": 42,
+      "hooks": 28,
+      "services": 45,
+      "types": 15
+    },
+    "backend": {
+      "edge_functions": 12,
+      "migrations": 35,
+      "workers": 4
+    }
+  },
+  "database": {
+    "tables": 48,
+    "views": 2,
+    "functions": 35,
+    "triggers": 12,
+    "policies": 95
+  },
+  "infrastructure": {
+    "supabase_project": "sdvyxdghxqmntyoweqbd",
+    "cdn": "cloudflare",
+    "storage": "r2",
+    "monitoring": ["sentry", "web_vitals"]
+  },
+  "deprecated_modules": [
+    {"path": "deprecated/unused/outbox.js", "reason": "Replaced by IndexedDB utils", "removal_date": "2025-12-29"},
+    {"path": "src/types/cliente.ts#Cliente", "reason": "Use ClienteDb", "removal_date": "2026-01-15"}
+  ],
+  "feature_flags": [
+    {"name": "use_cliente_db_only", "status": "migration", "percentage": 0},
+    {"name": "disable_legacy_routes", "status": "migration", "percentage": 0},
+    {"name": "consolidated_whatsapp", "status": "complete", "percentage": 100},
+    {"name": "new_notification_system", "status": "complete", "percentage": 100}
+  ],
+  "critical_flows": [
+    "ingest → transcode → R2 → CDN → Player",
+    "login → JWT → API → RLS",
+    "payment → webhook → subscription"
+  ]
+}
