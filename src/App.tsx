@@ -1,6 +1,6 @@
 /**
  * Main App Component
- * @version 2.1.0
+ * @version 3.0.0 - Consolidated Admin Routes
  */
 import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,32 +18,19 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Forbidden = lazy(() => import("./pages/Forbidden"));
 const Login = lazy(() => import("./pages/Login"));
 
-// Admin Hub (novo dashboard consolidado)
-const AdminHub = lazy(() => import("./pages/AdminHub"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const AdminClientes = lazy(() => import("./pages/AdminClientes"));
-const AdminClienteForm = lazy(() => import("./pages/AdminClienteForm"));
-const AdminClientM3U = lazy(() => import("./pages/AdminClientM3U"));
+// ========================================
+// ADMIN PAGES - Consolidated Hub Structure
+// ========================================
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
+const AdminClientesPage = lazy(() => import("./pages/admin/AdminClientesPage"));
+const AdminM3UPage = lazy(() => import("./pages/admin/AdminM3UPage"));
+const AdminNotificacoesPage = lazy(() => import("./pages/admin/AdminNotificacoesPage"));
+const AdminSegurancaPage = lazy(() => import("./pages/admin/AdminSegurancaPage"));
+const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
+const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
+const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
+const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
-
-// Consolidated admin pages (hub pages com tabs)
-const AdminM3UManagement = lazy(() => import("./pages/AdminM3UManagement"));
-const AdminNotifications = lazy(() => import("./pages/AdminNotifications"));
-const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
-const AdminAnalyticsHub = lazy(() => import("./pages/AdminAnalyticsHub"));
-const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
-const AdminIntegrations = lazy(() => import("./pages/AdminIntegrations"));
-const AdminUsersPermissions = lazy(() => import("./pages/AdminUsersPermissions"));
-const AdminCreateUser = lazy(() => import("./pages/AdminCreateUser"));
-const AdminWhatsAppConfig = lazy(() => import("./pages/AdminWhatsAppConfig"));
-const AdminPlansManager = lazy(() => import("./pages/AdminPlansManager"));
-const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
-const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
-const AdminSmartCache = lazy(() => import("./pages/AdminSmartCache"));
-const AdminTranscodeQueue = lazy(() => import("./pages/AdminTranscodeQueue"));
-const AdminCdn = lazy(() => import("./pages/AdminCdn"));
-const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
-const AdminQADashboard = lazy(() => import("./pages/AdminQADashboard"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
@@ -87,115 +74,153 @@ const App = () => (
           </div>
         }>
           <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/tutorial" element={<TutorialSmartOne />} />
-          <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/install" element={<Navigate to="/app/install" replace />} />
-          
-          {/* Checkout pages */}
-          <Route path="/checkout/success" element={<CheckoutSuccess />} />
-          <Route path="/checkout/failure" element={<CheckoutFailure />} />
-          <Route path="/checkout/pending" element={<CheckoutPending />} />
-          
-          {/* Legacy routes - redirect to unified profile */}
-          <Route path="/conta" element={<Navigate to="/app/profile" replace />} />
-          <Route path="/cliente/account" element={<Navigate to="/app/profile" replace />} />
-          
-          {/* ========================================
-              IPTV App Routes - Standalone Mobile/TV App
-              These are the ONLY pages in the native app:
-              - /app = Entry point with splash
-              - /app/login = Client login
-              - /app/player = IPTV Player (unified home + content)
-              - /app/profile = Client profile/settings
-              ======================================== */}
-          <Route path="/app" element={<AppEntry />} />
-          <Route path="/app/install" element={<AppInstall />} />
-          <Route path="/app/login" element={<Navigate to="/login" replace />} />
-          <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
-          <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
-          <Route path="/app/mylist" element={<ProtectedRoute><MyList /></ProtectedRoute>} />
-          {/* Legacy app routes - redirect to unified pages */}
-          <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
-          <Route path="/app/favorites" element={<Navigate to="/app/mylist" replace />} />
-          <Route path="/app/account" element={<Navigate to="/app/profile" replace />} />
-          <Route path="/tv-player" element={<TVPlayer />} />
-          <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
-          <Route path="/admin/smart-cache" element={<ProtectedRoute requireAdmin><AdminSmartCache /></ProtectedRoute>} />
-          <Route path="/admin/transcode-queue" element={<ProtectedRoute requireAdmin><AdminTranscodeQueue /></ProtectedRoute>} />
-          
-          <Route path="/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/dashboard" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/admin/clientes" element={<ProtectedRoute requireAdmin><AdminClientes /></ProtectedRoute>} />
-          <Route path="/admin/clientes/novo" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
-          <Route path="/admin/clientes/editar/:id" element={<ProtectedRoute requireAdmin><AdminClienteForm /></ProtectedRoute>} />
-          <Route path="/admin/clientes/:id/m3u" element={<ProtectedRoute requireAdmin><AdminClientM3U /></ProtectedRoute>} />
-          <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
-          
-          {/* Consolidated Admin Pages */}
-          <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UManagement /></ProtectedRoute>} />
-          <Route path="/admin/m3u-builder" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-import-history" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-sync" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/notifications" element={<ProtectedRoute requireAdmin><AdminNotifications /></ProtectedRoute>} />
-          <Route path="/admin/notification-queue" element={<Navigate to="/admin/notifications" replace />} />
-          <Route path="/admin/security" element={<ProtectedRoute requireAdmin><AdminSecurity /></ProtectedRoute>} />
-          <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsHub /></ProtectedRoute>} />
-          <Route path="/admin/system" element={<ProtectedRoute requireAdmin><AdminSystemSettings /></ProtectedRoute>} />
-          <Route path="/admin/integrations" element={<ProtectedRoute requireAdmin><AdminIntegrations /></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPermissions /></ProtectedRoute>} />
-          <Route path="/admin/create-user" element={<ProtectedRoute requireSuperAdmin><AdminCreateUser /></ProtectedRoute>} />
-          <Route path="/admin/whatsapp-config" element={<ProtectedRoute requireAdmin><AdminWhatsAppConfig /></ProtectedRoute>} />
-          <Route path="/dashboard/plans" element={<ProtectedRoute requireAdmin><AdminPlansManager /></ProtectedRoute>} />
-          <Route path="/dashboard/homepage" element={<ProtectedRoute requireAdmin><AdminHomepageEditor /></ProtectedRoute>} />
-          <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
-          <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
-          <Route path="/admin/qa" element={<ProtectedRoute requireAdmin><AdminQADashboard /></ProtectedRoute>} />
-          
-          {/* Admin Hub - Novo dashboard consolidado */}
-          <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminHub /></ProtectedRoute>} />
-          
-          {/* Legacy routes - redirect to consolidated pages */}
-          <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-stats" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-custom-dashboard" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u/custom" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/m3u-usage-report" element={<Navigate to="/admin/m3u" replace />} />
-          <Route path="/admin/notificacoes" element={<Navigate to="/admin/notifications" replace />} />
-          <Route path="/admin/notification-settings" element={<Navigate to="/admin/notifications" replace />} />
-          <Route path="/admin/auto-notifications" element={<Navigate to="/admin/notifications" replace />} />
-          <Route path="/admin/templates" element={<Navigate to="/admin/notifications" replace />} />
-          <Route path="/admin/conversion-dashboard" element={<Navigate to="/admin/analytics" replace />} />
-          <Route path="/admin/coupons" element={<Navigate to="/admin/analytics" replace />} />
-          <Route path="/admin/security-alerts" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/security-monitor" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/security-analytics" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/security-escalation" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/suspicious-logins" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/ip-blocking" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/ip-whitelist" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/2fa-settings" element={<Navigate to="/admin/security" replace />} />
-          <Route path="/admin/system-health" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/playlist-health" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/backup-system" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/customize" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/variables" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/status-history" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/custom-status-badges" element={<Navigate to="/admin/system" replace />} />
-          <Route path="/admin/user-roles" element={<Navigate to="/admin/users" replace />} />
-          <Route path="/admin/role-audit" element={<Navigate to="/admin/users" replace />} />
-          <Route path="/admin/permission-test" element={<Navigate to="/admin/users" replace />} />
-          
-          <Route path="/admin/login" element={<Navigate to="/login" replace />} />
-          <Route path="/auth" element={<Navigate to="/login" replace />} />
-          <Route path="/settings" element={<Navigate to="/conta" replace />} />
-          <Route path="/subscription" element={<Navigate to="/conta" replace />} />
-          
-          {/* Access denied */}
-          <Route path="/403" element={<Forbidden />} />
-          
-          <Route path="*" element={<NotFound />} />
+            {/* ========================================
+                PUBLIC ROUTES
+            ======================================== */}
+            <Route path="/" element={<Index />} />
+            <Route path="/tutorial" element={<TutorialSmartOne />} />
+            <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/install" element={<Navigate to="/app/install" replace />} />
+            
+            {/* Checkout pages */}
+            <Route path="/checkout/success" element={<CheckoutSuccess />} />
+            <Route path="/checkout/failure" element={<CheckoutFailure />} />
+            <Route path="/checkout/pending" element={<CheckoutPending />} />
+            
+            {/* ========================================
+                IPTV APP ROUTES - Mobile/TV App
+            ======================================== */}
+            <Route path="/app" element={<AppEntry />} />
+            <Route path="/app/install" element={<AppInstall />} />
+            <Route path="/app/login" element={<Navigate to="/login" replace />} />
+            <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
+            <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
+            <Route path="/app/mylist" element={<ProtectedRoute><MyList /></ProtectedRoute>} />
+            <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
+            <Route path="/app/favorites" element={<Navigate to="/app/mylist" replace />} />
+            <Route path="/app/account" element={<Navigate to="/app/profile" replace />} />
+            <Route path="/tv-player" element={<TVPlayer />} />
+            
+            {/* Legacy account routes - redirect to app profile */}
+            <Route path="/conta" element={<Navigate to="/app/profile" replace />} />
+            <Route path="/cliente/account" element={<Navigate to="/app/profile" replace />} />
+            
+            {/* ========================================
+                ADMIN ROUTES - Consolidated Hub Structure
+                
+                Main Routes (Hub Pages with Tabs):
+                - /admin/dashboard → Dashboard principal
+                - /admin/clientes → Gestão de clientes
+                - /admin/m3u → Gestão M3U & Playlists
+                - /admin/notificacoes → Notificações
+                - /admin/seguranca → Segurança
+                - /admin/sistema → Sistema
+                - /admin/analytics → Analytics
+                - /admin/usuarios → Usuários & Permissões
+                - /admin/integracao → Integrações
+            ======================================== */}
+            
+            {/* Main Admin Entry - Redirects to Dashboard */}
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            
+            {/* Admin Hub Pages */}
+            <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
+            <Route path="/admin/clientes" element={<ProtectedRoute requireAdmin><AdminClientesPage /></ProtectedRoute>} />
+            <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UPage /></ProtectedRoute>} />
+            <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoesPage /></ProtectedRoute>} />
+            <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><AdminSegurancaPage /></ProtectedRoute>} />
+            <Route path="/admin/sistema" element={<ProtectedRoute requireAdmin><AdminSistemaPage /></ProtectedRoute>} />
+            <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsPage /></ProtectedRoute>} />
+            <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
+            <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
+            <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
+            
+            {/* ========================================
+                LEGACY REDIRECTS - All old routes redirect to consolidated hubs
+            ======================================== */}
+            
+            {/* Old dashboard routes */}
+            <Route path="/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/dashboard/*" element={<Navigate to="/admin/dashboard" replace />} />
+            
+            {/* Cliente routes - redirect to hub */}
+            <Route path="/admin/clientes/novo" element={<Navigate to="/admin/clientes?action=novo" replace />} />
+            <Route path="/admin/clientes/editar/:id" element={<Navigate to="/admin/clientes?action=editar" replace />} />
+            <Route path="/admin/clientes/:id/m3u" element={<Navigate to="/admin/clientes" replace />} />
+            
+            {/* M3U routes - redirect to hub */}
+            <Route path="/admin/m3u-builder" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-import-history" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-sync" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-lists" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-stats" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-custom-dashboard" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u/custom" element={<Navigate to="/admin/m3u" replace />} />
+            <Route path="/admin/m3u-usage-report" element={<Navigate to="/admin/m3u" replace />} />
+            
+            {/* Notification routes - redirect to hub */}
+            <Route path="/admin/notifications" element={<Navigate to="/admin/notificacoes" replace />} />
+            <Route path="/admin/notification-queue" element={<Navigate to="/admin/notificacoes" replace />} />
+            <Route path="/admin/notification-settings" element={<Navigate to="/admin/notificacoes" replace />} />
+            <Route path="/admin/auto-notifications" element={<Navigate to="/admin/notificacoes" replace />} />
+            <Route path="/admin/templates" element={<Navigate to="/admin/notificacoes" replace />} />
+            
+            {/* Security routes - redirect to hub */}
+            <Route path="/admin/security" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/security-alerts" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/security-monitor" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/security-analytics" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/security-escalation" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/suspicious-logins" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/ip-blocking" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/ip-whitelist" element={<Navigate to="/admin/seguranca" replace />} />
+            <Route path="/admin/2fa-settings" element={<Navigate to="/admin/seguranca" replace />} />
+            
+            {/* System routes - redirect to hub */}
+            <Route path="/admin/system" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/system-health" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/playlist-health" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/backup-system" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/customize" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/variables" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/status-history" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/admin/custom-status-badges" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/dashboard/homepage" element={<Navigate to="/admin/sistema" replace />} />
+            <Route path="/dashboard/plans" element={<Navigate to="/admin/sistema" replace />} />
+            
+            {/* Analytics routes - redirect to hub */}
+            <Route path="/admin/conversion-dashboard" element={<Navigate to="/admin/analytics" replace />} />
+            <Route path="/admin/coupons" element={<Navigate to="/admin/analytics" replace />} />
+            
+            {/* User routes - redirect to hub */}
+            <Route path="/admin/users" element={<Navigate to="/admin/usuarios" replace />} />
+            <Route path="/admin/create-user" element={<Navigate to="/admin/usuarios" replace />} />
+            <Route path="/admin/user-roles" element={<Navigate to="/admin/usuarios" replace />} />
+            <Route path="/admin/role-audit" element={<Navigate to="/admin/usuarios" replace />} />
+            <Route path="/admin/permission-test" element={<Navigate to="/admin/usuarios" replace />} />
+            
+            {/* Integration routes - redirect to hub */}
+            <Route path="/admin/integrations" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/whatsapp-config" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/cdn" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/transcode-queue" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/iptv-test" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/smart-cache" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/rls-coverage" element={<Navigate to="/admin/integracao" replace />} />
+            <Route path="/admin/qa" element={<Navigate to="/admin/integracao" replace />} />
+            
+            {/* Other legacy routes */}
+            <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+            <Route path="/auth" element={<Navigate to="/login" replace />} />
+            <Route path="/settings" element={<Navigate to="/app/profile" replace />} />
+            <Route path="/subscription" element={<Navigate to="/app/profile" replace />} />
+            
+            {/* Access denied */}
+            <Route path="/403" element={<Forbidden />} />
+            
+            {/* 404 */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
         </BrowserRouter>
