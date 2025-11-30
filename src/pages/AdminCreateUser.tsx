@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, UserPlus, Pencil, Trash2, Shield, ShieldCheck, Search, RefreshCw, Eye, EyeOff, Users, Crown } from "lucide-react";
+import { Loader2, UserPlus, Pencil, Trash2, Shield, ShieldCheck, Search, RefreshCw, Eye, EyeOff, Users, Crown, Star, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppRole } from "@/types/auth";
+
+type ExtendedRole = AppRole | 'master';
 
 interface AdminUser {
   id: string;
@@ -26,10 +32,28 @@ interface AdminUser {
   roles: AppRole[];
   created_at: string;
   last_sign_in_at: string | null;
+  is_active?: boolean;
+  is_master?: boolean;
+}
+
+interface EditFormData {
+  email: string;
+  nome: string;
+  telefone: string;
+  newPassword: string;
+  isActive: boolean;
+  roles: ExtendedRole[];
 }
 
 const MASTER_ADMIN_EMAIL = 'murillo@gmail.com';
-const PROTECTED_EMAILS = [MASTER_ADMIN_EMAIL]; // Only master admin is fully protected
+const PROTECTED_EMAILS = [MASTER_ADMIN_EMAIL];
+
+const ALL_ROLES: { value: ExtendedRole; label: string; description: string; icon: React.ReactNode; color: string }[] = [
+  { value: 'client', label: 'Cliente', description: 'Acesso básico ao sistema', icon: <User className="h-4 w-4" />, color: 'text-gray-500' },
+  { value: 'admin', label: 'Admin', description: 'Gerenciamento de clientes e operações', icon: <Shield className="h-4 w-4" />, color: 'text-blue-500' },
+  { value: 'super_admin', label: 'Super Admin', description: 'Acesso total + criar admins', icon: <ShieldCheck className="h-4 w-4" />, color: 'text-amber-500' },
+  { value: 'master', label: 'Master', description: 'Controle absoluto do sistema', icon: <Star className="h-4 w-4" />, color: 'text-purple-500' },
+];
 
 const AdminCreateUser = () => {
   const { isSuperAdmin, user } = useAuth();
@@ -39,6 +63,7 @@ const AdminCreateUser = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   
   // Create form state
   const [formData, setFormData] = useState({
@@ -52,10 +77,13 @@ const AdminCreateUser = () => {
   // Edit dialog state
   const [editDialog, setEditDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
-  const [editFormData, setEditFormData] = useState({
+  const [editFormData, setEditFormData] = useState<EditFormData>({
+    email: "",
     nome: "",
     telefone: "",
-    role: "admin" as "admin" | "super_admin",
+    newPassword: "",
+    isActive: true,
+    roles: [],
   });
   const [editLoading, setEditLoading] = useState(false);
 
@@ -63,6 +91,8 @@ const AdminCreateUser = () => {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  const isMasterUser = user?.email === MASTER_ADMIN_EMAIL;
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -227,12 +257,37 @@ const AdminCreateUser = () => {
       return;
     }
     setEditingUser(adminUser);
+    
+    // Determine roles including master designation
+    const userRoles: ExtendedRole[] = [...adminUser.roles];
+    if (isMasterAdmin(adminUser.email)) {
+      userRoles.push('master');
+    }
+    
     setEditFormData({
+      email: adminUser.email,
       nome: adminUser.nome,
       telefone: adminUser.telefone || "",
-      role: adminUser.roles.includes('super_admin') ? 'super_admin' : 'admin',
+      newPassword: "",
+      isActive: true,
+      roles: userRoles,
     });
+    setShowEditPassword(false);
     setEditDialog(true);
+  };
+
+  const toggleRole = (role: ExtendedRole) => {
+    // Master role can only be toggled by murillo
+    if (role === 'master' && !isMasterUser) return;
+    
+    setEditFormData(prev => {
+      const hasRole = prev.roles.includes(role);
+      if (hasRole) {
+        return { ...prev, roles: prev.roles.filter(r => r !== role) };
+      } else {
+        return { ...prev, roles: [...prev.roles, role] };
+      }
+    });
   };
 
   const handleEditSubmit = async () => {
@@ -240,6 +295,9 @@ const AdminCreateUser = () => {
     
     setEditLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sessão não encontrada");
+
       // Update profile
       const { error: profileError } = await supabase
         .from('profiles')
@@ -251,23 +309,58 @@ const AdminCreateUser = () => {
 
       if (profileError) throw profileError;
 
-      // Update role if changed
-      const currentRole = editingUser.roles.includes('super_admin') ? 'super_admin' : 'admin';
-      if (currentRole !== editFormData.role) {
-        // Remove old role
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', editingUser.id)
-          .eq('role', currentRole);
+      // Update password if provided (via edge function)
+      if (editFormData.newPassword && editFormData.newPassword.length >= 8) {
+        const response = await fetch(
+          `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/update-user-password`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: editingUser.id,
+              newPassword: editFormData.newPassword,
+            }),
+          }
+        );
+        if (!response.ok) {
+          const err = await response.json();
+          console.warn("Password update failed:", err);
+        }
+      }
 
-        // Add new role
-        await supabase
-          .from('user_roles')
-          .insert({
-            user_id: editingUser.id,
-            role: editFormData.role,
-          });
+      // Get current roles from DB
+      const { data: currentRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', editingUser.id);
+
+      const currentRoleSet = new Set(currentRoles?.map(r => r.role) || []);
+      const newRoleSet = new Set(editFormData.roles.filter(r => r !== 'master') as AppRole[]);
+
+      // Remove roles that are no longer selected
+      for (const role of currentRoleSet) {
+        if (!newRoleSet.has(role as AppRole)) {
+          await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', editingUser.id)
+            .eq('role', role);
+        }
+      }
+
+      // Add new roles
+      for (const role of newRoleSet) {
+        if (!currentRoleSet.has(role)) {
+          await supabase
+            .from('user_roles')
+            .insert({
+              user_id: editingUser.id,
+              role: role,
+            });
+        }
       }
 
       toast({
@@ -624,54 +717,153 @@ const AdminCreateUser = () => {
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogTitle>Editar Usuário Administrador</DialogTitle>
             <DialogDescription>
               Editando: {editingUser?.email}
+              {isMasterAdmin(editingUser?.email || '') && (
+                <Badge className="ml-2 bg-purple-500/20 text-purple-500 border-purple-500/30">
+                  <Star className="h-3 w-3 mr-1" />Master
+                </Badge>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-nome">Nome</Label>
-              <Input
-                id="edit-nome"
-                value={editFormData.nome}
-                onChange={(e) => setEditFormData({ ...editFormData, nome: e.target.value })}
-                disabled={editLoading}
-              />
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-6 py-4 px-1">
+              {/* Email (readonly) */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editFormData.email}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">O email não pode ser alterado</p>
+              </div>
+
+              {/* Nome */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-nome">Nome Completo *</Label>
+                <Input
+                  id="edit-nome"
+                  value={editFormData.nome}
+                  onChange={(e) => setEditFormData({ ...editFormData, nome: e.target.value })}
+                  disabled={editLoading}
+                  placeholder="Nome completo"
+                />
+              </div>
+
+              {/* Telefone */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-telefone">Telefone</Label>
+                <Input
+                  id="edit-telefone"
+                  type="tel"
+                  value={editFormData.telefone}
+                  onChange={(e) => setEditFormData({ ...editFormData, telefone: e.target.value })}
+                  disabled={editLoading}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+
+              {/* Nova Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">Nova Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="edit-password"
+                    type={showEditPassword ? "text" : "password"}
+                    value={editFormData.newPassword}
+                    onChange={(e) => setEditFormData({ ...editFormData, newPassword: e.target.value })}
+                    disabled={editLoading}
+                    placeholder="Deixe em branco para manter a atual"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                  >
+                    {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Mínimo 8 caracteres. Deixe vazio para não alterar.</p>
+              </div>
+
+              <Separator />
+
+              {/* Permissões (Multiple Roles) */}
+              <div className="space-y-3">
+                <Label>Permissões</Label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Selecione uma ou mais permissões para este usuário
+                </p>
+                <div className="space-y-3">
+                  {ALL_ROLES.map((roleOption) => {
+                    const isChecked = editFormData.roles.includes(roleOption.value);
+                    const isDisabled = editLoading || 
+                      (roleOption.value === 'master' && !isMasterUser) ||
+                      (isMasterAdmin(editingUser?.email || '') && roleOption.value === 'master');
+                    
+                    return (
+                      <div
+                        key={roleOption.value}
+                        className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                          isChecked ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        onClick={() => !isDisabled && toggleRole(roleOption.value)}
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onCheckedChange={() => !isDisabled && toggleRole(roleOption.value)}
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={roleOption.color}>{roleOption.icon}</span>
+                            <span className="font-medium">{roleOption.label}</span>
+                            {roleOption.value === 'master' && !isMasterUser && (
+                              <Badge variant="outline" className="text-xs">Apenas Master</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{roleOption.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {editFormData.roles.length === 0 && (
+                  <p className="text-xs text-destructive">Selecione pelo menos uma permissão</p>
+                )}
+              </div>
+
+              {/* Status Ativo */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="space-y-0.5">
+                  <Label>Usuário Ativo</Label>
+                  <p className="text-xs text-muted-foreground">Desativar bloqueia o acesso ao sistema</p>
+                </div>
+                <Switch
+                  checked={editFormData.isActive}
+                  onCheckedChange={(checked) => setEditFormData({ ...editFormData, isActive: checked })}
+                  disabled={editLoading || isMasterAdmin(editingUser?.email || '')}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-telefone">Telefone</Label>
-              <Input
-                id="edit-telefone"
-                value={editFormData.telefone}
-                onChange={(e) => setEditFormData({ ...editFormData, telefone: e.target.value })}
-                disabled={editLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Nível de Permissão</Label>
-              <Select
-                value={editFormData.role}
-                onValueChange={(value: "admin" | "super_admin") => setEditFormData({ ...editFormData, role: value })}
-                disabled={editLoading || isMasterAdmin(editingUser?.email || '')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setEditDialog(false)} disabled={editLoading}>
               Cancelar
             </Button>
-            <Button onClick={handleEditSubmit} disabled={editLoading}>
+            <Button 
+              onClick={handleEditSubmit} 
+              disabled={editLoading || editFormData.roles.length === 0}
+            >
               {editLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Salvar
+              Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
