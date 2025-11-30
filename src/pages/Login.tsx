@@ -63,9 +63,13 @@ export default function Login() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Handle mouse movement for desktop
+  // Handle mouse movement for desktop - disabled when locked
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isMobile || lockedSide) return;
+    // When a side is locked, disable all hover animations
+    if (isMobile || lockedSide) {
+      setHoveredSide(null);
+      return;
+    }
     const midPoint = window.innerWidth / 2;
     if (e.clientX < midPoint) {
       setHoveredSide("login");
