@@ -192,31 +192,17 @@ export default function Login() {
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header with Logo */}
-        <motion.header className="p-4 md:p-6 flex justify-center" initial={{
-        opacity: 0,
-        y: -20
-      }} animate={{
-        opacity: 1,
-        y: 0
-      }} transition={{
-        duration: 0.5
-      }}>
-          
-        </motion.header>
-
         {/* Split View Container */}
         <div className="flex-1 flex flex-col lg:flex-row items-stretch w-full" onMouseLeave={() => setViewMode("split")}>
           {/* Login Section */}
           <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "login" && "lg:w-full", viewMode === "plans" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("login")}>
-            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10")}>
+            <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10")} onMouseEnter={() => setViewMode("login")}> 
               {/* Card Header */}
               <div className="text-center mb-6">
-                <img src="/logo.png" alt="IPTV LINK" className="w-28 h-auto object-contain mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
-                <p className="text-muted-foreground text-sm mt-2">
-                  Entre com suas credenciais para acessar
-                </p>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary" />
+                </div>
+               <h2 className="text-2xl font-bold text-foreground">Já sou cliente!</h2>
               </div>
 
               {/* Login Form */}
