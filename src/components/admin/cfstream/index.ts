@@ -3,3 +3,5 @@ export { CFStreamUploadsList } from './CFStreamUploadsList';
 export { CFStreamQuickActions } from './CFStreamQuickActions';
 export { CFStreamSchedulerInfo } from './CFStreamSchedulerInfo';
 export { CFStreamSignedUrlDialog } from './CFStreamSignedUrlDialog';
+export { CFStreamMetricsDashboard } from './CFStreamMetricsDashboard';
+export { CFStreamRetryManager } from './CFStreamRetryManager';
