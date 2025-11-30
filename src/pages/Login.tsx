@@ -206,9 +206,9 @@ export default function Login() {
         </motion.header>
 
         {/* Split View Container */}
-        <div className="flex-1 flex flex-col lg:flex-row items-stretch justify-center p-4 gap-4 md:gap-6 max-w-6xl mx-auto w-full" onMouseLeave={() => setViewMode("split")}>
+        <div className="flex-1 flex flex-col lg:flex-row items-stretch w-full" onMouseLeave={() => setViewMode("split")}>
           {/* Login Section */}
-          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center", viewMode === "split" && "lg:w-1/2", viewMode === "login" && "lg:w-full", viewMode === "plans" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("login")}>
+          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "login" && "lg:w-full", viewMode === "plans" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("login")}>
             <div className={cn("w-full max-w-md bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300", viewMode === "login" && "ring-2 ring-primary/20 shadow-primary/10")}>
               {/* Card Header */}
               <div className="p-6 pb-2 flex flex-col items-center">
@@ -262,15 +262,9 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Divider (only in split mode on desktop) */}
-          <div className={cn("hidden lg:flex flex-col items-center justify-center gap-4 transition-all duration-500", viewMode !== "split" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")}>
-            <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
-            <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50 whitespace-nowrap">ou</span>
-            <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
-          </div>
 
           {/* Plans Section */}
-          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center", viewMode === "split" && "lg:w-1/2", viewMode === "plans" && "lg:w-full", viewMode === "login" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("plans")}>
+          <div className={cn("transition-all duration-500 ease-out flex items-center justify-center p-4 lg:p-0", viewMode === "split" && "lg:w-1/2", viewMode === "plans" && "lg:w-full", viewMode === "login" && "lg:w-0 lg:opacity-0 lg:overflow-hidden")} onMouseEnter={() => setViewMode("plans")}>
             <div className={cn("w-full max-w-lg bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6 transition-all duration-300", viewMode === "plans" && "ring-2 ring-primary/20 shadow-primary/10")}>
               {/* Plans Header */}
               <div className="text-center mb-6">
