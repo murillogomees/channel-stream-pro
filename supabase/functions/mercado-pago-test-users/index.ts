@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { accessToken } = await req.json();
+    const { accessToken, action } = await req.json();
     
     if (!accessToken) {
       return new Response(
@@ -20,36 +20,56 @@ serve(async (req) => {
       );
     }
 
-    // Fetch test users from Mercado Pago API
-    // Note: GET /users/test lists test users, POST /users/test_user creates one
-    const response = await fetch('https://api.mercadopago.com/users/test', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // Mercado Pago only provides endpoint to CREATE test users, not LIST them
+    // POST /users/test_user creates a new test user
+    if (action === 'create') {
+      const response = await fetch('https://api.mercadopago.com/users/test_user', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          site_id: 'MLB' // Brazil - change based on country
+        })
+      });
 
-    if (response.ok) {
       const data = await response.json();
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          users: Array.isArray(data) ? data : [data]
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Falha ao buscar usuários de teste',
-          details: errorData 
-        }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      if (response.ok) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            user: data,
+            message: 'Usuário de teste criado com sucesso'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Falha ao criar usuário de teste',
+            details: data 
+          }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
+
+    // Default: Return info about how test users work
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'A API do Mercado Pago não fornece endpoint para listar usuários de teste. Use action="create" para criar um novo usuário de teste.',
+        info: {
+          createEndpoint: 'POST /users/test_user',
+          documentation: 'https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/accounts'
+        }
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
   } catch (error) {
     console.error('[MercadoPago Test Users] Error:', error);
     return new Response(
