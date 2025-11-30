@@ -39,6 +39,7 @@ const AdminPlansManager = lazy(() => import("./pages/AdminPlansManager"));
 const AdminHomepageEditor = lazy(() => import("./pages/AdminHomepageEditor"));
 const AdminIPTVTest = lazy(() => import("./pages/AdminIPTVTest"));
 const AdminSmartCache = lazy(() => import("./pages/AdminSmartCache"));
+const AdminTranscodeQueue = lazy(() => import("./pages/AdminTranscodeQueue"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
@@ -93,6 +94,7 @@ const App = () => (
           <Route path="/tv-player" element={<TVPlayer />} />
           <Route path="/admin/iptv-test" element={<ProtectedRoute requireAdmin><AdminIPTVTest /></ProtectedRoute>} />
           <Route path="/admin/smart-cache" element={<ProtectedRoute requireAdmin><AdminSmartCache /></ProtectedRoute>} />
+          <Route path="/admin/transcode-queue" element={<ProtectedRoute requireAdmin><AdminTranscodeQueue /></ProtectedRoute>} />
           
           <Route path="/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<Navigate to="/dashboard" replace />} />

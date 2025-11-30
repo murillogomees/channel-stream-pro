@@ -151,3 +151,15 @@ verify_jwt = false
 # Scheduler for batch Stream uploads - cron/admin access
 [functions.cf-stream-scheduler]
 verify_jwt = false
+
+# ==========================================
+# TRANSCODE JOB QUEUE SYSTEM
+# ==========================================
+
+# Transcode processor - consumes jobs from queue
+[functions.transcode-processor]
+verify_jwt = false
+
+# Transcode webhook - receives Cloudflare callbacks
+[functions.transcode-webhook]
+verify_jwt = false
