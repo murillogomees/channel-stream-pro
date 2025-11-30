@@ -200,6 +200,10 @@ verify_jwt = false
 [functions.mercado-pago-test]
 verify_jwt = false
 
+# Mercado Pago test users - public endpoint
+[functions.mercado-pago-test-users]
+verify_jwt = false
+
 # ==========================================
 # PLAYBACK ACCESS CONTROL
 # ==========================================
