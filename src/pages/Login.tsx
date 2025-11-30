@@ -268,7 +268,8 @@ export default function Login() {
   const PlansCard = () => (
     <motion.div
       className={cn(
-        "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-full max-w-lg mx-4"
+        "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
+        "p-4 sm:p-6 w-full max-w-[340px] sm:max-w-lg mx-2 sm:mx-4"
       )}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -276,35 +277,38 @@ export default function Login() {
       transition={{ duration: 0.3 }}
     >
       {/* Plans Header */}
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
-          <Crown className="w-8 h-8 text-primary" />
+      <div className="text-center mb-4 sm:mb-6">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-3">
+          <Crown className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Quero me cadastrar</h2>
-        <p className="text-muted-foreground text-sm mt-2">
-          Escolha o plano perfeito e comece a assistir agora!
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Quero me cadastrar</h2>
+        <p className="text-muted-foreground text-xs sm:text-sm mt-1.5 max-w-[280px] mx-auto">
+          Escolha o plano perfeito para você
         </p>
       </div>
 
-      {/* Device Icons */}
-      <div className="flex flex-wrap justify-center gap-3 mb-6">
-        {deviceIcons.map(device => (
-          <div key={device.label} className="flex flex-col items-center gap-1 hover:scale-110 hover:-translate-y-0.5 transition-transform">
-            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
-              <device.icon className="w-5 h-5 text-primary" />
+      {/* Device Icons - Compact */}
+      <div className="flex justify-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+        {deviceIcons.slice(0, 5).map(device => (
+          <div 
+            key={device.label} 
+            className="flex flex-col items-center gap-0.5 hover:scale-110 transition-transform"
+            title={device.label}
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-muted/60 flex items-center justify-center">
+              <device.icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-primary" />
             </div>
-            <span className="text-[10px] text-muted-foreground">{device.label}</span>
           </div>
         ))}
       </div>
 
       {/* Plans Grid */}
       {plansLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {plans.map(plan => (
             <div
               key={plan.id}
@@ -315,39 +319,40 @@ export default function Login() {
               onMouseEnter={() => setHoveredPlan(plan.id)}
               onMouseLeave={() => setHoveredPlan(null)}
               className={cn(
-                "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1",
+                "relative cursor-pointer rounded-xl border-2 p-2.5 sm:p-3 transition-all duration-200",
+                "hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]",
                 plan.is_highlighted
-                  ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                  : "border-border/50 bg-background/30 hover:border-primary/50",
-                hoveredPlan === plan.id && "ring-2 ring-primary/20"
+                  ? "border-primary bg-primary/10 shadow-md shadow-primary/15"
+                  : "border-border/40 bg-background/50 hover:border-primary/40 hover:bg-background/70",
+                hoveredPlan === plan.id && "ring-2 ring-primary/25"
               )}
             >
               {/* Highlighted Badge */}
               {plan.is_highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Star className="w-3 h-3" />
-                    MAIS POPULAR
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
+                  <span className="bg-primary text-primary-foreground text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap shadow-sm">
+                    <Star className="w-2.5 h-2.5" fill="currentColor" />
+                    POPULAR
                   </span>
                 </div>
               )}
 
               {/* Savings Badge */}
               {plan.savings_percent && plan.savings_percent > 0 && (
-                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
                   -{plan.savings_percent}%
                 </div>
               )}
 
-              <div className="text-center">
-                <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-2xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
-                  <span className="text-xs text-muted-foreground">/{plan.period}</span>
+              <div className={cn("text-center", plan.is_highlighted && "pt-1")}>
+                <h3 className="text-sm sm:text-base font-semibold text-foreground leading-tight">{plan.name}</h3>
+                <div className="flex items-baseline justify-center gap-0.5 mt-1">
+                  <span className="text-lg sm:text-xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
+                  <span className="text-[10px] sm:text-xs text-muted-foreground font-medium">/{plan.period}</span>
                 </div>
 
                 {plan.savings_amount && plan.savings_amount > 0 && (
-                  <p className="text-[10px] text-green-500 mt-1">
+                  <p className="text-[9px] sm:text-[10px] text-emerald-500 font-medium mt-0.5">
                     Economize {formatPrice(plan.savings_amount)}
                   </p>
                 )}
@@ -357,16 +362,18 @@ export default function Login() {
               <Button
                 size="sm"
                 className={cn(
-                  "w-full mt-3 rounded-lg text-sm",
-                  plan.is_highlighted ? "bg-primary hover:bg-primary/90" : "bg-muted hover:bg-muted/80"
+                  "w-full mt-2 sm:mt-2.5 rounded-lg text-xs sm:text-sm h-8 sm:h-9 font-semibold",
+                  plan.is_highlighted 
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm" 
+                    : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
                 )}
                 onClick={e => {
                   e.stopPropagation();
                   handlePlanSelect(plan);
                 }}
               >
-                <Zap className="w-4 h-4 mr-2" />
-                {plan.cta_text || "Assinar agora"}
+                <Zap className="w-3.5 h-3.5 mr-1.5" />
+                {plan.cta_text || "Assinar"}
               </Button>
             </div>
           ))}
@@ -375,11 +382,11 @@ export default function Login() {
 
       {/* Switch Button - Only on Mobile */}
       {isMobile && (
-        <div className="mt-6 pt-4 border-t border-border/50">
+        <div className="mt-4 pt-3 border-t border-border/30">
           <Button
             variant="ghost"
             onClick={switchToLogin}
-            className="w-full text-muted-foreground hover:text-foreground"
+            className="w-full text-muted-foreground hover:text-foreground h-10 text-sm"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Já sou cliente
