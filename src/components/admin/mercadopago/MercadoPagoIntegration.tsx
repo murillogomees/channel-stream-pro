@@ -2,7 +2,7 @@
  * MercadoPagoIntegration - Configuração completa da integração Mercado Pago
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,10 @@ import { Separator } from "@/components/ui/separator";
 import { 
   CreditCard, Key, Users, TestTube, Code, FileJson, 
   Copy, Check, AlertCircle, CheckCircle2, Play,
-  RefreshCw, ExternalLink, Shield
+  RefreshCw, ExternalLink, Shield, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ApiConfig {
   sandboxAccessToken: string;
@@ -124,6 +125,64 @@ export function MercadoPagoIntegration() {
   });
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load config on mount
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
+  const loadConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('mercado_pago_config')
+        .select('*')
+        .eq('id', '00000000-0000-0000-0000-000000000001')
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setConfig({
+          sandboxAccessToken: data.sandbox_access_token || "",
+          productionAccessToken: data.production_access_token || "",
+          publicKey: data.public_key || "",
+          webhookSecret: data.webhook_secret || "",
+          useSandbox: data.use_sandbox ?? true
+        });
+      }
+    } catch (error) {
+      console.error('Error loading config:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('mercado_pago_config')
+        .update({
+          sandbox_access_token: config.sandboxAccessToken || null,
+          production_access_token: config.productionAccessToken || null,
+          public_key: config.publicKey || null,
+          webhook_secret: config.webhookSecret || null,
+          use_sandbox: config.useSandbox
+        })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+      
+      if (error) throw error;
+      
+      toast.success("Configurações salvas com sucesso!");
+    } catch (error) {
+      console.error('Error saving config:', error);
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -261,13 +320,17 @@ export function MercadoPagoIntegration() {
               <Separator />
 
               <div className="flex gap-3">
-                <Button onClick={testConnection} variant="outline">
+                <Button onClick={testConnection} variant="outline" disabled={saving}>
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Testar Conexão
                 </Button>
-                <Button>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Salvar Configuração
+                <Button onClick={saveConfig} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Shield className="h-4 w-4 mr-2" />
+                  )}
+                  {saving ? "Salvando..." : "Salvar Configuração"}
                 </Button>
               </div>
 
