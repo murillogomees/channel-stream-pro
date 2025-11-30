@@ -11,15 +11,16 @@ const CLOUDFLARE_STREAM_API_TOKEN = Deno.env.get("CLOUDFLARE_STREAM_API_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Configuration
+// Configuration - Sprint 2 optimizations
 const CONFIG = {
-  MAX_CONCURRENT_UPLOADS: 2, // Reduced to avoid overwhelming origin
-  BATCH_SIZE: 5,
-  DELAY_BETWEEN_UPLOADS_MS: 5000, // 5 seconds between uploads
+  MAX_CONCURRENT_UPLOADS: 5, // Increased from 2 for better throughput
+  BATCH_SIZE: 10, // Increased from 5 for faster queue processing
+  DELAY_BETWEEN_UPLOADS_MS: 3000, // Reduced to 3 seconds
   MAX_RETRIES: 5,
   BASE_RETRY_DELAY_MS: 60000, // 1 minute base delay
   SOURCE_VALIDATION_TIMEOUT_MS: 10000,
-  STUCK_TIMEOUT_MINUTES: 60,
+  STUCK_TIMEOUT_MINUTES: 30, // Reduced to detect stuck uploads faster
+  DOWNLOADING_STUCK_MINUTES: 15, // For legacy "downloading" status
 };
 
 // Error categories for better handling
@@ -213,7 +214,8 @@ serve(async (req) => {
       });
     }
 
-    log('info', '=== Starting scheduler run ===');
+    const runStartTime = Date.now();
+    log('info', '=== Starting scheduler run ===', { config: CONFIG });
 
     const result = {
       statusChecked: 0,
@@ -551,7 +553,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 6: Reset stuck uploads
+    // STEP 6: Reset stuck uploads (uploading state)
     // ========================================
     const stuckTime = new Date(Date.now() - CONFIG.STUCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     
@@ -570,6 +572,7 @@ serve(async (req) => {
           error_message: "Reset: stuck in uploading state",
         }).eq("id", stuck.id);
         result.resetStuck++;
+        log('info', 'Reset stuck upload (uploading)', { id: stuck.id });
       } else {
         await supabase.from("cf_stream_uploads").update({
           status: "error",
@@ -578,7 +581,40 @@ serve(async (req) => {
       }
     }
 
-    log('info', '=== Scheduler completed ===', result);
+    // ========================================
+    // STEP 7: Reset legacy "downloading" status
+    // ========================================
+    const downloadingStuckTime = new Date(Date.now() - CONFIG.DOWNLOADING_STUCK_MINUTES * 60 * 1000).toISOString();
+    
+    const { data: downloadingStuck } = await supabase
+      .from("cf_stream_uploads")
+      .select("id, retry_count, updated_at")
+      .eq("status", "downloading")
+      .lt("updated_at", downloadingStuckTime);
+
+    for (const stuck of downloadingStuck || []) {
+      await supabase.from("cf_stream_uploads").update({
+        status: "queued",
+        started_at: null,
+        error_message: "Reset: legacy downloading status converted to queue",
+      }).eq("id", stuck.id);
+      result.resetStuck++;
+      log('info', 'Reset stuck download (downloading)', { id: stuck.id });
+    }
+
+    // ========================================
+    // STEP 8: Performance metrics logging
+    // ========================================
+    const runEndTime = Date.now();
+    const runDuration = runEndTime - runStartTime;
+    
+    log('info', '=== Scheduler completed ===', {
+      ...result,
+      performance: {
+        durationMs: runDuration,
+        uploadsPerSecond: result.newUploads / (runDuration / 1000),
+      }
+    });
 
     return new Response(JSON.stringify({
       success: true,
