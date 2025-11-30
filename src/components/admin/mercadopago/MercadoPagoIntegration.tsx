@@ -29,18 +29,14 @@ interface ApiConfig {
   useSandbox: boolean;
 }
 
-const TEST_USERS = {
-  seller: {
-    email: "test_user_seller@testuser.com",
-    password: "qatest1234",
-    description: "Vendedor/Integrador - Recebe os pagamentos"
-  },
-  buyer: {
-    email: "test_user_buyer@testuser.com",
-    password: "qatest1234",
-    description: "Comprador - Realiza pagamentos de teste"
-  }
-};
+interface TestUser {
+  id: number;
+  nickname: string;
+  email: string;
+  password?: string;
+  site_status: string;
+  description?: string;
+}
 
 const TEST_CARDS = [
   { brand: "Mastercard", number: "5031 4332 1540 6351", cvv: "123", expiry: "11/25", status: "approved", holder: "APRO" },
@@ -127,6 +123,8 @@ export function MercadoPagoIntegration() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [testUsers, setTestUsers] = useState<TestUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Load config on mount
   useEffect(() => {
@@ -189,6 +187,37 @@ export function MercadoPagoIntegration() {
     setCopiedField(field);
     toast.success("Copiado para área de transferência");
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const fetchTestUsers = async () => {
+    const token = config.useSandbox ? config.sandboxAccessToken : config.productionAccessToken;
+    if (!token) {
+      toast.error("Configure o Access Token primeiro");
+      return;
+    }
+
+    setLoadingUsers(true);
+    try {
+      const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/mercado-pago-test-users", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.users) {
+        setTestUsers(data.users);
+        toast.success(`${data.users.length} usuário(s) de teste encontrado(s)`);
+      } else {
+        toast.error(data.error || "Falha ao buscar usuários de teste");
+      }
+    } catch (error) {
+      console.error('Error fetching test users:', error);
+      toast.error("Erro ao buscar usuários de teste");
+    } finally {
+      setLoadingUsers(false);
+    }
   };
 
   const testConnection = async () => {
@@ -369,56 +398,85 @@ export function MercadoPagoIntegration() {
                 Usuários de Teste
               </CardTitle>
               <CardDescription>
-                Use estes usuários para testar pagamentos no ambiente sandbox
+                Busque os usuários de teste cadastrados na sua conta do Mercado Pago
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(TEST_USERS).map(([key, user]) => (
-                <div key={key} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant={key === "seller" ? "default" : "secondary"}>
-                      {key === "seller" ? "Vendedor" : "Comprador"}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">{user.description}</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-xs">Email</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-sm bg-muted px-2 py-1 rounded flex-1">{user.email}</code>
-                        <Button 
-                          size="icon" 
-                          variant="ghost"
-                          onClick={() => copyToClipboard(user.email, `${key}-email`)}
-                        >
-                          {copiedField === `${key}-email` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+              <Button onClick={fetchTestUsers} disabled={loadingUsers} className="w-full">
+                {loadingUsers ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                {loadingUsers ? "Buscando..." : "Buscar Usuários de Teste"}
+              </Button>
+
+              {testUsers.length > 0 ? (
+                <ScrollArea className="h-[300px]">
+                  <div className="space-y-3">
+                    {testUsers.map((user) => (
+                      <div key={user.id} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="default">
+                            {user.nickname || `User ${user.id}`}
+                          </Badge>
+                          <Badge variant={user.site_status === "active" ? "secondary" : "outline"}>
+                            {user.site_status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid gap-3">
+                          <div>
+                            <Label className="text-xs">ID</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-sm bg-muted px-2 py-1 rounded flex-1">{user.id}</code>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => copyToClipboard(String(user.id), `user-${user.id}-id`)}
+                              >
+                                {copiedField === `user-${user.id}-id` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Email</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-sm bg-muted px-2 py-1 rounded flex-1 truncate">{user.email}</code>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => copyToClipboard(user.email, `user-${user.id}-email`)}
+                              >
+                                {copiedField === `user-${user.id}-email` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Senha</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-sm bg-muted px-2 py-1 rounded flex-1">{user.password}</code>
-                        <Button 
-                          size="icon" 
-                          variant="ghost"
-                          onClick={() => copyToClipboard(user.password, `${key}-pass`)}
-                        >
-                          {copiedField === `${key}-pass` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                </ScrollArea>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Clique no botão acima para buscar os usuários de teste</p>
                 </div>
-              ))}
+              )}
 
               <div className="p-4 bg-yellow-500/10 rounded-lg">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-1 text-yellow-500" />
                   <p className="text-sm text-yellow-600">
-                    <strong>Importante:</strong> Crie seus próprios usuários de teste no painel do Mercado Pago 
-                    para evitar conflitos. Os usuários acima são apenas exemplos.
+                    <strong>Dica:</strong> Para criar novos usuários de teste, acesse o{" "}
+                    <a 
+                      href="https://www.mercadopago.com.br/developers/panel/test-users" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="underline hover:text-yellow-700"
+                    >
+                      Painel de Desenvolvedores
+                    </a>
                   </p>
                 </div>
               </div>
