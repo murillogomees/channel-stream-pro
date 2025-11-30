@@ -1,44 +1,64 @@
 /**
  * PÁGINA DE LOGIN INTERATIVA
- * 
+ *
  * Design moderno com tela dividida animada:
  * - Login form vs Planos de assinatura
  * - Transições suaves como jogo de escolha
  * - Modo focado em cada seção
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Loader2, Wifi, Tv, Smartphone, Monitor, Gamepad2, Tablet, Chrome, Play, Sparkles, ArrowRight, ArrowLeft, Check, Zap, Crown, Star } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { useSubscriptionPlans, SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  LogIn,
+  Loader2,
+  Wifi,
+  Tv,
+  Smartphone,
+  Monitor,
+  Gamepad2,
+  Tablet,
+  Chrome,
+  Play,
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Zap,
+  Crown,
+  Star,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { z } from "zod";
+import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
+import { cn } from "@/lib/utils";
 
-const REMEMBER_ME_KEY = 'iptv_remember_me';
+const REMEMBER_ME_KEY = "iptv_remember_me";
 const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60 * 1000;
 
 const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres')
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
 });
 
-type ViewMode = 'split' | 'login' | 'plans';
+type ViewMode = "split" | "login" | "plans";
 
 const deviceIcons = [
-  { icon: Smartphone, label: 'Celular' },
-  { icon: Monitor, label: 'Computador' },
-  { icon: Gamepad2, label: 'Video Game' },
-  { icon: Tablet, label: 'Tablet' },
-  { icon: Tv, label: 'Android TV' },
-  { icon: Chrome, label: 'Fire Stick' },
+  { icon: Smartphone, label: "Celular" },
+  { icon: Monitor, label: "Computador" },
+  { icon: Gamepad2, label: "Video Game" },
+  { icon: Tablet, label: "Tablet" },
+  { icon: Tv, label: "Android TV" },
+  { icon: Chrome, label: "Fire Stick" },
 ];
 
 export default function Login() {
@@ -46,30 +66,30 @@ export default function Login() {
   const location = useLocation();
   const { isAuthenticated, isAdmin, loading: authLoading, refreshUser, user } = useAuth();
   const { plans, loading: plansLoading } = useSubscriptionPlans();
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
 
   // Auto-redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
-      const isAdminRole = isAdmin || user.roles?.includes('admin');
-      const isClientRole = user.roles?.includes('client');
-      
+      const isAdminRole = isAdmin || user.roles?.includes("admin");
+      const isClientRole = user.roles?.includes("client");
+
       let redirectTo: string;
       if (isAdminRole) {
-        redirectTo = '/dashboard';
+        redirectTo = "/dashboard";
       } else {
         const stateFrom = (location.state as any)?.from?.pathname;
         if (isClientRole) {
-          redirectTo = stateFrom || '/app/player';
+          redirectTo = stateFrom || "/app/player";
         } else {
-          redirectTo = stateFrom || '/';
+          redirectTo = stateFrom || "/";
         }
       }
       navigate(redirectTo, { replace: true });
@@ -78,66 +98,69 @@ export default function Login() {
 
   const logFailedLogin = async (email: string) => {
     try {
-      const { securityMonitoringService } = await import('@/services/securityMonitoringService');
+      const { securityMonitoringService } = await import("@/services/securityMonitoringService");
       await securityMonitoringService.logFailedLogin(email, undefined, navigator.userAgent, true);
-      
-      fetch('https://api.ipify.org?format=json')
-        .then(res => res.json())
-        .then(data => {
-          import('@/services/suspiciousLoginService').then(module => {
+
+      fetch("https://api.ipify.org?format=json")
+        .then((res) => res.json())
+        .then((data) => {
+          import("@/services/suspiciousLoginService").then((module) => {
             module.suspiciousLoginService.checkLogin(data.ip, email);
           });
         })
         .catch(() => {});
     } catch (err) {
-      console.error('Erro ao registrar tentativa de login:', err);
+      console.error("Erro ao registrar tentativa de login:", err);
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const validatedData = loginSchema.parse({ email, password });
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
-        password: validatedData.password
+        password: validatedData.password,
       });
-      
+
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Email ou senha incorretos');
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Email ou senha incorretos");
           setTimeout(() => logFailedLogin(validatedData.email), 0);
-        } else if (error.message.includes('Email not confirmed')) {
-          toast.error('Por favor, confirme seu email antes de fazer login');
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Por favor, confirme seu email antes de fazer login");
         } else {
           toast.error(error.message);
         }
         return;
       }
-      
+
       if (data.user) {
-        toast.success('Login realizado com sucesso!');
-        
+        toast.success("Login realizado com sucesso!");
+
         if (rememberMe) {
-          localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({
-            expires: Date.now() + REMEMBER_ME_DURATION,
-            userId: data.user.id
-          }));
+          localStorage.setItem(
+            REMEMBER_ME_KEY,
+            JSON.stringify({
+              expires: Date.now() + REMEMBER_ME_DURATION,
+              userId: data.user.id,
+            }),
+          );
         } else {
           localStorage.removeItem(REMEMBER_ME_KEY);
         }
-        
+
         await refreshUser();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error('Erro ao fazer login. Tente novamente.');
+        toast.error("Erro ao fazer login. Tente novamente.");
       }
     } finally {
       setIsLoading(false);
@@ -150,9 +173,9 @@ export default function Login() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(price);
   };
 
@@ -160,26 +183,26 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div 
+        <motion.div
           className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl"
-          animate={{ 
+          animate={{
             scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3]
+            opacity: [0.3, 0.5, 0.3],
           }}
           transition={{ duration: 8, repeat: Infinity }}
         />
-        <motion.div 
+        <motion.div
           className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"
-          animate={{ 
+          animate={{
             scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2]
+            opacity: [0.2, 0.4, 0.2],
           }}
           transition={{ duration: 10, repeat: Infinity }}
         />
-        <motion.div 
+        <motion.div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl"
-          animate={{ 
-            rotate: [0, 360]
+          animate={{
+            rotate: [0, 360],
           }}
           transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
         />
@@ -188,7 +211,7 @@ export default function Login() {
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header with Logo */}
-        <motion.header 
+        <motion.header
           className="p-4 md:p-6 flex justify-center"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -199,29 +222,28 @@ export default function Login() {
 
         {/* Split View Container */}
         <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-4 md:gap-8">
-          
           {/* Login Section */}
           <AnimatePresence mode="wait">
-            {(viewMode === 'split' || viewMode === 'login') && (
+            {(viewMode === "split" || viewMode === "login") && (
               <motion.div
                 key="login-section"
                 className={cn(
                   "w-full transition-all duration-500",
-                  viewMode === 'split' ? 'lg:w-1/2 max-w-md' : 'max-w-lg'
+                  viewMode === "split" ? "lg:w-1/2 max-w-md" : "max-w-lg",
                 )}
                 initial={{ opacity: 0, x: -50 }}
-                animate={{ 
-                  opacity: 1, 
+                animate={{
+                  opacity: 1,
                   x: 0,
-                  scale: viewMode === 'login' ? 1.02 : 1
+                  scale: viewMode === "login" ? 1.02 : 1,
                 }}
                 exit={{ opacity: 0, x: -100, scale: 0.9 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
-                <motion.div 
+                <motion.div
                   className={cn(
                     "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
-                    viewMode === 'login' && "ring-2 ring-primary/20"
+                    viewMode === "login" && "ring-2 ring-primary/20",
                   )}
                   whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
                 >
@@ -231,7 +253,11 @@ export default function Login() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 overflow-hidden"
+                      className={cn(
+                        "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
+                        viewMode === "login" && "ring-2 ring-primary/20",
+                      )}
+                      whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
                     >
                       <img src="/logo.png" alt="IPTV LINK" className="w-12 h-12 object-contain" />
                     </motion.div>
@@ -253,9 +279,9 @@ export default function Login() {
                           type="email"
                           placeholder="seu@email.com"
                           value={email}
-                          onChange={e => setEmail(e.target.value)}
+                          onChange={(e) => setEmail(e.target.value)}
                           disabled={isLoading}
-                          onFocus={() => viewMode === 'split' && setViewMode('login')}
+                          onFocus={() => viewMode === "split" && setViewMode("login")}
                           className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
@@ -267,12 +293,12 @@ export default function Login() {
                         <div className="relative">
                           <Input
                             id="password"
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
                             value={password}
-                            onChange={e => setPassword(e.target.value)}
+                            onChange={(e) => setPassword(e.target.value)}
                             disabled={isLoading}
-                            onFocus={() => viewMode === 'split' && setViewMode('login')}
+                            onFocus={() => viewMode === "split" && setViewMode("login")}
                             className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
                           />
                           <button
@@ -289,7 +315,7 @@ export default function Login() {
                         <Checkbox
                           id="remember-me"
                           checked={rememberMe}
-                          onCheckedChange={checked => setRememberMe(checked === true)}
+                          onCheckedChange={(checked) => setRememberMe(checked === true)}
                         />
                         <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
                           Continuar conectado por 30 dias
@@ -316,7 +342,7 @@ export default function Login() {
                     </form>
 
                     {/* Switch to Plans */}
-                    {viewMode === 'login' && (
+                    {viewMode === "login" && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -324,7 +350,7 @@ export default function Login() {
                       >
                         <Button
                           variant="ghost"
-                          onClick={() => setViewMode('split')}
+                          onClick={() => setViewMode("split")}
                           className="w-full text-muted-foreground hover:text-foreground"
                         >
                           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -339,43 +365,38 @@ export default function Login() {
           </AnimatePresence>
 
           {/* Divider (only in split mode) */}
-          {viewMode === 'split' && (
-            <motion.div 
+          {viewMode === "split" && (
+            <motion.div
               className="hidden lg:flex flex-col items-center gap-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
               <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
-              <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50">
-                ou
-              </span>
+              <span className="text-muted-foreground text-sm font-medium px-3 py-1 rounded-full bg-muted/50">ou</span>
               <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent" />
             </motion.div>
           )}
 
           {/* Plans Section */}
           <AnimatePresence mode="wait">
-            {(viewMode === 'split' || viewMode === 'plans') && (
+            {(viewMode === "split" || viewMode === "plans") && (
               <motion.div
                 key="plans-section"
-                className={cn(
-                  "w-full transition-all duration-500",
-                  viewMode === 'split' ? 'lg:w-5/12' : 'max-w-4xl'
-                )}
+                className={cn("w-full transition-all duration-500", viewMode === "split" ? "lg:w-5/12" : "max-w-4xl")}
                 initial={{ opacity: 0, x: 50 }}
-                animate={{ 
-                  opacity: 1, 
+                animate={{
+                  opacity: 1,
                   x: 0,
-                  scale: viewMode === 'plans' ? 1.02 : 1
+                  scale: viewMode === "plans" ? 1.02 : 1,
                 }}
                 exit={{ opacity: 0, x: 100, scale: 0.9 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
-                <motion.div 
+                <motion.div
                   className={cn(
                     "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden p-6",
-                    viewMode === 'plans' && "ring-2 ring-primary/20"
+                    viewMode === "plans" && "ring-2 ring-primary/20",
                   )}
                 >
                   {/* Plans Header */}
@@ -395,7 +416,7 @@ export default function Login() {
                   </div>
 
                   {/* Device Icons */}
-                  <motion.div 
+                  <motion.div
                     className="flex flex-wrap justify-center gap-3 mb-6"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -435,18 +456,18 @@ export default function Login() {
                           onHoverStart={() => setHoveredPlan(plan.id)}
                           onHoverEnd={() => setHoveredPlan(null)}
                           onClick={() => {
-                            if (viewMode === 'split') {
-                              setViewMode('plans');
+                            if (viewMode === "split") {
+                              setViewMode("plans");
                             } else {
                               handlePlanSelect(plan);
                             }
                           }}
                           className={cn(
                             "relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300",
-                            plan.is_highlighted 
-                              ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" 
+                            plan.is_highlighted
+                              ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
                               : "border-border/50 bg-background/30 hover:border-primary/50",
-                            hoveredPlan === plan.id && "ring-2 ring-primary/20"
+                            hoveredPlan === plan.id && "ring-2 ring-primary/20",
                           )}
                         >
                           {/* Highlighted Badge */}
@@ -477,12 +498,10 @@ export default function Login() {
                           <div className="text-center">
                             <h3 className="text-base font-bold text-foreground mb-1">{plan.name}</h3>
                             <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-2xl font-extrabold text-primary">
-                                {formatPrice(plan.price)}
-                              </span>
+                              <span className="text-2xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
                               <span className="text-xs text-muted-foreground">/{plan.period}</span>
                             </div>
-                            
+
                             {plan.savings_amount && plan.savings_amount > 0 && (
                               <p className="text-[10px] text-green-500 mt-1">
                                 Economize {formatPrice(plan.savings_amount)}
@@ -491,10 +510,10 @@ export default function Login() {
                           </div>
 
                           {/* Features (show in expanded mode) */}
-                          {viewMode === 'plans' && (
+                          {viewMode === "plans" && (
                             <motion.ul
                               initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
+                              animate={{ opacity: 1, height: "auto" }}
                               className="mt-3 space-y-1"
                             >
                               {plan.features.slice(0, 3).map((feature, idx) => (
@@ -511,20 +530,18 @@ export default function Login() {
                             size="sm"
                             className={cn(
                               "w-full mt-3 rounded-lg text-sm",
-                              plan.is_highlighted 
-                                ? "bg-primary hover:bg-primary/90" 
-                                : "bg-muted hover:bg-muted/80"
+                              plan.is_highlighted ? "bg-primary hover:bg-primary/90" : "bg-muted hover:bg-muted/80",
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (viewMode === 'split') {
-                                setViewMode('plans');
+                              if (viewMode === "split") {
+                                setViewMode("plans");
                               } else {
                                 handlePlanSelect(plan);
                               }
                             }}
                           >
-                            {viewMode === 'split' ? (
+                            {viewMode === "split" ? (
                               <>
                                 <Sparkles className="w-4 h-4 mr-2" />
                                 Ver detalhes
@@ -532,7 +549,7 @@ export default function Login() {
                             ) : (
                               <>
                                 <Zap className="w-4 h-4 mr-2" />
-                                {plan.cta_text || 'Assinar agora'}
+                                {plan.cta_text || "Assinar agora"}
                               </>
                             )}
                           </Button>
@@ -542,7 +559,7 @@ export default function Login() {
                   )}
 
                   {/* Benefits Banner (expanded mode) */}
-                  {viewMode === 'plans' && (
+                  {viewMode === "plans" && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -564,7 +581,7 @@ export default function Login() {
                   )}
 
                   {/* Switch to Login */}
-                  {viewMode === 'plans' && (
+                  {viewMode === "plans" && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -572,7 +589,7 @@ export default function Login() {
                     >
                       <Button
                         variant="ghost"
-                        onClick={() => setViewMode('split')}
+                        onClick={() => setViewMode("split")}
                         className="w-full text-muted-foreground hover:text-foreground"
                       >
                         <ArrowLeft className="w-4 h-4 mr-2" />
@@ -587,7 +604,7 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <motion.footer 
+        <motion.footer
           className="p-4 text-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -597,9 +614,7 @@ export default function Login() {
             <Wifi className="w-4 h-4 text-green-500" />
             <span>Conectado</span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            © 2025 IPTV LINK. Todos os direitos reservados.
-          </p>
+          <p className="text-xs text-muted-foreground">© 2025 IPTV LINK. Todos os direitos reservados.</p>
         </motion.footer>
       </div>
     </div>
