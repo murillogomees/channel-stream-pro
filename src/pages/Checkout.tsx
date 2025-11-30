@@ -17,11 +17,12 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   CreditCard, Shield, Check, Lock, 
-  Tv, Loader2, AlertCircle, ArrowLeft, Sparkles,
+  Loader2, AlertCircle, ArrowLeft, Sparkles,
   User, Phone, Mail, MapPin, Percent, Tag, Ticket, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import logoWhite from "@/assets/logo-white.png";
 
 // Opções de origem do cadastro
 const DISCOVERY_OPTIONS = [
@@ -258,20 +259,24 @@ export default function Checkout() {
     <div className="min-h-screen bg-gradient-to-br from-slate-300 via-slate-200 to-slate-300">
       {/* Header */}
       <header className="border-b border-slate-700/50 bg-background sticky top-0 z-50 backdrop-blur-md">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <button 
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2 text-white hover:text-white/80 transition-colors"
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          {/* Voltar Button */}
+          <Button 
+            variant="ghost"
+            onClick={() => navigate("/login")}
+            className="text-white/80 hover:text-white hover:bg-white/10 transition-all"
           >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="hidden sm:inline">Voltar</span>
-          </button>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            <span className="text-sm">Voltar para o login</span>
+          </Button>
           
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/30">
-              <Tv className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-bold text-white">IPTV Link</span>
+          {/* Logo Centralizado */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <img 
+              src={logoWhite} 
+              alt="IPTV Link" 
+              className="h-10 w-auto object-contain"
+            />
           </div>
 
           {/* Security Badges */}
@@ -528,7 +533,7 @@ export default function Checkout() {
                                 className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
                                   isSelected 
                                     ? 'border-primary bg-primary shadow-lg shadow-primary/50' 
-                                    : 'border-slate-500 bg-slate-700'
+                                    : 'border-slate-400 bg-slate-300/80'
                                 }`}
                                 animate={{ scale: isSelected ? 1.1 : 1 }}
                               >
