@@ -275,23 +275,34 @@ export default function Checkout() {
           </div>
 
           {/* Security Badges */}
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="hidden md:flex items-center gap-1.5 text-emerald-400 text-xs">
-              <Shield className="h-3.5 w-3.5" />
-              <span>SSL</span>
-            </div>
-            <div className="hidden lg:flex items-center gap-1.5 text-emerald-400 text-xs">
-              <CreditCard className="h-3.5 w-3.5" />
-              <span>Mercado Pago</span>
-            </div>
-            <div className="hidden lg:flex items-center gap-1.5 text-emerald-400 text-xs">
-              <Check className="h-3.5 w-3.5" />
-              <span>Garantia</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40">
+          <div className="flex items-center gap-2 md:gap-3">
+            <motion.div 
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Shield className="h-4 w-4 text-emerald-400" />
+              <span className="text-emerald-400 text-xs font-semibold">Certificado SSL</span>
+            </motion.div>
+            <motion.div 
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <CreditCard className="h-4 w-4 text-blue-400" />
+              <span className="text-blue-400 text-xs font-semibold">Mercado Pago</span>
+            </motion.div>
+            <motion.div 
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/30 to-teal-500/20 border border-emerald-500/50 shadow-lg shadow-emerald-500/20"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+            >
               <Lock className="h-4 w-4 text-emerald-400" />
-              <span className="text-emerald-400 text-sm font-medium">Compra Protegida</span>
-            </div>
+              <span className="text-white text-sm font-bold">Compra Segura</span>
+            </motion.div>
           </div>
         </div>
       </header>
@@ -446,9 +457,23 @@ export default function Checkout() {
                     <Tag className="h-5 w-5 text-amber-400" />
                   </div>
                   Escolha seu Plano
-                  <Badge className="ml-auto bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 animate-pulse">
-                    Oferta Limitada
-                  </Badge>
+                  <motion.div
+                    className="ml-auto"
+                    animate={{ 
+                      opacity: [1, 0.6, 1],
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{ 
+                      duration: 2.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 border-0 shadow-lg shadow-orange-500/30 px-4 py-1.5 text-sm">
+                      <Sparkles className="h-4 w-4 mr-1.5 text-white" />
+                      <span className="text-white font-bold">Oferta Limitada</span>
+                    </Badge>
+                  </motion.div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
