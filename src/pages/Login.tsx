@@ -231,9 +231,9 @@ export default function Login() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
+                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 overflow-hidden"
                     >
-                      <LogIn className="w-8 h-8 text-primary" />
+                      <img src="/logo.png" alt="IPTV LINK" className="w-12 h-12 object-contain" />
                     </motion.div>
                     <h2 className="text-2xl font-bold text-foreground">Já sou cliente</h2>
                     <p className="text-muted-foreground text-center text-sm mt-2">
