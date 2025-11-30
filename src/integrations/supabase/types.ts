@@ -2476,6 +2476,42 @@ export type Database = {
           },
         ]
       }
+      mercado_pago_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          production_access_token: string | null
+          public_key: string | null
+          sandbox_access_token: string | null
+          updated_at: string | null
+          updated_by: string | null
+          use_sandbox: boolean | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          production_access_token?: string | null
+          public_key?: string | null
+          sandbox_access_token?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          use_sandbox?: boolean | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          production_access_token?: string | null
+          public_key?: string | null
+          sandbox_access_token?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          use_sandbox?: boolean | null
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
       mercado_pago_webhooks: {
         Row: {
           action: string | null
