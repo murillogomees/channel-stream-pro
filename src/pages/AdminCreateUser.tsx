@@ -28,7 +28,8 @@ interface AdminUser {
   last_sign_in_at: string | null;
 }
 
-const PROTECTED_EMAILS = ['murillo@gmail.com', 'rene@iptvlink.com.br'];
+const MASTER_ADMIN_EMAIL = 'murillo@gmail.com';
+const PROTECTED_EMAILS = [MASTER_ADMIN_EMAIL]; // Only master admin is fully protected
 
 const AdminCreateUser = () => {
   const { isSuperAdmin, user } = useAuth();
@@ -196,7 +197,35 @@ const AdminCreateUser = () => {
     }
   };
 
+  const isMasterAdmin = (email: string) => email === MASTER_ADMIN_EMAIL;
+  const canEditUser = (adminUser: AdminUser) => {
+    // Master admin can edit anyone
+    if (user?.email === MASTER_ADMIN_EMAIL) return true;
+    // No one else can edit master admin
+    if (isMasterAdmin(adminUser.email)) return false;
+    // Others can edit themselves or non-master admins
+    return true;
+  };
+  const canDeleteUser = (adminUser: AdminUser) => {
+    // No one can delete master admin
+    if (isMasterAdmin(adminUser.email)) return false;
+    // Can't delete yourself
+    if (adminUser.id === user?.id) return false;
+    // Master admin can delete anyone else
+    if (user?.email === MASTER_ADMIN_EMAIL) return true;
+    // Super admins can delete other non-master admins
+    return true;
+  };
+
   const handleEdit = (adminUser: AdminUser) => {
+    if (!canEditUser(adminUser)) {
+      toast({
+        title: "Ação bloqueada",
+        description: "Você não tem permissão para editar este usuário",
+        variant: "destructive",
+      });
+      return;
+    }
     setEditingUser(adminUser);
     setEditFormData({
       nome: adminUser.nome,
@@ -260,18 +289,12 @@ const AdminCreateUser = () => {
   };
 
   const handleDelete = (adminUser: AdminUser) => {
-    if (PROTECTED_EMAILS.includes(adminUser.email)) {
+    if (!canDeleteUser(adminUser)) {
       toast({
         title: "Ação bloqueada",
-        description: "Este usuário é protegido e não pode ser removido",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (adminUser.id === user?.id) {
-      toast({
-        title: "Ação bloqueada",
-        description: "Você não pode remover seu próprio usuário",
+        description: isMasterAdmin(adminUser.email) 
+          ? "O administrador master não pode ser removido"
+          : "Você não pode remover seu próprio usuário",
         variant: "destructive",
       });
       return;
@@ -325,17 +348,18 @@ const AdminCreateUser = () => {
     u.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getRoleBadge = (roles: AppRole[]) => {
+  const getRoleBadge = (roles: AppRole[], email: string) => {
+    if (isMasterAdmin(email)) {
+      return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30"><Crown className="h-3 w-3 mr-1" />Master</Badge>;
+    }
     if (roles.includes('super_admin')) {
-      return <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30"><Crown className="h-3 w-3 mr-1" />Super Admin</Badge>;
+      return <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30"><ShieldCheck className="h-3 w-3 mr-1" />Super Admin</Badge>;
     }
     if (roles.includes('admin')) {
       return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
     }
     return <Badge variant="secondary">Usuário</Badge>;
   };
-
-  const isProtected = (email: string) => PROTECTED_EMAILS.includes(email);
 
   return (
     <div className="space-y-6">
@@ -414,7 +438,7 @@ const AdminCreateUser = () => {
                                 <span className="text-sm text-muted-foreground">{adminUser.email}</span>
                               </div>
                             </TableCell>
-                            <TableCell>{getRoleBadge(adminUser.roles)}</TableCell>
+                            <TableCell>{getRoleBadge(adminUser.roles, adminUser.email)}</TableCell>
                             <TableCell className="hidden md:table-cell">
                               {adminUser.telefone || <span className="text-muted-foreground">-</span>}
                             </TableCell>
@@ -433,8 +457,8 @@ const AdminCreateUser = () => {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleEdit(adminUser)}
-                                  disabled={isProtected(adminUser.email) && adminUser.id !== user?.id}
-                                  title="Editar"
+                                  disabled={!canEditUser(adminUser)}
+                                  title={isMasterAdmin(adminUser.email) && user?.email !== MASTER_ADMIN_EMAIL ? "Master admin só pode ser editado por ele mesmo" : "Editar"}
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
@@ -442,9 +466,9 @@ const AdminCreateUser = () => {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleDelete(adminUser)}
-                                  disabled={isProtected(adminUser.email) || adminUser.id === user?.id}
+                                  disabled={!canDeleteUser(adminUser)}
                                   className="text-destructive hover:text-destructive"
-                                  title="Remover permissões"
+                                  title={isMasterAdmin(adminUser.email) ? "Master admin não pode ser removido" : "Remover permissões"}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -629,7 +653,7 @@ const AdminCreateUser = () => {
               <Select
                 value={editFormData.role}
                 onValueChange={(value: "admin" | "super_admin") => setEditFormData({ ...editFormData, role: value })}
-                disabled={editLoading || isProtected(editingUser?.email || '')}
+                disabled={editLoading || isMasterAdmin(editingUser?.email || '')}
               >
                 <SelectTrigger>
                   <SelectValue />
