@@ -29,6 +29,7 @@ import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
 import { useContinueWatching, useTrending, useRecommendations } from '@/features/player/hooks';
+import { useSmartCache } from '@/hooks/useSmartCache';
 import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView, SeriesView, HomeView } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { 
@@ -114,10 +115,17 @@ export default function AppPlayer() {
   const [movieSortBy, setMovieSortBy] = useState<MovieSortOption>('name');
   const [seriesSortBy, setSeriesSortBy] = useState<SeriesSortOption>('name');
   
+  // Smart Cache integration for predictive preloading
+  const { trackChannelView, setChannelList, pauseWarming, resumeWarming } = useSmartCache({
+    profileId: undefined, // Will be set from auth context if available
+    enabled: !isAdmin,
+    autoWarm: true,
+  });
+
   // Smart features hooks
   const { 
     items: continueWatchingItems, 
-    isLoading: loadingContinueWatching, 
+    isLoading: loadingContinueWatching,
     removeItem: removeContinueWatchingItem,
     refresh: refreshContinueWatching,
   } = useContinueWatching();
@@ -203,9 +211,16 @@ export default function AppPlayer() {
 
   // Get all channels for search and favorites
   const allChannels = useMemo(() => 
-    categories.flatMap(cat => cat.channels.map(ch => ({ ...ch, category_name: cat.display_name }))),
+    categories.flatMap(cat => cat.channels.map(ch => ({ ...ch, category_name: cat.display_name, category_id: cat.id }))),
     [categories]
   );
+
+  // Update smart cache channel list
+  useEffect(() => {
+    if (allChannels.length > 0) {
+      setChannelList(allChannels);
+    }
+  }, [allChannels, setChannelList]);
 
   // Recommendations based on watch history (must be after allChannels)
   const {
@@ -457,12 +472,15 @@ export default function AppPlayer() {
   // Handle playing a different episode
   const handlePlayEpisode = useCallback((episode: any) => {
     setPlayerChannel(episode);
-  }, []);
+    trackChannelView(episode.id, episode.category_id);
+  }, [trackChannelView]);
 
   // Handle play
   const handlePlay = (channel: any) => {
     setPlayerChannel(channel);
     setShowPlayerDialog(true);
+    trackChannelView(channel.id, channel.category_id);
+    pauseWarming(); // Pause warming during playback
   };
 
   // Loading state - only show if no content at all

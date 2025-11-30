@@ -34,9 +34,14 @@ export { useSignedStreamUrl, clearSignedUrlCache, preloadSignedUrl } from './use
 export { useCFStreamAnalytics, TIME_RANGES } from './useCFStreamAnalytics';
 export type { ChannelMetrics, AggregatedMetrics, MetricsTimeRange } from './useCFStreamAnalytics';
 
+// Smart Cache
+export { useSmartCache } from './useSmartCache';
+export type { SmartCacheStats, UseSmartCacheOptions } from './useSmartCache';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
 export type { ConnectionInfo, ConnectionQuality } from '@/services/connectionService';
 export type { RecoveryStats, RecoveryConfig } from '@/services/errorRecoveryService';
 export type { WebVitalMetric, WebVitalsReport, MetricName } from '@/services/webVitalsService';
+export type { PredictionScore, PredictionReason, WarmingStats, CacheStats } from '@/services/cache';
