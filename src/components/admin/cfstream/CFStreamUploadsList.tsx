@@ -33,11 +33,13 @@ import {
   CheckCircle,
   Loader2,
   Cloud,
-  Play
+  Play,
+  Shield
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CFStreamSignedUrlDialog } from "./CFStreamSignedUrlDialog";
 
 interface Upload {
   id: string;
@@ -89,6 +91,13 @@ export function CFStreamUploadsList({
   onSearchChange,
 }: CFStreamUploadsListProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [signedUrlDialogOpen, setSignedUrlDialogOpen] = useState(false);
+  const [selectedUpload, setSelectedUpload] = useState<{ uid: string; name?: string } | null>(null);
+
+  const handleOpenSignedUrlDialog = (cfStreamUid: string, channelName?: string) => {
+    setSelectedUpload({ uid: cfStreamUid, name: channelName });
+    setSignedUrlDialogOpen(true);
+  };
 
   const handleRetry = async (id: string) => {
     setActionLoading(id);
@@ -300,21 +309,32 @@ export function CFStreamUploadsList({
                           )}
 
                           {upload.status === 'ready' && upload.cf_stream_uid && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-green-500"
-                              title="Preview"
-                              asChild
-                            >
-                              <a 
-                                href={`https://customer-${upload.cf_stream_uid}.cloudflarestream.com/${upload.cf_stream_uid}/manifest/video.m3u8`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-primary"
+                                title="URL Assinada"
+                                onClick={() => handleOpenSignedUrlDialog(upload.cf_stream_uid!, upload.channel_name)}
                               >
-                                <Play className="h-4 w-4" />
-                              </a>
-                            </Button>
+                                <Shield className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-green-500"
+                                title="Preview"
+                                asChild
+                              >
+                                <a 
+                                  href={`https://customer-${upload.cf_stream_uid}.cloudflarestream.com/${upload.cf_stream_uid}/manifest/video.m3u8`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <Play className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -332,6 +352,16 @@ export function CFStreamUploadsList({
           </div>
         )}
       </CardContent>
+
+      {/* Signed URL Dialog */}
+      {selectedUpload && (
+        <CFStreamSignedUrlDialog
+          open={signedUrlDialogOpen}
+          onOpenChange={setSignedUrlDialogOpen}
+          cfStreamUid={selectedUpload.uid}
+          channelName={selectedUpload.name}
+        />
+      )}
     </Card>
   );
 }
