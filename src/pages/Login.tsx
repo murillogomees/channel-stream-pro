@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -287,26 +287,48 @@ export default function Login() {
     </motion.div>
   );
 
-  // Plans Card Component
+  // Plans Card Component - Expanded when locked on desktop
+  const isExpanded = !isMobile && lockedSide === "plans";
+  
   const PlansCard = () => (
     <motion.div
       className={cn(
         "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
-        "p-4 sm:p-5 w-full max-w-[320px] sm:max-w-md mx-2 sm:mx-4"
+        "mx-2 sm:mx-4 transition-all duration-500",
+        isExpanded 
+          ? "p-6 sm:p-8 w-full max-w-3xl" 
+          : "p-4 sm:p-5 w-full max-w-[320px] sm:max-w-md"
       )}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
+      layout
     >
       {/* Plans Header */}
-      <div className="text-center mb-3 sm:mb-4">
-        <h2 className="text-lg sm:text-xl font-bold text-foreground">Quero me cadastrar</h2>
+      <div className="text-center mb-4 sm:mb-6">
+        <h2 className={cn(
+          "font-bold text-foreground",
+          isExpanded ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"
+        )}>
+          Quero me cadastrar
+        </h2>
+        {isExpanded && (
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+            Escolha o plano ideal para você e sua família
+          </p>
+        )}
       </div>
 
       {/* Devices Banner */}
-      <div className="bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 mb-4 text-center">
-        <p className="text-[10px] sm:text-xs text-primary font-medium">
+      <div className={cn(
+        "bg-primary/10 border border-primary/20 rounded-xl text-center mb-4 sm:mb-6",
+        isExpanded ? "px-4 py-3" : "px-3 py-2"
+      )}>
+        <p className={cn(
+          "text-primary font-medium",
+          isExpanded ? "text-xs sm:text-sm" : "text-[10px] sm:text-xs"
+        )}>
           📱 Celular • 💻 PC • 📺 Smart TV • 🎮 Video Game • Fire Stick
         </p>
       </div>
@@ -317,10 +339,14 @@ export default function Login() {
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className={cn(
+          "grid gap-3 sm:gap-4",
+          isExpanded ? "grid-cols-2 lg:grid-cols-2" : "grid-cols-2"
+        )}>
           {plans.map(plan => (
-            <div
+            <motion.div
               key={plan.id}
+              layout
               onClick={(e) => {
                 e.stopPropagation();
                 handlePlanSelect(plan);
@@ -328,19 +354,23 @@ export default function Login() {
               onMouseEnter={() => setHoveredPlan(plan.id)}
               onMouseLeave={() => setHoveredPlan(null)}
               className={cn(
-                "relative cursor-pointer rounded-xl border-2 p-2.5 sm:p-3 transition-all duration-200",
+                "relative cursor-pointer rounded-xl border-2 transition-all duration-200",
                 "hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]",
+                isExpanded ? "p-4 sm:p-5" : "p-2.5 sm:p-3",
                 plan.is_highlighted
-                  ? "border-primary bg-primary/10 shadow-md shadow-primary/15"
-                  : "border-border/40 bg-background/50 hover:border-primary/40 hover:bg-background/70",
-                hoveredPlan === plan.id && "ring-2 ring-primary/25"
+                  ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
+                  : "border-border/50 bg-background/60 hover:border-accent hover:bg-background/80",
+                hoveredPlan === plan.id && "ring-2 ring-primary/30"
               )}
             >
               {/* Highlighted Badge */}
               {plan.is_highlighted && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
-                  <span className="bg-primary text-primary-foreground text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap shadow-sm">
-                    <Star className="w-2.5 h-2.5" fill="currentColor" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                  <span className={cn(
+                    "bg-primary text-primary-foreground font-bold rounded-full flex items-center gap-1 whitespace-nowrap shadow-md",
+                    isExpanded ? "text-xs px-3 py-1" : "text-[9px] sm:text-[10px] px-2 py-0.5"
+                  )}>
+                    <Star className={cn(isExpanded ? "w-3.5 h-3.5" : "w-2.5 h-2.5")} fill="currentColor" />
                     POPULAR
                   </span>
                 </div>
@@ -348,54 +378,117 @@ export default function Login() {
 
               {/* Savings Badge */}
               {plan.savings_percent && plan.savings_percent > 0 && (
-                <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                <div className={cn(
+                  "absolute bg-emerald-500 text-white font-bold rounded-full shadow-md",
+                  isExpanded 
+                    ? "-top-2 -right-2 text-xs px-2.5 py-1" 
+                    : "-top-1.5 -right-1.5 text-[9px] sm:text-[10px] px-1.5 py-0.5"
+                )}>
                   -{plan.savings_percent}%
                 </div>
               )}
 
               <div className={cn("text-center", plan.is_highlighted && "pt-1")}>
-                <h3 className="text-sm sm:text-base font-semibold text-foreground leading-tight">{plan.name}</h3>
-                <div className="flex items-baseline justify-center gap-0.5 mt-1">
-                  <span className="text-lg sm:text-xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
-                  <span className="text-[10px] sm:text-xs text-muted-foreground font-medium">/{plan.period}</span>
+                <h3 className={cn(
+                  "font-semibold text-foreground leading-tight",
+                  isExpanded ? "text-lg sm:text-xl" : "text-sm sm:text-base"
+                )}>
+                  {plan.name}
+                </h3>
+                
+                <div className={cn(
+                  "flex items-baseline justify-center gap-1 mt-2",
+                  isExpanded && "mt-3"
+                )}>
+                  <span className={cn(
+                    "font-extrabold text-primary",
+                    isExpanded ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"
+                  )}>
+                    {formatPrice(plan.price)}
+                  </span>
+                  <span className={cn(
+                    "text-muted-foreground font-medium",
+                    isExpanded ? "text-sm" : "text-[10px] sm:text-xs"
+                  )}>
+                    /{plan.period}
+                  </span>
                 </div>
 
+                {/* Price per month for multi-month plans */}
+                {isExpanded && plan.period_months > 1 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatPrice(plan.price / plan.period_months)}/mês
+                  </p>
+                )}
+
                 {plan.savings_amount && plan.savings_amount > 0 && (
-                  <p className="text-[9px] sm:text-[10px] text-emerald-500 font-medium mt-0.5">
+                  <p className={cn(
+                    "text-emerald-500 font-medium",
+                    isExpanded ? "text-sm mt-2" : "text-[9px] sm:text-[10px] mt-0.5"
+                  )}>
                     Economize {formatPrice(plan.savings_amount)}
                   </p>
+                )}
+
+                {/* Features - Only show when expanded */}
+                {isExpanded && plan.features && plan.features.length > 0 && (
+                  <motion.div 
+                    className="mt-4 pt-4 border-t border-border/30"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <ul className="space-y-2 text-left">
+                      {plan.features.map((feature, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </motion.div>
                 )}
               </div>
 
               {/* CTA Button */}
               <Button
-                size="sm"
+                size={isExpanded ? "default" : "sm"}
                 className={cn(
-                  "w-full mt-2 sm:mt-2.5 rounded-lg text-xs sm:text-sm h-8 sm:h-9 font-semibold",
+                  "w-full rounded-xl font-semibold transition-all",
+                  isExpanded ? "mt-5 h-11 text-sm" : "mt-2 sm:mt-2.5 h-8 sm:h-9 text-xs sm:text-sm",
                   plan.is_highlighted 
-                    ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm" 
-                    : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/25" 
+                    : "bg-accent hover:bg-accent/80 text-accent-foreground border border-border/50"
                 )}
                 onClick={e => {
                   e.stopPropagation();
                   handlePlanSelect(plan);
                 }}
               >
-                <Zap className="w-3.5 h-3.5 mr-1.5" />
-                {plan.cta_text || "Assinar"}
+                <Zap className={cn(
+                  "mr-1.5",
+                  isExpanded ? "w-4 h-4" : "w-3.5 h-3.5"
+                )} />
+                {plan.cta_text || "Assinar Agora"}
               </Button>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
 
       {/* Switch Button - Only on Mobile or when locked */}
       {(isMobile || lockedSide === "plans") && (
-        <div className="mt-4 pt-3 border-t border-border/30">
+        <div className={cn(
+          "border-t border-border/30",
+          isExpanded ? "mt-6 pt-4" : "mt-4 pt-3"
+        )}>
           <Button
             variant="ghost"
             onClick={() => isMobile ? switchToLogin() : switchToOtherSide("login")}
-            className="w-full text-muted-foreground hover:text-foreground h-10 text-sm"
+            className={cn(
+              "w-full text-muted-foreground hover:text-foreground",
+              isExpanded ? "h-12 text-base" : "h-10 text-sm"
+            )}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Já sou cliente
