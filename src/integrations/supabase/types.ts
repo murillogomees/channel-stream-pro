@@ -3666,6 +3666,140 @@ export type Database = {
         }
         Relationships: []
       }
+      transcode_job_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          job_id: string
+          metadata: Json | null
+          new_status: Database["public"]["Enums"]["transcode_job_status"]
+          old_status: Database["public"]["Enums"]["transcode_job_status"] | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          job_id: string
+          metadata?: Json | null
+          new_status: Database["public"]["Enums"]["transcode_job_status"]
+          old_status?:
+            | Database["public"]["Enums"]["transcode_job_status"]
+            | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          job_id?: string
+          metadata?: Json | null
+          new_status?: Database["public"]["Enums"]["transcode_job_status"]
+          old_status?:
+            | Database["public"]["Enums"]["transcode_job_status"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcode_job_history_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "transcode_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transcode_jobs: {
+        Row: {
+          cf_stream_uid: string | null
+          cf_upload_id: string | null
+          channel_id: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          estimated_popularity: number | null
+          historical_views: number | null
+          id: string
+          ladder_config: Json | null
+          ladder_preset: Database["public"]["Enums"]["quality_ladder_preset"]
+          max_retries: number
+          output_manifests: Json | null
+          output_metadata: Json | null
+          output_thumbnails: Json | null
+          priority: number
+          processor_id: string | null
+          retry_after: string | null
+          retry_count: number
+          source_resolution: Json | null
+          source_url: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["transcode_job_status"]
+          updated_at: string
+        }
+        Insert: {
+          cf_stream_uid?: string | null
+          cf_upload_id?: string | null
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          estimated_popularity?: number | null
+          historical_views?: number | null
+          id?: string
+          ladder_config?: Json | null
+          ladder_preset?: Database["public"]["Enums"]["quality_ladder_preset"]
+          max_retries?: number
+          output_manifests?: Json | null
+          output_metadata?: Json | null
+          output_thumbnails?: Json | null
+          priority?: number
+          processor_id?: string | null
+          retry_after?: string | null
+          retry_count?: number
+          source_resolution?: Json | null
+          source_url: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["transcode_job_status"]
+          updated_at?: string
+        }
+        Update: {
+          cf_stream_uid?: string | null
+          cf_upload_id?: string | null
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          estimated_popularity?: number | null
+          historical_views?: number | null
+          id?: string
+          ladder_config?: Json | null
+          ladder_preset?: Database["public"]["Enums"]["quality_ladder_preset"]
+          max_retries?: number
+          output_manifests?: Json | null
+          output_metadata?: Json | null
+          output_thumbnails?: Json | null
+          priority?: number
+          processor_id?: string | null
+          retry_after?: string | null
+          retry_count?: number
+          source_resolution?: Json | null
+          source_url?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["transcode_job_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcode_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trending_rankings: {
         Row: {
           content_category: string | null
@@ -4347,6 +4481,18 @@ export type Database = {
         Args: { p_key: string; p_locked_by: string }
         Returns: boolean
       }
+      acquire_transcode_job: {
+        Args: { p_processor_id: string }
+        Returns: string
+      }
+      calculate_ladder_preset: {
+        Args: {
+          p_historical_views: number
+          p_source_height: number
+          p_source_width: number
+        }
+        Returns: Database["public"]["Enums"]["quality_ladder_preset"]
+      }
       check_and_block_ip: {
         Args: {
           _event_type: string
@@ -4597,6 +4743,7 @@ export type Database = {
           suspicious_activities: number
         }[]
       }
+      get_transcode_queue_stats: { Args: never; Returns: Json }
       get_vod_statistics: {
         Args: never
         Returns: {
@@ -4728,6 +4875,15 @@ export type Database = {
           tvg_logo: string
         }[]
       }
+      update_transcode_job_status: {
+        Args: {
+          p_changed_by?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_new_status: Database["public"]["Enums"]["transcode_job_status"]
+        }
+        Returns: undefined
+      }
       update_watch_progress: {
         Args: {
           p_content_category: string
@@ -4795,8 +4951,15 @@ export type Database = {
         | "Website"
         | "Outro"
       plano_cliente: "Mensal" | "Trimestral" | "Semestral" | "Anual"
+      quality_ladder_preset: "basic" | "standard" | "premium" | "ultra"
       situacao_cliente: "Testando" | "Ativo" | "Devendo" | "Inativo" | "Lead"
       smartone_status: "nao_enviado" | "pendente" | "criado" | "erro"
+      transcode_job_status:
+        | "queued"
+        | "processing"
+        | "ready"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       activation_key_type: {
@@ -4953,8 +5116,16 @@ export const Constants = {
         "Outro",
       ],
       plano_cliente: ["Mensal", "Trimestral", "Semestral", "Anual"],
+      quality_ladder_preset: ["basic", "standard", "premium", "ultra"],
       situacao_cliente: ["Testando", "Ativo", "Devendo", "Inativo", "Lead"],
       smartone_status: ["nao_enviado", "pendente", "criado", "erro"],
+      transcode_job_status: [
+        "queued",
+        "processing",
+        "ready",
+        "failed",
+        "cancelled",
+      ],
     },
   },
 } as const
