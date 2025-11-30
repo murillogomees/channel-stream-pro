@@ -241,12 +241,11 @@ export default function Login() {
             <motion.div
               className={cn(
                 "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6",
-                "transition-all duration-300",
+                "transition-all duration-300 w-[440px] min-h-[520px] flex flex-col",
                 isLoginActive && "ring-2 ring-primary/30 shadow-primary/20"
               )}
               animate={{
                 scale: isLoginActive ? 1.05 : 1,
-                maxWidth: isLoginActive ? "540px" : "440px"
               }}
               transition={{ duration: 0.3 }}
             >
@@ -369,12 +368,11 @@ export default function Login() {
             <motion.div
               className={cn(
                 "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6",
-                "transition-all duration-300",
+                "transition-all duration-300 w-[440px] min-h-[520px] flex flex-col",
                 isPlansActive && "ring-2 ring-primary/30 shadow-primary/20"
               )}
               animate={{
                 scale: isPlansActive ? 1.05 : 1,
-                maxWidth: isPlansActive ? "540px" : "440px"
               }}
               transition={{ duration: 0.3 }}
             >
