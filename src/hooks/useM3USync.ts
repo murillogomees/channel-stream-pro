@@ -64,18 +64,49 @@ export function useM3USync() {
   const fetchSources = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Verify session before making request
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('[M3USync] Session error:', sessionError);
+        throw new Error(`Erro de autenticação: ${sessionError.message}`);
+      }
+      
+      if (!session) {
+        console.error('[M3USync] No active session');
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+
+      console.log('[M3USync] Fetching sources with user:', session.user.id);
+
       const { data, error } = await supabase
         .from('m3u_sync_sources')
         .select('*')
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('[M3USync] Supabase error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
+      
+      console.log('[M3USync] Sources fetched successfully:', data?.length || 0);
       setSources((data as unknown as M3USyncSource[]) || []);
     } catch (error: any) {
-      console.error('[M3USync] Error fetching sources:', error);
+      console.error('[M3USync] Error fetching sources:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack,
+      });
+      
       toast({
-        title: 'Erro',
-        description: 'Falha ao carregar fontes M3U',
+        title: 'Erro ao carregar fontes M3U',
+        description: error.message || 'Erro desconhecido. Verifique o console para mais detalhes.',
         variant: 'destructive',
       });
     } finally {
