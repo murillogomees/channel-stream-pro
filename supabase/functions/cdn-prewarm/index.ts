@@ -193,14 +193,14 @@ serve(async (req) => {
     
     const { data: { user }, error } = await authSupabase.auth.getUser();
     if (!error && user) {
-      // Check if user is admin
-      const { data: profile } = await supabase
-        .from('profiles')
+      // Check if user is admin using user_roles table
+      const { data: roles } = await supabase
+        .from('user_roles')
         .select('role')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id);
       
-      if (profile?.role === 'admin') {
+      const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+      if (isAdmin) {
         isAuthorized = true;
         console.log('[CDN-Prewarm] Admin user authorized:', user.email);
       }
