@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Search, RefreshCw, Edit, Trash2, Shield, User, Mail, Phone, Calendar, DollarSign, CreditCard } from 'lucide-react';
+import { Search, RefreshCw, Edit, Trash2, Shield, User, Mail, Phone, Calendar, DollarSign, CreditCard, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -39,6 +39,18 @@ export default function AdminUserList() {
     email: '',
     telefone: '',
     telefone_whatsapp: '',
+  });
+
+  // Create user dialog state
+  const [createDialog, setCreateDialog] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    email: '',
+    password: '',
+    nome: '',
+    telefone: '',
+    role: 'client' as 'client' | 'admin' | 'master',
   });
 
   useEffect(() => {
@@ -153,6 +165,74 @@ export default function AdminUserList() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!createFormData.email || !createFormData.password || !createFormData.nome) {
+      toast({
+        title: 'Erro',
+        description: 'Preencha todos os campos obrigatórios',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (createFormData.password.length < 8) {
+      toast({
+        title: 'Erro',
+        description: 'A senha deve ter no mínimo 8 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão não encontrada');
+
+      const response = await fetch(
+        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createFormData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar usuário');
+      }
+
+      toast({
+        title: 'Sucesso!',
+        description: `Usuário ${createFormData.email} criado com sucesso`,
+      });
+
+      setCreateDialog(false);
+      setCreateFormData({
+        email: '',
+        password: '',
+        nome: '',
+        telefone: '',
+        role: 'client',
+      });
+      refresh();
+      loadUsersWithRoles();
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao criar usuário',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const getRoleBadge = (roles: string[]) => {
     if (roles.includes('master')) {
       return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30">Master</Badge>;
@@ -255,8 +335,16 @@ export default function AdminUserList() {
       {/* Filtros e Ações */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Usuários</CardTitle>
-          <CardDescription>Gerenciamento completo de todos os usuários do sistema</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Lista de Usuários</CardTitle>
+              <CardDescription>Gerenciamento completo de todos os usuários do sistema</CardDescription>
+            </div>
+            <Button onClick={() => setCreateDialog(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Criar Usuário
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -447,6 +535,103 @@ export default function AdminUserList() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteConfirm}>
               Confirmar Exclusão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Criar Usuário */}
+      <Dialog open={createDialog} onOpenChange={setCreateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Preencha os dados para criar um novo usuário no sistema
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-nome">Nome Completo *</Label>
+              <Input
+                id="create-nome"
+                placeholder="Digite o nome completo"
+                value={createFormData.nome}
+                onChange={(e) => setCreateFormData({ ...createFormData, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email *</Label>
+              <Input
+                id="create-email"
+                type="email"
+                placeholder="usuario@exemplo.com"
+                value={createFormData.email}
+                onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Senha *</Label>
+              <div className="relative">
+                <Input
+                  id="create-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Mínimo 8 caracteres"
+                  value={createFormData.password}
+                  onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-telefone">Telefone</Label>
+              <Input
+                id="create-telefone"
+                placeholder="(00) 00000-0000"
+                value={createFormData.telefone}
+                onChange={(e) => setCreateFormData({ ...createFormData, telefone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-role">Tipo de Usuário *</Label>
+              <Select 
+                value={createFormData.role} 
+                onValueChange={(value: any) => setCreateFormData({ ...createFormData, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="client">Cliente</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="master">Master</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialog(false)} disabled={createLoading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={createLoading}>
+              {createLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Criar Usuário
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
