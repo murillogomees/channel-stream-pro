@@ -274,6 +274,27 @@ serve(async (req) => {
           r2_uploaded_at: new Date().toISOString()
         }).eq('id', channel.id);
         
+        // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
+        const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+        const downloadInfo = await supabaseService.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
+        const fileSizeBytes = downloadInfo?.data?.file_size_bytes || 0;
+        
+        await supabaseService.from('r2_storage_objects').upsert({
+          r2_key: r2Key,
+          r2_bucket: r2Bucket,
+          content_type: isHLS ? 'application/x-mpegURL' : 'video/mp4',
+          mime_type: isHLS ? 'application/x-mpegURL' : 'video/mp4',
+          size_bytes: fileSizeBytes,
+          source_channel_id: channel.id,
+          source_url: channel.stream_url,
+          cdn_url: r2Url,
+          cache_control: 'public, max-age=31536000, immutable',
+          status: 'ready',
+          access_count: 0,
+          bandwidth_bytes: 0,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'r2_key' });
+        
         // Registrar sucesso no circuit breaker
         await supabaseService.rpc('record_host_success', { p_url: download.original_url });
         
@@ -580,6 +601,27 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
       download_completed_at: new Date().toISOString(),
       metadata: null 
     }).eq('id', downloadId);
+
+    // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
+    const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+    const downloadInfo = await supabase.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
+    const fileSizeBytes = downloadInfo?.data?.file_size_bytes || 0;
+    
+    await supabase.from('r2_storage_objects').upsert({
+      r2_key: r2Key,
+      r2_bucket: r2Bucket,
+      content_type: isHLS ? 'application/x-mpegURL' : 'video/mp4',
+      mime_type: isHLS ? 'application/x-mpegURL' : 'video/mp4',
+      size_bytes: fileSizeBytes,
+      source_channel_id: channel.id,
+      source_url: channel.stream_url,
+      cdn_url: r2Url,
+      cache_control: 'public, max-age=31536000, immutable',
+      status: 'ready',
+      access_count: 0,
+      bandwidth_bytes: 0,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'r2_key' });
 
     console.log(`✅ [VOD] ${channel.name} em ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
