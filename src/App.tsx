@@ -22,11 +22,14 @@ const SignUp = lazy(() => import("./pages/SignUp"));
 // ========================================
 // ADMIN PAGES - Consolidated Hub Structure
 // ========================================
+// Admin Hub Pages
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const AdminClientesPage = lazy(() => import("./pages/admin/AdminClientesPage"));
 const AdminM3UPage = lazy(() => import("./pages/admin/AdminM3UPage"));
+const AdminRolesManagement = lazy(() => import("./pages/AdminRolesManagement"));
 const AdminNotificacoesPage = lazy(() => import("./pages/admin/AdminNotificacoesPage"));
 const AdminSegurancaPage = lazy(() => import("./pages/admin/AdminSegurancaPage"));
+const AdminRolesManagement = lazy(() => import("./pages/AdminRolesManagement"));
 const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
@@ -145,7 +148,7 @@ const App = () => (
             <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><AdminSegurancaPage /></ProtectedRoute>} />
             <Route path="/admin/sistema" element={<ProtectedRoute requireAdmin><AdminSistemaPage /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsPage /></ProtectedRoute>} />
-            <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
+            <Route path="/admin/roles" element={<ProtectedRoute requireAdmin><AdminRolesManagement /></ProtectedRoute>} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClientesDb } from '@/hooks/useClientesDb';
+import { useProfiles, UnifiedProfile } from '@/hooks/useProfiles';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, Filter, Download, Users, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
-import { Cliente } from '@/types/cliente';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,14 +79,14 @@ const dispositivoLabels: Record<string, string> = {
 export default function AdminClientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { clientes, deleteCliente, loading: loadingClientes } = useClientesDb();
+  const { profiles, deleteProfile, loading: loadingClientes } = useProfiles();
   const { config } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
   const { addLog } = useNotificationLogs();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const LOCAL_TEMPLATES = loadTemplates();
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [selectedCliente, setSelectedCliente] = useState<UnifiedProfile | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -110,20 +109,20 @@ export default function AdminClientes() {
   const [clientesWithoutAuth, setClientesWithoutAuth] = useState<number>(0);
 
   const filteredClientes = useMemo(() => {
-    return clientes.filter(cliente => {
+    return profiles.filter(cliente => {
       // Filtro de plano
       if (filterPlano !== 'all' && cliente.plano !== filterPlano) {
         return false;
       }
 
       // Filtro de origem
-      if (filterOrigem !== 'all' && cliente.origemCadastro !== filterOrigem) {
+      if (filterOrigem !== 'all' && cliente.origem_cadastro !== filterOrigem) {
         return false;
       }
 
       // Filtro de vencimento
-      if (filterVencimento !== 'all' && cliente.dataVencimento) {
-        const daysUntilDue = getDaysUntilDue(cliente.dataVencimento);
+      if (filterVencimento !== 'all' && cliente.data_vencimento) {
+        const daysUntilDue = getDaysUntilDue(cliente.data_vencimento);
         switch (filterVencimento) {
           case 'vencido':
             if (daysUntilDue >= 0) return false;
@@ -144,7 +143,7 @@ export default function AdminClientes() {
 
       return true;
     });
-  }, [clientes, filterPlano, filterOrigem, filterVencimento]);
+  }, [profiles, filterPlano, filterOrigem, filterVencimento]);
 
   const resetFilters = () => {
     setFilterPlano('all');
@@ -174,7 +173,7 @@ export default function AdminClientes() {
     };
 
     countWithoutAuth();
-  }, [clientes]);
+  }, [profiles]);
 
   // Função para criar contas em massa
   const handleBatchCreateAuth = async () => {
@@ -222,10 +221,10 @@ export default function AdminClientes() {
   // Buscar listas M3U dos clientes
   useEffect(() => {
     const fetchM3ULists = async () => {
-      if (clientes.length === 0) return;
+      if (profiles.length === 0) return;
 
       try {
-        const clienteIds = clientes.map(c => c.id);
+        const clienteIds = profiles.map(c => c.id);
         const { data, error } = await supabase
           .from('client_m3u_lists')
           .select(`
@@ -250,7 +249,7 @@ export default function AdminClientes() {
     };
 
     fetchM3ULists();
-  }, [clientes]);
+  }, [profiles]);
 
   if (loadingClientes) {
     return (
@@ -267,7 +266,7 @@ export default function AdminClientes() {
 
   const handleConfirmDelete = () => {
     if (deleteId) {
-      deleteCliente(deleteId);
+      deleteProfile(deleteId);
       setDeleteId(null);
       setShowConfirm(false);
     }
@@ -291,8 +290,8 @@ export default function AdminClientes() {
       const whatsappService = getWhatsAppService();
       const message = template.message
         .replace(/{nome}/g, selectedCliente.nome)
-        .replace(/{valor}/g, selectedCliente.valorPago?.toFixed(2) || '0.00')
-        .replace(/{dataVencimento}/g, selectedCliente.dataVencimento ? new Date(selectedCliente.dataVencimento).toLocaleDateString('pt-BR') : '');
+        .replace(/{valor}/g, selectedCliente.valor_pago?.toFixed(2) || '0.00')
+        .replace(/{dataVencimento}/g, selectedCliente.data_vencimento ? new Date(selectedCliente.data_vencimento).toLocaleDateString('pt-BR') : '');
       
       await whatsappService.sendTextMessage(selectedCliente.telefone, message);
       await addLog({
@@ -537,7 +536,7 @@ export default function AdminClientes() {
               {hasActiveFilters && (
                 <div className="pt-2 border-t">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {filteredClientes.length} de {clientes.length} clientes
+                    Mostrando {filteredClientes.length} de {profiles.length} clientes
                   </p>
                 </div>
               )}
@@ -572,24 +571,24 @@ export default function AdminClientes() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredClientes.map((cliente: Cliente) => (
+                    filteredClientes.map((cliente: UnifiedProfile) => (
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
-                      <TableCell className="hidden md:table-cell">{cliente.macSmartOne || 'N/A'}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{cliente.dispositivoContratado ? dispositivoLabels[cliente.dispositivoContratado] || cliente.dispositivoContratado : 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.mac_smart_one || 'N/A'}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{cliente.dispositivo_contratado ? dispositivoLabels[cliente.dispositivo_contratado] || cliente.dispositivo_contratado : 'N/A'}</TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        <Badge className={situacaoColors[cliente.situacao]}>
-                          {cliente.situacao}
+                        <Badge className={situacaoColors[cliente.situacao || 'Indefinido']}>
+                          {cliente.situacao || 'Indefinido'}
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">{cliente.plano}</TableCell>
                       <TableCell className="hidden lg:table-cell whitespace-nowrap">
-                      {cliente.dataVencimento
-                        ? new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')
+                      {cliente.data_vencimento
+                        ? new Date(cliente.data_vencimento).toLocaleDateString('pt-BR')
                         : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {cliente.dataVencimento && getDaysUntilBadge(cliente.dataVencimento)}
+                        {cliente.data_vencimento && getDaysUntilBadge(cliente.data_vencimento)}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         {clienteM3ULists[cliente.id] || 'N/A'}
@@ -699,8 +698,8 @@ export default function AdminClientes() {
                 <Textarea
                   value={LOCAL_TEMPLATES.find(t => t.id === selectedTemplate)?.message
                     .replace(/{nome}/g, selectedCliente.nome)
-                    .replace(/{valor}/g, selectedCliente.valorPago?.toFixed(2) || '0.00')
-                    .replace(/{dataVencimento}/g, selectedCliente.dataVencimento ? new Date(selectedCliente.dataVencimento).toLocaleDateString('pt-BR') : '')
+                    .replace(/{valor}/g, selectedCliente.valor_pago?.toFixed(2) || '0.00')
+                    .replace(/{dataVencimento}/g, selectedCliente.data_vencimento ? new Date(selectedCliente.data_vencimento).toLocaleDateString('pt-BR') : '')
                   }
                   readOnly
                   rows={4}

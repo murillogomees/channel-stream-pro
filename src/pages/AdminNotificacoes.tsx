@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClientesDb } from '@/hooks/useClientesDb';
+import { useProfiles } from '@/hooks/useProfiles';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { useFileUpload } from '@/hooks/useFileUpload';
@@ -41,7 +41,7 @@ import { getWhatsAppService } from '@/services/whatsapp';
 export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { clientes } = useClientesDb();
+  const { profiles } = useProfiles();
   const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
   const { addLog, stats, logs, loading: statsLoading } = useNotificationLogs();
@@ -256,28 +256,21 @@ export default function AdminNotificacoes() {
     }
   };
 
-  // Combinar clientes reais com contatos de teste para envio
+  // Combinar profiles reais com contatos de teste para envio
   const allContactsForSending = [
-    ...clientes,
+    ...profiles,
     ...(config.testContacts || []).map(contact => ({
       id: contact.id,
       nome: `${contact.name} (Teste)`,
-        telefone: contact.phone,
-        email: '',
-      situacao: 'Testando' as const,
-      dataContratacao: contact.addedAt,
-      dataVencimento: contact.addedAt,
-      plano: 'Mensal' as const,
-      valorPago: 0,
-      dataUltimoPagamento: contact.addedAt,
-      formaUltimoPagamento: '',
-      macSmartOne: '',
-      usuario: '',
-      senha: '',
-      dataCadastro: contact.addedAt,
-      dataUltimaEdicao: contact.addedAt,
-      clienteAtivo: true,
-      origemCadastro: 'Outro' as const,
+      telefone: contact.phone,
+      email: '',
+      situacao: 'Testando',
+      created_at: contact.addedAt,
+      updated_at: contact.addedAt,
+      data_contratacao: contact.addedAt,
+      data_vencimento: contact.addedAt,
+      plano: 'Mensal',
+      valor_pago: 0,
     }))
   ];
 
