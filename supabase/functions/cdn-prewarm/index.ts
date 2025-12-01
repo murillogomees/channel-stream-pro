@@ -65,54 +65,101 @@ async function prewarmAsset(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     
-    // Fetch manifest
-    const manifestResponse = await fetch(cdnUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'CDN-Prewarm-Bot/1.0',
-        'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
-      }
-    });
+    // Detect content type from URL
+    const isHlsManifest = cdnUrl.includes('.m3u8');
+    const isMp4 = cdnUrl.includes('.mp4') || cdnUrl.includes('/vod/');
     
-    if (!manifestResponse.ok) {
-      clearTimeout(timeout);
-      return { success: false, segments: 0, bytes: 0, error: `Manifest fetch failed: ${manifestResponse.status}` };
-    }
-    
-    const manifestContent = await manifestResponse.text();
-    const segments = parseHlsManifest(manifestContent, cdnUrl);
-    
-    // Fetch first N segments
-    let fetchedSegments = 0;
-    let totalBytes = 0;
-    const segmentsToPrewarm = segments.slice(0, segmentsToFetch);
-    
-    for (const segmentUrl of segmentsToPrewarm) {
-      try {
-        // Strip JWT from segment URL to normalize cache key
-        const normalizedUrl = segmentUrl.split('?')[0];
-        
-        const segmentResponse = await fetch(normalizedUrl, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'CDN-Prewarm-Bot/1.0',
-            'Accept': 'video/mp2t, application/octet-stream, */*'
-          }
-        });
-        
-        if (segmentResponse.ok) {
-          const body = await segmentResponse.arrayBuffer();
-          totalBytes += body.byteLength;
-          fetchedSegments++;
+    if (isHlsManifest) {
+      // HLS manifest - fetch and prewarm segments
+      const manifestResponse = await fetch(cdnUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'CDN-Prewarm-Bot/1.0',
+          'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
         }
-      } catch (segError) {
-        // Continue with other segments
-        console.warn('[CDN-Prewarm] Segment fetch error:', segError);
+      });
+      
+      if (!manifestResponse.ok) {
+        clearTimeout(timeout);
+        return { success: false, segments: 0, bytes: 0, error: `Manifest fetch failed: ${manifestResponse.status}` };
       }
+      
+      const manifestContent = await manifestResponse.text();
+      const segments = parseHlsManifest(manifestContent, cdnUrl);
+      
+      // Fetch first N segments
+      let fetchedSegments = 0;
+      let totalBytes = 0;
+      const segmentsToPrewarm = segments.slice(0, segmentsToFetch);
+      
+      for (const segmentUrl of segmentsToPrewarm) {
+        try {
+          const normalizedUrl = segmentUrl.split('?')[0];
+          
+          const segmentResponse = await fetch(normalizedUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'CDN-Prewarm-Bot/1.0',
+              'Accept': 'video/mp2t, application/octet-stream, */*'
+            }
+          });
+          
+          if (segmentResponse.ok) {
+            const body = await segmentResponse.arrayBuffer();
+            totalBytes += body.byteLength;
+            fetchedSegments++;
+          }
+        } catch (segError) {
+          console.warn('[CDN-Prewarm] Segment fetch error:', segError);
+        }
+      }
+      
+      clearTimeout(timeout);
+      return { success: true, segments: fetchedSegments, bytes: totalBytes };
+      
+    } else if (isMp4) {
+      // Direct video file (MP4) - fetch first 5MB to prewarm cache
+      const rangeSize = 5 * 1024 * 1024; // 5MB
+      
+      const response = await fetch(cdnUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'CDN-Prewarm-Bot/1.0',
+          'Accept': 'video/mp4, video/*, */*',
+          'Range': `bytes=0-${rangeSize - 1}`
+        }
+      });
+      
+      if (!response.ok && response.status !== 206) {
+        clearTimeout(timeout);
+        return { success: false, segments: 0, bytes: 0, error: `Video fetch failed: ${response.status}` };
+      }
+      
+      const body = await response.arrayBuffer();
+      clearTimeout(timeout);
+      
+      return { success: true, segments: 1, bytes: body.byteLength };
+      
+    } else {
+      // Unknown content type - try simple HEAD request
+      const response = await fetch(cdnUrl, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'CDN-Prewarm-Bot/1.0',
+          'Accept': '*/*'
+        }
+      });
+      
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        return { success: false, segments: 0, bytes: 0, error: `HEAD request failed: ${response.status}` };
+      }
+      
+      const contentLength = parseInt(response.headers.get('content-length') || '0');
+      return { success: true, segments: 1, bytes: contentLength };
     }
-    
-    clearTimeout(timeout);
-    return { success: true, segments: fetchedSegments, bytes: totalBytes };
     
   } catch (error) {
     return { 
