@@ -3725,40 +3725,101 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cliente_ativo: boolean | null
           created_at: string | null
+          data_contratacao: string | null
+          data_ultimo_pagamento: string | null
+          data_vencimento: string | null
+          dispositivo_contratado:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email: string | null
+          forma_ultimo_pagamento: string | null
           id: string
+          is_recorrente: boolean | null
+          mac_smart_one: string | null
           nome: string
+          plano: Database["public"]["Enums"]["plano_cliente"] | null
+          senha_m3u: string | null
+          situacao: Database["public"]["Enums"]["situacao_cliente"] | null
+          smartone_last_sync_at: string | null
+          smartone_playlist_id: string | null
+          smartone_raw_response: string | null
+          smartone_status: Database["public"]["Enums"]["smartone_status"] | null
           telefone: string | null
           theme: string | null
           totp_enabled: boolean | null
           totp_secret: string | null
           totp_verified_at: string | null
           updated_at: string | null
+          usuario_m3u: string | null
+          valor_pago: number | null
         }
         Insert: {
+          cliente_ativo?: boolean | null
           created_at?: string | null
+          data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email?: string | null
+          forma_ultimo_pagamento?: string | null
           id: string
+          is_recorrente?: boolean | null
+          mac_smart_one?: string | null
           nome: string
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          senha_m3u?: string | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          smartone_last_sync_at?: string | null
+          smartone_playlist_id?: string | null
+          smartone_raw_response?: string | null
+          smartone_status?:
+            | Database["public"]["Enums"]["smartone_status"]
+            | null
           telefone?: string | null
           theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null
           totp_verified_at?: string | null
           updated_at?: string | null
+          usuario_m3u?: string | null
+          valor_pago?: number | null
         }
         Update: {
+          cliente_ativo?: boolean | null
           created_at?: string | null
+          data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
           email?: string | null
+          forma_ultimo_pagamento?: string | null
           id?: string
+          is_recorrente?: boolean | null
+          mac_smart_one?: string | null
           nome?: string
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          senha_m3u?: string | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          smartone_last_sync_at?: string | null
+          smartone_playlist_id?: string | null
+          smartone_raw_response?: string | null
+          smartone_status?:
+            | Database["public"]["Enums"]["smartone_status"]
+            | null
           telefone?: string | null
           theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null
           totp_verified_at?: string | null
           updated_at?: string | null
+          usuario_m3u?: string | null
+          valor_pago?: number | null
         }
         Relationships: []
       }
@@ -6122,7 +6183,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "client" | "admin" | "super_admin"
+      app_role: "client" | "admin" | "super_admin" | "master"
       dispositivo_tipo:
         | "smart_tv"
         | "roku_tv"
@@ -6303,7 +6364,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["client", "admin", "super_admin"],
+      app_role: ["client", "admin", "super_admin", "master"],
       dispositivo_tipo: [
         "smart_tv",
         "roku_tv",
