@@ -11,16 +11,18 @@ const CLOUDFLARE_STREAM_API_TOKEN = Deno.env.get("CLOUDFLARE_STREAM_API_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Configuration - Sprint 2 optimizations
+// Configuration - Aggressive settings for high throughput
 const CONFIG = {
-  MAX_CONCURRENT_UPLOADS: 5, // Increased from 2 for better throughput
-  BATCH_SIZE: 10, // Increased from 5 for faster queue processing
-  DELAY_BETWEEN_UPLOADS_MS: 3000, // Reduced to 3 seconds
+  MAX_CONCURRENT_UPLOADS: 100, // Increased from 5 to 100 for parallel uploads
+  BATCH_SIZE: 100, // Process 100 items per batch
+  DELAY_BETWEEN_UPLOADS_MS: 500, // Reduced to 500ms for faster throughput
   MAX_RETRIES: 5,
-  BASE_RETRY_DELAY_MS: 60000, // 1 minute base delay
-  SOURCE_VALIDATION_TIMEOUT_MS: 10000,
-  STUCK_TIMEOUT_MINUTES: 30, // Reduced to detect stuck uploads faster
-  DOWNLOADING_STUCK_MINUTES: 15, // For legacy "downloading" status
+  BASE_RETRY_DELAY_MS: 30000, // 30 seconds base delay
+  SOURCE_VALIDATION_TIMEOUT_MS: 15000, // 15 seconds
+  STUCK_TIMEOUT_MINUTES: 60, // 60 minutes timeout for stuck uploads
+  DOWNLOADING_STUCK_MINUTES: 30,
+  PARALLEL_STATUS_CHECKS: 20, // Check 20 statuses in parallel
+  PARALLEL_UPLOADS: 10, // Upload 10 at a time
 };
 
 // Error categories for better handling
@@ -65,8 +67,8 @@ function categorizeError(errorMessage: string): { category: string; shouldRetry:
 function calculateNextRetryTime(retryCount: number, delayMultiplier: number): Date {
   const baseDelay = CONFIG.BASE_RETRY_DELAY_MS;
   const exponentialDelay = baseDelay * Math.pow(2, retryCount) * delayMultiplier;
-  const jitter = Math.random() * 30000; // Add up to 30 seconds jitter
-  const totalDelay = Math.min(exponentialDelay + jitter, 3600000); // Cap at 1 hour
+  const jitter = Math.random() * 15000; // Add up to 15 seconds jitter
+  const totalDelay = Math.min(exponentialDelay + jitter, 1800000); // Cap at 30 minutes
   return new Date(Date.now() + totalDelay);
 }
 
@@ -119,15 +121,13 @@ async function uploadToCloudflareStream(
   channelName: string,
   channelId: string
 ): Promise<{ success: boolean; uid?: string; error?: string }> {
-  log('info', 'Initiating CF Stream copy', { channelId, url: url.substring(0, 60) + '...' });
-
   try {
     const copyPayload = {
       url: url,
       meta: {
         name: channelName,
         channel_id: channelId,
-        source: 'iptvlink-scheduler',
+        source: 'iptvlink-scheduler-v2',
         uploaded_at: new Date().toISOString(),
       },
       requireSignedURLs: false,
@@ -150,7 +150,6 @@ async function uploadToCloudflareStream(
 
     if (!response.ok || !data.success) {
       const errorMsg = data.errors?.[0]?.message || `HTTP ${response.status}`;
-      log('error', 'CF copy request failed', { error: errorMsg, status: response.status });
       return { success: false, error: errorMsg };
     }
 
@@ -159,12 +158,41 @@ async function uploadToCloudflareStream(
       return { success: false, error: 'No UID returned from Cloudflare' };
     }
 
-    log('info', 'CF copy initiated successfully', { uid, channelId });
     return { success: true, uid };
 
   } catch (error: any) {
-    log('error', 'CF upload exception', { error: error.message, channelId });
     return { success: false, error: error.message };
+  }
+}
+
+// Check status of a single upload from Cloudflare
+async function checkCloudflareStatus(cfStreamUid: string): Promise<any> {
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/stream/${cfStreamUid}`,
+      { headers: { "Authorization": `Bearer ${CLOUDFLARE_STREAM_API_TOKEN}` } }
+    );
+    return await response.json();
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+// Process uploads in parallel batches
+async function processUploadsInParallel<T>(
+  items: T[],
+  processor: (item: T) => Promise<void>,
+  parallelCount: number
+): Promise<void> {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += parallelCount) {
+    chunks.push(items.slice(i, i + parallelCount));
+  }
+  
+  for (const chunk of chunks) {
+    await Promise.all(chunk.map(processor));
+    // Small delay between batches to avoid overwhelming
+    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAY_BETWEEN_UPLOADS_MS));
   }
 }
 
@@ -178,31 +206,18 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     const expectedCronSecret = Deno.env.get("CRON_SECRET");
     
-    // Debug logging (masking sensitive data)
-    log('info', 'Auth check', { 
-      hasCronSecret: !!cronSecret,
-      hasExpectedSecret: !!expectedCronSecret,
-      hasAuthHeader: !!authHeader,
-      cronSecretLength: cronSecret?.length || 0,
-      expectedSecretLength: expectedCronSecret?.length || 0,
-      secretsMatch: cronSecret && expectedCronSecret ? cronSecret === expectedCronSecret : false
-    });
-    
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Authentication - either valid cron secret or admin JWT
+    // Authentication
     let isAuthenticated = false;
 
-    // Check cron secret first (for automated cron jobs)
     if (cronSecret && expectedCronSecret && cronSecret === expectedCronSecret) {
       isAuthenticated = true;
       log('info', 'Authenticated via CRON_SECRET');
     }
 
-    // If no valid cron secret, check JWT
     if (!isAuthenticated) {
       if (!authHeader) {
-        log('warn', 'No authentication provided - cron secret validation failed');
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -213,7 +228,6 @@ serve(async (req) => {
       const { data: { user } } = await supabase.auth.getUser(token);
       
       if (!user) {
-        log('warn', 'Invalid JWT token');
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -222,7 +236,6 @@ serve(async (req) => {
 
       const { data: isAdmin } = await supabase.rpc("is_admin", { uid: user.id });
       if (!isAdmin) {
-        log('warn', 'User is not admin', { userId: user.id });
         return new Response(JSON.stringify({ error: "Admin access required" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -241,7 +254,7 @@ serve(async (req) => {
     }
 
     const runStartTime = Date.now();
-    log('info', '=== Starting scheduler run ===', { config: CONFIG });
+    log('info', '=== Starting aggressive scheduler run ===', { config: CONFIG });
 
     const result = {
       statusChecked: 0,
@@ -258,178 +271,142 @@ serve(async (req) => {
     };
 
     // ========================================
-    // STEP 1: Check status of processing uploads
+    // STEP 1: Check status of processing uploads (parallel)
     // ========================================
     const { data: processingUploads } = await supabase
       .from("cf_stream_uploads")
       .select("id, cf_stream_uid, channel_id, retry_count, metadata, original_url")
       .eq("status", "processing")
-      .limit(50);
+      .limit(100);
 
     result.statusChecked = processingUploads?.length || 0;
-    log('info', `Checking ${result.statusChecked} processing uploads`);
+    log('info', `Checking ${result.statusChecked} processing uploads in parallel`);
 
-    for (const upload of processingUploads || []) {
-      if (!upload.cf_stream_uid) continue;
+    // Process status checks in parallel
+    await processUploadsInParallel(
+      processingUploads || [],
+      async (upload) => {
+        if (!upload.cf_stream_uid) return;
 
-      try {
-        const cfResponse = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/stream/${upload.cf_stream_uid}`,
-          { headers: { "Authorization": `Bearer ${CLOUDFLARE_STREAM_API_TOKEN}` } }
-        );
+        try {
+          const cfData = await checkCloudflareStatus(upload.cf_stream_uid);
+          
+          if (cfData.success && cfData.result) {
+            const res = cfData.result;
+            const state = res.status?.state;
+            const isReady = res.readyToStream || state === "ready";
+            const isError = state === "error";
+            const progress = res.status?.pctComplete || 0;
 
-        const cfData = await cfResponse.json();
-        
-        if (cfData.success && cfData.result) {
-          const res = cfData.result;
-          const state = res.status?.state;
-          const isReady = res.readyToStream || state === "ready";
-          const isError = state === "error";
-          const progress = res.status?.pctComplete || 0;
+            if (isReady) {
+              const playbackUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${upload.cf_stream_uid}/manifest/video.m3u8`;
 
-          if (isReady) {
-            const playbackUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${upload.cf_stream_uid}/manifest/video.m3u8`;
-
-            await supabase.from("m3u_channels").update({
-              cf_stream_status: "ready",
-              cf_stream_url: playbackUrl,
-              cf_stream_duration_seconds: res.duration ? Math.floor(res.duration) : null,
-              cf_stream_size_bytes: res.size || null,
-            }).eq("id", upload.channel_id);
-
-            await supabase.from("cf_stream_uploads").update({
-              status: "ready",
-              progress_percent: 100,
-              completed_at: new Date().toISOString(),
-              metadata: res,
-            }).eq("id", upload.id);
-
-            result.statusReady++;
-            result.statusUpdated++;
-            log('info', 'Upload ready', { uid: upload.cf_stream_uid });
-
-          } else if (isError) {
-            const errorMsg = res.status?.errorReasonText || "Encoding failed";
-            const errorCategory = categorizeError(errorMsg);
-            const isEncodingError = errorMsg.toLowerCase().includes('unknown cause') || 
-                                    errorMsg.toLowerCase().includes('encoding');
-            const encodingFailures = (upload.metadata?.encoding_failures || 0) + 1;
-            const currentRetries = upload.retry_count || 0;
-            
-            // After 2 encoding failures, fallback to R2 download instead of retrying Stream
-            if (isEncodingError && encodingFailures >= 2) {
-              log('warn', 'Multiple encoding failures, marking for R2 fallback', { 
-                uid: upload.cf_stream_uid, 
-                encodingFailures,
-              });
-              
-              await supabase.from("cf_stream_uploads").update({
-                status: "needs_r2_fallback",
-                error_message: `CF Stream encoding failed ${encodingFailures}x - queued for R2 download`,
-                metadata: { 
-                  last_cf_uid: upload.cf_stream_uid,
-                  last_error: errorMsg,
-                  error_category: errorCategory.category,
-                  encoding_failures: encodingFailures,
-                  fallback_reason: 'repeated_encoding_failure',
-                },
-              }).eq("id", upload.id);
-              
-              // Also create R2 download job if r2_download_jobs table exists
-              try {
-                await supabase.from("r2_download_jobs").insert({
-                  channel_id: upload.channel_id,
-                  source_url: upload.original_url,
-                  priority: 10, // High priority for fallback
-                  status: 'queued',
-                  metadata: {
-                    cf_upload_id: upload.id,
-                    fallback_from_stream: true,
-                  },
-                });
-                log('info', 'Created R2 fallback job', { channelId: upload.channel_id });
-              } catch (r2Err) {
-                log('warn', 'Could not create R2 job (table may not exist)', { error: r2Err.message });
-              }
-              
-              result.statusError++;
-              
-            } else if (errorCategory.shouldRetry && currentRetries < CONFIG.MAX_RETRIES) {
-              // Schedule retry - keep UID for first retry, clear after
-              const nextRetry = calculateNextRetryTime(currentRetries, errorCategory.delayMultiplier);
-              const shouldKeepUid = currentRetries < 1 && isEncodingError;
-              
-              await supabase.from("cf_stream_uploads").update({
-                status: "retry_scheduled",
-                error_message: `${errorMsg} (will retry at ${nextRetry.toISOString()})`,
-                retry_count: currentRetries + 1,
-                cf_stream_uid: shouldKeepUid ? upload.cf_stream_uid : null,
-                metadata: { 
-                  last_error: errorMsg,
-                  error_category: errorCategory.category,
-                  next_retry: nextRetry.toISOString(),
-                  retry_count: currentRetries + 1,
-                  encoding_failures: isEncodingError ? encodingFailures : 0,
-                  last_cf_uid: upload.cf_stream_uid,
-                },
-              }).eq("id", upload.id);
-
-              result.retriesScheduled++;
-              log('warn', 'Encoding failed, retry scheduled', { 
-                uid: upload.cf_stream_uid, 
-                error: errorMsg,
-                nextRetry: nextRetry.toISOString(),
-                encodingFailures,
-                keptUid: shouldKeepUid,
-              });
-            } else {
-              // Max retries exceeded or permanent error
-              await supabase.from("cf_stream_uploads").update({
-                status: "error",
-                error_message: errorMsg,
-                metadata: { 
-                  last_error: errorMsg, 
-                  error_category: errorCategory.category,
-                  final_failure: true,
-                  last_cf_uid: upload.cf_stream_uid,
-                },
-              }).eq("id", upload.id);
-              
               await supabase.from("m3u_channels").update({
-                cf_stream_status: "error",
+                cf_stream_status: "ready",
+                cf_stream_url: playbackUrl,
+                cf_stream_duration_seconds: res.duration ? Math.floor(res.duration) : null,
+                cf_stream_size_bytes: res.size || null,
               }).eq("id", upload.channel_id);
 
-              result.statusError++;
-              log('error', 'Upload failed permanently', { uid: upload.cf_stream_uid, error: errorMsg });
+              await supabase.from("cf_stream_uploads").update({
+                status: "ready",
+                progress_percent: 100,
+                completed_at: new Date().toISOString(),
+                metadata: res,
+              }).eq("id", upload.id);
+
+              result.statusReady++;
+              result.statusUpdated++;
+
+            } else if (isError) {
+              const errorMsg = res.status?.errorReasonText || "Encoding failed";
+              const errorCategory = categorizeError(errorMsg);
+              const isEncodingError = errorMsg.toLowerCase().includes('unknown cause') || 
+                                      errorMsg.toLowerCase().includes('encoding');
+              const encodingFailures = (upload.metadata?.encoding_failures || 0) + 1;
+              const currentRetries = upload.retry_count || 0;
+              
+              if (isEncodingError && encodingFailures >= 2) {
+                await supabase.from("cf_stream_uploads").update({
+                  status: "needs_r2_fallback",
+                  error_message: `CF Stream encoding failed ${encodingFailures}x - queued for R2 download`,
+                  metadata: { 
+                    last_cf_uid: upload.cf_stream_uid,
+                    last_error: errorMsg,
+                    error_category: errorCategory.category,
+                    encoding_failures: encodingFailures,
+                    fallback_reason: 'repeated_encoding_failure',
+                  },
+                }).eq("id", upload.id);
+                
+                result.statusError++;
+                
+              } else if (errorCategory.shouldRetry && currentRetries < CONFIG.MAX_RETRIES) {
+                const nextRetry = calculateNextRetryTime(currentRetries, errorCategory.delayMultiplier);
+                const shouldKeepUid = currentRetries < 1 && isEncodingError;
+                
+                await supabase.from("cf_stream_uploads").update({
+                  status: "retry_scheduled",
+                  error_message: `${errorMsg} (will retry at ${nextRetry.toISOString()})`,
+                  retry_count: currentRetries + 1,
+                  cf_stream_uid: shouldKeepUid ? upload.cf_stream_uid : null,
+                  metadata: { 
+                    last_error: errorMsg,
+                    error_category: errorCategory.category,
+                    next_retry: nextRetry.toISOString(),
+                    retry_count: currentRetries + 1,
+                    encoding_failures: isEncodingError ? encodingFailures : 0,
+                    last_cf_uid: upload.cf_stream_uid,
+                  },
+                }).eq("id", upload.id);
+
+                result.retriesScheduled++;
+              } else {
+                await supabase.from("cf_stream_uploads").update({
+                  status: "error",
+                  error_message: errorMsg,
+                  metadata: { 
+                    last_error: errorMsg, 
+                    error_category: errorCategory.category,
+                    final_failure: true,
+                    last_cf_uid: upload.cf_stream_uid,
+                  },
+                }).eq("id", upload.id);
+                
+                await supabase.from("m3u_channels").update({
+                  cf_stream_status: "error",
+                }).eq("id", upload.channel_id);
+
+                result.statusError++;
+              }
+            } else {
+              await supabase.from("cf_stream_uploads").update({
+                progress_percent: progress,
+              }).eq("id", upload.id);
             }
-          } else {
-            // Still processing - update progress
-            await supabase.from("cf_stream_uploads").update({
-              progress_percent: progress,
-            }).eq("id", upload.id);
           }
+        } catch (err: any) {
+          log('error', 'Status check exception', { uid: upload.cf_stream_uid, error: err.message });
         }
-      } catch (err: any) {
-        log('error', 'Status check exception', { uid: upload.cf_stream_uid, error: err.message });
-      }
-    }
+      },
+      CONFIG.PARALLEL_STATUS_CHECKS
+    );
 
     // ========================================
-    // STEP 2: Process retry_scheduled uploads (if their time has come)
+    // STEP 2: Process retry_scheduled uploads
     // ========================================
     const { data: retryUploads } = await supabase
       .from("cf_stream_uploads")
       .select("id, channel_id, original_url, retry_count, metadata")
       .eq("status", "retry_scheduled")
-      .limit(5);
+      .limit(50);
 
     for (const upload of retryUploads || []) {
       const nextRetryTime = upload.metadata?.next_retry;
       if (nextRetryTime && new Date(nextRetryTime) > new Date()) {
-        continue; // Not time yet
+        continue;
       }
 
-      // Move back to queued for processing
       await supabase.from("cf_stream_uploads").update({
         status: "queued",
         error_message: null,
@@ -452,144 +429,138 @@ serve(async (req) => {
     log('info', `Active uploads: ${result.activeUploads}, Available slots: ${availableSlots}`);
 
     // ========================================
-    // STEP 4: Process queued uploads
+    // STEP 4: Process queued uploads (parallel)
     // ========================================
     if (availableSlots > 0) {
       const { data: queuedUploads } = await supabase
         .from("cf_stream_uploads")
         .select("id, channel_id, original_url, retry_count")
         .eq("status", "queued")
-        .order("retry_count", { ascending: true }) // Prioritize fresh uploads
+        .order("retry_count", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(availableSlots);
 
-      for (const upload of queuedUploads || []) {
-        try {
-          // Validate source URL first
-          log('info', 'Validating source URL', { channelId: upload.channel_id });
-          const validation = await validateSourceUrl(upload.original_url);
-          
-          if (!validation.valid) {
-            log('warn', 'Source validation failed', { 
-              channelId: upload.channel_id, 
-              error: validation.error,
-              statusCode: validation.statusCode,
-            });
+      log('info', `Processing ${queuedUploads?.length || 0} queued uploads`);
 
-            const errorCategory = categorizeError(validation.error || '');
-            
-            if (errorCategory.shouldRetry && (upload.retry_count || 0) < CONFIG.MAX_RETRIES) {
-              const nextRetry = calculateNextRetryTime(upload.retry_count || 0, 2);
-              await supabase.from("cf_stream_uploads").update({
-                status: "retry_scheduled",
-                error_message: `Source validation failed: ${validation.error}`,
-                retry_count: (upload.retry_count || 0) + 1,
-                metadata: {
-                  validation_error: validation.error,
-                  status_code: validation.statusCode,
-                  next_retry: nextRetry.toISOString(),
-                },
-              }).eq("id", upload.id);
-              result.retriesScheduled++;
-            } else {
-              await supabase.from("cf_stream_uploads").update({
-                status: "validation_failed",
-                error_message: `Source unreachable: ${validation.error}`,
-              }).eq("id", upload.id);
+      await processUploadsInParallel(
+        queuedUploads || [],
+        async (upload) => {
+          try {
+            // Skip validation for retries to save time
+            if ((upload.retry_count || 0) === 0) {
+              const validation = await validateSourceUrl(upload.original_url);
+              
+              if (!validation.valid) {
+                const errorCategory = categorizeError(validation.error || '');
+                
+                if (errorCategory.shouldRetry && (upload.retry_count || 0) < CONFIG.MAX_RETRIES) {
+                  const nextRetry = calculateNextRetryTime(upload.retry_count || 0, 2);
+                  await supabase.from("cf_stream_uploads").update({
+                    status: "retry_scheduled",
+                    error_message: `Source validation failed: ${validation.error}`,
+                    retry_count: (upload.retry_count || 0) + 1,
+                    metadata: {
+                      validation_error: validation.error,
+                      status_code: validation.statusCode,
+                      next_retry: nextRetry.toISOString(),
+                    },
+                  }).eq("id", upload.id);
+                  result.retriesScheduled++;
+                } else {
+                  await supabase.from("cf_stream_uploads").update({
+                    status: "validation_failed",
+                    error_message: `Source unreachable: ${validation.error}`,
+                  }).eq("id", upload.id);
+                }
+                
+                result.sourceValidationFailed++;
+                return;
+              }
             }
-            
-            result.sourceValidationFailed++;
-            continue;
-          }
 
-          // Get channel name
-          const { data: channel } = await supabase
-            .from("m3u_channels")
-            .select("name")
-            .eq("id", upload.channel_id)
-            .maybeSingle();
+            // Get channel name
+            const { data: channel } = await supabase
+              .from("m3u_channels")
+              .select("name")
+              .eq("id", upload.channel_id)
+              .maybeSingle();
 
-          const channelName = channel?.name || upload.channel_id;
+            const channelName = channel?.name || upload.channel_id;
 
-          // Mark as uploading
-          await supabase.from("cf_stream_uploads").update({
-            status: "uploading",
-            started_at: new Date().toISOString(),
-            error_message: null,
-          }).eq("id", upload.id);
-
-          // Upload to Cloudflare Stream
-          const uploadResult = await uploadToCloudflareStream(
-            upload.original_url,
-            channelName,
-            upload.channel_id
-          );
-
-          if (uploadResult.success && uploadResult.uid) {
+            // Mark as uploading
             await supabase.from("cf_stream_uploads").update({
-              cf_stream_uid: uploadResult.uid,
-              status: "processing",
-              upload_type: "copy",
+              status: "uploading",
+              started_at: new Date().toISOString(),
+              error_message: null,
             }).eq("id", upload.id);
 
-            await supabase.from("m3u_channels").update({
-              cf_stream_uid: uploadResult.uid,
-              cf_stream_status: "processing",
-              cf_stream_uploaded_at: new Date().toISOString(),
-            }).eq("id", upload.channel_id);
+            // Upload to Cloudflare Stream
+            const uploadResult = await uploadToCloudflareStream(
+              upload.original_url,
+              channelName,
+              upload.channel_id
+            );
 
-            result.newUploads++;
-            log('info', 'Upload started', { channelId: upload.channel_id, uid: uploadResult.uid });
-
-          } else {
-            // Handle upload failure
-            const errorCategory = categorizeError(uploadResult.error || '');
-            const newRetryCount = (upload.retry_count || 0) + 1;
-
-            if (errorCategory.shouldRetry && newRetryCount < CONFIG.MAX_RETRIES) {
-              const nextRetry = calculateNextRetryTime(newRetryCount, errorCategory.delayMultiplier);
-              
+            if (uploadResult.success && uploadResult.uid) {
               await supabase.from("cf_stream_uploads").update({
-                status: "retry_scheduled",
-                error_message: uploadResult.error,
-                retry_count: newRetryCount,
-                started_at: null,
-                metadata: {
-                  error_category: errorCategory.category,
-                  next_retry: nextRetry.toISOString(),
-                },
+                cf_stream_uid: uploadResult.uid,
+                status: "processing",
+                upload_type: "copy",
               }).eq("id", upload.id);
 
-              result.retriesScheduled++;
+              await supabase.from("m3u_channels").update({
+                cf_stream_uid: uploadResult.uid,
+                cf_stream_status: "processing",
+                cf_stream_uploaded_at: new Date().toISOString(),
+              }).eq("id", upload.channel_id);
+
+              result.newUploads++;
+
             } else {
-              await supabase.from("cf_stream_uploads").update({
-                status: "error",
-                error_message: uploadResult.error,
-                retry_count: newRetryCount,
-                started_at: null,
-              }).eq("id", upload.id);
+              const errorCategory = categorizeError(uploadResult.error || '');
+              const newRetryCount = (upload.retry_count || 0) + 1;
+
+              if (errorCategory.shouldRetry && newRetryCount < CONFIG.MAX_RETRIES) {
+                const nextRetry = calculateNextRetryTime(newRetryCount, errorCategory.delayMultiplier);
+                
+                await supabase.from("cf_stream_uploads").update({
+                  status: "retry_scheduled",
+                  error_message: uploadResult.error,
+                  retry_count: newRetryCount,
+                  started_at: null,
+                  metadata: {
+                    error_category: errorCategory.category,
+                    next_retry: nextRetry.toISOString(),
+                  },
+                }).eq("id", upload.id);
+
+                result.retriesScheduled++;
+              } else {
+                await supabase.from("cf_stream_uploads").update({
+                  status: "error",
+                  error_message: uploadResult.error,
+                  retry_count: newRetryCount,
+                  started_at: null,
+                }).eq("id", upload.id);
+              }
+
+              result.errors.push(`${upload.channel_id}: ${uploadResult.error}`);
             }
 
-            result.errors.push(`${upload.channel_id}: ${uploadResult.error}`);
+          } catch (err: any) {
+            log('error', 'Upload processing error', { uploadId: upload.id, error: err.message });
+            await supabase.from("cf_stream_uploads").update({
+              status: "error",
+              error_message: err.message,
+            }).eq("id", upload.id);
           }
-
-          // Delay between uploads to avoid overwhelming origin
-          if ((queuedUploads || []).indexOf(upload) < (queuedUploads || []).length - 1) {
-            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAY_BETWEEN_UPLOADS_MS));
-          }
-
-        } catch (err: any) {
-          log('error', 'Upload processing error', { uploadId: upload.id, error: err.message });
-          await supabase.from("cf_stream_uploads").update({
-            status: "error",
-            error_message: err.message,
-          }).eq("id", upload.id);
-        }
-      }
+        },
+        CONFIG.PARALLEL_UPLOADS
+      );
     }
 
     // ========================================
-    // STEP 5: Queue new VODs (conservative)
+    // STEP 5: Queue new VODs aggressively
     // ========================================
     const { count: pendingCount } = await supabase
       .from("cf_stream_uploads")
@@ -599,16 +570,16 @@ serve(async (req) => {
     if ((pendingCount || 0) < CONFIG.BATCH_SIZE) {
       const slotsForNew = CONFIG.BATCH_SIZE - (pendingCount || 0);
       
+      // Prioritize Live TV content for Cloudflare Stream
       const { data: vodsToQueue } = await supabase
         .from("m3u_channels")
-        .select("id, stream_url")
-        .eq("is_vod", true)
+        .select("id, stream_url, group_title")
+        .eq("is_vod", false) // Live content first
         .is("cf_stream_uid", null)
         .is("r2_url", null)
         .limit(slotsForNew);
 
       for (const vod of vodsToQueue || []) {
-        // Check if already has an upload record
         const { count: existingCount } = await supabase
           .from("cf_stream_uploads")
           .select("*", { count: "exact", head: true })
@@ -627,7 +598,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 6: Reset stuck uploads (uploading state)
+    // STEP 6: Reset stuck uploads (60 min timeout)
     // ========================================
     const stuckTime = new Date(Date.now() - CONFIG.STUCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     
@@ -643,10 +614,9 @@ serve(async (req) => {
           status: "queued",
           started_at: null,
           retry_count: (stuck.retry_count || 0) + 1,
-          error_message: "Reset: stuck in uploading state",
+          error_message: "Reset: stuck in uploading state (60min timeout)",
         }).eq("id", stuck.id);
         result.resetStuck++;
-        log('info', 'Reset stuck upload (uploading)', { id: stuck.id });
       } else {
         await supabase.from("cf_stream_uploads").update({
           status: "error",
@@ -656,7 +626,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 7: Reset legacy "downloading" status
+    // STEP 7: Reset legacy downloading status
     // ========================================
     const downloadingStuckTime = new Date(Date.now() - CONFIG.DOWNLOADING_STUCK_MINUTES * 60 * 1000).toISOString();
     
@@ -673,20 +643,20 @@ serve(async (req) => {
         error_message: "Reset: legacy downloading status converted to queue",
       }).eq("id", stuck.id);
       result.resetStuck++;
-      log('info', 'Reset stuck download (downloading)', { id: stuck.id });
     }
 
     // ========================================
-    // STEP 8: Performance metrics logging
+    // STEP 8: Performance metrics
     // ========================================
     const runEndTime = Date.now();
     const runDuration = runEndTime - runStartTime;
     
-    log('info', '=== Scheduler completed ===', {
+    log('info', '=== Aggressive scheduler completed ===', {
       ...result,
       performance: {
         durationMs: runDuration,
         uploadsPerSecond: result.newUploads / (runDuration / 1000),
+        config: CONFIG,
       }
     });
 
@@ -698,8 +668,10 @@ serve(async (req) => {
         ready: result.statusReady,
         errors: result.statusError,
         newUploads: result.newUploads,
+        newQueued: result.newQueued,
         retries: result.retriesScheduled,
         active: result.activeUploads,
+        durationMs: runDuration,
       },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
