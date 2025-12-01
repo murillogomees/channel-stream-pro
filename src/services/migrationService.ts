@@ -149,20 +149,15 @@ class MigrationService {
   ): Promise<string | null> {
     try {
       const { data, error } = await supabase
-        .from('activity_logs')
+        .from('migration_audit')
         .insert({
-          action_type: 'migration',
-          action_description: `Migration ${migrationName}: ${status}`,
-          entity_type: 'migration',
-          entity_id: migrationName,
-          metadata: {
-            status,
-            duration_ms: options.durationMs,
-            rows_affected: options.rowsAffected,
-            error_message: options.errorMessage,
-            ...options.metadata,
-          },
-        })
+          migration_name: migrationName,
+          status,
+          duration_ms: options.durationMs,
+          rows_affected: options.rowsAffected,
+          error_message: options.errorMessage,
+          metadata: options.metadata || {},
+        } as any)
         .select('id')
         .single();
 
@@ -258,26 +253,24 @@ class MigrationService {
   async getMigrationHistory(limit: number = 50): Promise<MigrationAuditEntry[]> {
     try {
       const { data, error } = await supabase
-        .from('activity_logs')
+        .from('migration_audit')
         .select('*')
-        .eq('action_type', 'migration')
-        .order('created_at', { ascending: false })
+        .order('executed_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
 
-      // Transform activity logs to migration audit format
       return (data || []).map(log => ({
         id: log.id,
-        migration_name: log.entity_id || 'unknown',
-        executed_at: log.created_at || '',
-        executed_by: log.user_id,
-        status: (log.metadata as any)?.status || 'unknown',
-        duration_ms: (log.metadata as any)?.duration_ms || null,
-        rows_affected: (log.metadata as any)?.rows_affected || null,
-        rollback_available: true,
-        rollback_executed_at: (log.metadata as any)?.rollback_executed_at || null,
-        error_message: (log.metadata as any)?.error_message || null,
+        migration_name: log.migration_name,
+        executed_at: log.executed_at,
+        executed_by: log.executed_by,
+        status: log.status as MigrationAuditEntry['status'],
+        duration_ms: log.duration_ms,
+        rows_affected: log.rows_affected,
+        rollback_available: log.rollback_available ?? true,
+        rollback_executed_at: log.rollback_executed_at,
+        error_message: log.error_message,
         metadata: log.metadata as Record<string, unknown> || {},
       }));
     } catch (error) {
