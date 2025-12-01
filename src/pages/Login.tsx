@@ -2,12 +2,12 @@
  * PÁGINA DE LOGIN RESPONSIVA
  *
  * Mobile: Uma coluna por vez com botões de navegação
- * Desktop/TV: Duas colunas lado a lado sempre visíveis
+ * Desktop/TV: Duas colunas lado a lado, clique expande para tela cheia
  */
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2, Wifi, Zap, Crown, Star, ArrowRight, ArrowLeft, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ const loginSchema = z.object({
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres")
 });
 
-type ViewMode = "login" | "plans";
+type ViewMode = "initial" | "login" | "plans";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -47,13 +47,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("login");
+  const [viewMode, setViewMode] = useState<ViewMode>("initial");
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Desktop hover/lock states
-  const [hoveredSide, setHoveredSide] = useState<"login" | "plans" | null>(null);
-  const [lockedSide, setLockedSide] = useState<"login" | "plans" | null>(null);
 
   // Detect mobile
   useEffect(() => {
@@ -62,42 +58,6 @@ export default function Login() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
-
-  // Handle mouse movement for desktop - disabled when locked
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    // When a side is locked, disable all hover animations
-    if (isMobile || lockedSide) {
-      setHoveredSide(null);
-      return;
-    }
-    const midPoint = window.innerWidth / 2;
-    if (e.clientX < midPoint) {
-      setHoveredSide("login");
-    } else {
-      setHoveredSide("plans");
-    }
-  };
-
-  // Handle click on background to lock (only when not clicking inside cards)
-  const handleSideClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only handle clicks directly on the background, not on cards
-    // Cards handle their own locking via handleLoginCardClick and handlePlansCardClick
-    if (isMobile || lockedSide) return;
-    if (e.target === e.currentTarget) {
-      const midPoint = window.innerWidth / 2;
-      const clickedSide = e.clientX < midPoint ? "login" : "plans";
-      setLockedSide(clickedSide);
-      setHoveredSide(null);
-    }
-  };
-
-  // Unlock and switch to other side
-  const switchToOtherSide = (side: "login" | "plans") => {
-    setLockedSide(side);
-  };
-
-  // Get the active side (locked takes priority, then hovered)
-  const activeSide = lockedSide || hoveredSide;
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
@@ -190,336 +150,297 @@ export default function Login() {
     }).format(price);
   };
 
-  const switchToPlans = () => setViewMode("plans");
-  const switchToLogin = () => setViewMode("login");
+  const openLogin = () => setViewMode("login");
+  const openPlans = () => setViewMode("plans");
+  const goBack = () => setViewMode("initial");
 
-  // Lock login side when clicking inside the card
-  const handleLoginCardClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!lockedSide) {
-      setLockedSide("login");
-      setHoveredSide(null);
-    }
-  };
+  // Initial Selection Cards (two side by side)
+  const initialView = (
+    <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 px-4">
+      {/* Login Card Preview */}
+      <motion.div
+        whileHover={{ scale: 1.03, y: -5 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={openLogin}
+        className="cursor-pointer bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 w-full max-w-[280px] text-center transition-all hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10"
+      >
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-5">
+          <Crown className="w-10 h-10 text-primary" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground mb-2">Já sou cliente</h3>
+        <p className="text-sm text-muted-foreground">Acesse sua conta</p>
+      </motion.div>
 
-  // Lock plans side when clicking inside the card
-  const handlePlansCardClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!lockedSide) {
-      setLockedSide("plans");
-      setHoveredSide(null);
-    }
-  };
+      {/* Plans Card Preview */}
+      <motion.div
+        whileHover={{ scale: 1.03, y: -5 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={openPlans}
+        className="cursor-pointer bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 w-full max-w-[280px] text-center transition-all hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10"
+      >
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-5">
+          <Zap className="w-10 h-10 text-primary" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground mb-2">Quero me cadastrar</h3>
+        <p className="text-sm text-muted-foreground">Escolha seu plano</p>
+      </motion.div>
+    </div>
+  );
 
-  // Determine if plans card should be expanded
-  const isExpanded = !isMobile && lockedSide === "plans";
-
-  // Login Card JSX
-  const loginCardContent = (
-    <div
-      onClick={handleLoginCardClick}
-      className={cn(
-        "bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4"
-      )}
+  // Full Screen Login View
+  const loginView = (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl flex items-center justify-center p-4"
     >
-      {/* Card Header */}
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-4">
-          <Crown className="w-8 h-8 text-primary" />
-        </div>
-        <h2 className="text-2xl font-bold text-foreground">Já sou cliente!</h2>
-      </div>
+      {/* Close Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={goBack}
+        className="absolute top-4 right-4 z-10"
+      >
+        <X className="w-6 h-6" />
+      </Button>
 
-      {/* Login Form */}
-      <form onSubmit={handleLogin} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
-            Email
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="seu@email.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            disabled={isLoading}
-            className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
-            Senha
-          </Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={isLoading}
-              className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
+      <div className="bg-card/90 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-8 w-full max-w-md">
+        {/* Card Header */}
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto mb-5">
+            <Crown className="w-10 h-10 text-primary" />
           </div>
+          <h2 className="text-3xl font-bold text-foreground">Bem-vindo de volta!</h2>
+          <p className="text-muted-foreground mt-2">Entre com suas credenciais</p>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="remember-me"
-            checked={rememberMe}
-            onCheckedChange={checked => setRememberMe(checked === true)}
-          />
-          <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
-            Continuar conectado por 30 dias
-          </Label>
-        </div>
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={isLoading}
+              className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
 
-        <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
-          {isLoading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Entrando...
-            </>
-          ) : (
-            <>
-              <LogIn className="w-5 h-5 mr-2" />
-              Entrar
-            </>
-          )}
-        </Button>
-      </form>
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+              Senha
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent/50 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
 
-      {/* Switch Button - Only on Mobile or when locked */}
-      {(isMobile || lockedSide === "login") && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember-me"
+              checked={rememberMe}
+              onCheckedChange={checked => setRememberMe(checked === true)}
+            />
+            <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
+              Continuar conectado por 30 dias
+            </Label>
+          </div>
+
+          <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Entrando...
+              </>
+            ) : (
+              <>
+                <LogIn className="w-5 h-5 mr-2" />
+                Entrar
+              </>
+            )}
+          </Button>
+        </form>
+
+        {/* Switch to Plans */}
         <div className="mt-6 pt-4 border-t border-border/50">
           <Button
             variant="ghost"
-            onClick={() => isMobile ? switchToPlans() : switchToOtherSide("plans")}
+            onClick={openPlans}
             className="w-full text-muted-foreground hover:text-foreground"
           >
             Ainda não sou cliente
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
-      )}
-    </div>
+      </div>
+    </motion.div>
   );
 
-  // Plans Card JSX
-  const plansCardContent = (
-    <div
-      onClick={handlePlansCardClick}
-      className={cn(
-        "bg-card/95 backdrop-blur-xl border border-border/30 rounded-3xl shadow-2xl",
-        "mx-2 sm:mx-4",
-        isExpanded 
-          ? "p-8 sm:p-10 lg:p-12 w-[95vw] max-w-[1400px]" 
-          : "p-4 sm:p-5 w-full max-w-[320px] sm:max-w-md"
-      )}
+  // Full Screen Plans View
+  const plansView = (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
     >
-      {/* Plans Header */}
-      <div className={cn(
-        "text-center",
-        isExpanded ? "mb-8 lg:mb-10" : "mb-4 sm:mb-6"
-      )}>
-        <h2 className={cn(
-          "font-bold text-foreground",
-          isExpanded ? "text-3xl sm:text-4xl lg:text-5xl" : "text-lg sm:text-xl"
-        )}>
-          Quero me cadastrar
-        </h2>
-        {isExpanded && (
-          <p className="text-muted-foreground mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl">
-            Escolha o plano ideal para você e sua família
+      {/* Close Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={goBack}
+        className="absolute top-4 right-4 z-10"
+      >
+        <X className="w-6 h-6" />
+      </Button>
+
+      <div className="bg-card/90 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-6xl my-8">
+        {/* Header */}
+        <div className="text-center mb-8 md:mb-10">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground">Escolha seu plano</h2>
+          <p className="text-muted-foreground mt-3 text-lg">
+            Assista em todos os seus dispositivos
           </p>
-        )}
-      </div>
-
-      {/* Devices Banner */}
-      <div className={cn(
-        "bg-primary/10 border border-primary/20 rounded-2xl text-center",
-        isExpanded ? "px-8 py-5 mb-8 lg:mb-10" : "px-3 py-2 mb-4"
-      )}>
-        <p className={cn(
-          "text-primary font-medium",
-          isExpanded ? "text-base sm:text-lg" : "text-[10px] sm:text-xs"
-        )}>
-          📱 Celular • 💻 PC • 📺 Smart TV • 🎮 Video Game • Fire Stick
-        </p>
-      </div>
-
-      {/* Plans Grid */}
-      {plansLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      ) : (
-        <div className={cn(
-          "grid gap-3 sm:gap-4",
-          isExpanded 
-            ? "grid-cols-8 gap-5 lg:gap-8" 
-            : "grid-cols-2"
-        )}>
-          {plans.map(plan => (
-            <div
-              key={plan.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePlanSelect(plan);
-              }}
-              onMouseEnter={() => setHoveredPlan(plan.id)}
-              onMouseLeave={() => setHoveredPlan(null)}
-              className={cn(
-                "relative cursor-pointer rounded-2xl border-2 transition-all duration-200",
-                "hover:scale-[1.02] hover:-translate-y-1 active:scale-[0.98]",
-                isExpanded ? "col-span-2 p-6 sm:p-8 min-h-[420px] flex flex-col" : "p-2.5 sm:p-3",
-                plan.is_highlighted
-                  ? "border-primary bg-primary/10 shadow-xl shadow-primary/20 ring-1 ring-primary/30"
-                  : "border-border/50 bg-background/60 hover:border-primary/40 hover:bg-background/80",
-                hoveredPlan === plan.id && "ring-2 ring-primary/40"
-              )}
-            >
-              {/* Highlighted Badge */}
-              {plan.is_highlighted && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                  <span className={cn(
-                    "bg-primary text-primary-foreground font-bold rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-lg",
-                    isExpanded ? "text-base px-5 py-2" : "text-[9px] sm:text-[10px] px-2 py-0.5"
-                  )}>
-                    <Star className={cn(isExpanded ? "w-5 h-5" : "w-2.5 h-2.5")} fill="currentColor" />
-                    MAIS POPULAR
-                  </span>
-                </div>
-              )}
 
-              {/* Savings Badge */}
-              {plan.savings_percent && plan.savings_percent > 0 && (
-                <div className={cn(
-                  "absolute bg-emerald-500 text-white font-bold rounded-full shadow-lg",
-                  isExpanded 
-                    ? "-top-3 -right-3 text-base px-4 py-2" 
-                    : "-top-1.5 -right-1.5 text-[9px] sm:text-[10px] px-1.5 py-0.5"
-                )}>
-                  -{plan.savings_percent}%
-                </div>
-              )}
+        {/* Devices Banner */}
+        <div className="bg-primary/10 border border-primary/20 rounded-2xl px-6 py-4 mb-8 text-center">
+          <p className="text-primary font-medium text-base md:text-lg">
+            📱 Celular • 💻 PC • 📺 Smart TV • 🎮 Video Game • Fire Stick
+          </p>
+        </div>
 
-              <div className={cn(
-                "text-center flex-1 flex flex-col", 
-                plan.is_highlighted && isExpanded && "pt-4",
-                plan.is_highlighted && !isExpanded && "pt-2"
-              )}>
-                <h3 className={cn(
-                  "font-bold text-foreground leading-tight",
-                  isExpanded ? "text-2xl sm:text-3xl" : "text-sm sm:text-base"
-                )}>
-                  {plan.name}
-                </h3>
-                
-                <div className={cn(
-                  "flex items-baseline justify-center gap-1.5",
-                  isExpanded ? "mt-6" : "mt-2"
-                )}>
-                  <span className={cn(
-                    "font-extrabold text-primary",
-                    isExpanded ? "text-4xl sm:text-5xl" : "text-lg sm:text-xl"
-                  )}>
-                    {formatPrice(plan.price)}
-                  </span>
-                  <span className={cn(
-                    "text-muted-foreground font-medium",
-                    isExpanded ? "text-lg" : "text-[10px] sm:text-xs"
-                  )}>
-                    /{plan.period}
-                  </span>
-                </div>
-
-                {/* Price per month for multi-month plans */}
-                {isExpanded && plan.period_months > 1 && (
-                  <p className="text-base text-muted-foreground mt-2">
-                    {formatPrice(plan.price / plan.period_months)}/mês
-                  </p>
-                )}
-
-                {plan.savings_amount && plan.savings_amount > 0 && (
-                  <p className={cn(
-                    "text-emerald-500 font-semibold",
-                    isExpanded ? "text-lg mt-3" : "text-[9px] sm:text-[10px] mt-0.5"
-                  )}>
-                    Economize {formatPrice(plan.savings_amount)}
-                  </p>
-                )}
-
-                {/* Features - Only show when expanded */}
-                {isExpanded && plan.features && plan.features.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-border/30 flex-1">
-                    <ul className="space-y-3 text-left">
-                      {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start gap-3 text-base text-foreground/80">
-                          <Check className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* CTA Button */}
-              <Button
-                size={isExpanded ? "lg" : "sm"}
+        {/* Plans Grid */}
+        {plansLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+            {plans.map(plan => (
+              <motion.div
+                key={plan.id}
+                whileHover={{ scale: 1.02, y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handlePlanSelect(plan)}
+                onMouseEnter={() => setHoveredPlan(plan.id)}
+                onMouseLeave={() => setHoveredPlan(null)}
                 className={cn(
-                  "w-full font-semibold",
-                  isExpanded 
-                    ? "mt-6 h-14 text-lg rounded-xl" 
-                    : "mt-2 h-7 text-[10px] sm:text-xs rounded-lg",
-                  plan.is_highlighted 
-                    ? "bg-primary hover:bg-primary/90" 
-                    : "bg-foreground/10 hover:bg-foreground/20 text-foreground"
+                  "relative cursor-pointer rounded-2xl border-2 transition-all duration-200 p-6 flex flex-col",
+                  plan.is_highlighted
+                    ? "border-primary bg-primary/10 shadow-xl shadow-primary/20 ring-1 ring-primary/30"
+                    : "border-border/50 bg-background/60 hover:border-primary/40 hover:bg-background/80",
+                  hoveredPlan === plan.id && "ring-2 ring-primary/40"
                 )}
               >
-                {isExpanded ? (
-                  <>
-                    Assinar agora
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                ) : (
-                  "Assinar"
+                {/* Highlighted Badge */}
+                {plan.is_highlighted && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                    <span className="bg-primary text-primary-foreground font-bold rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-lg text-sm px-4 py-1.5">
+                      <Star className="w-4 h-4" fill="currentColor" />
+                      MAIS POPULAR
+                    </span>
+                  </div>
                 )}
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Back Button - Only on Mobile or when locked */}
-      {(isMobile || lockedSide === "plans") && (
-        <div className={cn(
-          "border-t border-border/50",
-          isExpanded ? "mt-10 pt-6" : "mt-4 pt-3"
-        )}>
+                {/* Savings Badge */}
+                {plan.savings_percent && plan.savings_percent > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-emerald-500 text-white font-bold rounded-full shadow-lg text-sm px-3 py-1">
+                    -{plan.savings_percent}%
+                  </div>
+                )}
+
+                <div className={cn("text-center flex-1 flex flex-col", plan.is_highlighted && "pt-3")}>
+                  <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
+                  
+                  <div className="flex items-baseline justify-center gap-1 mt-4">
+                    <span className="text-3xl md:text-4xl font-extrabold text-primary">
+                      {formatPrice(plan.price)}
+                    </span>
+                    <span className="text-muted-foreground font-medium">/{plan.period}</span>
+                  </div>
+
+                  {plan.period_months > 1 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {formatPrice(plan.price / plan.period_months)}/mês
+                    </p>
+                  )}
+
+                  {plan.savings_amount && plan.savings_amount > 0 && (
+                    <p className="text-emerald-500 font-semibold text-sm mt-2">
+                      Economize {formatPrice(plan.savings_amount)}
+                    </p>
+                  )}
+
+                  {/* Features */}
+                  {plan.features && plan.features.length > 0 && (
+                    <div className="mt-5 pt-5 border-t border-border/30 flex-1">
+                      <ul className="space-y-2.5 text-left">
+                        {plan.features.slice(0, 5).map((feature, i) => (
+                          <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
+                            <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* CTA Button */}
+                <Button
+                  size="lg"
+                  className={cn(
+                    "w-full font-semibold mt-5 h-12 rounded-xl",
+                    plan.is_highlighted 
+                      ? "bg-primary hover:bg-primary/90" 
+                      : "bg-foreground/10 hover:bg-foreground/20 text-foreground"
+                  )}
+                >
+                  Assinar agora
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Back to Login */}
+        <div className="mt-8 pt-6 border-t border-border/50">
           <Button
             variant="ghost"
-            onClick={() => isMobile ? switchToLogin() : switchToOtherSide("login")}
-            className={cn(
-              "w-full text-muted-foreground hover:text-foreground",
-              isExpanded ? "text-lg h-12" : "text-sm"
-            )}
+            onClick={openLogin}
+            className="w-full text-muted-foreground hover:text-foreground text-lg"
           >
-            <ArrowLeft className={cn("mr-2", isExpanded ? "w-5 h-5" : "w-4 h-4")} />
+            <ArrowLeft className="w-5 h-5 mr-2" />
             Já sou cliente
           </Button>
         </div>
-      )}
-    </div>
+      </div>
+    </motion.div>
   );
 
   return (
@@ -544,68 +465,17 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div 
-        className="relative z-10 h-screen flex items-center justify-center"
-        onMouseMove={handleMouseMove}
-        onClick={handleSideClick}
-      >
-        {isMobile ? (
-          /* Mobile: One card at a time with animation */
-          <AnimatePresence mode="wait">
-            {viewMode === "login" ? (
-              <motion.div
-                key="login"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2 }}
-              >
-                {loginCardContent}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="plans"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                {plansCardContent}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        ) : (
-          <div className="relative w-full h-full flex items-center justify-center">
-            {lockedSide ? (
-              lockedSide === "login" ? loginCardContent : plansCardContent
-            ) : hoveredSide ? (
-              hoveredSide === "login" ? loginCardContent : plansCardContent
-            ) : (
-              <div className="flex flex-col items-center gap-8">
-                <p className="text-muted-foreground text-lg">
-                  Passe o mouse para selecionar uma opção
-                </p>
-                <div className="flex gap-8">
-                  <div className="text-center">
-                    <div className="w-32 h-32 rounded-2xl bg-card/50 border border-border/30 flex items-center justify-center mb-3">
-                      <Crown className="w-12 h-12 text-primary/50" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Já sou cliente</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-32 h-32 rounded-2xl bg-card/50 border border-border/30 flex items-center justify-center mb-3">
-                      <Zap className="w-12 h-12 text-primary/50" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Quero me cadastrar</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="relative z-10 min-h-screen flex items-center justify-center py-20">
+        {initialView}
       </div>
 
-      {/* Footer - Fixed at bottom */}
+      {/* Full Screen Views */}
+      <AnimatePresence>
+        {viewMode === "login" && loginView}
+        {viewMode === "plans" && plansView}
+      </AnimatePresence>
+
+      {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-20 p-4 text-center bg-gradient-to-t from-background to-transparent">
         <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-2">
           <Wifi className="w-4 h-4 text-green-500" />
