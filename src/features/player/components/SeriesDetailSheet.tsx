@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSafeImageUrl } from '@/utils/imageUtils';
 import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
 import type { SeriesMetadata, Episode } from '../types/series';
 
@@ -81,8 +82,8 @@ export function SeriesDetailSheet({
   if (!series) return null;
 
   const displayName = metadata?.title || series.name;
-  const posterUrl = metadata?.poster_url || series.tvg_logo;
-  const backdropUrl = metadata?.backdrop_url;
+  const posterUrl = getSafeImageUrl(metadata?.poster_url || series.tvg_logo);
+  const backdropUrl = getSafeImageUrl(metadata?.backdrop_url);
 
   // Parse episodes from relatedEpisodes if available
   const parsedEpisodes = relatedEpisodes

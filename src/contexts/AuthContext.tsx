@@ -138,6 +138,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(currentSession);
     
     if (currentSession?.user) {
+      // Verificar se token está válido antes de continuar
+      const tokenExpiry = currentSession.expires_at;
+      if (tokenExpiry) {
+        const expiresAt = new Date(tokenExpiry * 1000);
+        const now = new Date();
+        
+        // Se token expira em menos de 1 minuto, forçar refresh
+        if (expiresAt.getTime() - now.getTime() < 60000) {
+          console.log('[AuthContext] Token próximo de expirar, forçando refresh...');
+          try {
+            const { data, error } = await supabase.auth.refreshSession();
+            if (error) {
+              console.error('[AuthContext] Erro ao fazer refresh:', error);
+              // Se refresh falhar, fazer logout
+              await supabase.auth.signOut();
+              setUser(null);
+              setSession(null);
+              setLoading(false);
+              return;
+            }
+            if (data.session) {
+              currentSession = data.session;
+              setSession(data.session);
+            }
+          } catch (error) {
+            console.error('[AuthContext] Erro crítico no refresh:', error);
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      
       // CRÍTICO: Liberar loading IMEDIATAMENTE com dados básicos do session
       const basicUser: UnifiedUser = {
         id: currentSession.user.id,

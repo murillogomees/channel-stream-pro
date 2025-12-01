@@ -60,21 +60,33 @@ webVitalsService.init((report) => {
 // Initialize stream cache service
 streamCacheService.init();
 
-// Suprimir erros de WebSocket do Realtime para evitar impacto no Lighthouse/SEO
+// Suprimir ruídos de console para melhor experiência de desenvolvimento
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
 console.error = (...args: unknown[]) => {
   const errorMessage = String(args[0] || '');
   
-  // Suprimir todos os erros relacionados ao WebSocket do Realtime
-  if (
-    (errorMessage.includes('WebSocket') && errorMessage.includes('realtime')) ||
-    (errorMessage.includes('sdvyxdghxqmntyoweqbd.supabase.co') && errorMessage.includes('websocket')) ||
-    errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
-    (errorMessage.includes('wss://') && errorMessage.includes('failed'))
-  ) {
-    return; // Silenciar completamente
+  // Suprimir erros conhecidos que não afetam funcionalidade
+  const suppressPatterns = [
+    // WebSocket do Realtime (esperado em desenvolvimento)
+    /WebSocket.*realtime/i,
+    /websocket.*failed/i,
+    /wss:\/\/.*failed/i,
+    // Erros de rede esperados (offline, DNS)
+    /ERR_NAME_NOT_RESOLVED/,
+    /ERR_NETWORK/,
+    /ERR_CONNECTION/,
+    // Service Worker tentando cachear URLs inválidas
+    /chrome-extension/i,
+    /Failed to execute 'put' on 'Cache'/,
+    /Failed to convert value to 'Response'/,
+    // Facebook Pixel (funciona mesmo com alguns 400s de pré-fetch)
+    /facebook\.com.*400/i,
+  ];
+  
+  if (suppressPatterns.some(pattern => pattern.test(errorMessage))) {
+    return;
   }
   
   originalConsoleError.apply(console, args);
@@ -83,10 +95,11 @@ console.error = (...args: unknown[]) => {
 console.warn = (...args: unknown[]) => {
   const warnMessage = String(args[0] || '');
   
-  // Suprimir avisos do WebSocket do Realtime
+  // Suprimir avisos conhecidos
   if (
-    (warnMessage.includes('WebSocket') && warnMessage.includes('realtime')) ||
-    (warnMessage.includes('sdvyxdghxqmntyoweqbd.supabase.co') && warnMessage.includes('websocket'))
+    /WebSocket.*realtime/i.test(warnMessage) ||
+    /websocket.*failed/i.test(warnMessage) ||
+    /chrome-extension/i.test(warnMessage)
   ) {
     return;
   }
