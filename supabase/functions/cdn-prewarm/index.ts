@@ -186,8 +186,8 @@ serve(async (req) => {
   // Also check for authenticated admin user
   if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace('Bearer ', '');
-    const { createClient: createAuthClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-    const authSupabase = createAuthClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const authSupabase = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
     
