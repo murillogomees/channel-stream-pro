@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Play, Info, Plus, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getSafeImageUrl } from '@/utils/imageUtils';
 import type { ContentType } from '../types';
 
 interface HeroItem {
@@ -82,14 +83,14 @@ export function TVHeroCarousel({
           >
             {item.backdrop_url ? (
               <img
-                src={item.backdrop_url}
+                src={getSafeImageUrl(item.backdrop_url)}
                 alt={item.title}
                 className="w-full h-full object-cover object-top"
                 loading={index === 0 ? "eager" : "lazy"}
               />
             ) : item.poster_url ? (
               <img
-                src={item.poster_url}
+                src={getSafeImageUrl(item.poster_url)}
                 alt={item.title}
                 className="w-full h-full object-cover object-center blur-sm scale-110"
                 loading={index === 0 ? "eager" : "lazy"}

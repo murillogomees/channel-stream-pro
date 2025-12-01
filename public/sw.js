@@ -86,9 +86,30 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// URLs que devem ser IGNORADAS pelo Service Worker
+const SKIP_PATTERNS = [
+  /chrome-extension:\/\//i,
+  /chrome:\/\//i,
+  /^blob:/,
+  /facebook\.com/i,
+  /fbcdn\.net/i,
+  /doubleclick\.net/i,
+  /google-analytics\.com/i,
+  /googletagmanager\.com/i,
+];
+
+function shouldSkipRequest(url) {
+  return SKIP_PATTERNS.some(pattern => pattern.test(url));
+}
+
 // ============ FETCH STRATEGIES ============
 
 async function cacheFirst(request, cacheName = CACHE_NAMES.STATIC) {
+  // Verificar se deve ignorar
+  if (shouldSkipRequest(request.url)) {
+    return fetch(request);
+  }
+
   const cached = await caches.match(request);
   if (cached) {
     log('Cache hit:', request.url);
@@ -98,8 +119,13 @@ async function cacheFirst(request, cacheName = CACHE_NAMES.STATIC) {
   try {
     const response = await fetch(request);
     if (response && response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
+      try {
+        const cache = await caches.open(cacheName);
+        await cache.put(request, response.clone());
+      } catch (cacheError) {
+        // Ignorar erros de cache silenciosamente
+        log('Cache put failed (ignored):', cacheError.message);
+      }
     }
     return response;
   } catch (error) {
@@ -109,11 +135,20 @@ async function cacheFirst(request, cacheName = CACHE_NAMES.STATIC) {
 }
 
 async function networkFirst(request, cacheName = CACHE_NAMES.DYNAMIC) {
+  // Verificar se deve ignorar
+  if (shouldSkipRequest(request.url)) {
+    return fetch(request);
+  }
+
   try {
     const response = await fetch(request);
     if (response && response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
+      try {
+        const cache = await caches.open(cacheName);
+        await cache.put(request, response.clone());
+      } catch (cacheError) {
+        log('Cache put failed (ignored):', cacheError.message);
+      }
     }
     return response;
   } catch (error) {
@@ -125,13 +160,22 @@ async function networkFirst(request, cacheName = CACHE_NAMES.DYNAMIC) {
 }
 
 async function staleWhileRevalidate(request, cacheName = CACHE_NAMES.DYNAMIC) {
+  // Verificar se deve ignorar
+  if (shouldSkipRequest(request.url)) {
+    return fetch(request);
+  }
+
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
   const fetchPromise = fetch(request)
     .then(response => {
       if (response && response.ok) {
-        cache.put(request, response.clone());
+        try {
+          cache.put(request, response.clone());
+        } catch (cacheError) {
+          log('Cache put failed (ignored):', cacheError.message);
+        }
       }
       return response;
     })
@@ -220,6 +264,11 @@ async function imageStrategy(request) {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // CRÍTICO: Ignorar URLs que causam problemas
+  if (shouldSkipRequest(request.url)) {
+    return; // Deixar navegador lidar com isso naturalmente
+  }
 
   if (request.method !== 'GET') {
     event.respondWith(

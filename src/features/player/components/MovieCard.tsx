@@ -7,6 +7,7 @@ import { Play, Plus, Star, Info, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSafeImageUrl } from '@/utils/imageUtils';
 import type { ContentMetadata } from '../types';
 
 interface MovieCardProps {
@@ -43,7 +44,7 @@ export const MovieCard = memo(function MovieCard({
 
   // Use TMDB data if available
   const displayTitle = metadata?.title || name;
-  const displayPoster = metadata?.poster_url || logo;
+  const displayPoster = getSafeImageUrl(metadata?.poster_url || logo);
   const displayRating = metadata?.tmdb_rating;
   const displayYear = metadata?.year;
   const displayGenres = metadata?.genres?.slice(0, 2) || [];

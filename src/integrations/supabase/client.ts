@@ -13,11 +13,16 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
   realtime: {
     params: {
       eventsPerSecond: 2,
     },
+    // Desabilitar realtime WebSocket para evitar erros no console durante desenvolvimento
+    // quando não há necessidade de subscriptions em tempo real
+    log_level: 'error',
   },
   global: {
     headers: {

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSafeImageUrl } from '@/utils/imageUtils';
 import type { SeriesMetadata } from '../types/series';
 
 interface SeriesCardProps {
@@ -35,7 +36,7 @@ export const SeriesCard = memo(function SeriesCard({
   onToggleFavorite,
   className,
 }: SeriesCardProps) {
-  const posterUrl = metadata?.poster_url || logo;
+  const posterUrl = getSafeImageUrl(metadata?.poster_url || logo);
   const displayName = metadata?.title || name;
   const rating = metadata?.tmdb_rating;
   const year = metadata?.year;

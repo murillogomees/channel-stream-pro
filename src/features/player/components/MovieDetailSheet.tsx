@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSafeImageUrl } from '@/utils/imageUtils';
 import type { ContentMetadata } from '../types';
 
 interface MovieDetailSheetProps {
@@ -68,8 +69,8 @@ export const MovieDetailSheet = memo(function MovieDetailSheet({
   const displayGenres = metadata?.genres || [];
   const displayCast = metadata?.cast_members || [];
   const displayDirector = metadata?.director;
-  const backdropUrl = metadata?.backdrop_url || movie.tvg_logo;
-  const posterUrl = metadata?.poster_url || movie.tvg_logo;
+  const backdropUrl = getSafeImageUrl(metadata?.backdrop_url || movie.tvg_logo);
+  const posterUrl = getSafeImageUrl(metadata?.poster_url || movie.tvg_logo);
 
   return (
     <>
