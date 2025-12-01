@@ -306,12 +306,18 @@ serve(async (req) => {
     let assetsWithUrls = [];
     
     if (predictions && predictions.length > 0) {
-      // Get CDN URLs from r2_storage_objects for predicted keys
-      const { data: r2Objects } = await supabase
+    // Get CDN URLs from r2_storage_objects for predicted keys
+      const { data: r2Objects, error: r2Error } = await supabase
         .from('r2_storage_objects')
         .select('r2_key, cdn_url, source_channel_id')
         .in('r2_key', predictions.map(p => p.r2_key).filter(Boolean))
         .eq('status', 'ready');
+      
+      if (r2Error) {
+        console.error('[CDN-Prewarm] Error fetching R2 objects:', r2Error);
+      }
+      
+      console.log('[CDN-Prewarm] Found R2 objects:', r2Objects?.length || 0);
       
       // Map predictions to r2_storage_objects to get cdn_url
       assetsWithUrls = predictions
@@ -380,12 +386,28 @@ serve(async (req) => {
 
     // Prepare assets for prewarming using cdn_url from database
     const assets = assetsWithUrls
-      .filter(p => p.cdn_url)
-      .map(p => ({
-        r2_key: p.r2_key!,
-        cdn_url: p.cdn_url!, // Use cdn_url directly from database
-        channel_id: p.channel_id
-      }));
+      .filter(p => {
+        if (!p.cdn_url) {
+          console.warn('[CDN-Prewarm] No cdn_url for:', p.r2_key);
+          return false;
+        }
+        
+        // Validate URL format
+        if (p.cdn_url.includes('https://https//')) {
+          console.error('[CDN-Prewarm] Malformed URL detected:', p.cdn_url);
+          return false;
+        }
+        
+        return true;
+      })
+      .map(p => {
+        console.log('[CDN-Prewarm] Preparing asset:', { r2_key: p.r2_key, cdn_url: p.cdn_url });
+        return {
+          r2_key: p.r2_key!,
+          cdn_url: p.cdn_url!, // Use cdn_url directly from database
+          channel_id: p.channel_id
+        };
+      });
 
     // Progress update function
     const updateProgress = async (prewarmed: number, failed: number, bytes: number) => {

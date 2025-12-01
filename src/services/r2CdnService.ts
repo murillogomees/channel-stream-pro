@@ -280,28 +280,34 @@ export async function listActiveTokens(options?: {
   channel_id?: string;
   limit?: number;
 }): Promise<CdnSignedToken[]> {
-  let query = supabase
-    .from('cdn_signed_tokens')
-    .select('*')
-    .is('revoked_at', null)
-    .gt('expires_at', new Date().toISOString());
+  try {
+    let query = supabase
+      .from('cdn_signed_tokens')
+      .select('*')
+      .is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString());
 
-  if (options?.channel_id) {
-    query = query.eq('channel_id', options.channel_id);
-  }
+    if (options?.channel_id) {
+      query = query.eq('channel_id', options.channel_id);
+    }
 
-  query = query
-    .order('issued_at', { ascending: false })
-    .limit(options?.limit || 100);
+    query = query
+      .order('issued_at', { ascending: false })
+      .limit(options?.limit || 100);
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    console.error('[R2CDN] List tokens error:', error);
+    if (error) {
+      console.error('[R2CDN] List tokens error:', error);
+      return [];
+    }
+
+    console.log('[R2CDN] Active tokens:', data?.length || 0);
+    return (data as unknown as CdnSignedToken[]) || [];
+  } catch (error) {
+    console.error('[R2CDN] List active tokens exception:', error);
     return [];
   }
-
-  return (data as unknown as CdnSignedToken[]) || [];
 }
 
 // ============================================
@@ -395,11 +401,15 @@ export async function getCdnStats(): Promise<CdnStats | null> {
   try {
     const { data, error } = await supabase.rpc('get_cdn_stats');
 
-    if (error) throw error;
+    if (error) {
+      console.error('[R2CDN] Get stats RPC error:', error);
+      throw error;
+    }
 
+    console.log('[R2CDN] Stats retrieved:', data?.[0]);
     return data?.[0] as CdnStats || null;
   } catch (error) {
-    console.error('[R2CDN] Get stats error:', error);
+    console.error('[R2CDN] Get stats exception:', error);
     return null;
   }
 }
@@ -408,22 +418,43 @@ export async function getCdnStats(): Promise<CdnStats | null> {
  * Track content access - increments access count and bandwidth
  */
 export async function trackAccess(r2_key: string, bytes: number = 0): Promise<void> {
-  // First get current values
-  const { data } = await supabase
-    .from('r2_storage_objects')
-    .select('access_count, bandwidth_bytes')
-    .eq('r2_key', r2_key)
-    .single();
-
-  if (data) {
-    await supabase
+  try {
+    console.log('[R2CDN] Tracking access:', { r2_key, bytes });
+    
+    // Get current values and update atomically
+    const { data, error: selectError } = await supabase
       .from('r2_storage_objects')
-      .update({
-        access_count: (data.access_count || 0) + 1,
-        bandwidth_bytes: (data.bandwidth_bytes || 0) + bytes,
-        last_accessed_at: new Date().toISOString()
-      })
-      .eq('r2_key', r2_key);
+      .select('access_count, bandwidth_bytes')
+      .eq('r2_key', r2_key)
+      .single();
+
+    if (selectError) {
+      console.error('[R2CDN] Track access select error:', selectError);
+      return;
+    }
+
+    if (data) {
+      const { error: updateError } = await supabase
+        .from('r2_storage_objects')
+        .update({
+          access_count: (data.access_count || 0) + 1,
+          bandwidth_bytes: (data.bandwidth_bytes || 0) + bytes,
+          last_accessed_at: new Date().toISOString()
+        })
+        .eq('r2_key', r2_key);
+      
+      if (updateError) {
+        console.error('[R2CDN] Track access update error:', updateError);
+      } else {
+        console.log('[R2CDN] Access tracked successfully:', {
+          r2_key,
+          new_access_count: (data.access_count || 0) + 1,
+          new_bandwidth: (data.bandwidth_bytes || 0) + bytes
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[R2CDN] Track access exception:', error);
   }
 }
 
