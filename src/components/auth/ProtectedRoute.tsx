@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
-  requireSuperAdmin?: boolean;
+  requireMaster?: boolean;
   requireClient?: boolean;
   requireValidAccess?: boolean; // Requer acesso não vencido
 }
@@ -25,14 +25,14 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ 
   children, 
   requireAdmin = false,
-  requireSuperAdmin = false,
+  requireMaster = false,
   requireClient = false,
   requireValidAccess = false
 }: ProtectedRouteProps) => {
   const { 
     isAuthenticated, 
     isAdmin, 
-    isSuperAdmin, 
+    isMaster, 
     isClient, 
     loading, 
     user, 
@@ -85,13 +85,13 @@ export const ProtectedRoute = ({
   // VERIFICAÇÕES PARA ROTAS ADMIN
   // ========================================
   
-  if (requireSuperAdmin && !isSuperAdmin && !rolesNotLoadedYet) {
+  if (requireMaster && !isMaster && !rolesNotLoadedYet) {
     if (user) {
       setTimeout(() => {
-        authLoggingService.logAccessDenied(user.id, user.email || '', 'super_admin required', location.pathname);
+        authLoggingService.logAccessDenied(user.id, user.email || '', 'master required', location.pathname);
       }, 0);
     }
-    return <Navigate to="/403" state={{ required: 'super_admin' }} replace />;
+    return <Navigate to="/403" state={{ required: 'master' }} replace />;
   }
 
   if (requireAdmin && !isAdmin && !rolesNotLoadedYet) {

@@ -145,16 +145,21 @@ const AdminUserRoles = () => {
 
   const handleAddRole = async (userId: string, role: string) => {
     try {
-      const validRoles = ['admin', 'client'];
+      const validRoles = ['admin', 'client', 'master'];
       if (!validRoles.includes(role)) {
         throw new Error('Role inválida');
       }
 
-      const { error } = await supabase
+      // Apenas master pode criar outros masters ou modificar admins
+      if (role === 'master' && !currentUser?.isMaster) {
+        throw new Error('Apenas o usuário master pode criar outros masters');
+      }
+
+      const { error } = await (supabase as any)
         .from('user_roles')
         .insert([{ 
           user_id: userId, 
-          role: role as 'admin' | 'client'
+          role: role
         }]);
 
       if (error) throw error;
@@ -369,6 +374,7 @@ const AdminUserRoles = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todas as roles</SelectItem>
+                          <SelectItem value="master">Master</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="client">Client</SelectItem>
                         </SelectContent>
@@ -410,6 +416,7 @@ const AdminUserRoles = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="client">Client</SelectItem>
                             </SelectContent>
