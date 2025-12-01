@@ -276,6 +276,8 @@ serve(async (req) => {
         
         // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
         const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+        const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.iptvlink.com.br';
+        const publicCdnUrl = `https://${r2PublicDomain}/${r2Key}`;
         const downloadInfo = await supabaseService.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
         const fileSizeBytes = downloadInfo?.data?.file_size_bytes || 0;
         
@@ -287,7 +289,13 @@ serve(async (req) => {
           size_bytes: fileSizeBytes,
           source_channel_id: channel.id,
           source_url: channel.stream_url,
-          cdn_url: r2Url,
+          cdn_url: publicCdnUrl,
+          cache_control: 'public, max-age=31536000, immutable',
+          status: 'ready',
+          access_count: 0,
+          bandwidth_bytes: 0,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'r2_key' });
           cache_control: 'public, max-age=31536000, immutable',
           status: 'ready',
           access_count: 0,
@@ -604,6 +612,8 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
 
     // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
     const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+    const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.iptvlink.com.br';
+    const publicCdnUrl = `https://${r2PublicDomain}/${r2Key}`;
     const downloadInfo = await supabase.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
     const fileSizeBytes = downloadInfo?.data?.file_size_bytes || 0;
     
@@ -615,7 +625,7 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
       size_bytes: fileSizeBytes,
       source_channel_id: channel.id,
       source_url: channel.stream_url,
-      cdn_url: r2Url,
+      cdn_url: publicCdnUrl,
       cache_control: 'public, max-age=31536000, immutable',
       status: 'ready',
       access_count: 0,

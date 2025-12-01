@@ -158,7 +158,9 @@ serve(async (req) => {
         }
       }));
 
+      // Generate proper public CDN URL
       const cdnUrl = `https://${r2Domain}/${r2Key}`;
+      console.log('[R2-Upload] Generated CDN URL:', cdnUrl);
 
       // Store in database
       const { data: record, error: dbError } = await supabase
