@@ -3739,6 +3739,7 @@ export type Database = {
           is_recorrente: boolean | null
           mac_smart_one: string | null
           nome: string
+          origem_cadastro: string | null
           plano: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u: string | null
           situacao: Database["public"]["Enums"]["situacao_cliente"] | null
@@ -3747,6 +3748,7 @@ export type Database = {
           smartone_raw_response: string | null
           smartone_status: Database["public"]["Enums"]["smartone_status"] | null
           telefone: string | null
+          telefone_whatsapp: string | null
           theme: string | null
           totp_enabled: boolean | null
           totp_secret: string | null
@@ -3770,6 +3772,7 @@ export type Database = {
           is_recorrente?: boolean | null
           mac_smart_one?: string | null
           nome: string
+          origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
@@ -3780,6 +3783,7 @@ export type Database = {
             | Database["public"]["Enums"]["smartone_status"]
             | null
           telefone?: string | null
+          telefone_whatsapp?: string | null
           theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null
@@ -3803,6 +3807,7 @@ export type Database = {
           is_recorrente?: boolean | null
           mac_smart_one?: string | null
           nome?: string
+          origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
@@ -3813,6 +3818,7 @@ export type Database = {
             | Database["public"]["Enums"]["smartone_status"]
             | null
           telefone?: string | null
+          telefone_whatsapp?: string | null
           theme?: string | null
           totp_enabled?: boolean | null
           totp_secret?: string | null

@@ -123,8 +123,8 @@ export default function AdminClienteForm() {
     const loadCliente = async () => {
       if (id) {
         try {
-          const { data, error } = await supabase
-            .from('clientes')
+          const { data, error } = await (supabase as any)
+            .from('profiles')
             .select('*')
             .eq('id', id)
             .single();
@@ -137,11 +137,11 @@ export default function AdminClienteForm() {
               id: data.id,
               nome: data.nome,
               email: data.email || '',
-              telefone: data.telefone,
-              telefone_whatsapp: (data as any).telefone_whatsapp,
+              telefone: data.telefone || '',
+              telefone_whatsapp: data.telefone_whatsapp,
               origem_cadastro: data.origem_cadastro,
-              created_at: data.data_cadastro || '',
-              updated_at: data.data_ultima_edicao || '',
+              created_at: data.created_at || '',
+              updated_at: data.updated_at || '',
               situacao: data.situacao,
               plano: data.plano,
               data_vencimento: data.data_vencimento,
