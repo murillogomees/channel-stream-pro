@@ -7,13 +7,14 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Users, Shield, History, UserPlus, FlaskConical, Activity } from "lucide-react";
+import { Users, Shield, History, FlaskConical, Activity, CreditCard, Play } from "lucide-react";
 import AdminUserList from "../AdminUserList";
 import AdminUserRoles from "../AdminUserRoles";
 import AdminRoleAudit from "../AdminRoleAudit";
-import AdminCreateUser from "../AdminCreateUser";
 import AdminPermissionTest from "../AdminPermissionTest";
 import AdminActivityLogs from "../AdminActivityLogs";
+import AdminUserPayments from "./AdminUserPayments";
+import AdminUserStreaming from "./AdminUserStreaming";
 
 export default function AdminUsuariosPage() {
   return (
@@ -28,21 +29,25 @@ export default function AdminUsuariosPage() {
               <Users className="h-3.5 w-3.5" />
               Usuários
             </TabsTrigger>
-            <TabsTrigger value="roles" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <Shield className="h-3.5 w-3.5" />
-              Roles
+            <TabsTrigger value="payments" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" />
+              Pagamentos
             </TabsTrigger>
-            <TabsTrigger value="create" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <UserPlus className="h-3.5 w-3.5" />
-              Criar
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <History className="h-3.5 w-3.5" />
-              Auditoria
+            <TabsTrigger value="streaming" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
+              <Play className="h-3.5 w-3.5" />
+              Streaming
             </TabsTrigger>
             <TabsTrigger value="activity" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
               <Activity className="h-3.5 w-3.5" />
               Atividades
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
+              <Shield className="h-3.5 w-3.5" />
+              Roles
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
+              <History className="h-3.5 w-3.5" />
+              Auditoria
             </TabsTrigger>
             <TabsTrigger value="test" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
               <FlaskConical className="h-3.5 w-3.5" />
@@ -56,20 +61,24 @@ export default function AdminUsuariosPage() {
           <AdminUserList />
         </TabsContent>
 
-        <TabsContent value="roles" className="space-y-4 mt-4">
-          <AdminUserRoles />
+        <TabsContent value="payments" className="space-y-4 mt-4">
+          <AdminUserPayments />
         </TabsContent>
 
-        <TabsContent value="create" className="space-y-4 mt-4">
-          <AdminCreateUser />
-        </TabsContent>
-
-        <TabsContent value="audit" className="space-y-4 mt-4">
-          <AdminRoleAudit />
+        <TabsContent value="streaming" className="space-y-4 mt-4">
+          <AdminUserStreaming />
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4 mt-4">
           <AdminActivityLogs />
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-4 mt-4">
+          <AdminUserRoles />
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-4 mt-4">
+          <AdminRoleAudit />
         </TabsContent>
 
         <TabsContent value="test" className="space-y-4 mt-4">
