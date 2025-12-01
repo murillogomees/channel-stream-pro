@@ -27,8 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Copy, ExternalLink, Code, Database, CreditCard, Webhook, User, Receipt, Settings } from "lucide-react";
+import { Copy, ExternalLink, Code, Database, CreditCard, Webhook, User, Receipt, Settings, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useSupabaseSecrets } from "@/hooks/useSupabaseSecrets";
 
 interface Variable {
   name: string;
@@ -207,6 +208,7 @@ const getSourceBadge = (source: Variable["source"]) => {
 
 export function PaymentVariablesAdmin() {
   const [showSecrets, setShowSecrets] = useState(false);
+  const { isConfigured, getStatus, loading: secretsLoading } = useSupabaseSecrets();
 
   return (
     <div className="space-y-6">
@@ -632,14 +634,29 @@ export function PaymentVariablesAdmin() {
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <code className="font-semibold">MERCADO_PAGO_ACCESS_TOKEN</code>
-                    <Badge>Obrigatório</Badge>
+                    <div className="flex items-center gap-2">
+                      {secretsLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : getStatus('MERCADO_PAGO_ACCESS_TOKEN') === 'configured' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <Badge>Obrigatório</Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
                     Token de acesso do Mercado Pago para criar preferências e consultar pagamentos
                   </p>
                   <Input 
                     type={showSecrets ? "text" : "password"} 
-                    value="TEST-xxxx-xxxx-xxxx-xxxx" 
+                    value={
+                      secretsLoading 
+                        ? "Verificando..." 
+                        : getStatus('MERCADO_PAGO_ACCESS_TOKEN') === 'configured'
+                          ? "••••••••••••••••••••"
+                          : "Não configurado"
+                    }
                     disabled 
                     className="font-mono text-xs"
                   />
@@ -648,14 +665,29 @@ export function PaymentVariablesAdmin() {
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <code className="font-semibold">MERCADO_PAGO_WEBHOOK_SECRET</code>
-                    <Badge variant="secondary">Opcional</Badge>
+                    <div className="flex items-center gap-2">
+                      {secretsLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : getStatus('MERCADO_PAGO_WEBHOOK_SECRET') === 'configured' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <Badge variant="secondary">Opcional</Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
                     Secret para validar assinatura HMAC dos webhooks (recomendado em produção)
                   </p>
                   <Input 
                     type={showSecrets ? "text" : "password"} 
-                    value="Não configurado" 
+                    value={
+                      secretsLoading 
+                        ? "Verificando..." 
+                        : getStatus('MERCADO_PAGO_WEBHOOK_SECRET') === 'configured'
+                          ? "••••••••••••••••••••"
+                          : "Não configurado"
+                    }
                     disabled 
                     className="font-mono text-xs"
                   />
