@@ -70,7 +70,7 @@ const AdminCreateUser = () => {
     password: "",
     nome: "",
     telefone: "",
-    role: "admin" as "admin" | "super_admin",
+    role: "admin" as AppRole,
   });
 
   // Edit dialog state
@@ -113,9 +113,9 @@ const AdminCreateUser = () => {
       const result = await response.json();
       
       if (response.ok && result.users) {
-        // Filter only admin/super_admin users
+        // Filter only admin/master users
         const adminUsers = result.users.filter((u: any) => 
-          u.roles?.includes('admin') || u.roles?.includes('super_admin')
+          u.roles?.includes('admin') || u.roles?.includes('master')
         ).map((u: any) => ({
           id: u.id,
           email: u.email,
@@ -201,7 +201,7 @@ const AdminCreateUser = () => {
 
       toast({
         title: "Sucesso!",
-        description: `Usuário ${formData.role === 'super_admin' ? 'Super Admin' : 'Admin'} ${formData.email} criado!`,
+        description: `Usuário ${formData.role === 'master' ? 'Master' : formData.role === 'admin' ? 'Admin' : 'Cliente'} ${formData.email} criado!`,
       });
 
       setFormData({
@@ -336,13 +336,13 @@ const AdminCreateUser = () => {
         .select('role')
         .eq('user_id', editingUser.id);
 
-      const currentRoleSet = new Set(currentRoles?.map(r => r.role) || []);
-      const newRoleSet = new Set(editFormData.roles.filter(r => r !== 'master') as AppRole[]);
+      const currentRoleSet = new Set<AppRole>(currentRoles?.map(r => r.role as AppRole) || []);
+      const newRoleSet = new Set<AppRole>(editFormData.roles);
 
       // Remove roles that are no longer selected
       for (const role of currentRoleSet) {
-        if (!newRoleSet.has(role as AppRole)) {
-          await supabase
+        if (!newRoleSet.has(role)) {
+          await (supabase as any)
             .from('user_roles')
             .delete()
             .eq('user_id', editingUser.id)
@@ -350,15 +350,19 @@ const AdminCreateUser = () => {
         }
       }
 
-      // Add new roles
+      // Add new roles (usando 'as any' até types serem regenerados)
       for (const role of newRoleSet) {
         if (!currentRoleSet.has(role)) {
-          await (supabase as any)
+          const { error: insertError } = await (supabase as any)
             .from('user_roles')
             .insert({
               user_id: editingUser.id,
               role: role,
             });
+          
+          if (insertError) {
+            console.error('Error inserting role:', insertError);
+          }
         }
       }
 
@@ -400,12 +404,12 @@ const AdminCreateUser = () => {
     
     setDeleteLoading(true);
     try {
-      // Remove all roles (effectively demoting to client)
-      const { error } = await supabase
+      // Remove all admin/master roles (effectively demoting to client)
+      const { error } = await (supabase as any)
         .from('user_roles')
         .delete()
         .eq('user_id', deletingUser.id)
-        .in('role', ['admin', 'super_admin']);
+        .in('role', ['admin', 'master']);
 
       if (error) throw error;
 
@@ -662,33 +666,44 @@ const AdminCreateUser = () => {
                   <Label htmlFor="role">Nível de Permissão *</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value: "admin" | "super_admin") => setFormData({ ...formData, role: value })}
+                    onValueChange={(value: AppRole) => setFormData({ ...formData, role: value })}
                     disabled={loading}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o nível" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="client">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span>Cliente</span>
+                          <span className="text-xs text-muted-foreground">- Acesso ao streaming</span>
+                        </div>
+                      </SelectItem>
                       <SelectItem value="admin">
                         <div className="flex items-center gap-2">
                           <Shield className="h-4 w-4 text-blue-500" />
                           <span>Admin</span>
-                          <span className="text-xs text-muted-foreground">- Gerenciamento geral</span>
+                          <span className="text-xs text-muted-foreground">- Dashboard + streaming</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="super_admin">
-                        <div className="flex items-center gap-2">
-                          <Crown className="h-4 w-4 text-amber-500" />
-                          <span>Super Admin</span>
-                          <span className="text-xs text-muted-foreground">- Acesso total</span>
-                        </div>
-                      </SelectItem>
+                      {isMaster && (
+                        <SelectItem value="master">
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-purple-500" />
+                            <span>Master</span>
+                            <span className="text-xs text-muted-foreground">- Acesso total</span>
+                          </div>
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    {formData.role === 'super_admin' 
-                      ? 'Super Admin: pode criar/editar outros admins e acessar todas as configurações'
-                      : 'Admin: acesso ao painel administrativo e gerenciamento de clientes'
+                    {formData.role === 'master' 
+                      ? 'Master: controle absoluto incluindo manipulação de admins'
+                      : formData.role === 'admin'
+                      ? 'Admin: acesso ao painel administrativo e streaming'
+                      : 'Cliente: acesso apenas ao streaming (/app/*)'
                     }
                   </p>
                 </div>
@@ -702,7 +717,7 @@ const AdminCreateUser = () => {
                   ) : (
                     <>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Criar {formData.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                      Criar {formData.role === 'master' ? 'Master' : formData.role === 'admin' ? 'Admin' : 'Usuário'}
                     </>
                   )}
                 </Button>
