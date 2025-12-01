@@ -1,7 +1,7 @@
 /**
  * AdminIntegracaoPage - Hub de integrações
  * Rota: /admin/integracao
- * Abas: Mercado Pago, WhatsApp, CDN, Transcode, Smart Cache
+ * Abas: Mercado Pago, Variáveis de Pagamento, WhatsApp, CDN, Transcode, Smart Cache
  */
 
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -15,7 +15,7 @@ import AdminRLSCoverage from "../AdminRLSCoverage";
 import AdminQADashboard from "../AdminQADashboard";
 import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
 import { MercadoPagoIntegration } from "@/components/admin/mercadopago/MercadoPagoIntegration";
-import { CustomCheckoutBuilder } from "@/components/admin/mercadopago/CustomCheckoutBuilder";
+import { PaymentVariablesAdmin } from "@/components/admin/payment/PaymentVariablesAdmin";
 
 export default function AdminIntegracaoPage() {
   return (
@@ -29,8 +29,8 @@ export default function AdminIntegracaoPage() {
             <TabsTrigger value="mercadopago" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               💳 Mercado Pago
             </TabsTrigger>
-            <TabsTrigger value="checkout" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🛒 Checkout
+            <TabsTrigger value="payment-vars" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              📋 Variáveis API
             </TabsTrigger>
             <TabsTrigger value="whatsapp" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               💬 WhatsApp
@@ -61,8 +61,8 @@ export default function AdminIntegracaoPage() {
           <MercadoPagoIntegration />
         </TabsContent>
 
-        <TabsContent value="checkout" className="space-y-4 mt-4">
-          <CustomCheckoutBuilder />
+        <TabsContent value="payment-vars" className="space-y-4 mt-4">
+          <PaymentVariablesAdmin />
         </TabsContent>
 
         <TabsContent value="whatsapp" className="space-y-4 mt-4">
