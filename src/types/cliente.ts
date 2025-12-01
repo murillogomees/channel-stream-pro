@@ -1,6 +1,14 @@
 export type SituacaoCliente = 'Testando' | 'Ativo' | 'Devendo' | 'Inativo' | 'Lead';
 export type PlanoCliente = 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
-export type FormaPagamento = 'Pix' | 'TED' | 'Boleto' | 'Cartão de Crédito' | 'Cartão de Débito' | 'Dinheiro';
+export type FormaPagamento = 
+  | 'PIX' 
+  | 'TED' 
+  | 'Boleto' 
+  | 'Cartão de Crédito' 
+  | 'Cartão de Débito' 
+  | 'Dinheiro'
+  | 'Saldo Mercado Pago'
+  | 'Outro';
 export type OrigemCadastro = 'Google Ads' | 'Facebook' | 'Instagram' | 'Indicação' | 'Website' | 'Outro';
 export type SmartoneStatus = 'nao_enviado' | 'pendente' | 'criado' | 'erro';
 export type DispositivoTipo = 
