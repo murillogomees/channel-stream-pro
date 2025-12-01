@@ -1,12 +1,11 @@
 /**
  * PROTEÇÃO DE ROTAS UNIFICADA
+ * @version 2.0.0
  * 
- * Usa o contexto de autenticação centralizado para:
- * - Verificar autenticação
- * - Verificar permissões (admin, super_admin, client)
- * - Redirecionar usuários não autorizados
- * 
- * OTIMIZADO: Não bloqueia a UI enquanto roles estão sendo carregados
+ * Controle de acesso:
+ * - /app/* → Apenas clientes autenticados com acesso válido
+ * - /admin/* → Apenas administradores
+ * - Clientes vencidos → Redireciona para checkout
  */
 
 import { Navigate, useLocation } from 'react-router-dom';
@@ -20,21 +19,35 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean;
   requireSuperAdmin?: boolean;
   requireClient?: boolean;
+  requireValidAccess?: boolean; // Requer acesso não vencido
 }
 
 export const ProtectedRoute = ({ 
   children, 
   requireAdmin = false,
   requireSuperAdmin = false,
-  requireClient = false 
+  requireClient = false,
+  requireValidAccess = false
 }: ProtectedRouteProps) => {
-  const { isAuthenticated, isAdmin, isSuperAdmin, isClient, loading, user, session } = useAuth();
+  const { 
+    isAuthenticated, 
+    isAdmin, 
+    isSuperAdmin, 
+    isClient, 
+    loading, 
+    user, 
+    session,
+    hasValidAccess,
+    isExpired 
+  } = useAuth();
   const location = useLocation();
   
-  // Estado para controlar timeout de segurança
   const [showTimeout, setShowTimeout] = useState(false);
   
-  // Timeout de segurança - máximo 3 segundos de loading
+  // Detectar se é rota /app/*
+  const isAppRoute = location.pathname.startsWith('/app');
+  
+  // Timeout de segurança - máximo 3 segundos
   useEffect(() => {
     if (loading) {
       const timer = setTimeout(() => {
@@ -46,13 +59,13 @@ export const ProtectedRoute = ({
     }
   }, [loading]);
 
-  // Se passou do timeout, considera como não autenticado e redireciona
+  // Timeout - redirecionar para login
   if (showTimeout && loading) {
-    console.warn('[ProtectedRoute] Timeout de loading - redirecionando para login');
+    console.warn('[ProtectedRoute] Timeout - redirecionando para login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Mostrar loading apenas por um tempo curto
+  // Loading
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -61,58 +74,64 @@ export const ProtectedRoute = ({
     );
   }
 
-  // Não autenticado - redireciona para login
+  // Não autenticado
   if (!isAuthenticated && !session) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se tem session mas roles ainda não carregaram, permite acesso temporário
-  // (os roles serão verificados quando carregarem em background)
   const rolesNotLoadedYet = user && user.roles.length === 0;
   
-  // Super admin requer permissão específica (mas espera roles carregarem)
+  // ========================================
+  // VERIFICAÇÕES PARA ROTAS ADMIN
+  // ========================================
+  
   if (requireSuperAdmin && !isSuperAdmin && !rolesNotLoadedYet) {
     if (user) {
       setTimeout(() => {
-        authLoggingService.logAccessDenied(
-          user.id,
-          user.email || '',
-          'super_admin required',
-          location.pathname
-        );
+        authLoggingService.logAccessDenied(user.id, user.email || '', 'super_admin required', location.pathname);
       }, 0);
     }
     return <Navigate to="/403" state={{ required: 'super_admin' }} replace />;
   }
 
-  // Admin pode ser admin ou super_admin (mas espera roles carregarem)
   if (requireAdmin && !isAdmin && !rolesNotLoadedYet) {
     if (user) {
       setTimeout(() => {
-        authLoggingService.logAccessDenied(
-          user.id,
-          user.email || '',
-          'admin required',
-          location.pathname
-        );
+        authLoggingService.logAccessDenied(user.id, user.email || '', 'admin required', location.pathname);
       }, 0);
+    }
+    // Se é cliente, redireciona para /app/player
+    if (isClient) {
+      return <Navigate to="/app/player" replace />;
     }
     return <Navigate to="/403" state={{ required: 'admin' }} replace />;
   }
 
-  // Cliente precisa ter role client (mas espera roles carregarem)
-  if (requireClient && !isClient && !rolesNotLoadedYet) {
+  // ========================================
+  // VERIFICAÇÕES PARA ROTAS /app/*
+  // ========================================
+  
+  if (requireClient && !isClient && !isAdmin && !rolesNotLoadedYet) {
     if (user) {
       setTimeout(() => {
-        authLoggingService.logAccessDenied(
-          user.id,
-          user.email || '',
-          'client required',
-          location.pathname
-        );
+        authLoggingService.logAccessDenied(user.id, user.email || '', 'client required', location.pathname);
       }, 0);
     }
     return <Navigate to="/403" state={{ required: 'client' }} replace />;
+  }
+
+  // Verificar acesso válido (não vencido) para rotas /app/*
+  if (isAppRoute || requireValidAccess) {
+    // Admin sempre tem acesso
+    if (isAdmin) {
+      return <>{children}</>;
+    }
+    
+    // Cliente com acesso vencido → checkout
+    if (isExpired && !rolesNotLoadedYet) {
+      console.log('[ProtectedRoute] Acesso vencido, redirecionando para checkout');
+      return <Navigate to="/checkout" state={{ from: location, expired: true }} replace />;
+    }
   }
 
   return <>{children}</>;

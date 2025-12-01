@@ -1,20 +1,62 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO
- * @version 2.0.7
+ * @version 3.0.0
  * 
  * Gerencia autenticação e autorização usando:
  * - Supabase Auth para identidade
  * - public.profiles para dados de perfil
  * - public.user_roles para permissões
+ * - public.clientes para dados de cliente e vencimento
+ * - public.user_subscriptions para status de assinatura
  */
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
+import { AuthContextType, UnifiedUser, AppRole, SubscriptionStatusType } from '@/types/auth';
 import { authLoggingService } from '@/services/authLoggingService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/**
+ * Calcula status de acesso baseado nos dados do cliente
+ */
+function calculateAccessStatus(clienteData: any, subscriptionData: any): {
+  hasValidAccess: boolean;
+  isExpired: boolean;
+  daysRemaining: number;
+  isTrial: boolean;
+} {
+  const now = new Date();
+  
+  // Verificar subscription status
+  const isTrial = subscriptionData?.status === 'trial';
+  const subscriptionActive = ['trial', 'active'].includes(subscriptionData?.status);
+  
+  // Verificar vencimento pelo cliente
+  let daysRemaining = 0;
+  let isExpired = false;
+  
+  if (clienteData?.data_vencimento) {
+    const vencimento = new Date(clienteData.data_vencimento);
+    const diffTime = vencimento.getTime() - now.getTime();
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    isExpired = daysRemaining < 0;
+  }
+  
+  // Acesso válido = cliente ativo + não vencido + subscription ok
+  const hasValidAccess = 
+    clienteData?.cliente_ativo === true && 
+    !isExpired && 
+    subscriptionActive;
+  
+  return {
+    hasValidAccess,
+    isExpired,
+    daysRemaining: Math.max(0, daysRemaining),
+    isTrial
+  };
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UnifiedUser | null>(null);
@@ -23,15 +65,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const cacheRef = useRef<{ userId: string; data: UnifiedUser; timestamp: number } | null>(null);
 
   /**
-   * Busca dados completos do usuário: perfil + roles + dados de cliente
+   * Busca dados completos do usuário: perfil + roles + cliente + subscription
    */
   const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
-      // Fazer queries em paralelo (3 ao invés de 5+)
-      const [profileResult, rolesResult, clienteResult] = await Promise.all([
+      // Fazer queries em paralelo
+      const [profileResult, rolesResult, clienteResult, subscriptionResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo, mac_smart_one').eq('user_id', userId).maybeSingle()
+        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo, mac_smart_one').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_subscriptions').select('id, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, mercado_pago_subscription_id').eq('user_id', userId).maybeSingle()
       ]);
 
       if (profileResult.error) {
@@ -42,6 +85,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const profile = profileResult.data;
       const roles: AppRole[] = (rolesResult.data || []).map((r) => r.role as AppRole);
       const clienteData = clienteResult.data;
+      const subscriptionData = subscriptionResult.data;
+
+      // Calcular status de acesso
+      const accessStatus = calculateAccessStatus(clienteData, subscriptionData);
 
       // Montar objeto unificado
       const unifiedUser: UnifiedUser = {
@@ -50,6 +97,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin: roles.includes('admin') || roles.includes('super_admin'),
         isSuperAdmin: roles.includes('super_admin'),
         isClient: roles.includes('client'),
+        // Status de acesso
+        hasValidAccess: accessStatus.hasValidAccess,
+        isExpired: accessStatus.isExpired,
+        daysRemaining: accessStatus.daysRemaining,
+        isTrial: accessStatus.isTrial,
+        // Dados de cliente
         clienteData: clienteData ? {
           id: clienteData.id,
           situacao: clienteData.situacao,
@@ -58,6 +111,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           valor_pago: clienteData.valor_pago,
           cliente_ativo: clienteData.cliente_ativo,
           mac_smart_one: clienteData.mac_smart_one,
+        } : undefined,
+        // Dados de subscription
+        subscriptionData: subscriptionData ? {
+          id: subscriptionData.id,
+          status: subscriptionData.status as SubscriptionStatusType,
+          current_period_start: subscriptionData.current_period_start,
+          current_period_end: subscriptionData.current_period_end,
+          trial_end: subscriptionData.trial_end,
+          cancel_at_period_end: subscriptionData.cancel_at_period_end,
+          mercado_pago_subscription_id: subscriptionData.mercado_pago_subscription_id,
         } : undefined
       };
 
@@ -76,7 +139,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (currentSession?.user) {
       // CRÍTICO: Liberar loading IMEDIATAMENTE com dados básicos do session
-      // Isso evita tela branca enquanto busca dados do perfil
       const basicUser: UnifiedUser = {
         id: currentSession.user.id,
         nome: currentSession.user.user_metadata?.nome || currentSession.user.email?.split('@')[0] || 'Usuário',
@@ -84,7 +146,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roles: [],
         isAdmin: false,
         isSuperAdmin: false,
-        isClient: false,
+        isClient: true, // Assume client por padrão
+        hasValidAccess: true, // Assume válido até carregar
+        isExpired: false,
+        daysRemaining: 0,
+        isTrial: false,
         created_at: currentSession.user.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -92,21 +158,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(basicUser);
       setLoading(false); // LIBERA A UI IMEDIATAMENTE
       
-      // Buscar dados completos em background (não bloqueia a UI)
+      // Buscar dados completos em background
       try {
         const userData = await fetchUserData(currentSession.user.id);
         if (userData) {
           setUser(userData);
           
-          // Registrar login de forma assíncrona (fire and forget)
+          // Registrar login de forma assíncrona
           authLoggingService.logLogin(
             currentSession.user.id,
             userData.email || currentSession.user.email || ''
-          ).catch(() => {}); // Silenciar erros de log
+          ).catch(() => {});
         }
       } catch (error) {
         console.error('[AuthContext] Erro ao buscar dados extras:', error);
-        // Mantém o basicUser - não limpa o usuário
       }
     } else {
       setUser(null);
@@ -119,7 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    */
   const refreshUser = useCallback(async () => {
     if (session?.user) {
-      cacheRef.current = null; // Invalidar cache
+      cacheRef.current = null;
       const userData = await fetchUserData(session.user.id);
       setUser(userData);
     }
@@ -129,13 +194,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * Logout (limpa cache e remember me)
    */
   const signOut = useCallback(async () => {
-    // Registrar logout antes de fazer signOut
     if (user) {
       await authLoggingService.logLogout(user.id, user.email || '').catch(console.error);
     }
     
-    cacheRef.current = null; // Limpar cache
-    localStorage.removeItem('iptv_remember_me'); // Limpar remember me
+    cacheRef.current = null;
+    localStorage.removeItem('iptv_remember_me');
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -144,25 +208,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const REMEMBER_ME_KEY = 'iptv_remember_me';
     
-    // Timeout de segurança para evitar loading infinito
+    // Timeout de segurança
     const safetyTimeout = setTimeout(() => {
       if (loading) {
-        console.warn('[AuthContext] Safety timeout triggered - forcing loading to false');
+        console.warn('[AuthContext] Safety timeout triggered');
         setLoading(false);
       }
     }, 5000);
 
-    // Verificar se "continuar conectado" expirou
+    // Verificar remember me
     const checkRememberMe = () => {
       const stored = localStorage.getItem(REMEMBER_ME_KEY);
       if (stored) {
         try {
           const { expires } = JSON.parse(stored);
           if (Date.now() > expires) {
-            console.log('[AuthContext] Remember me expirado, fazendo logout...');
             localStorage.removeItem(REMEMBER_ME_KEY);
             supabase.auth.signOut();
-            return true; // Session expired
+            return true;
           }
         } catch {
           localStorage.removeItem(REMEMBER_ME_KEY);
@@ -171,15 +234,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false;
     };
 
-    // Configurar listener de mudanças de autenticação
+    // Listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
-        // Usar setTimeout para evitar deadlock
         setTimeout(() => {
-          // Se não tem remember me e está logado, verificar se deve sair
-          if (currentSession && !localStorage.getItem(REMEMBER_ME_KEY)) {
-            // Usuário não marcou "continuar conectado" - sessão normal
-          }
           updateAuthState(currentSession);
         }, 0);
       }
@@ -188,10 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Verificar sessão inicial
     supabase.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
-        // Verificar remember me antes de carregar sessão
-        if (currentSession && checkRememberMe()) {
-          return; // Don't update auth state, logout in progress
-        }
+        if (currentSession && checkRememberMe()) return;
         updateAuthState(currentSession);
       })
       .catch((error) => {
@@ -213,6 +268,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAdmin: user?.isAdmin || false,
     isSuperAdmin: user?.isSuperAdmin || false,
     isClient: user?.isClient || false,
+    hasValidAccess: user?.hasValidAccess || false,
+    isExpired: user?.isExpired || false,
+    isTrial: user?.isTrial || false,
+    daysRemaining: user?.daysRemaining || 0,
     signOut,
     refreshUser,
   };

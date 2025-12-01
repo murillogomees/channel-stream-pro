@@ -17,6 +17,7 @@ const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Forbidden = lazy(() => import("./pages/Forbidden"));
 const Login = lazy(() => import("./pages/Login"));
+const SignUp = lazy(() => import("./pages/SignUp"));
 
 // ========================================
 // ADMIN PAGES - Consolidated Hub Structure
@@ -82,6 +83,8 @@ const App = () => (
                 PUBLIC ROUTES
             ======================================== */}
             <Route path="/" element={<Index />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/cadastro" element={<SignUp />} />
             <Route path="/tutorial" element={<TutorialSmartOne />} />
             <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
             <Route path="/login" element={<Login />} />
@@ -98,13 +101,15 @@ const App = () => (
             
             {/* ========================================
                 IPTV APP ROUTES - Mobile/TV App
+                Requer autenticação + acesso válido (não vencido)
             ======================================== */}
             <Route path="/app" element={<AppEntry />} />
             <Route path="/app/install" element={<AppInstall />} />
             <Route path="/app/login" element={<Navigate to="/login" replace />} />
-            <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
+            <Route path="/app/signup" element={<Navigate to="/signup" replace />} />
+            <Route path="/app/player" element={<ProtectedRoute requireValidAccess><AppPlayer /></ProtectedRoute>} />
             <Route path="/app/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
-            <Route path="/app/mylist" element={<ProtectedRoute><MyList /></ProtectedRoute>} />
+            <Route path="/app/mylist" element={<ProtectedRoute requireValidAccess><MyList /></ProtectedRoute>} />
             <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
             <Route path="/app/favorites" element={<Navigate to="/app/mylist" replace />} />
             <Route path="/app/account" element={<Navigate to="/app/profile" replace />} />
