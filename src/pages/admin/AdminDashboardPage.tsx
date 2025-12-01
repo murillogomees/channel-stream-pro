@@ -166,7 +166,7 @@ export default function AdminDashboardPage() {
             <h2 className="text-lg font-semibold">Player e Usuário</h2>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <NavCard
             title="Player IPTV"
             description="Canais ao vivo, filmes e séries"
@@ -183,18 +183,11 @@ export default function AdminDashboardPage() {
             badge="Hub"
           />
           <NavCard
-            title="Clientes"
-            description="Gestão completa de clientes"
-            icon={<Users className="h-5 w-5" />}
-            path="/admin/clientes"
-            badge="Hub"
-          />
-          <NavCard
-            title="Usuários"
-            description="Roles e permissões"
+            title="Usuários & Permissões"
+            description="CRUD, roles, auditoria e logs"
             icon={<UserCog className="h-5 w-5" />}
             path="/admin/usuarios"
-            badge="Hub"
+            badge={`${stats.total} usuários`}
           />
           <NavCard
             title="Tutorial de Instalação"
