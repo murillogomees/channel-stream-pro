@@ -284,7 +284,7 @@ serve(async (req) => {
       console.log('[CDN-Prewarm] Updated predictions:', predictionCount);
     }
 
-    // Get top predicted assets
+    // Get top predicted assets with CDN URLs from r2_storage_objects
     const { data: predictions, error: fetchError } = await supabase
       .from('cdn_prewarm_predictions')
       .select(`
@@ -303,7 +303,29 @@ serve(async (req) => {
       throw new Error(`Failed to fetch predictions: ${fetchError.message}`);
     }
 
-    if (!predictions || predictions.length === 0) {
+    let assetsWithUrls = [];
+    
+    if (predictions && predictions.length > 0) {
+      // Get CDN URLs from r2_storage_objects for predicted keys
+      const { data: r2Objects } = await supabase
+        .from('r2_storage_objects')
+        .select('r2_key, cdn_url, source_channel_id')
+        .in('r2_key', predictions.map(p => p.r2_key).filter(Boolean))
+        .eq('status', 'ready');
+      
+      // Map predictions to r2_storage_objects to get cdn_url
+      assetsWithUrls = predictions
+        .map(p => {
+          const r2Object = r2Objects?.find(r => r.r2_key === p.r2_key);
+          return r2Object ? {
+            ...p,
+            cdn_url: r2Object.cdn_url
+          } : null;
+        })
+        .filter(Boolean);
+    }
+    
+    if (!assetsWithUrls || assetsWithUrls.length === 0) {
       // Fallback: get R2 objects with highest access count
       const { data: fallbackAssets } = await supabase
         .from('r2_storage_objects')
@@ -326,7 +348,7 @@ serve(async (req) => {
       }
       
       // Use fallback assets
-      predictions.push(...fallbackAssets.map(a => ({
+      assetsWithUrls = fallbackAssets.map(a => ({
         channel_id: a.source_channel_id,
         r2_key: a.r2_key,
         cdn_url: a.cdn_url,
@@ -334,11 +356,11 @@ serve(async (req) => {
         moving_avg_views: 0,
         ml_score: null,
         priority_rank: 0
-      })));
+      }));
     }
 
     // Create prewarm job record
-    const targetKeys = predictions.map(p => p.r2_key).filter(Boolean);
+    const targetKeys = assetsWithUrls.map(p => p.r2_key).filter(Boolean);
     const { data: job, error: jobError } = await supabase
       .from('cdn_prewarm_jobs')
       .insert({
@@ -346,7 +368,7 @@ serve(async (req) => {
         status: 'running',
         target_r2_keys: targetKeys,
         segments_per_asset: config.segmentsPerAsset,
-        total_assets: predictions.length,
+        total_assets: assetsWithUrls.length,
         started_at: new Date().toISOString()
       })
       .select()
@@ -356,12 +378,12 @@ serve(async (req) => {
       throw new Error(`Failed to create job: ${jobError.message}`);
     }
 
-    // Prepare assets for prewarming
-    const assets = predictions
-      .filter(p => p.r2_key)
+    // Prepare assets for prewarming using cdn_url from database
+    const assets = assetsWithUrls
+      .filter(p => p.cdn_url)
       .map(p => ({
         r2_key: p.r2_key!,
-        cdn_url: `https://${r2Domain}/${p.r2_key}`,
+        cdn_url: p.cdn_url!, // Use cdn_url directly from database
         channel_id: p.channel_id
       }));
 
