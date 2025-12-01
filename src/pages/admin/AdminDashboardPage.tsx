@@ -128,7 +128,7 @@ export default function AdminDashboardPage() {
                 <>
                   <QuickStat
                     icon={<Users className="h-5 w-5" />}
-                    label="Total de Clientes"
+                    label="Total de Usuários"
                     value={stats.total}
                   />
                   <QuickStat

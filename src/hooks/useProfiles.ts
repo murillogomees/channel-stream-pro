@@ -41,17 +41,23 @@ export function useProfiles() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
+      // Buscar todos os profiles (admins têm acesso via RLS policy)
+      const { data, error } = await (supabase as any)
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar profiles:', error);
+        throw error;
+      }
 
       setProfiles(data || []);
     } catch (e: any) {
       console.error('Erro ao carregar profiles:', e);
       setError(e?.message || 'Erro ao carregar profiles');
+      // Em caso de erro, definir array vazio para evitar crashes
+      setProfiles([]);
     } finally {
       setLoading(false);
     }
