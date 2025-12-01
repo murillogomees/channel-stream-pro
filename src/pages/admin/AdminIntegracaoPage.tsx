@@ -13,9 +13,9 @@ import AdminTranscodeQueue from "../AdminTranscodeQueue";
 import AdminSmartCache from "../AdminSmartCache";
 import AdminRLSCoverage from "../AdminRLSCoverage";
 import AdminQADashboard from "../AdminQADashboard";
-import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
-import { MercadoPagoIntegration } from "@/components/admin/mercadopago/MercadoPagoIntegration";
-import { PaymentVariablesAdmin } from "@/components/admin/payment/PaymentVariablesAdmin";
+import MigrationDashboard from "@/components/admin/MigrationDashboard";
+import MercadoPagoIntegration from "@/components/admin/mercadopago/MercadoPagoIntegration";
+import PaymentVariablesAdmin from "@/components/admin/payment/PaymentVariablesAdmin";
 
 export default function AdminIntegracaoPage() {
   return (
