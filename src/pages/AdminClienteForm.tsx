@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useClientesDb } from '@/hooks/useClientesDb';
+import { useProfiles, UnifiedProfile } from '@/hooks/useProfiles';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler, EventNotificationHandler } from '@/services/notifications';
@@ -94,10 +94,10 @@ export default function AdminClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { clientes, loading: loadingClientes, addCliente, updateCliente } = useClientesDb();
+  const { profiles, updateProfile } = useProfiles();
   const { addLog } = useNotificationLogs();
-  const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id); // true para novo cliente, false para edição
-  const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id);
+  const [clienteOriginal, setClienteOriginal] = useState<UnifiedProfile | null>(null);
   const isInitialLoad = useRef(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedM3ULists, setSelectedM3ULists] = useState<string[]>([]);

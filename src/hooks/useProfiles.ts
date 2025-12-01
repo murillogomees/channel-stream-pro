@@ -1,0 +1,143 @@
+/**
+ * useProfiles - Hook unificado para gerenciar profiles/clientes
+ * Substitui useClientesDb após unificação das tabelas
+ */
+
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface UnifiedProfile {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string;
+  telefone_whatsapp?: string;
+  origem_cadastro?: string;
+  created_at: string;
+  updated_at: string;
+  // Campos de cliente/assinatura
+  situacao?: string;
+  plano?: string;
+  data_vencimento?: string;
+  data_contratacao?: string;
+  valor_pago?: number;
+  cliente_ativo?: boolean;
+  data_ultimo_pagamento?: string;
+  forma_ultimo_pagamento?: string;
+  mac_smart_one?: string;
+  is_recorrente?: boolean;
+  dispositivo_contratado?: string;
+  smartone_status?: string;
+  smartone_playlist_id?: string;
+  smartone_last_sync_at?: string;
+}
+
+export function useProfiles() {
+  const [profiles, setProfiles] = useState<UnifiedProfile[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfiles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setProfiles(data || []);
+    } catch (e: any) {
+      console.error('Erro ao carregar profiles:', e);
+      setError(e?.message || 'Erro ao carregar profiles');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfiles();
+
+    // Realtime subscription
+    const subscription = supabase
+      .channel('profiles_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'profiles' }, 
+        () => {
+          fetchProfiles();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchProfiles]);
+
+  const updateProfile = useCallback(async (id: string, updates: Partial<UnifiedProfile>) => {
+    const { data, error } = await (supabase as any)
+      .from('profiles')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    if (data) {
+      setProfiles(prev => prev.map(p => p.id === id ? data : p));
+      return data;
+    }
+  }, []);
+
+  const deleteProfile = useCallback(async (id: string) => {
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    if (error) throw error;
+    setProfiles(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  const getStats = useCallback(() => {
+    const total = profiles.length;
+    const now = new Date();
+    const cincoProximos = new Date();
+    cincoProximos.setDate(now.getDate() + 5);
+
+    const vencendoProximos5Dias = profiles.filter(p => {
+      if (!p.data_vencimento) return false;
+      const vencimento = new Date(p.data_vencimento);
+      return vencimento >= now && vencimento <= cincoProximos;
+    }).length;
+
+    const ativosVencidos = profiles.filter(p => {
+      if (p.situacao !== 'Ativo' || !p.data_vencimento) return false;
+      const vencimento = new Date(p.data_vencimento);
+      return vencimento < now;
+    }).length;
+
+    const porSituacao = profiles.reduce((acc, p) => {
+      const situacao = p.situacao || 'Indefinido';
+      acc[situacao] = (acc[situacao] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return { 
+      total, 
+      vencendoProximos5Dias, 
+      ativosVencidos,
+      porSituacao 
+    };
+  }, [profiles]);
+
+  const stats = useMemo(() => getStats(), [getStats]);
+
+  return {
+    profiles,
+    loading,
+    error,
+    refresh: fetchProfiles,
+    updateProfile,
+    deleteProfile,
+    getStats: () => stats,
+  };
+}

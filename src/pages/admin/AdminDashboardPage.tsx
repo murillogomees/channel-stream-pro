@@ -14,7 +14,7 @@ import {
   Sparkles, LayoutDashboard, GitBranch
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useClientesDb } from "@/hooks/useClientesDb";
+import { useProfiles } from "@/hooks/useProfiles";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -100,7 +100,7 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { getStats, loading: statsLoading } = useClientesDb();
+  const { getStats, loading: statsLoading } = useProfiles();
   const stats = getStats();
 
   return (

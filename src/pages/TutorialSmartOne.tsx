@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useClientesDb } from '@/hooks/useClientesDb';
+import { useProfiles } from '@/hooks/useProfiles';
 import { Loader2, CheckCircle2, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const tutorialSteps = [
@@ -52,7 +52,7 @@ export default function TutorialSmartOne() {
   const [macWarning, setMacWarning] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { clientes, addCliente, updateCliente } = useClientesDb();
+  const { profiles, updateProfile } = useProfiles();
 
   useEffect(() => {
     trackEvent('ViewContent', { content_name: 'Tutorial Page', content_type: 'page' });
@@ -94,8 +94,8 @@ export default function TutorialSmartOne() {
     }
 
     // Verificar se MAC já existe
-    const macExistente = clientes.find(c => 
-      c.macSmartOne?.toUpperCase() === mac.toUpperCase()
+    const macExistente = profiles.find(p => 
+      p.mac_smart_one?.toUpperCase() === mac.toUpperCase()
     );
 
     if (macExistente) {
@@ -114,7 +114,7 @@ export default function TutorialSmartOne() {
     if (formData.macSmartOne) {
       validateMac(formData.macSmartOne);
     }
-  }, [formData.macSmartOne, clientes]);
+  }, [formData.macSmartOne, profiles]);
 
   const handleMacChange = (value: string) => {
     const formatted = formatMacAddress(value);

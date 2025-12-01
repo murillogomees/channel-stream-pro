@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientesDb } from "@/hooks/useClientesDb";
+import { useProfiles } from "@/hooks/useProfiles";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -103,7 +103,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { signOut: logout, user } = useAuth();
-  const { getStats, loading: statsLoading } = useClientesDb();
+  const { getStats, loading: statsLoading } = useProfiles();
   const stats = getStats();
 
   const handleLogout = async () => {
@@ -250,11 +250,17 @@ const AdminDashboard = () => {
               path="/admin/clientes/novo"
             />
             <NavCard
-              title="Gestão de Usuários"
-              description="Roles, auditoria e permissões"
+              title="Gerenciamento de Roles"
+              description="Controle de permissões e acessos"
               icon={<UserCog className="h-5 w-5" />}
-              path="/admin/users"
-              badge="Consolidado"
+              path="/admin/roles"
+              isNew
+            />
+            <NavCard
+              title="Gestão de Usuários"
+              description="Criar usuários e auditoria"
+              icon={<Users className="h-5 w-5" />}
+              path="/admin/usuarios"
             />
             <NavCard
               title="Gestão M3U & Playlists"

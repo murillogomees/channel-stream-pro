@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, TrendingUp, Users, Calendar, Target, Award, TrendingDown, DollarSign, AlertTriangle, Download, ArrowUpRight, ArrowDownRight, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useClientesDb } from '@/hooks/useClientesDb';
+import { useProfiles } from '@/hooks/useProfiles';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LineChart, AreaChart, Area } from "recharts";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ const INVESTMENT_STORAGE_KEY = 'marketing_investments';
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
-  const { clientes } = useClientesDb();
+  const { profiles } = useProfiles();
   
   // Estado para filtro de período
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
@@ -63,18 +63,18 @@ const AdminAnalytics = () => {
 
   // Filtrar clientes por período
   const filteredClientes = useMemo(() => {
-    if (periodFilter === 'all') return clientes;
+    if (periodFilter === 'all') return profiles;
     
     const now = new Date();
     const daysAgo = parseInt(periodFilter);
     const filterDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
     
-    return clientes.filter(cliente => {
-      if (!cliente.dataCadastro) return false;
-      const cadastroDate = new Date(cliente.dataCadastro);
+    return profiles.filter(profile => {
+      if (!profile.created_at) return false;
+      const cadastroDate = new Date(profile.created_at);
       return cadastroDate >= filterDate;
     });
-  }, [clientes, periodFilter]);
+  }, [profiles, periodFilter]);
 
   // Calcular período anterior para comparação
   const previousPeriodClientes = useMemo(() => {
@@ -85,12 +85,12 @@ const AdminAnalytics = () => {
     const currentPeriodStart = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
     const previousPeriodStart = new Date(currentPeriodStart.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
     
-    return clientes.filter(cliente => {
-      if (!cliente.dataCadastro) return false;
-      const cadastroDate = new Date(cliente.dataCadastro);
+    return profiles.filter(profile => {
+      if (!profile.created_at) return false;
+      const cadastroDate = new Date(profile.created_at);
       return cadastroDate >= previousPeriodStart && cadastroDate < currentPeriodStart;
     });
-  }, [clientes, periodFilter]);
+  }, [profiles, periodFilter]);
 
   // Função para exportar dados para CSV
   const exportToCSV = () => {
