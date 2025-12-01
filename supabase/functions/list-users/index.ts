@@ -55,13 +55,12 @@ Deno.serve(async (req) => {
 
     console.log('Authenticated user:', user.id);
 
-    // Check if user is admin using RLS-protected query
+    // Check if user is admin or master using RLS-protected query
     const { data: roleData, error: roleError } = await anonClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
+      .in('role', ['admin', 'master']);
 
     if (roleError) {
       console.error('Role check error:', roleError);
@@ -71,8 +70,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!roleData) {
-      console.log('User is not admin:', user.id);
+    if (!roleData || roleData.length === 0) {
+      console.log('User is not admin/master:', user.id);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
