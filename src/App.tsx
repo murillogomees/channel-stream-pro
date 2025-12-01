@@ -29,7 +29,6 @@ const AdminM3UPage = lazy(() => import("./pages/admin/AdminM3UPage"));
 const AdminRolesManagement = lazy(() => import("./pages/AdminRolesManagement"));
 const AdminNotificacoesPage = lazy(() => import("./pages/admin/AdminNotificacoesPage"));
 const AdminSegurancaPage = lazy(() => import("./pages/admin/AdminSegurancaPage"));
-const AdminRolesManagement = lazy(() => import("./pages/AdminRolesManagement"));
 const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));

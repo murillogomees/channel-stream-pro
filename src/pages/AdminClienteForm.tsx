@@ -94,7 +94,7 @@ export default function AdminClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { profiles, updateProfile } = useProfiles();
+  const { profiles, updateProfile, loading: loadingProfiles } = useProfiles();
   const { addLog } = useNotificationLogs();
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id);
   const [clienteOriginal, setClienteOriginal] = useState<UnifiedProfile | null>(null);
@@ -132,39 +132,49 @@ export default function AdminClienteForm() {
           if (error) throw error;
 
           if (data) {
-            // Mapear campos do banco (snake_case) para o formato do formulário (camelCase)
-            const cliente: Cliente = {
+            // Mapear campos do banco para UnifiedProfile
+            const cliente: UnifiedProfile = {
               id: data.id,
               nome: data.nome,
-              telefone: data.telefone,
               email: data.email || '',
-              situacao: data.situacao as SituacaoCliente,
-              dataContratacao: data.data_contratacao || '',
-              dataVencimento: data.data_vencimento || '',
-              plano: data.plano as PlanoCliente,
-              valorPago: data.valor_pago || 0,
-              dataUltimoPagamento: data.data_ultimo_pagamento || '',
-              formaUltimoPagamento: data.forma_ultimo_pagamento || '',
-              macSmartOne: data.mac_smart_one || '',
-              dataCadastro: data.data_cadastro || '',
-              dataUltimaEdicao: data.data_ultima_edicao || '',
-              clienteAtivo: data.cliente_ativo ?? false,
+              telefone: data.telefone,
+              telefone_whatsapp: (data as any).telefone_whatsapp,
+              origem_cadastro: data.origem_cadastro,
+              created_at: data.data_cadastro || '',
+              updated_at: data.data_ultima_edicao || '',
+              situacao: data.situacao,
+              plano: data.plano,
+              data_vencimento: data.data_vencimento,
+              data_contratacao: data.data_contratacao,
+              valor_pago: data.valor_pago,
+              data_ultimo_pagamento: data.data_ultimo_pagamento,
+              forma_ultimo_pagamento: data.forma_ultimo_pagamento,
+              mac_smart_one: data.mac_smart_one,
+              cliente_ativo: data.cliente_ativo,
+              is_recorrente: data.is_recorrente,
+              dispositivo_contratado: data.dispositivo_contratado,
               smartone_status: data.smartone_status,
               smartone_playlist_id: data.smartone_playlist_id,
-              smartone_raw_response: data.smartone_raw_response,
               smartone_last_sync_at: data.smartone_last_sync_at,
-              origemCadastro: data.origem_cadastro,
-              dispositivoContratado: data.dispositivo_contratado,
             };
 
             setClienteOriginal(cliente);
             
             // Preencher os campos do formulário
-            Object.entries(cliente).forEach(([key, value]) => {
-              if (key !== 'id' && key !== 'dataCadastro' && key !== 'dataUltimaEdicao') {
-                setValue(key as keyof ClienteFormData, value, { shouldValidate: false });
-              }
-            });
+            setValue('nome', cliente.nome);
+            setValue('telefone', cliente.telefone);
+            setValue('email', cliente.email);
+            setValue('situacao', cliente.situacao as any || 'Testando');
+            setValue('dataContratacao', cliente.data_contratacao || cliente.created_at);
+            setValue('dataVencimento', cliente.data_vencimento || '');
+            setValue('plano', cliente.plano as any || 'Mensal');
+            setValue('valorPago', cliente.valor_pago || 0);
+            setValue('dataUltimoPagamento', cliente.data_ultimo_pagamento || '');
+            setValue('formaUltimoPagamento', cliente.forma_ultimo_pagamento as any || '');
+            setValue('macSmartOne', cliente.mac_smart_one || '');
+            setValue('clienteAtivo', cliente.cliente_ativo ?? false);
+            setValue('origemCadastro', cliente.origem_cadastro as any || '');
+            setValue('dispositivoContratado', cliente.dispositivo_contratado as any || '');
 
             // Buscar M3U lists atribuídas ao cliente
             const { data: m3uAssignments } = await supabase
@@ -250,7 +260,7 @@ export default function AdminClienteForm() {
     // Verificar se houve mudanças relevantes
     const mudouSituacao = situacaoAtual !== clienteOriginal.situacao;
     const mudouPlano = planoAtual !== clienteOriginal.plano;
-    const mudouVencimento = dataVencimentoAtual !== clienteOriginal.dataVencimento;
+    const mudouVencimento = dataVencimentoAtual !== clienteOriginal.data_vencimento;
     
     // Ativação de assinatura (saiu de Testando)
     const ativouAssinatura = clienteOriginal.situacao === 'Testando' && situacaoAtual === 'Ativo';
@@ -272,7 +282,7 @@ export default function AdminClienteForm() {
     }
   }, [clienteOriginal]);
 
-  if (loadingClientes) {
+  if (loadingProfiles) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg text-muted-foreground">Carregando...</p>
@@ -326,7 +336,7 @@ export default function AdminClienteForm() {
     let clientId: string;
     
     if (id) {
-      await updateCliente(id, clienteData);
+      await updateProfile(id, clienteData as any);
       clientId = id;
       
       // Registrar atividade de atualização
@@ -391,14 +401,18 @@ export default function AdminClienteForm() {
           const clienteAtualizado: Cliente = {
             ...clienteData,
             id: id,
-            dataCadastro: clienteOriginal.dataCadastro,
+            dataCadastro: clienteOriginal.created_at,
             dataUltimaEdicao: new Date().toISOString(),
           };
 
           const updateHandler = new UpdateNotificationHandler();
           const enviado = await updateHandler.sendUpdateNotification(
             clienteAtualizado,
-            clienteOriginal,
+            {
+              ...clienteAtualizado,
+              dataCadastro: clienteOriginal.created_at,
+              dataUltimaEdicao: clienteOriginal.updated_at,
+            } as Cliente,
             addLog
           );
           
