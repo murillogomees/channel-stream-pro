@@ -211,8 +211,11 @@ export default function Login() {
     }
   };
 
-  // Login Card Component
-  const LoginCard = () => (
+  // Determine if plans card should be expanded
+  const isExpanded = !isMobile && lockedSide === "plans";
+
+  // Login Card JSX
+  const loginCardContent = (
     <div
       onClick={handleLoginCardClick}
       className={cn(
@@ -310,10 +313,8 @@ export default function Login() {
     </div>
   );
 
-  // Plans Card Component - Expanded when locked on desktop
-  const isExpanded = !isMobile && lockedSide === "plans";
-  
-  const PlansCard = () => (
+  // Plans Card JSX
+  const plansCardContent = (
     <div
       onClick={handlePlansCardClick}
       className={cn(
@@ -476,43 +477,44 @@ export default function Login() {
               <Button
                 size={isExpanded ? "lg" : "sm"}
                 className={cn(
-                  "w-full rounded-xl font-semibold transition-all",
-                  isExpanded ? "mt-auto h-14 text-lg" : "mt-2 sm:mt-2.5 h-8 sm:h-9 text-xs sm:text-sm",
+                  "w-full font-semibold",
+                  isExpanded 
+                    ? "mt-6 h-14 text-lg rounded-xl" 
+                    : "mt-2 h-7 text-[10px] sm:text-xs rounded-lg",
                   plan.is_highlighted 
-                    ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30" 
-                    : "bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 hover:border-primary/50"
+                    ? "bg-primary hover:bg-primary/90" 
+                    : "bg-foreground/10 hover:bg-foreground/20 text-foreground"
                 )}
-                onClick={e => {
-                  e.stopPropagation();
-                  handlePlanSelect(plan);
-                }}
               >
-                <Zap className={cn(
-                  "mr-2",
-                  isExpanded ? "w-6 h-6" : "w-3.5 h-3.5"
-                )} />
-                {plan.cta_text || "Assinar Agora"}
+                {isExpanded ? (
+                  <>
+                    Assinar agora
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </>
+                ) : (
+                  "Assinar"
+                )}
               </Button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Switch Button - Only on Mobile or when locked */}
+      {/* Back Button - Only on Mobile or when locked */}
       {(isMobile || lockedSide === "plans") && (
         <div className={cn(
-          "border-t border-border/30",
-          isExpanded ? "mt-10 pt-8" : "mt-4 pt-3"
+          "border-t border-border/50",
+          isExpanded ? "mt-10 pt-6" : "mt-4 pt-3"
         )}>
           <Button
             variant="ghost"
             onClick={() => isMobile ? switchToLogin() : switchToOtherSide("login")}
             className={cn(
               "w-full text-muted-foreground hover:text-foreground",
-              isExpanded ? "h-16 text-xl" : "h-10 text-sm"
+              isExpanded ? "text-lg h-12" : "text-sm"
             )}
           >
-            <ArrowLeft className={cn("mr-2", isExpanded ? "w-6 h-6" : "w-4 h-4")} />
+            <ArrowLeft className={cn("mr-2", isExpanded ? "w-5 h-5" : "w-4 h-4")} />
             Já sou cliente
           </Button>
         </div>
@@ -551,17 +553,33 @@ export default function Login() {
           /* Mobile: One card at a time with animation */
           <AnimatePresence mode="wait">
             {viewMode === "login" ? (
-              <LoginCard key="login" />
+              <motion.div
+                key="login"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                {loginCardContent}
+              </motion.div>
             ) : (
-              <PlansCard key="plans" />
+              <motion.div
+                key="plans"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                {plansCardContent}
+              </motion.div>
             )}
           </AnimatePresence>
         ) : (
           <div className="relative w-full h-full flex items-center justify-center">
             {lockedSide ? (
-              lockedSide === "login" ? <LoginCard /> : <PlansCard />
+              lockedSide === "login" ? loginCardContent : plansCardContent
             ) : hoveredSide ? (
-              hoveredSide === "login" ? <LoginCard /> : <PlansCard />
+              hoveredSide === "login" ? loginCardContent : plansCardContent
             ) : (
               <div className="flex flex-col items-center gap-8">
                 <p className="text-muted-foreground text-lg">
