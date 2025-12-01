@@ -92,6 +92,283 @@ const AdminAnalytics = () => {
     });
   }, [profiles, periodFilter]);
 
+  // Processar dados de origem
+  const origemData = filteredClientes.reduce((acc, profile) => {
+    const origem = profile.origem_cadastro || 'Não informado';
+    acc[origem] = (acc[origem] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const chartData = Object.entries(origemData).map(([name, value]) => ({
+    name,
+    value,
+    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
+  }));
+
+  // Dados do período anterior
+  const previousOrigemData = previousPeriodClientes.reduce((acc, profile) => {
+    const origem = profile.origem_cadastro || 'Não informado';
+    acc[origem] = (acc[origem] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Cores para o gráfico
+  const COLORS = [
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+  ];
+
+  // Dados por situação
+  const situacaoData = filteredClientes.reduce((acc, cliente) => {
+    acc[cliente.situacao || 'Indefinido'] = (acc[cliente.situacao || 'Indefinido'] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const situacaoChartData = Object.entries(situacaoData).map(([name, value]) => ({
+    name,
+    value,
+    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
+  }));
+
+  // Dados por plano
+  const planoData = filteredClientes.reduce((acc, cliente) => {
+    acc[cliente.plano || 'Indefinido'] = (acc[cliente.plano || 'Indefinido'] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const planoChartData = Object.entries(planoData).map(([name, value]) => ({
+    name,
+    value
+  }));
+
+  // Dados de conversão por origem
+  const conversaoData = filteredClientes.reduce((acc, profile) => {
+    const origem = profile.origem_cadastro || 'Não informado';
+    if (!acc[origem]) {
+      acc[origem] = { total: 0, ativos: 0 };
+    }
+    acc[origem].total += 1;
+    if (profile.cliente_ativo || profile.situacao === 'Ativo') {
+      acc[origem].ativos += 1;
+    }
+    return acc;
+  }, {} as Record<string, { total: number; ativos: number }>);
+
+  const conversaoChartData = Object.entries(conversaoData).map(([name, data]) => ({
+    name,
+    total: data.total,
+    ativos: data.ativos,
+    inativos: data.total - data.ativos,
+    taxa: ((data.ativos / data.total) * 100).toFixed(1)
+  })).sort((a, b) => parseFloat(b.taxa) - parseFloat(a.taxa));
+
+  // Calcular métricas gerais de conversão
+  const totalClientes = filteredClientes.length;
+  const clientesAtivos = filteredClientes.filter(c => c.cliente_ativo || c.situacao === 'Ativo').length;
+  const previousTotalClientes = previousPeriodClientes.length;
+  const previousClientesAtivos = previousPeriodClientes.filter(c => c.cliente_ativo || c.situacao === 'Ativo').length;
+  const taxaConversaoGeral = totalClientes > 0 ? ((clientesAtivos / totalClientes) * 100).toFixed(1) : '0';
+  const previousTaxaConversao = previousTotalClientes > 0 ? ((previousClientesAtivos / previousTotalClientes) * 100).toFixed(1) : '0';
+  const melhorOrigem = conversaoChartData.length > 0 ? conversaoChartData[0] : null;
+
+  // Calcular variações percentuais
+  const clientesGrowth = previousTotalClientes > 0 
+    ? (((totalClientes - previousTotalClientes) / previousTotalClientes) * 100).toFixed(1)
+    : '0';
+  const conversaoGrowth = parseFloat(previousTaxaConversao) > 0
+    ? (parseFloat(taxaConversaoGeral) - parseFloat(previousTaxaConversao)).toFixed(1)
+    : '0';
+
+  const getConversaoColor = (taxa: number) => {
+    if (taxa >= 70) return 'text-green-500';
+    if (taxa >= 40) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getConversaoBadge = (taxa: number) => {
+    if (taxa >= 70) return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Excelente</Badge>;
+    if (taxa >= 40) return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Bom</Badge>;
+    return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Baixo</Badge>;
+  };
+
+  // Análise temporal - conversão ao longo dos meses
+  const temporalData = filteredClientes.reduce((acc, profile) => {
+    if (!profile.created_at) return acc;
+    const date = new Date(profile.created_at);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const origem = profile.origem_cadastro || 'Não informado';
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = {};
+    }
+    if (!acc[monthKey][origem]) {
+      acc[monthKey][origem] = { total: 0, ativos: 0 };
+    }
+    
+    acc[monthKey][origem].total += 1;
+    if (profile.cliente_ativo || profile.situacao === 'Ativo') {
+      acc[monthKey][origem].ativos += 1;
+    }
+    
+    return acc;
+  }, {} as Record<string, Record<string, { total: number; ativos: number }>>);
+
+  const temporalChartData = Object.entries(temporalData)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, origens]) => {
+      const dataPoint: any = { month };
+      Object.entries(origens).forEach(([origem, data]) => {
+        dataPoint[origem] = ((data.ativos / data.total) * 100).toFixed(1);
+      });
+      return dataPoint;
+    });
+
+  // Análise de funil de conversão
+  const funnelData = filteredClientes.reduce((acc, cliente) => {
+    const origem = cliente.origem_cadastro || 'Não informado';
+    if (!acc[origem]) {
+      acc[origem] = { lead: 0, testando: 0, ativo: 0 };
+    }
+    
+    if (cliente.situacao === 'Lead') {
+      acc[origem].lead += 1;
+    } else if (cliente.situacao === 'Testando') {
+      acc[origem].testando += 1;
+    } else if (cliente.situacao === 'Ativo') {
+      acc[origem].ativo += 1;
+    }
+    
+    return acc;
+  }, {} as Record<string, { lead: number; testando: number; ativo: number }>);
+
+  const funnelChartData = Object.entries(funnelData).map(([origem, stages]) => {
+    const total = stages.lead + stages.testando + stages.ativo;
+    const leadToTest = total > 0 ? ((stages.testando + stages.ativo) / total * 100).toFixed(1) : '0';
+    const testToActive = (stages.testando + stages.ativo) > 0 ? (stages.ativo / (stages.testando + stages.ativo) * 100).toFixed(1) : '0';
+    
+    return {
+      origem,
+      Lead: stages.lead,
+      Testando: stages.testando,
+      Ativo: stages.ativo,
+      taxaLeadToTest: parseFloat(leadToTest),
+      taxaTestToActive: parseFloat(testToActive)
+    };
+  });
+
+  // Análise de ROI - Receita por canal
+  const roiData = filteredClientes.reduce((acc, profile) => {
+    const origem = profile.origem_cadastro || 'Não informado';
+    if (!acc[origem]) {
+      acc[origem] = { totalReceita: 0, count: 0, clientes: [] };
+    }
+    
+    const valor = profile.valor_pago || 0;
+    acc[origem].totalReceita += valor;
+    acc[origem].count += 1;
+    if (valor > 0) {
+      acc[origem].clientes.push(valor);
+    }
+    
+    return acc;
+  }, {} as Record<string, { totalReceita: number; count: number; clientes: number[] }>);
+
+  const roiChartData = Object.entries(roiData)
+    .map(([origem, data]) => ({
+      origem,
+      receitaTotal: data.totalReceita,
+      valorMedio: data.clientes.length > 0 ? data.totalReceita / data.clientes.length : 0,
+      clientesPagantes: data.clientes.length,
+      totalClientes: data.count
+    }))
+    .sort((a, b) => b.receitaTotal - a.receitaTotal);
+
+  const receitaTotal = roiChartData.reduce((sum, item) => sum + item.receitaTotal, 0);
+  const melhorROI = roiChartData.length > 0 ? roiChartData[0] : null;
+
+  // Análise de CAC e ROI Real
+  const cacRoiData = roiChartData.map(item => {
+    const investimento = marketingInvestments[item.origem] || 0;
+    const cac = item.totalClientes > 0 ? investimento / item.totalClientes : 0;
+    const roiReal = investimento > 0 ? ((item.receitaTotal - investimento) / investimento * 100) : 0;
+    const lucro = item.receitaTotal - investimento;
+    
+    return {
+      ...item,
+      investimento,
+      cac,
+      roiReal,
+      lucro
+    };
+  }).sort((a, b) => b.roiReal - a.roiReal);
+
+  const investimentoTotal = Object.values(marketingInvestments).reduce((sum, val) => sum + val, 0);
+  const lucroTotal = receitaTotal - investimentoTotal;
+  const roiGeralReal = investimentoTotal > 0 ? ((receitaTotal - investimentoTotal) / investimentoTotal * 100) : 0;
+  const melhorCanalROI = cacRoiData.length > 0 ? cacRoiData[0] : null;
+
+  // Análise de tendência de receita mensal
+  const receitaMensal = filteredClientes.reduce((acc, profile) => {
+    if (!profile.created_at || !profile.valor_pago) return acc;
+    const date = new Date(profile.created_at);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = 0;
+    }
+    acc[monthKey] += profile.valor_pago;
+    
+    return acc;
+  }, {} as Record<string, number>);
+
+  const receitaMensalData = Object.entries(receitaMensal)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, receita]) => ({
+      month,
+      receita: parseFloat(receita.toFixed(2))
+    }));
+
+  // Previsão de receita baseada em média móvel (últimos 3 meses)
+  const calcularPrevisao = () => {
+    if (receitaMensalData.length < 3) return [];
+    
+    const ultimos3Meses = receitaMensalData.slice(-3);
+    const mediaMovel = ultimos3Meses.reduce((sum, item) => sum + item.receita, 0) / 3;
+    
+    // Calcular taxa de crescimento
+    const crescimento = receitaMensalData.length >= 2
+      ? (receitaMensalData[receitaMensalData.length - 1].receita - receitaMensalData[receitaMensalData.length - 2].receita) / receitaMensalData[receitaMensalData.length - 2].receita
+      : 0;
+    
+    // Gerar previsão para próximos 3 meses
+    const ultimoMes = receitaMensalData[receitaMensalData.length - 1];
+    const [ano, mes] = ultimoMes.month.split('-').map(Number);
+    
+    const previsoes = [];
+    for (let i = 1; i <= 3; i++) {
+      const novoMes = new Date(ano, mes - 1 + i, 1);
+      const monthKey = `${novoMes.getFullYear()}-${String(novoMes.getMonth() + 1).padStart(2, '0')}`;
+      const previsaoValor = mediaMovel * (1 + (crescimento * i * 0.5)); // Crescimento amortecido
+      
+      previsoes.push({
+        month: monthKey,
+        receita: null,
+        previsao: parseFloat(previsaoValor.toFixed(2))
+      });
+    }
+    
+    return previsoes;
+  };
+
+  const previsaoReceita = calcularPrevisao();
+  const receitaComPrevisao = [
+    ...receitaMensalData.map(item => ({ ...item, previsao: null })),
+    ...previsaoReceita
+  ];
+
   // Função para exportar dados para CSV
   const exportToCSV = () => {
     try {
@@ -197,283 +474,6 @@ const AdminAnalytics = () => {
       toast.success('Todas as metas estão sendo atingidas! 🎉');
     }
   };
-
-  // Processar dados de origem
-  const origemData = filteredClientes.reduce((acc, cliente) => {
-    const origem = cliente.origemCadastro || 'Não informado';
-    acc[origem] = (acc[origem] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const chartData = Object.entries(origemData).map(([name, value]) => ({
-    name,
-    value,
-    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
-  }));
-
-  // Dados do período anterior
-  const previousOrigemData = previousPeriodClientes.reduce((acc, cliente) => {
-    const origem = cliente.origemCadastro || 'Não informado';
-    acc[origem] = (acc[origem] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Cores para o gráfico
-  const COLORS = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-  ];
-
-  // Dados por situação
-  const situacaoData = filteredClientes.reduce((acc, cliente) => {
-    acc[cliente.situacao] = (acc[cliente.situacao] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const situacaoChartData = Object.entries(situacaoData).map(([name, value]) => ({
-    name,
-    value,
-    percentage: ((value / filteredClientes.length) * 100).toFixed(1)
-  }));
-
-  // Dados por plano
-  const planoData = filteredClientes.reduce((acc, cliente) => {
-    acc[cliente.plano] = (acc[cliente.plano] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const planoChartData = Object.entries(planoData).map(([name, value]) => ({
-    name,
-    value
-  }));
-
-  // Dados de conversão por origem
-  const conversaoData = filteredClientes.reduce((acc, cliente) => {
-    const origem = cliente.origemCadastro || 'Não informado';
-    if (!acc[origem]) {
-      acc[origem] = { total: 0, ativos: 0 };
-    }
-    acc[origem].total += 1;
-    if (cliente.clienteAtivo || cliente.situacao === 'Ativo') {
-      acc[origem].ativos += 1;
-    }
-    return acc;
-  }, {} as Record<string, { total: number; ativos: number }>);
-
-  const conversaoChartData = Object.entries(conversaoData).map(([name, data]) => ({
-    name,
-    total: data.total,
-    ativos: data.ativos,
-    inativos: data.total - data.ativos,
-    taxa: ((data.ativos / data.total) * 100).toFixed(1)
-  })).sort((a, b) => parseFloat(b.taxa) - parseFloat(a.taxa));
-
-  // Calcular métricas gerais de conversão
-  const totalClientes = filteredClientes.length;
-  const clientesAtivos = filteredClientes.filter(c => c.clienteAtivo || c.situacao === 'Ativo').length;
-  const previousTotalClientes = previousPeriodClientes.length;
-  const previousClientesAtivos = previousPeriodClientes.filter(c => c.clienteAtivo || c.situacao === 'Ativo').length;
-  const taxaConversaoGeral = totalClientes > 0 ? ((clientesAtivos / totalClientes) * 100).toFixed(1) : '0';
-  const previousTaxaConversao = previousTotalClientes > 0 ? ((previousClientesAtivos / previousTotalClientes) * 100).toFixed(1) : '0';
-  const melhorOrigem = conversaoChartData.length > 0 ? conversaoChartData[0] : null;
-
-  // Calcular variações percentuais
-  const clientesGrowth = previousTotalClientes > 0 
-    ? (((totalClientes - previousTotalClientes) / previousTotalClientes) * 100).toFixed(1)
-    : '0';
-  const conversaoGrowth = parseFloat(previousTaxaConversao) > 0
-    ? (parseFloat(taxaConversaoGeral) - parseFloat(previousTaxaConversao)).toFixed(1)
-    : '0';
-
-  const getConversaoColor = (taxa: number) => {
-    if (taxa >= 70) return 'text-green-500';
-    if (taxa >= 40) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const getConversaoBadge = (taxa: number) => {
-    if (taxa >= 70) return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Excelente</Badge>;
-    if (taxa >= 40) return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Bom</Badge>;
-    return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Baixo</Badge>;
-  };
-
-  // Análise temporal - conversão ao longo dos meses
-  const temporalData = filteredClientes.reduce((acc, cliente) => {
-    if (!cliente.dataCadastro) return acc;
-    const date = new Date(cliente.dataCadastro);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const origem = cliente.origemCadastro || 'Não informado';
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = {};
-    }
-    if (!acc[monthKey][origem]) {
-      acc[monthKey][origem] = { total: 0, ativos: 0 };
-    }
-    
-    acc[monthKey][origem].total += 1;
-    if (cliente.clienteAtivo || cliente.situacao === 'Ativo') {
-      acc[monthKey][origem].ativos += 1;
-    }
-    
-    return acc;
-  }, {} as Record<string, Record<string, { total: number; ativos: number }>>);
-
-  const temporalChartData = Object.entries(temporalData)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, origens]) => {
-      const dataPoint: any = { month };
-      Object.entries(origens).forEach(([origem, data]) => {
-        dataPoint[origem] = ((data.ativos / data.total) * 100).toFixed(1);
-      });
-      return dataPoint;
-    });
-
-  // Análise de funil de conversão
-  const funnelData = filteredClientes.reduce((acc, cliente) => {
-    const origem = cliente.origemCadastro || 'Não informado';
-    if (!acc[origem]) {
-      acc[origem] = { lead: 0, testando: 0, ativo: 0 };
-    }
-    
-    if (cliente.situacao === 'Lead') {
-      acc[origem].lead += 1;
-    } else if (cliente.situacao === 'Testando') {
-      acc[origem].testando += 1;
-    } else if (cliente.situacao === 'Ativo') {
-      acc[origem].ativo += 1;
-    }
-    
-    return acc;
-  }, {} as Record<string, { lead: number; testando: number; ativo: number }>);
-
-  const funnelChartData = Object.entries(funnelData).map(([origem, stages]) => {
-    const total = stages.lead + stages.testando + stages.ativo;
-    const leadToTest = total > 0 ? ((stages.testando + stages.ativo) / total * 100).toFixed(1) : '0';
-    const testToActive = (stages.testando + stages.ativo) > 0 ? (stages.ativo / (stages.testando + stages.ativo) * 100).toFixed(1) : '0';
-    
-    return {
-      origem,
-      Lead: stages.lead,
-      Testando: stages.testando,
-      Ativo: stages.ativo,
-      taxaLeadToTest: parseFloat(leadToTest),
-      taxaTestToActive: parseFloat(testToActive)
-    };
-  });
-
-  // Análise de ROI - Receita por canal
-  const roiData = filteredClientes.reduce((acc, cliente) => {
-    const origem = cliente.origemCadastro || 'Não informado';
-    if (!acc[origem]) {
-      acc[origem] = { totalReceita: 0, count: 0, clientes: [] };
-    }
-    
-    const valor = cliente.valorPago || 0;
-    acc[origem].totalReceita += valor;
-    acc[origem].count += 1;
-    if (valor > 0) {
-      acc[origem].clientes.push(valor);
-    }
-    
-    return acc;
-  }, {} as Record<string, { totalReceita: number; count: number; clientes: number[] }>);
-
-  const roiChartData = Object.entries(roiData)
-    .map(([origem, data]) => ({
-      origem,
-      receitaTotal: data.totalReceita,
-      valorMedio: data.clientes.length > 0 ? data.totalReceita / data.clientes.length : 0,
-      clientesPagantes: data.clientes.length,
-      totalClientes: data.count
-    }))
-    .sort((a, b) => b.receitaTotal - a.receitaTotal);
-
-  const receitaTotal = roiChartData.reduce((sum, item) => sum + item.receitaTotal, 0);
-  const melhorROI = roiChartData.length > 0 ? roiChartData[0] : null;
-
-  // Análise de CAC e ROI Real
-  const cacRoiData = roiChartData.map(item => {
-    const investimento = marketingInvestments[item.origem] || 0;
-    const cac = item.totalClientes > 0 ? investimento / item.totalClientes : 0;
-    const roiReal = investimento > 0 ? ((item.receitaTotal - investimento) / investimento * 100) : 0;
-    const lucro = item.receitaTotal - investimento;
-    
-    return {
-      ...item,
-      investimento,
-      cac,
-      roiReal,
-      lucro
-    };
-  }).sort((a, b) => b.roiReal - a.roiReal);
-
-  const investimentoTotal = Object.values(marketingInvestments).reduce((sum, val) => sum + val, 0);
-  const lucroTotal = receitaTotal - investimentoTotal;
-  const roiGeralReal = investimentoTotal > 0 ? ((receitaTotal - investimentoTotal) / investimentoTotal * 100) : 0;
-  const melhorCanalROI = cacRoiData.length > 0 ? cacRoiData[0] : null;
-
-  // Análise de tendência de receita mensal
-  const receitaMensal = filteredClientes.reduce((acc, cliente) => {
-    if (!cliente.dataCadastro || !cliente.valorPago) return acc;
-    const date = new Date(cliente.dataCadastro);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = 0;
-    }
-    acc[monthKey] += cliente.valorPago;
-    
-    return acc;
-  }, {} as Record<string, number>);
-
-  const receitaMensalData = Object.entries(receitaMensal)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, receita]) => ({
-      month,
-      receita: parseFloat(receita.toFixed(2))
-    }));
-
-  // Previsão de receita baseada em média móvel (últimos 3 meses)
-  const calcularPrevisao = () => {
-    if (receitaMensalData.length < 3) return [];
-    
-    const ultimos3Meses = receitaMensalData.slice(-3);
-    const mediaMovel = ultimos3Meses.reduce((sum, item) => sum + item.receita, 0) / 3;
-    
-    // Calcular taxa de crescimento
-    const crescimento = receitaMensalData.length >= 2
-      ? (receitaMensalData[receitaMensalData.length - 1].receita - receitaMensalData[receitaMensalData.length - 2].receita) / receitaMensalData[receitaMensalData.length - 2].receita
-      : 0;
-    
-    // Gerar previsão para próximos 3 meses
-    const ultimoMes = receitaMensalData[receitaMensalData.length - 1];
-    const [ano, mes] = ultimoMes.month.split('-').map(Number);
-    
-    const previsoes = [];
-    for (let i = 1; i <= 3; i++) {
-      const novoMes = new Date(ano, mes - 1 + i, 1);
-      const monthKey = `${novoMes.getFullYear()}-${String(novoMes.getMonth() + 1).padStart(2, '0')}`;
-      const previsaoValor = mediaMovel * (1 + (crescimento * i * 0.5)); // Crescimento amortecido
-      
-      previsoes.push({
-        month: monthKey,
-        receita: null,
-        previsao: parseFloat(previsaoValor.toFixed(2))
-      });
-    }
-    
-    return previsoes;
-  };
-
-  const previsaoReceita = calcularPrevisao();
-  const receitaComPrevisao = [
-    ...receitaMensalData.map(item => ({ ...item, previsao: null })),
-    ...previsaoReceita
-  ];
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {

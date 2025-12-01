@@ -354,11 +354,11 @@ export default function AdminNotificacoes() {
     }
   };
 
-  const clientesComVencimento = clientes
-    .filter(c => c.dataVencimento)
+  const clientesComVencimento = profiles
+    .filter(c => c.data_vencimento)
     .map(c => ({
       ...c,
-      daysUntil: getDaysUntilDue(c.dataVencimento),
+      daysUntil: getDaysUntilDue(c.data_vencimento || ''),
     }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
@@ -991,12 +991,25 @@ export default function AdminNotificacoes() {
                         className="w-full p-2 border rounded-md bg-background"
                         value={selectedCliente?.id || ''}
                         onChange={(e) => {
-                          const cliente = allContactsForSending.find(c => c.id === e.target.value);
-                          setSelectedCliente(cliente || null);
+                          const profile = profiles.find(c => c.id === e.target.value);
+                          setSelectedCliente(profile ? {
+                            id: profile.id,
+                            nome: profile.nome,
+                            telefone: profile.telefone,
+                            email: profile.email,
+                            situacao: profile.situacao as any || 'Testando',
+                            dataContratacao: profile.data_contratacao || profile.created_at,
+                            dataVencimento: profile.data_vencimento || '',
+                            plano: profile.plano as any || 'Mensal',
+                            valorPago: profile.valor_pago || 0,
+                            dataCadastro: profile.created_at,
+                            dataUltimaEdicao: profile.updated_at,
+                            clienteAtivo: profile.cliente_ativo ?? true,
+                          } as Cliente : null);
                         }}
                       >
                         <option value="">Selecione um cliente</option>
-                        {allContactsForSending.map(c => (
+                        {profiles.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.nome} - {formatPhoneForDisplay(c.telefone)}
                           </option>
@@ -1051,12 +1064,25 @@ export default function AdminNotificacoes() {
                         className="w-full p-2 border rounded-md bg-background"
                         value={selectedCliente?.id || ''}
                         onChange={(e) => {
-                          const cliente = allContactsForSending.find(c => c.id === e.target.value);
-                          setSelectedCliente(cliente || null);
+                          const profile = profiles.find(c => c.id === e.target.value);
+                          setSelectedCliente(profile ? {
+                            id: profile.id,
+                            nome: profile.nome,
+                            telefone: profile.telefone,
+                            email: profile.email,
+                            situacao: profile.situacao as any || 'Testando',
+                            dataContratacao: profile.data_contratacao || profile.created_at,
+                            dataVencimento: profile.data_vencimento || '',
+                            plano: profile.plano as any || 'Mensal',
+                            valorPago: profile.valor_pago || 0,
+                            dataCadastro: profile.created_at,
+                            dataUltimaEdicao: profile.updated_at,
+                            clienteAtivo: profile.cliente_ativo ?? true,
+                          } as Cliente : null);
                         }}
                       >
                         <option value="">Selecione um cliente</option>
-                        {allContactsForSending.map(c => (
+                        {profiles.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.nome} - {formatPhoneForDisplay(c.telefone)}
                           </option>
@@ -1153,8 +1179,8 @@ export default function AdminNotificacoes() {
                   {clientesComVencimento.slice(0, 10).map((cliente) => {
                     // Determinar qual será a próxima notificação baseado nos dias até vencer
                     let nextNotificationDate = new Date();
-                    let nextNotificationType = '';
-                    const vencimento = new Date(cliente.dataVencimento);
+                     let nextNotificationType = '';
+                    const vencimento = new Date(cliente.data_vencimento || '');
                     
                     if (cliente.daysUntil > 5) {
                       // Próxima notificação: quando faltarem 5 dias
@@ -1202,7 +1228,7 @@ export default function AdminNotificacoes() {
                         <TableCell className="font-medium">{cliente.nome}</TableCell>
                         <TableCell>{formatPhoneForDisplay(cliente.telefone)}</TableCell>
                         <TableCell>
-                          {new Date(cliente.dataVencimento).toLocaleDateString('pt-BR')}
+                          {new Date(cliente.data_vencimento || '').toLocaleDateString('pt-BR')}
                         </TableCell>
                         <TableCell>
                           <Badge variant={cliente.daysUntil < 0 ? 'destructive' : cliente.daysUntil <= 2 ? 'default' : 'secondary'}>

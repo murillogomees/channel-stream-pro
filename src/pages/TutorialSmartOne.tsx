@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useProfiles } from '@/hooks/useProfiles';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const tutorialSteps = [
@@ -177,8 +178,8 @@ export default function TutorialSmartOne() {
     }
 
     // Verificar se MAC já foi cadastrado
-    const macExistente = clientes.find(c => 
-      c.macSmartOne?.toUpperCase() === formData.macSmartOne.toUpperCase()
+    const macExistente = profiles.find(c => 
+      c.mac_smart_one?.toUpperCase() === formData.macSmartOne.toUpperCase()
     );
 
     if (macExistente) {
@@ -198,26 +199,47 @@ export default function TutorialSmartOne() {
       const dataVencimento = new Date(hoje);
       dataVencimento.setDate(hoje.getDate() + 14); // 14 dias de teste grátis
 
-      // Criar cliente em período de teste
-      const novoCliente = await addCliente({
-        nome: formData.nome,
-        telefone: formData.telefone,
-        email: formData.email,
-        situacao: 'Testando',
-        dataContratacao: hoje.toISOString().split('T')[0],
-        dataVencimento: dataVencimento.toISOString().split('T')[0],
-        plano: 'Mensal', // Plano padrão para teste
-        valorPago: 0, // Teste grátis
-        dataUltimoPagamento: hoje.toISOString().split('T')[0],
-        formaUltimoPagamento: '',
-        macSmartOne: formData.macSmartOne.toUpperCase(),
-        clienteAtivo: true,
-        origemCadastro: 'Website',
-      });
+      // Criar novo perfil/cliente
+      const { data: novoCliente, error } = await (supabase as any)
+        .from('profiles')
+        .insert({
+          nome: formData.nome,
+          telefone: formData.telefone,
+          email: formData.email,
+          situacao: 'Testando',
+          data_contratacao: hoje.toISOString().split('T')[0],
+          data_vencimento: dataVencimento.toISOString().split('T')[0],
+          plano: 'Mensal',
+          valor_pago: 0,
+          data_ultimo_pagamento: hoje.toISOString().split('T')[0],
+          forma_ultimo_pagamento: '',
+          mac_smart_one: formData.macSmartOne.toUpperCase(),
+          cliente_ativo: true,
+          origem_cadastro: 'Website',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       // Enviar notificação para admins
       const { sendTutorialClientNotification } = await import('@/services/prospectNotificationService');
-      await sendTutorialClientNotification(novoCliente);
+      if (novoCliente) {
+        await sendTutorialClientNotification({
+          id: novoCliente.id,
+          nome: novoCliente.nome,
+          telefone: novoCliente.telefone,
+          email: novoCliente.email,
+          situacao: novoCliente.situacao as any || 'Testando',
+          dataContratacao: novoCliente.data_contratacao || hoje.toISOString().split('T')[0],
+          dataVencimento: novoCliente.data_vencimento || dataVencimento.toISOString().split('T')[0],
+          plano: novoCliente.plano as any || 'Mensal',
+          valorPago: novoCliente.valor_pago || 0,
+          dataCadastro: novoCliente.created_at,
+          dataUltimaEdicao: novoCliente.updated_at,
+          clienteAtivo: novoCliente.cliente_ativo ?? true,
+        } as any);
+      }
 
       // Track lead conversion
       trackLead({ 
