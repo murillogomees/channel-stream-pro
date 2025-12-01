@@ -6043,6 +6043,7 @@ export type Database = {
         }[]
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
+      is_admin_or_master: { Args: { _user_id: string }; Returns: boolean }
       log_activity: {
         Args: {
           _action_description: string
