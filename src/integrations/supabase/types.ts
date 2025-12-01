@@ -1181,7 +1181,7 @@ export type Database = {
           {
             foreignKeyName: "clientes_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -6106,6 +6106,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      user_access_days_remaining: {
+        Args: { _user_id: string }
+        Returns: number
+      }
+      user_has_valid_access: { Args: { _user_id: string }; Returns: boolean }
       validate_playback_token: {
         Args: { p_ip_address?: string; p_token_hash: string }
         Returns: {

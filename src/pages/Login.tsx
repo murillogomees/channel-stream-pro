@@ -151,7 +151,7 @@ export default function Login() {
   };
 
   const openLogin = () => setViewMode("login");
-  const openPlans = () => setViewMode("plans");
+  const openPlans = () => navigate("/signup"); // Redireciona para cadastro
   const goBack = () => setViewMode("initial");
 
   // Initial Selection Cards (two side by side)
@@ -182,7 +182,7 @@ export default function Login() {
           <Zap className="w-10 h-10 text-primary" />
         </div>
         <h3 className="text-xl font-bold text-foreground mb-2">Quero me cadastrar</h3>
-        <p className="text-sm text-muted-foreground">Escolha seu plano</p>
+        <p className="text-sm text-muted-foreground">3 dias grátis!</p>
       </motion.div>
     </div>
   );
@@ -283,14 +283,14 @@ export default function Login() {
           </Button>
         </form>
 
-        {/* Switch to Plans */}
+        {/* Switch to Signup */}
         <div className="mt-6 pt-4 border-t border-border/50">
           <Button
             variant="ghost"
-            onClick={openPlans}
+            onClick={() => navigate("/signup")}
             className="w-full text-muted-foreground hover:text-foreground"
           >
-            Ainda não sou cliente
+            Criar conta grátis
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
