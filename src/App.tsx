@@ -30,7 +30,6 @@ const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
-const AdminPerfil = lazy(() => import("./pages/AdminPerfil"));
 
 // Public standalone pages
 const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
@@ -49,7 +48,7 @@ const AdminAffiliates = lazy(() => import("./pages/AdminAffiliates"));
 // IPTV App pages - Standalone Mobile/TV App
 const AppEntry = lazy(() => import("./pages/AppEntry"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
-const AppProfile = lazy(() => import("./pages/app/AppProfile"));
+const UnifiedProfile = lazy(() => import("./pages/UnifiedProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 const TVPlayer = lazy(() => import("./pages/TVPlayer"));
 const MyList = lazy(() => import("./pages/MyList"));
@@ -104,7 +103,7 @@ const App = () => (
             <Route path="/app/install" element={<AppInstall />} />
             <Route path="/app/login" element={<Navigate to="/login" replace />} />
             <Route path="/app/player" element={<ProtectedRoute><AppPlayer /></ProtectedRoute>} />
-            <Route path="/app/profile" element={<ProtectedRoute><AppProfile /></ProtectedRoute>} />
+            <Route path="/app/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/app/mylist" element={<ProtectedRoute><MyList /></ProtectedRoute>} />
             <Route path="/app/home" element={<Navigate to="/app/player" replace />} />
             <Route path="/app/favorites" element={<Navigate to="/app/mylist" replace />} />
@@ -143,7 +142,7 @@ const App = () => (
             <Route path="/admin/analytics" element={<ProtectedRoute requireAdmin><AdminAnalyticsPage /></ProtectedRoute>} />
             <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
-            <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><AdminPerfil /></ProtectedRoute>} />
+            <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
             
             {/* ========================================
