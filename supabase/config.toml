@@ -235,3 +235,11 @@ verify_jwt = false
 # Security Audit - pentest and security analysis
 [functions.security-audit]
 verify_jwt = false
+
+# ==========================================
+# CHECKOUT WITH REGISTRATION
+# ==========================================
+
+# Checkout with user registration - public for new users
+[functions.checkout-with-registration]
+verify_jwt = false
