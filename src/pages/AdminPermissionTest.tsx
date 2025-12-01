@@ -13,7 +13,7 @@ interface TestResult {
 }
 
 export default function AdminPermissionTest() {
-  const { user, isAuthenticated, isAdmin, isSuperAdmin, isClient, loading } = useAuth();
+  const { user, isAuthenticated, isAdmin, isMaster, isClient, loading } = useAuth();
   const [dbTests, setDbTests] = useState<TestResult[]>([]);
   const [rpcTests, setRpcTests] = useState<TestResult[]>([]);
 
@@ -168,8 +168,8 @@ export default function AdminPermissionTest() {
               <span className="text-sm">isAdmin</span>
             </div>
             <div className="flex items-center gap-2">
-              {isSuperAdmin ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
-              <span className="text-sm">isSuperAdmin</span>
+              {isMaster ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
+              <span className="text-sm">isMaster</span>
             </div>
             <div className="flex items-center gap-2">
               {isClient ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}

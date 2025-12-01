@@ -10,7 +10,13 @@
  * - public.user_subscriptions - status de assinatura
  */
 
-export type AppRole = 'client' | 'admin' | 'super_admin';
+/**
+ * Roles do sistema (3 níveis):
+ * - client: Acesso apenas a /app/* (streaming)
+ * - admin: Acesso total ao dashboard + /app/* 
+ * - master: Único usuário (murillo@gmail.com) com acesso total incluindo manipulação de admins
+ */
+export type AppRole = 'client' | 'admin' | 'master';
 
 export type SubscriptionStatusType = 'trial' | 'active' | 'canceled' | 'expired' | 'past_due';
 
@@ -55,7 +61,7 @@ export interface SubscriptionData {
 export interface UnifiedUser extends UserProfile {
   roles: AppRole[];
   isAdmin: boolean;
-  isSuperAdmin: boolean;
+  isMaster: boolean;
   isClient: boolean;
   // Status de acesso
   hasValidAccess: boolean;
@@ -74,7 +80,7 @@ export interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  isSuperAdmin: boolean;
+  isMaster: boolean;
   isClient: boolean;
   // Status de acesso
   hasValidAccess: boolean;

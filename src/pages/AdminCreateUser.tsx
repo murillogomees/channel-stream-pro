@@ -22,8 +22,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppRole } from "@/types/auth";
 
-type ExtendedRole = AppRole | 'master';
-
 interface AdminUser {
   id: string;
   email: string;
@@ -42,21 +40,22 @@ interface EditFormData {
   telefone: string;
   newPassword: string;
   isActive: boolean;
-  roles: ExtendedRole[];
+  roles: AppRole[];
 }
 
 const MASTER_ADMIN_EMAIL = 'murillo@gmail.com';
 const PROTECTED_EMAILS = [MASTER_ADMIN_EMAIL];
 
-const ALL_ROLES: { value: ExtendedRole; label: string; description: string; icon: React.ReactNode; color: string }[] = [
+type ExtendedRole = AppRole;
+
+const ALL_ROLES: { value: AppRole; label: string; description: string; icon: React.ReactNode; color: string }[] = [
   { value: 'client', label: 'Cliente', description: 'Acesso básico ao sistema', icon: <User className="h-4 w-4" />, color: 'text-gray-500' },
-  { value: 'admin', label: 'Admin', description: 'Gerenciamento de clientes e operações', icon: <Shield className="h-4 w-4" />, color: 'text-blue-500' },
-  { value: 'super_admin', label: 'Super Admin', description: 'Acesso total + criar admins', icon: <ShieldCheck className="h-4 w-4" />, color: 'text-amber-500' },
+  { value: 'admin', label: 'Admin', description: 'Acesso total ao dashboard + streaming', icon: <Shield className="h-4 w-4" />, color: 'text-blue-500' },
   { value: 'master', label: 'Master', description: 'Controle absoluto do sistema', icon: <Star className="h-4 w-4" />, color: 'text-purple-500' },
 ];
 
 const AdminCreateUser = () => {
-  const { isSuperAdmin, user } = useAuth();
+  const { isMaster, user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -141,12 +140,12 @@ const AdminCreateUser = () => {
   }, [toast]);
 
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (isMaster) {
       fetchUsers();
     }
-  }, [isSuperAdmin, fetchUsers]);
+  }, [isMaster, fetchUsers]);
 
-  if (!isSuperAdmin) {
+  if (!isMaster) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
@@ -354,7 +353,7 @@ const AdminCreateUser = () => {
       // Add new roles
       for (const role of newRoleSet) {
         if (!currentRoleSet.has(role)) {
-          await supabase
+          await (supabase as any)
             .from('user_roles')
             .insert({
               user_id: editingUser.id,
@@ -445,13 +444,13 @@ const AdminCreateUser = () => {
     if (isMasterAdmin(email)) {
       return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30"><Crown className="h-3 w-3 mr-1" />Master</Badge>;
     }
-    if (roles.includes('super_admin')) {
-      return <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30"><ShieldCheck className="h-3 w-3 mr-1" />Super Admin</Badge>;
+    if (roles.includes('master')) {
+      return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30"><Star className="h-3 w-3 mr-1" />Master</Badge>;
     }
     if (roles.includes('admin')) {
       return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
     }
-    return <Badge variant="secondary">Usuário</Badge>;
+    return <Badge variant="secondary"><User className="h-3 w-3 mr-1" />Cliente</Badge>;
   };
 
   return (

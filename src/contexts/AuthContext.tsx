@@ -94,8 +94,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const unifiedUser: UnifiedUser = {
         ...profile,
         roles,
-        isAdmin: roles.includes('admin') || roles.includes('super_admin'),
-        isSuperAdmin: roles.includes('super_admin'),
+        isMaster: roles.includes('master'),
+        isAdmin: roles.includes('admin') || roles.includes('master'),
         isClient: roles.includes('client'),
         // Status de acesso
         hasValidAccess: accessStatus.hasValidAccess,
@@ -180,7 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: currentSession.user.email || '',
         roles: [],
         isAdmin: false,
-        isSuperAdmin: false,
+        isMaster: false,
         isClient: true, // Assume client por padrão
         hasValidAccess: true, // Assume válido até carregar
         isExpired: false,
@@ -301,7 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     isAuthenticated: !!session,
     isAdmin: user?.isAdmin || false,
-    isSuperAdmin: user?.isSuperAdmin || false,
+    isMaster: user?.isMaster || false,
     isClient: user?.isClient || false,
     hasValidAccess: user?.hasValidAccess || false,
     isExpired: user?.isExpired || false,
