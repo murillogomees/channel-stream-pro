@@ -24,11 +24,13 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const mercadoPagoAccessToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")!;
 const webhookSecret = Deno.env.get("MERCADO_PAGO_WEBHOOK_SECRET");
+const whatsappAppkey = Deno.env.get("WHATSAPP_APPKEY");
+const whatsappAuthkey = Deno.env.get("WHATSAPP_AUTHKEY");
 
 function verifySignature(payload: string, signature: string | null): boolean {
   if (!webhookSecret || !signature) {
     console.log("[MP-Webhook] No secret configured or no signature provided, skipping verification");
-    return true; // Skip verification in sandbox mode
+    return true;
   }
   
   try {
@@ -70,13 +72,139 @@ async function getPaymentDetails(paymentId: string) {
   return response.json();
 }
 
+// Mapeia payment_method_id do Mercado Pago para formas de pagamento do sistema
+function mapPaymentMethod(paymentMethodId: string, paymentTypeId: string): string {
+  const methodMap: Record<string, string> = {
+    'pix': 'PIX',
+    'bolbradesco': 'Boleto',
+    'account_money': 'Saldo Mercado Pago',
+    'credit_card': 'Cartão de Crédito',
+    'debit_card': 'Cartão de Débito',
+    'bank_transfer': 'TED',
+  };
+  
+  // Tenta mapear pelo payment_method_id específico
+  if (methodMap[paymentMethodId]) {
+    return methodMap[paymentMethodId];
+  }
+  
+  // Fallback para payment_type_id
+  if (paymentTypeId === 'credit_card') return 'Cartão de Crédito';
+  if (paymentTypeId === 'debit_card') return 'Cartão de Débito';
+  if (paymentTypeId === 'ticket') return 'Boleto';
+  if (paymentTypeId === 'bank_transfer') return 'TED';
+  
+  return paymentMethodId || 'Outro';
+}
+
+// Mapeia status do Mercado Pago para status do sistema
+function mapPaymentStatus(mpStatus: string): { systemStatus: string; clienteAtivo: boolean } {
+  const statusMap: Record<string, { systemStatus: string; clienteAtivo: boolean }> = {
+    approved: { systemStatus: 'Ativo', clienteAtivo: true },
+    pending: { systemStatus: 'Testando', clienteAtivo: false },
+    in_process: { systemStatus: 'Testando', clienteAtivo: false },
+    rejected: { systemStatus: 'Inativo', clienteAtivo: false },
+    refunded: { systemStatus: 'Inativo', clienteAtivo: false },
+    cancelled: { systemStatus: 'Inativo', clienteAtivo: false },
+  };
+  
+  return statusMap[mpStatus] || { systemStatus: 'Inativo', clienteAtivo: false };
+}
+
+// Envia notificação WhatsApp para o cliente
+async function sendWhatsAppNotification(
+  supabase: any,
+  telefone: string,
+  status: string,
+  clienteNome: string,
+  plano: string,
+  valor: number,
+  dataVencimento: string,
+  formaPagamento: string
+) {
+  if (!whatsappAppkey || !whatsappAuthkey) {
+    console.log("[MP-Webhook] WhatsApp credentials not configured");
+    return;
+  }
+
+  // Busca template específico para o status
+  const { data: template } = await supabase
+    .from('whatsapp_templates')
+    .select('*')
+    .eq('event_type', 'mercado_pago_status')
+    .eq('active', true)
+    .ilike('name', `%${status}%`)
+    .single();
+
+  let message = '';
+  
+  if (template) {
+    // Substitui variáveis do template
+    message = template.message
+      .replace(/\{\{nome\}\}/g, clienteNome)
+      .replace(/\{\{plano\}\}/g, plano)
+      .replace(/\{\{valor\}\}/g, `R$ ${valor.toFixed(2)}`)
+      .replace(/\{\{dataVencimento\}\}/g, new Date(dataVencimento).toLocaleDateString('pt-BR'))
+      .replace(/\{\{formaPagamento\}\}/g, formaPagamento)
+      .replace(/\{\{status\}\}/g, status);
+  } else {
+    // Template padrão se não houver específico
+    const statusMessages: Record<string, string> = {
+      approved: `🎉 *Pagamento Aprovado!*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi aprovado!\n\n✅ Plano: ${plano}\n💳 Forma: ${formaPagamento}\n📅 Válido até: ${new Date(dataVencimento).toLocaleDateString('pt-BR')}\n\nSeu acesso já está ativo! Aproveite! 🎬`,
+      pending: `⏳ *Pagamento Pendente*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* está em análise.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nAssim que for aprovado, você será notificado!`,
+      in_process: `⏳ *Pagamento em Processamento*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* está sendo processado.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nEm breve você receberá a confirmação!`,
+      rejected: `❌ *Pagamento Recusado*\n\nOlá ${clienteNome}!\n\nInfelizmente seu pagamento de *R$ ${valor.toFixed(2)}* foi recusado.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nPor favor, tente novamente ou entre em contato conosco!`,
+      refunded: `💰 *Pagamento Reembolsado*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi reembolsado.\n\n📋 Plano: ${plano}\n\nQualquer dúvida, estamos à disposição!`,
+      cancelled: `🚫 *Pagamento Cancelado*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi cancelado.\n\n📋 Plano: ${plano}\n\nSe precisar de ajuda, entre em contato conosco!`,
+    };
+
+    message = statusMessages[status] || `Status: ${status}`;
+  }
+
+  try {
+    // Remove caracteres especiais do telefone
+    const cleanPhone = telefone.replace(/\D/g, '');
+    
+    const response = await fetch('https://api.botbot.com.br/waboxapp/send-text', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        appkey: whatsappAppkey,
+        authkey: whatsappAuthkey,
+        to: cleanPhone,
+        message: message,
+        priority: 1,
+      }),
+    });
+
+    const result = await response.json();
+    
+    // Log da notificação
+    await supabase.from('notification_logs').insert({
+      cliente_id: null, // Será preenchido depois se necessário
+      cliente_nome: clienteNome,
+      telefone: cleanPhone,
+      tipo: `mercado_pago_${status}`,
+      template: template?.name || 'Template Padrão',
+      data_envio: new Date().toISOString(),
+      status: response.ok ? 'success' : 'error',
+      resposta: result,
+    });
+
+    console.log(`[MP-Webhook] WhatsApp notification sent: ${response.ok}`);
+  } catch (error) {
+    console.error("[MP-Webhook] Error sending WhatsApp:", error);
+  }
+}
+
 async function processPayment(supabase: any, paymentData: any) {
   const externalReference = paymentData.external_reference;
   const status = paymentData.status;
   
   console.log(`[MP-Webhook] Processing payment ${paymentData.id} with status ${status}`);
   
-  // Map Mercado Pago status to our status
   const statusMap: Record<string, string> = {
     approved: "approved",
     pending: "pending",
@@ -132,26 +260,44 @@ async function processPayment(supabase: any, paymentData: any) {
     return { success: false, error: paymentError.message };
   }
   
-  // If payment approved, update subscription
-  if (status === "approved" && planId) {
-    // Get plan details
-    const { data: plan } = await supabase
-      .from("subscription_plans")
-      .select("*")
-      .eq("id", planId)
-      .single();
-    
-    // Calculate period based on plan duration
-    let periodDays = 30; // Default monthly
-    if (plan) {
-      if (plan.name?.toLowerCase().includes("trimestral")) periodDays = 90;
-      else if (plan.name?.toLowerCase().includes("semestral")) periodDays = 180;
-      else if (plan.name?.toLowerCase().includes("anual")) periodDays = 365;
-    }
-    
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + periodDays);
-    
+  // Get plan details
+  const { data: plan } = await supabase
+    .from("subscription_plans")
+    .select("*")
+    .eq("id", planId)
+    .single();
+  
+  // Calculate period based on plan duration
+  let periodDays = 30; // Default monthly
+  let planoNome = 'Mensal';
+  
+  if (plan) {
+    periodDays = plan.period_months * 30;
+    planoNome = plan.name;
+  }
+  
+  const dataPagamento = new Date();
+  const dataVencimento = new Date();
+  dataVencimento.setDate(dataVencimento.getDate() + periodDays);
+  
+  // Map payment method
+  const formaPagamento = mapPaymentMethod(
+    paymentData.payment_method_id,
+    paymentData.payment_type_id
+  );
+  
+  // Map status
+  const { systemStatus, clienteAtivo } = mapPaymentStatus(status);
+  
+  // Get client info for WhatsApp
+  const { data: cliente } = await supabase
+    .from("clientes")
+    .select("nome, telefone")
+    .eq("user_id", userId)
+    .single();
+  
+  // Update subscription based on status
+  if (status === "approved") {
     // Upsert subscription
     const { error: subError } = await supabase
       .from("user_subscriptions")
@@ -159,8 +305,8 @@ async function processPayment(supabase: any, paymentData: any) {
         user_id: userId,
         plan_id: planId,
         status: "active",
-        current_period_start: new Date().toISOString(),
-        current_period_end: periodEnd.toISOString(),
+        current_period_start: dataPagamento.toISOString(),
+        current_period_end: dataVencimento.toISOString(),
         cancel_at_period_end: false,
         trial_end: null,
       }, {
@@ -171,34 +317,47 @@ async function processPayment(supabase: any, paymentData: any) {
       console.error("[MP-Webhook] Subscription update error:", subError);
     } else {
       console.log(`[MP-Webhook] Subscription activated for user ${userId}`);
-      
-      // Update user role to ensure they have client role
-      await supabase
-        .from("user_roles")
-        .upsert({
-          user_id: userId,
-          role: "client",
-        }, {
-          onConflict: "user_id,role",
-        });
-      
-      // Update clientes table if exists
-      await supabase
-        .from("clientes")
-        .update({
-          situacao: "Ativo",
-          data_ultimo_pagamento: new Date().toISOString(),
-          valor_pago: paymentData.transaction_amount,
-          forma_ultimo_pagamento: paymentData.payment_method_id,
-          plano: plan?.name || "Mensal",
-        })
-        .eq("user_id", userId);
     }
+    
+    // Update user role
+    await supabase
+      .from("user_roles")
+      .upsert({
+        user_id: userId,
+        role: "client",
+      }, {
+        onConflict: "user_id,role",
+      });
   }
   
-  // If payment rejected/cancelled, check if subscription should be updated
-  if (["rejected", "cancelled", "refunded"].includes(status)) {
-    console.log(`[MP-Webhook] Payment ${status} for user ${userId}`);
+  // Update clientes table with all payment info
+  await supabase
+    .from("clientes")
+    .update({
+      situacao: systemStatus,
+      cliente_ativo: clienteAtivo,
+      plano: planoNome,
+      data_contratacao: status === "approved" ? dataPagamento.toISOString() : undefined,
+      data_ultimo_pagamento: status === "approved" ? dataPagamento.toISOString() : undefined,
+      data_vencimento: status === "approved" ? dataVencimento.toISOString() : undefined,
+      valor_pago: paymentData.transaction_amount,
+      forma_ultimo_pagamento: formaPagamento,
+      is_recorrente: status === "approved",
+    })
+    .eq("user_id", userId);
+  
+  // Send WhatsApp notification
+  if (cliente) {
+    await sendWhatsAppNotification(
+      supabase,
+      cliente.telefone,
+      status,
+      cliente.nome,
+      planoNome,
+      paymentData.transaction_amount,
+      dataVencimento.toISOString(),
+      formaPagamento
+    );
   }
   
   return { success: true, payment };
@@ -263,7 +422,6 @@ serve(async (req) => {
     // Handle subscription events
     if (payload.type === "subscription_preapproval" || payload.type === "subscription_authorized_payment") {
       console.log(`[MP-Webhook] Subscription event: ${payload.type}`);
-      // Handle recurring subscription events
     }
     
     return new Response(JSON.stringify({ received: true }), {
