@@ -296,12 +296,6 @@ serve(async (req) => {
           bandwidth_bytes: 0,
           updated_at: new Date().toISOString()
         }, { onConflict: 'r2_key' });
-          cache_control: 'public, max-age=31536000, immutable',
-          status: 'ready',
-          access_count: 0,
-          bandwidth_bytes: 0,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'r2_key' });
         
         // Registrar sucesso no circuit breaker
         await supabaseService.rpc('record_host_success', { p_url: download.original_url });
