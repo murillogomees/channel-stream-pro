@@ -168,7 +168,7 @@ USING (
     SELECT 1 FROM client_m3u_custom_assignments
     WHERE custom_list_id = m3u_custom_lists.id
       AND cliente_id IN (
-        SELECT id FROM clientes WHERE user_id = auth.uid()
+        SELECT id FROM profiles WHERE user_id = auth.uid()
       )
   )
 );
