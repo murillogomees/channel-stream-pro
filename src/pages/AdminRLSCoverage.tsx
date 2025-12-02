@@ -22,79 +22,146 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Shield, AlertTriangle, CheckCircle, Play, History, Code } from "lucide-react";
-import { rlsCoverageService, RLSIssue } from "@/services/rlsCoverageService";
+import { Shield, AlertTriangle, CheckCircle, RefreshCw, History, Code, ShieldCheck, XCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import AdminShell from "@/components/admin/AdminShell";
 
+interface RLSTableInfo {
+  schema_name: string;
+  table_name: string;
+  has_rls: boolean;
+  policy_count: number;
+  policies: Array<{
+    policy_name: string;
+    command: string;
+    permissive: string;
+  }>;
+  severity: 'high' | 'medium' | 'low' | 'ok';
+}
+
 export default function AdminRLSCoverage() {
   const queryClient = useQueryClient();
-  const [selectedIssue, setSelectedIssue] = useState<RLSIssue | null>(null);
-  const [showFixModal, setShowFixModal] = useState(false);
-  const [confirmChecked, setConfirmChecked] = useState(false);
-  const [isDryRun, setIsDryRun] = useState(true);
+  const [selectedTable, setSelectedTable] = useState<RLSTableInfo | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Fetch coverage data
-  const { data: coverage, isLoading, refetch } = useQuery({
-    queryKey: ['rls-coverage'],
-    queryFn: () => rlsCoverageService.runScan(),
-  });
+  // Fetch all tables with RLS info
+  const { data: tables, isLoading, refetch } = useQuery({
+    queryKey: ['rls-all-tables'],
+    queryFn: async () => {
+      // Get all tables without RLS
+      const { data: tablesWithoutRLS, error: error1 } = await supabase
+        .rpc('detect_tables_without_rls');
 
-  // Fetch scan history
-  const { data: scanHistory } = useQuery({
-    queryKey: ['rls-scan-history'],
-    queryFn: () => rlsCoverageService.getScanHistory(),
-  });
-
-  // Fix mutation
-  const fixMutation = useMutation({
-    mutationFn: (params: any) => rlsCoverageService.applyFix(params),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success(result.message || 'Fix applied successfully!');
-        queryClient.invalidateQueries({ queryKey: ['rls-coverage'] });
-        queryClient.invalidateQueries({ queryKey: ['rls-scan-history'] });
-        setShowFixModal(false);
-        setSelectedIssue(null);
-        setConfirmChecked(false);
-      } else if (result.requires_master) {
-        toast.error('Master role required for high severity fixes');
-      } else {
-        toast.error(result.error || 'Failed to apply fix');
+      if (error1) {
+        console.error('Error detecting tables without RLS:', error1);
+        throw error1;
       }
-    },
-    onError: (error: Error) => {
-      toast.error(`Error: ${error.message}`);
+
+      // Get all RLS policies
+      const { data: allPolicies, error: error2 } = await supabase
+        .rpc('get_all_rls_policies');
+
+      if (error2) {
+        console.error('Error getting RLS policies:', error2);
+        throw error2;
+      }
+
+      // Get permissive policies
+      const { data: permissivePolicies, error: error3 } = await supabase
+        .rpc('detect_permissive_policies');
+
+      if (error3) {
+        console.error('Error detecting permissive policies:', error3);
+      }
+
+      // Build comprehensive table list
+      const tableMap = new Map<string, RLSTableInfo>();
+
+      // Add tables without RLS (high severity)
+      tablesWithoutRLS?.forEach((t: any) => {
+        const key = `${t.schema_name}.${t.table_name}`;
+        tableMap.set(key, {
+          schema_name: t.schema_name,
+          table_name: t.table_name,
+          has_rls: false,
+          policy_count: 0,
+          policies: [],
+          severity: 'high',
+        });
+      });
+
+      // Add tables with policies
+      const policyGroups = new Map<string, any[]>();
+      allPolicies?.forEach((p: any) => {
+        const key = `${p.schemaname}.${p.tablename}`;
+        if (!policyGroups.has(key)) {
+          policyGroups.set(key, []);
+        }
+        policyGroups.get(key)?.push({
+          policy_name: p.policyname,
+          command: p.cmd,
+          permissive: p.permissive,
+        });
+      });
+
+      policyGroups.forEach((policies, key) => {
+        const [schema, table] = key.split('.');
+        
+        // Check if any policies are permissive
+        const hasPermissive = permissivePolicies?.some(
+          (pp: any) => pp.schema_name === schema && pp.table_name === table
+        );
+
+        tableMap.set(key, {
+          schema_name: schema,
+          table_name: table,
+          has_rls: true,
+          policy_count: policies.length,
+          policies,
+          severity: hasPermissive ? 'medium' : 'ok',
+        });
+      });
+
+      return Array.from(tableMap.values()).sort((a, b) => {
+        // Sort by severity first, then alphabetically
+        const severityOrder = { high: 0, medium: 1, low: 2, ok: 3 };
+        if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+          return severityOrder[a.severity] - severityOrder[b.severity];
+        }
+        return a.table_name.localeCompare(b.table_name);
+      });
     },
   });
 
-  const handleFixClick = (issue: RLSIssue) => {
-    setSelectedIssue(issue);
-    setShowFixModal(true);
-    setIsDryRun(true);
-    setConfirmChecked(false);
-  };
-
-  const handleApplyFix = async () => {
-    if (!selectedIssue) return;
-
-    await fixMutation.mutateAsync({
-      issue_id: selectedIssue.id,
-      severity: selectedIssue.severity,
-      schema_name: selectedIssue.schema,
-      table_name: selectedIssue.table,
-      policy_name: selectedIssue.action,
-      sql_apply: selectedIssue.proposed_fix.sql_apply,
-      sql_rollback: selectedIssue.proposed_fix.rollback_sql,
-      dry_run: isDryRun,
-      confirm: !isDryRun && confirmChecked,
-    });
+  const handleViewDetails = (table: RLSTableInfo) => {
+    setSelectedTable(table);
+    setShowDetailModal(true);
   };
 
   const getSeverityBadge = (severity: string) => {
-    const config = rlsCoverageService.formatSeverityBadge(severity);
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    switch (severity) {
+      case 'high':
+        return <Badge variant="destructive">Critical</Badge>;
+      case 'medium':
+        return <Badge variant="default">Warning</Badge>;
+      case 'low':
+        return <Badge variant="secondary">Info</Badge>;
+      case 'ok':
+        return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">OK</Badge>;
+      default:
+        return <Badge variant="secondary">{severity}</Badge>;
+    }
+  };
+
+  const stats = {
+    total: tables?.length || 0,
+    critical: tables?.filter(t => t.severity === 'high').length || 0,
+    warning: tables?.filter(t => t.severity === 'medium').length || 0,
+    ok: tables?.filter(t => t.severity === 'ok').length || 0,
+    coverage: tables?.length 
+      ? Math.round(((tables.filter(t => t.has_rls).length / tables.length) * 100))
+      : 0,
   };
 
   if (isLoading) {
@@ -103,7 +170,7 @@ export default function AdminRLSCoverage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Scanning RLS policies...</p>
+            <p className="text-muted-foreground">Loading RLS coverage data...</p>
           </div>
         </div>
       </AdminShell>
@@ -113,282 +180,240 @@ export default function AdminRLSCoverage() {
   return (
     <AdminShell 
       title="RLS Coverage & Security Audit"
-      description="Detect and fix Row-Level Security issues"
+      description="Row-Level Security status for all database tables"
     >
       <div className="space-y-6">
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Tables</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{coverage?.total_issues || 0}</div>
-              <p className="text-xs text-muted-foreground">Detected problems</p>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground">In public schema</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">High Severity</CardTitle>
-              <Shield className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium">Critical Issues</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {coverage?.by_severity.high || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">Requires immediate attention</p>
+              <div className="text-2xl font-bold text-destructive">{stats.critical}</div>
+              <p className="text-xs text-muted-foreground">No RLS enabled</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Warnings</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-500">{stats.warning}</div>
+              <p className="text-xs text-muted-foreground">Permissive policies</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Protected</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-500">{stats.ok}</div>
+              <p className="text-xs text-muted-foreground">Properly secured</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Coverage</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {coverage?.summary.coverage_percentage || 0}%
-              </div>
-              <p className="text-xs text-muted-foreground">Tables with RLS</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Last Scan</CardTitle>
-              <History className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-medium">
-                {coverage?.timestamp ? new Date(coverage.timestamp).toLocaleTimeString() : 'N/A'}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => refetch()} className="mt-2 h-7 px-2">
-                Rescan
+              <div className="text-2xl font-bold">{stats.coverage}%</div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => refetch()} 
+                className="mt-1 h-7 px-2"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Refresh
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="issues" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="issues">
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Issues ({coverage?.total_issues || 0})
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="w-4 h-4 mr-2" />
-              Scan History
-            </TabsTrigger>
-          </TabsList>
+        {/* Main Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Tables - RLS Status</CardTitle>
+            <CardDescription>
+              Complete list of database tables with Row-Level Security analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[600px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Table Name</TableHead>
+                    <TableHead className="text-center">RLS Enabled</TableHead>
+                    <TableHead className="text-center">Policies</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tables && tables.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No tables found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    tables?.map((table) => (
+                      <TableRow key={`${table.schema_name}.${table.table_name}`}>
+                        <TableCell>
+                          {table.has_rls ? (
+                            <ShieldCheck className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-destructive" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {table.schema_name}.{table.table_name}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {table.has_rls ? (
+                            <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive mx-auto" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">{table.policy_count}</Badge>
+                        </TableCell>
+                        <TableCell>{getSeverityBadge(table.severity)}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleViewDetails(table)}
+                          >
+                            <Code className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="issues" className="space-y-4">
-            {coverage && coverage.issues.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No RLS Issues Found!</h3>
-                  <p className="text-muted-foreground text-center">
-                    All tables have proper Row-Level Security policies configured.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security Issues</CardTitle>
-                  <CardDescription>
-                    Review and fix RLS policy problems. High severity issues require Master role.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[600px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>Severity</TableHead>
-                          <TableHead>Table</TableHead>
-                          <TableHead>Issue</TableHead>
-                          <TableHead>Evidence</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {coverage?.issues.map((issue) => (
-                          <TableRow key={issue.id}>
-                            <TableCell className="font-mono text-xs">{issue.id}</TableCell>
-                            <TableCell>{getSeverityBadge(issue.severity)}</TableCell>
-                            <TableCell>
-                              <code className="text-xs bg-muted px-2 py-1 rounded">
-                                {issue.schema}.{issue.table}
-                              </code>
-                            </TableCell>
-                            <TableCell>
-                              {rlsCoverageService.formatIssueType(issue.issue)}
-                            </TableCell>
-                            <TableCell className="max-w-xs">
-                              <div className="text-xs text-muted-foreground line-clamp-2">
-                                {issue.evidence.join(', ')}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleFixClick(issue)}
-                              >
-                                <Code className="w-3 h-3 mr-1" />
-                                Fix
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
+        {/* Detail Modal */}
+        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                {selectedTable?.schema_name}.{selectedTable?.table_name}
+              </DialogTitle>
+              <DialogDescription>
+                RLS configuration details and policies
+              </DialogDescription>
+            </DialogHeader>
 
-          <TabsContent value="history" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Scan History</CardTitle>
-                <CardDescription>Previous RLS security scans and fixes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[400px]">
+            <div className="space-y-4">
+              {/* Status Overview */}
+              <Alert>
+                <AlertDescription>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <strong>RLS Enabled:</strong>{' '}
+                      {selectedTable?.has_rls ? (
+                        <span className="text-green-500">Yes</span>
+                      ) : (
+                        <span className="text-destructive">No</span>
+                      )}
+                    </div>
+                    <div>
+                      <strong>Policies:</strong> {selectedTable?.policy_count}
+                    </div>
+                    <div>
+                      <strong>Severity:</strong> {selectedTable && getSeverityBadge(selectedTable.severity)}
+                    </div>
+                    <div>
+                      <strong>Schema:</strong> {selectedTable?.schema_name}
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+
+              {/* Policies List */}
+              {selectedTable && selectedTable.policies.length > 0 ? (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Active Policies:</h4>
                   <div className="space-y-2">
-                    {scanHistory?.map((scan: any) => (
-                      <div
-                        key={scan.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">
-                            {scan.schema_name}.{scan.table_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {rlsCoverageService.formatIssueType(scan.issue_type)} •{' '}
-                            {new Date(scan.created_at).toLocaleString()}
-                          </p>
+                    {selectedTable.policies.map((policy, idx) => (
+                      <div key={idx} className="p-3 border rounded-lg bg-muted/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <code className="text-xs font-semibold">{policy.policy_name}</code>
+                          <Badge variant="outline">{policy.command}</Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {getSeverityBadge(scan.severity)}
-                          <Badge variant={scan.status === 'fixed' ? 'default' : 'secondary'}>
-                            {scan.status}
-                          </Badge>
+                        <div className="text-xs text-muted-foreground">
+                          Type: {policy.permissive}
                         </div>
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* Fix Modal */}
-        <Dialog open={showFixModal} onOpenChange={setShowFixModal}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Code className="w-5 h-5" />
-                Preview RLS Fix: {selectedIssue?.id}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedIssue?.proposed_fix.summary}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-auto space-y-4">
-              {/* Issue Details */}
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Table:</strong> {selectedIssue?.schema}.{selectedIssue?.table}
-                  <br />
-                  <strong>Severity:</strong> {selectedIssue && getSeverityBadge(selectedIssue.severity)}
-                  <br />
-                  <strong>Evidence:</strong>
-                  <ul className="list-disc list-inside mt-2">
-                    {selectedIssue?.evidence.map((e, i) => (
-                      <li key={i} className="text-sm">{e}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-
-              {/* SQL Preview */}
-              <div className="space-y-2">
-                <h4 className="font-semibold text-sm">SQL to Execute:</h4>
-                <ScrollArea className="h-48 w-full rounded-md border bg-muted p-4">
-                  <pre className="text-xs font-mono whitespace-pre-wrap">
-                    {isDryRun
-                      ? selectedIssue?.proposed_fix.sql_dry_run
-                      : selectedIssue?.proposed_fix.sql_apply}
-                  </pre>
-                </ScrollArea>
-              </div>
-
-              {/* Rollback SQL */}
-              <div className="space-y-2">
-                <h4 className="font-semibold text-sm">Rollback SQL (if needed):</h4>
-                <ScrollArea className="h-32 w-full rounded-md border bg-muted p-4">
-                  <pre className="text-xs font-mono whitespace-pre-wrap">
-                    {selectedIssue?.proposed_fix.rollback_sql}
-                  </pre>
-                </ScrollArea>
-              </div>
-
-              {/* Confirmation */}
-              {!isDryRun && (
-                <div className="flex items-start space-x-2 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950">
-                  <Checkbox
-                    id="confirm"
-                    checked={confirmChecked}
-                    onCheckedChange={(checked) => setConfirmChecked(checked as boolean)}
-                  />
-                  <label
-                    htmlFor="confirm"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    I understand this will modify database RLS policies. A backup will be created automatically.
-                    {selectedIssue?.severity === 'high' && (
-                      <span className="text-destructive font-semibold"> Master role required.</span>
-                    )}
-                  </label>
                 </div>
+              ) : (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>No policies configured!</strong>
+                    <br />
+                    This table has no Row-Level Security policies. All authenticated users may have unrestricted access.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Recommendations */}
+              {selectedTable?.severity === 'high' && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Critical:</strong> Enable RLS and create appropriate policies to protect this table.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {selectedTable?.severity === 'medium' && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Warning:</strong> Some policies may be too permissive. Review and tighten access controls.
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
 
-            <DialogFooter className="flex-shrink-0">
-              <Button variant="outline" onClick={() => setShowFixModal(false)}>
-                Cancel
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDetailModal(false)}>
+                Close
               </Button>
-              {isDryRun ? (
-                <>
-                  <Button onClick={handleApplyFix} variant="secondary">
-                    <Play className="w-4 h-4 mr-2" />
-                    Run Dry Run
-                  </Button>
-                  <Button onClick={() => setIsDryRun(false)}>
-                    Proceed to Apply
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={handleApplyFix}
-                  disabled={!confirmChecked || fixMutation.isPending}
-                  variant="destructive"
-                >
-                  {fixMutation.isPending ? 'Applying...' : 'Confirm & Apply Fix'}
-                </Button>
-              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
