@@ -25,6 +25,9 @@ import { CacheInvalidationPanel } from './CacheInvalidationPanel';
 import { CreateCacheRuleDialog } from './CreateCacheRuleDialog';
 import { CachePerformanceCharts } from './CachePerformanceCharts';
 import { CacheBatchInvalidation } from './CacheBatchInvalidation';
+import { CacheABTesting } from './CacheABTesting';
+import { CacheExportImport } from './CacheExportImport';
+import { CacheAlertMonitor } from './CacheAlertMonitor';
 
 export function SmartCacheMonitor() {
   const { toast } = useToast();
@@ -214,11 +217,14 @@ export function SmartCacheMonitor() {
 
       {/* Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="rules">Regras de Cache</TabsTrigger>
+          <TabsTrigger value="rules">Regras</TabsTrigger>
           <TabsTrigger value="stats">Estatísticas</TabsTrigger>
           <TabsTrigger value="invalidation">Invalidação</TabsTrigger>
+          <TabsTrigger value="alerts">Alertas</TabsTrigger>
+          <TabsTrigger value="ab-testing">A/B Test</TabsTrigger>
+          <TabsTrigger value="export">Import/Export</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -306,6 +312,18 @@ export function SmartCacheMonitor() {
             <CacheInvalidationPanel onInvalidate={() => loadData()} />
             <CacheBatchInvalidation onInvalidate={() => loadData()} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="alerts">
+          <CacheAlertMonitor />
+        </TabsContent>
+
+        <TabsContent value="ab-testing">
+          <CacheABTesting />
+        </TabsContent>
+
+        <TabsContent value="export">
+          <CacheExportImport />
         </TabsContent>
       </Tabs>
 

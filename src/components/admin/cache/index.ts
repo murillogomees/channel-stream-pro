@@ -5,3 +5,6 @@ export { CacheInvalidationPanel } from './CacheInvalidationPanel';
 export { CreateCacheRuleDialog } from './CreateCacheRuleDialog';
 export { CachePerformanceCharts } from './CachePerformanceCharts';
 export { CacheBatchInvalidation } from './CacheBatchInvalidation';
+export { CacheABTesting } from './CacheABTesting';
+export { CacheExportImport } from './CacheExportImport';
+export { CacheAlertMonitor } from './CacheAlertMonitor';

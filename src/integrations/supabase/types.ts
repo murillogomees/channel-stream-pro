@@ -607,6 +607,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           enabled: boolean
+          geo_continents: string[] | null
+          geo_countries: string[] | null
+          geo_exclude_countries: string[] | null
           headers: Json | null
           id: string
           last_applied_at: string | null
@@ -625,6 +628,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           enabled?: boolean
+          geo_continents?: string[] | null
+          geo_countries?: string[] | null
+          geo_exclude_countries?: string[] | null
           headers?: Json | null
           id?: string
           last_applied_at?: string | null
@@ -643,6 +649,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           enabled?: boolean
+          geo_continents?: string[] | null
+          geo_countries?: string[] | null
+          geo_exclude_countries?: string[] | null
           headers?: Json | null
           id?: string
           last_applied_at?: string | null
