@@ -243,3 +243,11 @@ verify_jwt = false
 # Checkout with user registration - public for new users
 [functions.checkout-with-registration]
 verify_jwt = false
+
+# ==========================================
+# SECRET VERIFICATION
+# ==========================================
+
+# Check secrets configuration - public endpoint
+[functions.check-secrets]
+verify_jwt = false
