@@ -150,12 +150,8 @@ function generateAdminNotificationMessage(cliente: Cliente): string {
 • Data Contratação: *${dataContratacao}*
 • Data Vencimento: *${dataVencimento}*
 
-📍 *Status SmartOne:*
-• Status: *${cliente.smartone_status || 'Pendente'}*
-${cliente.smartone_playlist_id ? `• Playlist ID: *${cliente.smartone_playlist_id}*` : ''}
-
 🔗 *Origem:*
-Cadastro via Tutorial SmartOne
+Cadastro via Sistema IPTV
 
 ---
 _Sistema IPTV LINK - Gestão de Clientes_`;

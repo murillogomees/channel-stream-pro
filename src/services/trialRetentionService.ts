@@ -38,10 +38,6 @@ export class TrialRetentionService {
         dataCadastro: clientData.data_cadastro || '',
         dataUltimaEdicao: clientData.data_ultima_edicao || '',
         clienteAtivo: clientData.cliente_ativo,
-        smartone_status: clientData.smartone_status,
-        smartone_playlist_id: clientData.smartone_playlist_id,
-        smartone_raw_response: clientData.smartone_raw_response,
-        smartone_last_sync_at: clientData.smartone_last_sync_at,
         origemCadastro: clientData.origem_cadastro
       };
 

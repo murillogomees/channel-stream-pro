@@ -1102,10 +1102,6 @@ export type Database = {
           plano: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u: string | null
           situacao: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at: string | null
-          smartone_playlist_id: string | null
-          smartone_raw_response: string | null
-          smartone_status: Database["public"]["Enums"]["smartone_status"] | null
           telefone: string
           user_id: string | null
           usuario_m3u: string | null
@@ -1133,12 +1129,6 @@ export type Database = {
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at?: string | null
-          smartone_playlist_id?: string | null
-          smartone_raw_response?: string | null
-          smartone_status?:
-            | Database["public"]["Enums"]["smartone_status"]
-            | null
           telefone: string
           user_id?: string | null
           usuario_m3u?: string | null
@@ -1166,12 +1156,6 @@ export type Database = {
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at?: string | null
-          smartone_playlist_id?: string | null
-          smartone_raw_response?: string | null
-          smartone_status?:
-            | Database["public"]["Enums"]["smartone_status"]
-            | null
           telefone?: string
           user_id?: string | null
           usuario_m3u?: string | null
@@ -1628,9 +1612,6 @@ export type Database = {
         Row: {
           id: string
           overall_status: string | null
-          smartone_error: string | null
-          smartone_latency: number | null
-          smartone_status: string | null
           supabase_error: string | null
           supabase_latency: number | null
           supabase_status: string | null
@@ -1645,9 +1626,6 @@ export type Database = {
         Insert: {
           id?: string
           overall_status?: string | null
-          smartone_error?: string | null
-          smartone_latency?: number | null
-          smartone_status?: string | null
           supabase_error?: string | null
           supabase_latency?: number | null
           supabase_status?: string | null
@@ -1662,9 +1640,6 @@ export type Database = {
         Update: {
           id?: string
           overall_status?: string | null
-          smartone_error?: string | null
-          smartone_latency?: number | null
-          smartone_status?: string | null
           supabase_error?: string | null
           supabase_latency?: number | null
           supabase_status?: string | null
@@ -3744,10 +3719,6 @@ export type Database = {
           plano: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u: string | null
           situacao: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at: string | null
-          smartone_playlist_id: string | null
-          smartone_raw_response: string | null
-          smartone_status: Database["public"]["Enums"]["smartone_status"] | null
           telefone: string | null
           telefone_whatsapp: string | null
           theme: string | null
@@ -3778,12 +3749,6 @@ export type Database = {
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at?: string | null
-          smartone_playlist_id?: string | null
-          smartone_raw_response?: string | null
-          smartone_status?:
-            | Database["public"]["Enums"]["smartone_status"]
-            | null
           telefone?: string | null
           telefone_whatsapp?: string | null
           theme?: string | null
@@ -3814,12 +3779,6 @@ export type Database = {
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
           senha_m3u?: string | null
           situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          smartone_last_sync_at?: string | null
-          smartone_playlist_id?: string | null
-          smartone_raw_response?: string | null
-          smartone_status?:
-            | Database["public"]["Enums"]["smartone_status"]
-            | null
           telefone?: string | null
           telefone_whatsapp?: string | null
           theme?: string | null
@@ -6232,7 +6191,6 @@ export type Database = {
       plano_cliente: "Mensal" | "Trimestral" | "Semestral" | "Anual"
       quality_ladder_preset: "basic" | "standard" | "premium" | "ultra"
       situacao_cliente: "Testando" | "Ativo" | "Devendo" | "Inativo" | "Lead"
-      smartone_status: "nao_enviado" | "pendente" | "criado" | "erro"
       subscription_status:
         | "trial"
         | "active"
@@ -6411,7 +6369,6 @@ export const Constants = {
       plano_cliente: ["Mensal", "Trimestral", "Semestral", "Anual"],
       quality_ladder_preset: ["basic", "standard", "premium", "ultra"],
       situacao_cliente: ["Testando", "Ativo", "Devendo", "Inativo", "Lead"],
-      smartone_status: ["nao_enviado", "pendente", "criado", "erro"],
       subscription_status: [
         "trial",
         "active",
