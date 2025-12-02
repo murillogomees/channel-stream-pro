@@ -3,13 +3,17 @@ import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, Refre
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
 import { onPlayerOpen, onPlayerClose } from '@/services/downloadPriorityService';
+import { useConnectionAwarePlayer } from '@/hooks/useConnectionAwarePlayer';
 
 interface VideoPlayerProps {
   url: string;
   title: string;
   logo?: string;
   onError?: (error: string) => void;
+  onReady?: () => void;
   className?: string;
+  source?: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin';
+  fallbackUrl?: string;
 }
 
 // =============================================================================
@@ -65,7 +69,16 @@ function isDirectVideoUrl(url: string): boolean {
   return false;
 }
 
-export function VideoPlayer({ url, title, logo, onError, className = '' }: VideoPlayerProps) {
+export function VideoPlayer({ 
+  url, 
+  title, 
+  logo, 
+  onError, 
+  onReady,
+  className = '',
+  source = 'origin',
+  fallbackUrl,
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,8 +89,13 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState(url);
+  const [hasFallback, setHasFallback] = useState(false);
   const retryCount = useRef(0);
   const maxRetries = 3;
+
+  // Connection-aware configuration
+  const { getOptimizedHlsConfig } = useConnectionAwarePlayer();
 
   const cleanup = useCallback(() => {
     if (hlsRef.current) {
@@ -139,14 +157,29 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     };
   }, []);
 
+  // Try fallback URL if available
+  const tryFallback = useCallback(() => {
+    if (fallbackUrl && !hasFallback) {
+      console.log('[VideoPlayer] Trying fallback URL:', fallbackUrl);
+      setHasFallback(true);
+      setCurrentUrl(fallbackUrl);
+      retryCount.current = 0;
+    } else {
+      setHasError(true);
+      setErrorMessage('Stream indisponível. Tente outro canal.');
+      setIsLoading(false);
+      onError?.('All sources failed');
+    }
+  }, [fallbackUrl, hasFallback, onError]);
+
   const initPlayer = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !url) return;
+    if (!video || !currentUrl) return;
 
-    const isHls = isHlsUrl(url);
-    const isDirect = isDirectVideoUrl(url);
+    const isHls = isHlsUrl(currentUrl);
+    const isDirect = isDirectVideoUrl(currentUrl);
     
-    console.log(`[VideoPlayer] Init: ${url.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}`);
+    console.log(`[VideoPlayer] Init: ${currentUrl.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}, source: ${source}`);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -157,13 +190,14 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
     // DIRECT VIDEO STREAM (MP4, TS, Xtream live/movie)
     if (isDirect && !isHls) {
       console.log('[VideoPlayer] Using direct video playback');
-      video.src = url;
+      video.src = currentUrl;
       
       const onLoadedData = () => {
         console.log('[VideoPlayer] Direct stream loaded');
         setIsLoading(false);
         retryCount.current = 0;
         attemptPlay();
+        onReady?.();
       };
       
       const onVideoError = () => {
@@ -175,14 +209,12 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
           console.log(`[VideoPlayer] Retry ${retryCount.current}/${maxRetries}`);
           setTimeout(() => {
             video.src = '';
-            video.src = url;
+            video.src = currentUrl;
             video.load();
           }, 1000 * retryCount.current);
         } else {
-          setHasError(true);
-          setErrorMessage('Stream indisponível. Tente outro canal.');
-          setIsLoading(false);
-          onError?.('Direct stream error');
+          // Try fallback if available
+          tryFallback();
         }
       };
       
@@ -200,47 +232,34 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
 
     // HLS.js for HLS streams
     if (Hls.isSupported() && isHls) {
-      console.log('[VideoPlayer] Using HLS.js');
+      console.log('[VideoPlayer] Using HLS.js with connection-aware config');
+      
+      // Get optimized config based on connection and source
+      const optimizedConfig = getOptimizedHlsConfig({ source });
+      
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 60,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
         maxBufferSize: 100 * 1000 * 1000,
         maxBufferHole: 2,
-        startLevel: -1,
-        abrEwmaDefaultEstimate: 500000,
-        abrBandWidthFactor: 0.7,
-        abrBandWidthUpFactor: 0.5,
         capLevelToPlayerSize: true,
-        fragLoadingTimeOut: 60000,
-        manifestLoadingTimeOut: 30000,
-        levelLoadingTimeOut: 30000,
-        fragLoadingMaxRetry: 10,
-        manifestLoadingMaxRetry: 6,
-        levelLoadingMaxRetry: 6,
-        fragLoadingRetryDelay: 500,
-        manifestLoadingRetryDelay: 500,
-        levelLoadingRetryDelay: 500,
-        fragLoadingMaxRetryTimeout: 30000,
-        manifestLoadingMaxRetryTimeout: 30000,
-        levelLoadingMaxRetryTimeout: 30000,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
         liveDurationInfinity: true,
         appendErrorMaxRetry: 5,
         debug: false,
+        ...optimizedConfig, // Apply connection-aware settings
       });
 
       hlsRef.current = hls;
-      hls.loadSource(url);
+      hls.loadSource(currentUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         console.log('[VideoPlayer] Manifest loaded');
         setIsLoading(false);
+        retryCount.current = 0;
         attemptPlay();
+        onReady?.();
       });
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
@@ -253,22 +272,26 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
           return;
         }
 
-        console.error('[VideoPlayer] Fatal error:', data.type, data.details);
+        console.error('[VideoPlayer] Fatal HLS error:', data.type, data.details, 'source:', source);
         
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
             console.log('[VideoPlayer] Attempting network recovery...');
-            hls.startLoad();
+            if (retryCount.current < maxRetries) {
+              retryCount.current++;
+              hls.startLoad();
+            } else {
+              // Network errors on CDN Worker - try fallback
+              tryFallback();
+            }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
             console.log('[VideoPlayer] Attempting media recovery...');
             hls.recoverMediaError();
             break;
           default:
-            setHasError(true);
-            setErrorMessage('Stream indisponível.');
-            setIsLoading(false);
-            onError?.('Stream indisponível');
+            // Fatal error - try fallback
+            tryFallback();
             break;
         }
       });
@@ -280,13 +303,13 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       
       video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
+        retryCount.current = 0;
         attemptPlay();
+        onReady?.();
       }, { once: true });
 
       video.addEventListener('error', () => {
-        setHasError(true);
-        setErrorMessage('Erro ao carregar stream');
-        setIsLoading(false);
+        tryFallback();
       }, { once: true });
 
       video.load();
@@ -297,24 +320,30 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
       
       video.addEventListener('loadeddata', () => {
         setIsLoading(false);
+        retryCount.current = 0;
         attemptPlay();
+        onReady?.();
       }, { once: true });
       
       video.addEventListener('error', () => {
-        setHasError(true);
-        setErrorMessage('Formato não suportado');
-        setIsLoading(false);
-        onError?.('Format not supported');
+        tryFallback();
       }, { once: true });
       
       video.load();
     }
-  }, [url, cleanup, attemptPlay, onError, isLoading]);
+  }, [currentUrl, cleanup, attemptPlay, onError, onReady, isLoading, source, getOptimizedHlsConfig, tryFallback]);
+
+  // Update currentUrl when url prop changes
+  useEffect(() => {
+    setCurrentUrl(url);
+    setHasFallback(false);
+    retryCount.current = 0;
+  }, [url]);
 
   useEffect(() => {
     initPlayer();
     return cleanup;
-  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const video = videoRef.current;
@@ -366,6 +395,9 @@ export function VideoPlayer({ url, title, logo, onError, className = '' }: Video
   };
 
   const handleRetry = () => {
+    setHasFallback(false);
+    setCurrentUrl(url); // Reset to original URL
+    retryCount.current = 0;
     initPlayer();
   };
 

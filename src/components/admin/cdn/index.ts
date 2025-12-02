@@ -5,3 +5,4 @@
 export { CdnDashboard } from './CdnDashboard';
 export { ContentRoutingDashboard } from './ContentRoutingDashboard';
 export { CdnWorkerStatus } from './CdnWorkerStatus';
+export { CdnTestPanel } from './CdnTestPanel';

@@ -37,6 +37,7 @@ import r2CdnService, {
   R2StorageObject 
 } from '@/services/r2CdnService';
 import { CdnWorkerStatus } from './CdnWorkerStatus';
+import { CdnTestPanel } from './CdnTestPanel';
 
 export function CdnDashboard() {
   const [stats, setStats] = useState<CdnStats | null>(null);
@@ -235,12 +236,16 @@ export function CdnDashboard() {
             Prewarm
           </TabsTrigger>
           <TabsTrigger value="predictions">
-            <TrendingUp className="w-4 h-4 mr-2" />
+            <TrendingUp className="w-4 w-4 mr-2" />
             Predições
           </TabsTrigger>
           <TabsTrigger value="storage">
             <Database className="w-4 h-4 mr-2" />
             Storage
+          </TabsTrigger>
+          <TabsTrigger value="tests">
+            <Zap className="w-4 h-4 mr-2" />
+            Testes
           </TabsTrigger>
         </TabsList>
 
@@ -416,6 +421,16 @@ export function CdnDashboard() {
               </ScrollArea>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tests Tab */}
+        <TabsContent value="tests">
+          <CdnTestPanel />
+        </TabsContent>
+
+        {/* Tests Tab */}
+        <TabsContent value="tests">
+          <CdnTestPanel />
         </TabsContent>
       </Tabs>
     </div>

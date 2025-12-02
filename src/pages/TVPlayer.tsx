@@ -90,10 +90,20 @@ export default function TVPlayer() {
     };
   }, [channelId, channelName, channelUrl]);
 
-  // Get playable URL
+  // Get playable URL with CDN optimization
   const playableUrl = channelUrl 
     ? streamService.getPlayableUrl(channelUrl)
     : null;
+
+  // For future: async CDN optimization
+  // const [optimizedUrl, setOptimizedUrl] = useState<string | null>(null);
+  // useEffect(() => {
+  //   if (currentChannel) {
+  //     streamService.getOptimizedUrl(currentChannel).then(result => {
+  //       setOptimizedUrl(result.url);
+  //     });
+  //   }
+  // }, [currentChannel]);
 
   const handleError = useCallback((msg: string) => {
     setError(msg);
