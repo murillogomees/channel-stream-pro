@@ -3,7 +3,7 @@
 ## Visão Geral
 
 Sistema completo de notificação de alertas de segurança com suporte a:
-- ✅ Múltiplos canais (WhatsApp, Telegram, SMS)
+- ✅ Canal WhatsApp via BotBot API
 - ✅ Sistema de plantão com horários específicos
 - ✅ Confirmação de leitura de alertas
 - ✅ Escalonamento automático para alertas não confirmados
@@ -68,25 +68,14 @@ Permite configurar horários específicos em que cada admin deve receber alertas
 - Se `schedule_enabled = true`: Admin só recebe no horário configurado
 - Se o dia está `enabled = false`: Admin não recebe nesse dia
 
-### 2. Múltiplos Canais de Notificação
+### 2. Canal de Notificação WhatsApp
 
-Suporte para envio via WhatsApp, Telegram e SMS.
+Sistema utiliza WhatsApp como canal exclusivo via BotBot API.
 
 **Como Configurar:**
 1. Acesse `/admin/schedule-config`
 2. Selecione um administrador
-3. Vá na aba "Canais"
-4. Ative os canais desejados
-5. Configure credenciais (Telegram ID, Phone SMS)
-6. Salve
-
-**Ordem de Envio:**
-O sistema tenta enviar em todos os canais configurados simultaneamente. Se pelo menos um canal tiver sucesso, o alerta é considerado entregue.
-
-**Status:**
-- ✅ WhatsApp: Totalmente funcional
-- 🚧 Telegram: Interface pronta, requer implementação do Bot API
-- 🚧 SMS: Interface pronta, requer integração com provedor (Twilio, AWS SNS)
+3. Configure telefone WhatsApp
 
 ### 3. Confirmação de Leitura
 
@@ -196,7 +185,7 @@ Gerencie em `/admin/security-escalation`:
 ### WhatsApp (BotBot)
 Usa `WhatsAppAdapter` existente com credenciais em secrets.
 
-### Telegram (A Implementar)
+## Monitoramento
 ```typescript
 // Exemplo de implementação necessária
 private async sendTelegram(telegramId: string, message: string): Promise<void> {

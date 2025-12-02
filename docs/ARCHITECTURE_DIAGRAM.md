@@ -193,12 +193,34 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    USERS ||--o{ USER_ROLES : has
-    USERS ||--o{ USER_PROFILES : has
-    USERS ||--o{ CLIENTES : manages
+    PROFILES ||--o{ USER_SUBSCRIPTIONS : "profile_id"
+    PROFILES ||--o{ USER_ROLES : "user_id"
     
-    CLIENTES ||--o{ CLIENT_M3U_LISTS : assigned
-    CLIENTES ||--o{ NOTIFICATION_LOGS : receives
+    PROFILES {
+        uuid id PK
+        uuid user_id FK
+        string full_name
+        string contact_phone
+        string email
+        string plano
+        date data_vencimento
+        boolean cliente_ativo
+        string situacao
+        string mac_smart_one
+    }
+    USER_SUBSCRIPTIONS {
+        uuid id PK
+        uuid profile_id FK
+        string status
+        date current_period_start
+        date current_period_end
+    }
+    
+    USER_ROLES {
+        uuid id PK
+        uuid user_id FK
+        string role
+    }
     
     M3U_CUSTOM_LISTS ||--o{ M3U_CATEGORIES : contains
     M3U_CATEGORIES ||--o{ M3U_CHANNELS : contains
@@ -218,18 +240,15 @@ erDiagram
         timestamp created_at
     }
     
-    USER_ROLES {
+    PROFILES {
         uuid id PK
         uuid user_id FK
-        string role
-    }
-    
-    CLIENTES {
-        uuid id PK
-        string nome
-        string telefone
-        string situacao
+        string full_name
+        string contact_phone
+        string email
+        string plano
         date data_vencimento
+        boolean cliente_ativo
     }
     
     M3U_CHANNELS {
