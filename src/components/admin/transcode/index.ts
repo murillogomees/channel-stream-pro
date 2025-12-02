@@ -15,3 +15,7 @@ export { TranscodeRealtimeMonitor } from './TranscodeRealtimeMonitor';
 export { TranscodeCostForecasting } from './TranscodeCostForecasting';
 export { TranscodeAdvancedAnalytics } from './TranscodeAdvancedAnalytics';
 export { TranscodeQueueDashboard } from './TranscodeQueueDashboard';
+export { TranscodeQualityControl } from './TranscodeQualityControl';
+export { TranscodeBatchOperations } from './TranscodeBatchOperations';
+export { TranscodeAPIRateLimiting } from './TranscodeAPIRateLimiting';
+export { TranscodeMultiCDN } from './TranscodeMultiCDN';
