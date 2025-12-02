@@ -20,6 +20,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auto-retry failed jobs with exponential backoff
+    await retryFailedJobs();
+    
+    // Process new queued jobs
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -124,3 +128,54 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+/**
+ * Auto-retry failed jobs with exponential backoff
+ */
+async function retryFailedJobs() {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  // Get failed jobs eligible for retry
+  const { data: failedJobs, error } = await supabase
+    .from('transcode_jobs')
+    .select('*')
+    .eq('status', 'failed')
+    .lt('retry_count', 3); // Max 3 retries
+
+  if (error || !failedJobs || failedJobs.length === 0) return;
+
+  console.log(`Found ${failedJobs.length} failed jobs eligible for retry`);
+
+  for (const job of failedJobs) {
+    const retryCount = job.retry_count || 0;
+    
+    // Calculate exponential backoff delay (1min, 5min, 15min)
+    const backoffMinutes = Math.pow(5, retryCount);
+    const failedAt = new Date(job.completed_at || job.created_at);
+    const now = new Date();
+    const minutesSinceFailed = (now.getTime() - failedAt.getTime()) / 1000 / 60;
+
+    // Check if enough time has passed for retry
+    if (minutesSinceFailed < backoffMinutes) {
+      console.log(`Job ${job.id} not ready for retry yet (${minutesSinceFailed.toFixed(1)}/${backoffMinutes} min)`);
+      continue;
+    }
+
+    console.log(`Auto-retrying job ${job.id} (attempt ${retryCount + 1}/3)`);
+
+    // Reset job to queued status
+    await supabase
+      .from('transcode_jobs')
+      .update({
+        status: 'queued',
+        retry_count: retryCount + 1,
+        error_message: null,
+        error_code: null,
+        completed_at: null,
+      })
+      .eq('id', job.id);
+  }
+}
