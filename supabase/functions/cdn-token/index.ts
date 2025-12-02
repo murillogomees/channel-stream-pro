@@ -121,9 +121,12 @@ serve(async (req) => {
 
     if (action === 'generate') {
       // Generate new signed token
-      let body: any;
+      let body: any = {};
       try {
-        body = await req.json();
+        const text = await req.text();
+        if (text && text.trim() !== '') {
+          body = JSON.parse(text);
+        }
       } catch (parseError) {
         console.error('[CDN-Token] Invalid JSON body for generate:', parseError);
         return new Response(
@@ -294,9 +297,12 @@ serve(async (req) => {
 
     } else if (action === 'revoke') {
       // Revoke token
-      let body: any;
+      let body: any = {};
       try {
-        body = await req.json();
+        const text = await req.text();
+        if (text && text.trim() !== '') {
+          body = JSON.parse(text);
+        }
       } catch (parseError) {
         console.error('[CDN-Token] Invalid JSON body for revoke:', parseError);
         return new Response(
