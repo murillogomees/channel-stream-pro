@@ -189,19 +189,58 @@ Métricas disponíveis:
 **Causa**: `JWT_SECRET` não configurado ou erro no R2
 **Solução**: Verificar secrets com `wrangler secret list --env production`
 
-## Otimizações
+## ⚡ Otimizações de Performance
 
-### Cache Strategy
+### Layered Caching Strategy
 
-```javascript
-// Manifests: curto TTL, permite stale
-Cache-Control: public, max-age=30, stale-while-revalidate=60
+**Manifests (.m3u8):**
+```
+Browser Cache:  max-age=10s (atualizações frequentes)
+Edge Cache:     s-maxage=30s, CDN-Cache-Control: max-age=30s
+Stale Grace:    stale-while-revalidate=30s
+Vary:           Accept-Encoding
+```
 
-// Segments: longo TTL, imutável
-Cache-Control: public, max-age=86400, immutable
+**Segments (.ts, .m4s, .mp4):**
+```
+Browser Cache:  max-age=3600s (1 hora)
+Edge Cache:     s-maxage=86400s (24 horas), CDN-Cache-Control: max-age=86400s
+Immutable:      true (conteúdo nunca muda)
+Accept-Ranges:  bytes (suporte a range requests)
+```
 
-// Vary by encoding
-Vary: Accept-Encoding
+**Rationale:**
+- Manifests precisam atualizar frequentemente (playlist dinâmico)
+- Segments são imutáveis, podem ter cache agressivo
+- CDN cache separado do browser cache para otimização máxima
+- `CDN-Cache-Control` header específico do Cloudflare para edge cache longo
+
+### Rate Limiting
+
+- **200 requisições/minuto** por IP (increased from 100)
+- **500 MB/minuto** de bandwidth por IP (increased from 100)
+- Resposta 429 se excedido
+- Header `Retry-After: 60` incluído
+
+### Health Check Endpoint
+
+```bash
+curl https://your-worker-url.workers.dev/health
+```
+
+Retorna:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-12-02T03:00:00.000Z",
+  "version": "1.0.0",
+  "config": {
+    "rateLimit": "200 req/min",
+    "bandwidth": "500 MB/min",
+    "manifestCache": "10s browser, 30s edge",
+    "segmentCache": "3600s browser, 86400s edge"
+  }
+}
 ```
 
 ### Compression
