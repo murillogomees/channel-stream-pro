@@ -34,6 +34,7 @@ const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage")
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 const AdminMigrations = lazy(() => import("./pages/AdminMigracoes"));
+const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
@@ -150,6 +151,7 @@ const App = () => (
             <Route path="/admin/roles" element={<ProtectedRoute requireAdmin><AdminRolesManagement /></ProtectedRoute>} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
             <Route path="/admin/migrations" element={<ProtectedRoute requireAdmin><AdminMigrations /></ProtectedRoute>} />
+            <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
             
@@ -224,7 +226,6 @@ const App = () => (
             <Route path="/admin/transcode-queue" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/iptv-test" element={<Navigate to="/app/player" replace />} />
             <Route path="/admin/smart-cache" element={<Navigate to="/admin/integracao" replace />} />
-            <Route path="/admin/rls-coverage" element={<Navigate to="/admin/integracao" replace />} />
             <Route path="/admin/qa" element={<Navigate to="/admin/integracao" replace />} />
             
             {/* Other legacy routes */}

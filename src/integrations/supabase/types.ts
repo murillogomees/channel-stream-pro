@@ -4013,6 +4013,84 @@ export type Database = {
           },
         ]
       }
+      rls_fix_backups: {
+        Row: {
+          backup_timestamp: string
+          created_by: string | null
+          id: string
+          metadata: Json | null
+          policy_definition: string
+          policy_name: string | null
+          restore_sql: string | null
+          schema_name: string
+          table_name: string
+        }
+        Insert: {
+          backup_timestamp?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          policy_definition: string
+          policy_name?: string | null
+          restore_sql?: string | null
+          schema_name: string
+          table_name: string
+        }
+        Update: {
+          backup_timestamp?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          policy_definition?: string
+          policy_name?: string | null
+          restore_sql?: string | null
+          schema_name?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
+      rls_manifest: {
+        Row: {
+          action: string
+          created_at: string | null
+          expected_using: string | null
+          expected_with_check: string | null
+          id: string
+          policy_name: string
+          required_for_roles: string[] | null
+          schema_name: string
+          severity: string | null
+          table_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          expected_using?: string | null
+          expected_with_check?: string | null
+          id?: string
+          policy_name: string
+          required_for_roles?: string[] | null
+          schema_name: string
+          severity?: string | null
+          table_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          expected_using?: string | null
+          expected_with_check?: string | null
+          id?: string
+          policy_name?: string
+          required_for_roles?: string[] | null
+          schema_name?: string
+          severity?: string | null
+          table_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       rls_policy_backups: {
         Row: {
           created_at: string | null
@@ -4040,6 +4118,57 @@ export type Database = {
           policy_with_check?: string | null
           schema_name?: string | null
           table_name?: string | null
+        }
+        Relationships: []
+      }
+      rls_scan_results: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          evidence: Json | null
+          fixed_at: string | null
+          fixed_by: string | null
+          id: string
+          issue_type: string
+          proposed_fix: Json | null
+          scan_id: string
+          scan_timestamp: string
+          schema_name: string
+          severity: string
+          status: string | null
+          table_name: string
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          evidence?: Json | null
+          fixed_at?: string | null
+          fixed_by?: string | null
+          id?: string
+          issue_type: string
+          proposed_fix?: Json | null
+          scan_id: string
+          scan_timestamp?: string
+          schema_name: string
+          severity: string
+          status?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          evidence?: Json | null
+          fixed_at?: string | null
+          fixed_by?: string | null
+          id?: string
+          issue_type?: string
+          proposed_fix?: Json | null
+          scan_id?: string
+          scan_timestamp?: string
+          schema_name?: string
+          severity?: string
+          status?: string | null
+          table_name?: string
         }
         Relationships: []
       }
@@ -5779,6 +5908,18 @@ export type Database = {
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       cleanup_orphaned_downloads: { Args: never; Returns: number }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      detect_permissive_policies: {
+        Args: never
+        Returns: {
+          command: string
+          policy_name: string
+          qual: string
+          schema_name: string
+          severity: string
+          table_name: string
+          with_check: string
+        }[]
+      }
       detect_permissive_rls_policies: {
         Args: never
         Returns: {
@@ -5788,6 +5929,14 @@ export type Database = {
           policy_name: unknown
           severity: string
           table_name: unknown
+        }[]
+      }
+      detect_tables_without_rls: {
+        Args: never
+        Returns: {
+          schema_name: string
+          severity: string
+          table_name: string
         }[]
       }
       detect_vod_channels: {
@@ -6056,6 +6205,7 @@ export type Database = {
           views_24h: number
         }[]
       }
+      get_rls_coverage_summary: { Args: never; Returns: Json }
       get_security_analytics: {
         Args: { _days?: number }
         Returns: {
