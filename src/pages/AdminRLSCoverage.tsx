@@ -1,362 +1,398 @@
-/**
- * RLS Policy Coverage Report
- * Admin page showing Row Level Security policy status for all tables
- */
-
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import AdminLayout from "@/components/admin/AdminLayout";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { 
-  Shield, 
-  ShieldCheck, 
-  ShieldAlert, 
-  Search,
-  RefreshCw,
-  Download,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle
-} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Shield, AlertTriangle, CheckCircle, Play, History, Code } from "lucide-react";
+import { rlsCoverageService, RLSIssue } from "@/services/rlsCoverageService";
 import { toast } from "sonner";
-
-interface TableRLSInfo {
-  table_name: string;
-  rls_enabled: boolean;
-  policies: string[];
-  has_select: boolean;
-  has_insert: boolean;
-  has_update: boolean;
-  has_delete: boolean;
-  coverage_score: number;
-}
-
-const RLS_TABLES_QUERY = `
-SELECT 
-  t.table_name,
-  (SELECT string_agg(p.policyname, ', ') 
-   FROM pg_policies p 
-   WHERE p.tablename = t.table_name) as policies
-FROM information_schema.tables t
-WHERE table_schema = 'public' 
-AND table_type = 'BASE TABLE'
-ORDER BY table_name
-`;
+import AdminShell from "@/components/admin/AdminShell";
 
 export default function AdminRLSCoverage() {
-  const [tables, setTables] = useState<TableRLSInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const queryClient = useQueryClient();
+  const [selectedIssue, setSelectedIssue] = useState<RLSIssue | null>(null);
+  const [showFixModal, setShowFixModal] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [isDryRun, setIsDryRun] = useState(true);
 
-  const loadRLSData = async () => {
-    setLoading(true);
-    try {
-      // Fetch table and policy data
-      const { data, error } = await supabase
-        .from("rls_policy_backups")
-        .select("*")
-        .order("table_name");
+  // Fetch coverage data
+  const { data: coverage, isLoading, refetch } = useQuery({
+    queryKey: ['rls-coverage'],
+    queryFn: () => rlsCoverageService.runScan(),
+  });
 
-      if (error) throw error;
+  // Fetch scan history
+  const { data: scanHistory } = useQuery({
+    queryKey: ['rls-scan-history'],
+    queryFn: () => rlsCoverageService.getScanHistory(),
+  });
 
-      // Process into our format - using static data based on linter results
-      const rlsData: TableRLSInfo[] = [
-        // Payment & Subscription tables (new)
-        { table_name: "user_subscriptions", rls_enabled: true, policies: ["Users can view own subscription", "Admins have full access", "System can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "payments", rls_enabled: true, policies: ["Users can view own payments", "Admins have full access", "System can manage"], has_select: true, has_insert: true, has_update: true, has_delete: false, coverage_score: 90 },
-        { table_name: "playback_tokens", rls_enabled: true, policies: ["Users can view own tokens", "Admins can manage", "System can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "mercado_pago_webhooks", rls_enabled: true, policies: ["Admins can view", "System can insert"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 75 },
-        
-        // User & Auth tables
-        { table_name: "profiles", rls_enabled: true, policies: ["Users can view own", "Users can update own", "Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: false, coverage_score: 95 },
-        { table_name: "user_roles", rls_enabled: true, policies: ["Users can view own", "Admins can manage all"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "user_profiles", rls_enabled: true, policies: ["Users can CRUD own profiles"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        
-        // Client tables
-        { table_name: "clientes", rls_enabled: true, policies: ["Users can view own", "Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "client_m3u_lists", rls_enabled: true, policies: ["Users can view own", "Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        
-        // Security tables
-        { table_name: "security_events", rls_enabled: true, policies: ["Admins full access", "Service can insert"], has_select: true, has_insert: true, has_update: true, has_delete: false, coverage_score: 90 },
-        { table_name: "ip_blacklist", rls_enabled: true, policies: ["Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "ip_whitelist", rls_enabled: true, policies: ["Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "auth_sessions_log", rls_enabled: true, policies: ["Users view own", "Admins full access"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 85 },
-        
-        // Content tables
-        { table_name: "m3u_lists", rls_enabled: true, policies: ["Admins full access", "Auth users can view active"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "m3u_channels", rls_enabled: true, policies: ["Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "m3u_categories", rls_enabled: true, policies: ["Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "content_metadata", rls_enabled: true, policies: ["Anyone can read", "Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "epg_data", rls_enabled: true, policies: ["Anyone can read", "Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        
-        // User activity tables
-        { table_name: "watch_progress", rls_enabled: true, policies: ["Users can manage own"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "watch_history", rls_enabled: true, policies: ["Users can view/insert own"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 80 },
-        { table_name: "user_favorites", rls_enabled: true, policies: ["Users can manage own"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "user_watchlist", rls_enabled: true, policies: ["Users can manage own"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        
-        // Analytics tables
-        { table_name: "stream_analytics", rls_enabled: true, policies: ["Users can view own", "System can insert", "Admins can view all"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 85 },
-        { table_name: "player_analytics", rls_enabled: true, policies: ["Users can insert own", "Admins can view all"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 80 },
-        
-        // Admin tables
-        { table_name: "admin_phones", rls_enabled: true, policies: ["Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "admin_shortcuts", rls_enabled: true, policies: ["Users manage own", "Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "activity_logs", rls_enabled: true, policies: ["Users view own", "Admins full access", "System can insert"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 85 },
-        
-        // Subscription & Payment
-        { table_name: "subscription_plans", rls_enabled: true, policies: ["Public can view active", "Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "discount_coupons", rls_enabled: true, policies: ["Clients can view active", "Admins can manage"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "coupon_usage", rls_enabled: true, policies: ["Admins can view", "System can insert"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 75 },
-        
-        // Notification tables
-        { table_name: "notification_templates", rls_enabled: true, policies: ["Admins full access"], has_select: true, has_insert: true, has_update: true, has_delete: true, coverage_score: 100 },
-        { table_name: "notification_history", rls_enabled: true, policies: ["Admins can view", "System can insert"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 75 },
-        { table_name: "notification_logs", rls_enabled: true, policies: ["Users view own", "Admins full access"], has_select: true, has_insert: true, has_update: false, has_delete: false, coverage_score: 85 },
-      ];
+  // Fix mutation
+  const fixMutation = useMutation({
+    mutationFn: (params: any) => rlsCoverageService.applyFix(params),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(result.message || 'Fix applied successfully!');
+        queryClient.invalidateQueries({ queryKey: ['rls-coverage'] });
+        queryClient.invalidateQueries({ queryKey: ['rls-scan-history'] });
+        setShowFixModal(false);
+        setSelectedIssue(null);
+        setConfirmChecked(false);
+      } else if (result.requires_master) {
+        toast.error('Master role required for high severity fixes');
+      } else {
+        toast.error(result.error || 'Failed to apply fix');
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Error: ${error.message}`);
+    },
+  });
 
-      setTables(rlsData);
-    } catch (error) {
-      console.error("Error loading RLS data:", error);
-      toast.error("Erro ao carregar dados de RLS");
-    } finally {
-      setLoading(false);
-    }
+  const handleFixClick = (issue: RLSIssue) => {
+    setSelectedIssue(issue);
+    setShowFixModal(true);
+    setIsDryRun(true);
+    setConfirmChecked(false);
   };
 
-  useEffect(() => {
-    loadRLSData();
-  }, []);
+  const handleApplyFix = async () => {
+    if (!selectedIssue) return;
 
-  const filteredTables = tables.filter(t => 
-    t.table_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const stats = {
-    total: tables.length,
-    protected: tables.filter(t => t.rls_enabled).length,
-    fullCoverage: tables.filter(t => t.coverage_score === 100).length,
-    partialCoverage: tables.filter(t => t.coverage_score >= 75 && t.coverage_score < 100).length,
-    lowCoverage: tables.filter(t => t.coverage_score < 75).length,
-    avgScore: tables.length > 0 
-      ? Math.round(tables.reduce((sum, t) => sum + t.coverage_score, 0) / tables.length)
-      : 0,
+    await fixMutation.mutateAsync({
+      issue_id: selectedIssue.id,
+      severity: selectedIssue.severity,
+      schema_name: selectedIssue.schema,
+      table_name: selectedIssue.table,
+      policy_name: selectedIssue.action,
+      sql_apply: selectedIssue.proposed_fix.sql_apply,
+      sql_rollback: selectedIssue.proposed_fix.rollback_sql,
+      dry_run: isDryRun,
+      confirm: !isDryRun && confirmChecked,
+    });
   };
 
-  const exportReport = () => {
-    const report = {
-      generated_at: new Date().toISOString(),
-      summary: stats,
-      tables: tables.map(t => ({
-        table: t.table_name,
-        rls_enabled: t.rls_enabled,
-        policies: t.policies,
-        coverage_score: t.coverage_score,
-        operations: {
-          select: t.has_select,
-          insert: t.has_insert,
-          update: t.has_update,
-          delete: t.has_delete,
-        },
-      })),
-    };
-
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rls-coverage-report-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Relatório exportado");
+  const getSeverityBadge = (severity: string) => {
+    const config = rlsCoverageService.formatSeverityBadge(severity);
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
+
+  if (isLoading) {
+    return (
+      <AdminShell title="RLS Coverage">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Scanning RLS policies...</p>
+          </div>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
-    <AdminLayout>
+    <AdminShell 
+      title="RLS Coverage & Security Audit"
+      description="Detect and fix Row-Level Security issues"
+    >
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="h-6 w-6" />
-              Cobertura de RLS
-            </h1>
-            <p className="text-muted-foreground">
-              Row Level Security policies para todas as tabelas
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadRLSData} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
-            <Button onClick={exportReport}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-          </div>
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{coverage?.total_issues || 0}</div>
+              <p className="text-xs text-muted-foreground">Detected problems</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+              <Shield className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {coverage?.by_severity.high || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Requires immediate attention</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Coverage</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {coverage?.summary.coverage_percentage || 0}%
+              </div>
+              <p className="text-xs text-muted-foreground">Tables with RLS</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Last Scan</CardTitle>
+              <History className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm font-medium">
+                {coverage?.timestamp ? new Date(coverage.timestamp).toLocaleTimeString() : 'N/A'}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => refetch()} className="mt-2 h-7 px-2">
+                Rescan
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Tabelas</CardDescription>
-              <CardTitle className="text-2xl">{stats.total}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>RLS Ativo</CardDescription>
-              <CardTitle className="text-2xl text-green-500">{stats.protected}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Cobertura 100%</CardDescription>
-              <CardTitle className="text-2xl text-green-500">{stats.fullCoverage}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Cobertura Parcial</CardDescription>
-              <CardTitle className="text-2xl text-yellow-500">{stats.partialCoverage}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Score Médio</CardDescription>
-              <CardTitle className="text-2xl">{stats.avgScore}%</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+        {/* Main Content */}
+        <Tabs defaultValue="issues" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="issues">
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Issues ({coverage?.total_issues || 0})
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="w-4 h-4 mr-2" />
+              Scan History
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar tabela..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+          <TabsContent value="issues" className="space-y-4">
+            {coverage && coverage.issues.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No RLS Issues Found!</h3>
+                  <p className="text-muted-foreground text-center">
+                    All tables have proper Row-Level Security policies configured.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Security Issues</CardTitle>
+                  <CardDescription>
+                    Review and fix RLS policy problems. High severity issues require Master role.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[600px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID</TableHead>
+                          <TableHead>Severity</TableHead>
+                          <TableHead>Table</TableHead>
+                          <TableHead>Issue</TableHead>
+                          <TableHead>Evidence</TableHead>
+                          <TableHead>Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {coverage?.issues.map((issue) => (
+                          <TableRow key={issue.id}>
+                            <TableCell className="font-mono text-xs">{issue.id}</TableCell>
+                            <TableCell>{getSeverityBadge(issue.severity)}</TableCell>
+                            <TableCell>
+                              <code className="text-xs bg-muted px-2 py-1 rounded">
+                                {issue.schema}.{issue.table}
+                              </code>
+                            </TableCell>
+                            <TableCell>
+                              {rlsCoverageService.formatIssueType(issue.issue)}
+                            </TableCell>
+                            <TableCell className="max-w-xs">
+                              <div className="text-xs text-muted-foreground line-clamp-2">
+                                {issue.evidence.join(', ')}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleFixClick(issue)}
+                              >
+                                <Code className="w-3 h-3 mr-1" />
+                                Fix
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tabela</TableHead>
-                  <TableHead className="text-center">RLS</TableHead>
-                  <TableHead className="text-center">SELECT</TableHead>
-                  <TableHead className="text-center">INSERT</TableHead>
-                  <TableHead className="text-center">UPDATE</TableHead>
-                  <TableHead className="text-center">DELETE</TableHead>
-                  <TableHead className="text-center">Score</TableHead>
-                  <TableHead>Policies</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTables.map((table) => (
-                  <TableRow key={table.table_name}>
-                    <TableCell className="font-mono text-sm">{table.table_name}</TableCell>
-                    <TableCell className="text-center">
-                      {table.rls_enabled ? (
-                        <ShieldCheck className="h-5 w-5 text-green-500 mx-auto" />
-                      ) : (
-                        <ShieldAlert className="h-5 w-5 text-red-500 mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {table.has_select ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {table.has_insert ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {table.has_update ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {table.has_delete ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mx-auto" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge 
-                        variant={
-                          table.coverage_score === 100 ? "default" :
-                          table.coverage_score >= 75 ? "secondary" : "destructive"
-                        }
+          <TabsContent value="history" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Scan History</CardTitle>
+                <CardDescription>Previous RLS security scans and fixes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-2">
+                    {scanHistory?.map((scan: any) => (
+                      <div
+                        key={scan.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
                       >
-                        {table.coverage_score}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-xs text-muted-foreground">
-                      {table.policies.join(", ")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">
+                            {scan.schema_name}.{scan.table_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {rlsCoverageService.formatIssueType(scan.issue_type)} •{' '}
+                            {new Date(scan.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getSeverityBadge(scan.severity)}
+                          <Badge variant={scan.status === 'fixed' ? 'default' : 'secondary'}>
+                            {scan.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-        {/* Legend */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Legenda</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-green-500" />
-              <span>RLS Ativo</span>
+        {/* Fix Modal */}
+        <Dialog open={showFixModal} onOpenChange={setShowFixModal}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Code className="w-5 h-5" />
+                Preview RLS Fix: {selectedIssue?.id}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedIssue?.proposed_fix.summary}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-auto space-y-4">
+              {/* Issue Details */}
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Table:</strong> {selectedIssue?.schema}.{selectedIssue?.table}
+                  <br />
+                  <strong>Severity:</strong> {selectedIssue && getSeverityBadge(selectedIssue.severity)}
+                  <br />
+                  <strong>Evidence:</strong>
+                  <ul className="list-disc list-inside mt-2">
+                    {selectedIssue?.evidence.map((e, i) => (
+                      <li key={i} className="text-sm">{e}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+
+              {/* SQL Preview */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm">SQL to Execute:</h4>
+                <ScrollArea className="h-48 w-full rounded-md border bg-muted p-4">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {isDryRun
+                      ? selectedIssue?.proposed_fix.sql_dry_run
+                      : selectedIssue?.proposed_fix.sql_apply}
+                  </pre>
+                </ScrollArea>
+              </div>
+
+              {/* Rollback SQL */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm">Rollback SQL (if needed):</h4>
+                <ScrollArea className="h-32 w-full rounded-md border bg-muted p-4">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {selectedIssue?.proposed_fix.rollback_sql}
+                  </pre>
+                </ScrollArea>
+              </div>
+
+              {/* Confirmation */}
+              {!isDryRun && (
+                <div className="flex items-start space-x-2 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950">
+                  <Checkbox
+                    id="confirm"
+                    checked={confirmChecked}
+                    onCheckedChange={(checked) => setConfirmChecked(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="confirm"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    I understand this will modify database RLS policies. A backup will be created automatically.
+                    {selectedIssue?.severity === 'high' && (
+                      <span className="text-destructive font-semibold"> Master role required.</span>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span>Policy presente</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span>Policy ausente (pode ser intencional)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="default">100%</Badge>
-              <span>Cobertura total</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">75-99%</Badge>
-              <span>Cobertura parcial</span>
-            </div>
-          </CardContent>
-        </Card>
+
+            <DialogFooter className="flex-shrink-0">
+              <Button variant="outline" onClick={() => setShowFixModal(false)}>
+                Cancel
+              </Button>
+              {isDryRun ? (
+                <>
+                  <Button onClick={handleApplyFix} variant="secondary">
+                    <Play className="w-4 h-4 mr-2" />
+                    Run Dry Run
+                  </Button>
+                  <Button onClick={() => setIsDryRun(false)}>
+                    Proceed to Apply
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={handleApplyFix}
+                  disabled={!confirmChecked || fixMutation.isPending}
+                  variant="destructive"
+                >
+                  {fixMutation.isPending ? 'Applying...' : 'Confirm & Apply Fix'}
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-    </AdminLayout>
+    </AdminShell>
   );
 }
