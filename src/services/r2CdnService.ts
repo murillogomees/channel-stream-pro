@@ -240,9 +240,6 @@ export async function generateCdnToken(options: GenerateTokenOptions): Promise<{
     
     const { data, error } = await supabase.functions.invoke('cdn-token', {
       body: options,
-      headers: {
-        'Content-Type': 'application/json'
-      }
     });
 
     if (error) {
@@ -273,9 +270,6 @@ export async function revokeCdnToken(options: { token?: string; channel_id?: str
     
     const { error } = await supabase.functions.invoke('cdn-token?action=revoke', {
       body: options,
-      headers: {
-        'Content-Type': 'application/json'
-      }
     });
 
     if (error) {
