@@ -18,9 +18,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, RefreshCw, Edit, Trash2, Shield, User, Mail, Phone, Calendar, DollarSign, CreditCard, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AdminUserForm } from '@/components/admin/AdminUserForm';
 
 interface UserWithRole extends UnifiedProfile {
   roles: string[];
+  totp_enabled?: boolean;
+  totp_secret?: string;
+  totp_verified_at?: string;
 }
 
 export default function AdminUserList() {
@@ -34,12 +38,7 @@ export default function AdminUserList() {
   const [editDialog, setEditDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [editFormData, setEditFormData] = useState({
-    nome: '',
-    email: '',
-    telefone: '',
-    telefone_whatsapp: '',
-  });
+  const [editFormData, setEditFormData] = useState<any>({});
 
   // Create user dialog state
   const [createDialog, setCreateDialog] = useState(false);
@@ -91,10 +90,11 @@ export default function AdminUserList() {
   const handleEdit = (user: UserWithRole) => {
     setSelectedUser(user);
     setEditFormData({
-      nome: user.nome,
-      email: user.email,
-      telefone: user.telefone || '',
-      telefone_whatsapp: user.telefone_whatsapp || '',
+      ...user,
+      cliente_ativo: user.cliente_ativo ?? true,
+      is_recorrente: user.is_recorrente ?? false,
+      totp_enabled: user.totp_enabled ?? false,
+      valor_pago: user.valor_pago ?? 0,
     });
     setEditDialog(true);
   };
@@ -103,14 +103,14 @@ export default function AdminUserList() {
     if (!selectedUser) return;
 
     try {
+      // Preparar dados para update (remover campos readonly e undefined)
+      const { id, created_at, updated_at, smartone_playlist_id, smartone_status, 
+              smartone_last_sync_at, smartone_raw_response, totp_secret, totp_verified_at, 
+              roles, ...updateData } = editFormData;
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          nome: editFormData.nome,
-          email: editFormData.email,
-          telefone: editFormData.telefone || null,
-          telefone_whatsapp: editFormData.telefone_whatsapp || null,
-        })
+        .update(updateData)
         .eq('id', selectedUser.id);
 
       if (error) throw error;
@@ -466,48 +466,18 @@ export default function AdminUserList() {
 
       {/* Dialog de Edição */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
             <DialogDescription>
               Altere as informações do usuário {selectedUser?.nome}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-nome">Nome</Label>
-              <Input
-                id="edit-nome"
-                value={editFormData.nome}
-                onChange={(e) => setEditFormData({ ...editFormData, nome: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editFormData.email}
-                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-telefone">Telefone</Label>
-              <Input
-                id="edit-telefone"
-                value={editFormData.telefone}
-                onChange={(e) => setEditFormData({ ...editFormData, telefone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-whatsapp">WhatsApp</Label>
-              <Input
-                id="edit-whatsapp"
-                value={editFormData.telefone_whatsapp}
-                onChange={(e) => setEditFormData({ ...editFormData, telefone_whatsapp: e.target.value })}
-              />
-            </div>
-          </div>
+          <AdminUserForm
+            formData={editFormData}
+            onChange={setEditFormData}
+            isEdit={true}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>
               Cancelar

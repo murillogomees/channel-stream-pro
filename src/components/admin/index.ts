@@ -19,6 +19,9 @@ export { ResponsiveTabs } from './ResponsiveTabs';
 // Filters
 export { ResponsiveFilters } from './ResponsiveFilters';
 
+// Forms
+export { AdminUserForm } from './AdminUserForm';
+
 // Other components
 export { GlobalSearch } from './GlobalSearch';
 export { QuickShortcuts } from './QuickShortcuts';
