@@ -1,0 +1,55 @@
+--- Consolidate authentication documentation into single source of truth
++++ Merge AUTH_CHANGES_SUMMARY.md and AUTH_TESTING_GUIDE.md into AUTH_ARCHITECTURE.md
+
+RATIONALE:
+- AUTH_ARCHITECTURE.md is comprehensive and current
+- AUTH_CHANGES_SUMMARY.md (90% overlap) is redundant
+- AUTH_TESTING_GUIDE.md (80% overlap) duplicates testing sections
+- Multiple docs create confusion about single source of truth
+
+ACTIONS REQUIRED:
+1. Add "Testing Guidelines" section to AUTH_ARCHITECTURE.md
+2. Add "Recent Changes" historical section to AUTH_ARCHITECTURE.md
+3. Archive AUTH_CHANGES_SUMMARY.md → docs/archive/auth/
+4. Archive AUTH_TESTING_GUIDE.md → docs/archive/auth/
+
+RISK: BAIXA
+EFFORT: PEQUENO
+
+DIFF for AUTH_ARCHITECTURE.md:
+--- a/docs/AUTH_ARCHITECTURE.md
++++ b/docs/AUTH_ARCHITECTURE.md
+@@ -end of file
++
++## Testing Guidelines
++
++### Unit Tests
++- Test role assignment in custom_access_token_hook
++- Test RLS policies for each role
++- Test permission functions (is_admin_or_master, has_role)
++
++### Integration Tests
++- Test complete login flow for each role
++- Test JWT token generation and validation
++- Test unauthorized access attempts
++
++### Manual Testing Checklist
++- [ ] Master user can access all admin functions
++- [ ] Admin user can manage clients but not modify master
++- [ ] Client user restricted to /app/* routes
++- [ ] Logout/re-login generates correct JWT
++
++## Historical Changes
++
++### Phase 8: Three-Tier Consolidation (Dec 2024)
++- Consolidated from four roles to three (client/admin/master)
++- Unified profiles table as single source of truth
++- Fixed JWT custom_access_token_hook role priority
++
++For detailed change history, see docs/archive/auth/
+
+ACCEPTANCE CRITERIA:
+- [ ] AUTH_ARCHITECTURE.md includes testing section
+- [ ] AUTH_ARCHITECTURE.md includes historical changes
+- [ ] Old docs moved to docs/archive/auth/
+- [ ] Archive README.md explains consolidation
