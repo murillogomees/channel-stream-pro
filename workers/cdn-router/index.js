@@ -403,25 +403,3 @@ export default {
     return new Response(object.body, { headers });
   }
 };
-
-// ============================================
-// WRANGLER.TOML CONFIGURATION (Reference)
-// ============================================
-/*
-name = "iptvlink-cdn"
-main = "worker.js"
-compatibility_date = "2024-01-01"
-
-[vars]
-ALLOWED_REFERRERS = "iptvlink.com,localhost"
-
-[[r2_buckets]]
-binding = "R2_BUCKET"
-bucket_name = "iptvlink-cdn"
-
-[env.production]
-vars = { ENVIRONMENT = "prod" }
-
-[env.staging]
-vars = { ENVIRONMENT = "staging" }
-*/
