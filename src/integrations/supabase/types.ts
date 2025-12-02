@@ -6260,10 +6260,23 @@ export type Database = {
           tvg_logo: string
         }[]
       }
-      toggle_feature_flag: {
-        Args: { p_enabled: boolean; p_flag_name: string; p_percentage?: number }
-        Returns: boolean
-      }
+      toggle_feature_flag:
+        | {
+            Args: {
+              p_enabled: boolean
+              p_flag_name: string
+              p_percentage?: number
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_enabled: boolean
+              p_flag_name: string
+              p_percentage?: number
+            }
+            Returns: undefined
+          }
       track_channel_view: {
         Args: { p_channel_id: string; p_watch_seconds?: number }
         Returns: undefined
