@@ -22,7 +22,7 @@
  * - Manifests: cache-control public, max-age=30, stale-while-revalidate=60
  * - Segments: cache-control public, max-age=86400
  * - Enable Brotli compression
- * - Executa esse carai
+ * - Executa esse carai - e def oovo
  * - Set CSP and CORS headers
  */
 
