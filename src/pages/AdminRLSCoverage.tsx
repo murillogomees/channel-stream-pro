@@ -408,6 +408,85 @@ export default function AdminRLSCoverage() {
                   </AlertDescription>
                 </Alert>
               )}
+
+              {/* Solution Guide */}
+              {selectedTable && (
+                <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Shield className="h-4 w-4 text-primary" />
+                    <span>Como Resolver</span>
+                  </div>
+                  
+                  {selectedTable.severity === 'high' && (
+                    <div className="space-y-3 text-sm">
+                      <p className="text-muted-foreground">
+                        Esta tabela não possui RLS habilitado. Siga os passos:
+                      </p>
+                      <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                        <li>Habilite RLS na tabela</li>
+                        <li>Crie políticas para SELECT, INSERT, UPDATE e DELETE</li>
+                        <li>Teste o acesso com diferentes usuários</li>
+                      </ol>
+                      <div className="mt-3 p-3 bg-background rounded border">
+                        <p className="text-xs font-mono mb-2 text-muted-foreground">SQL de exemplo:</p>
+                        <pre className="text-xs overflow-x-auto">
+{`-- 1. Habilitar RLS
+ALTER TABLE ${selectedTable.schema_name}.${selectedTable.table_name} 
+ENABLE ROW LEVEL SECURITY;
+
+-- 2. Criar política de SELECT (exemplo)
+CREATE POLICY "Users can view own records"
+ON ${selectedTable.schema_name}.${selectedTable.table_name}
+FOR SELECT
+USING (auth.uid() = user_id);
+
+-- 3. Criar política de INSERT (exemplo)
+CREATE POLICY "Users can insert own records"
+ON ${selectedTable.schema_name}.${selectedTable.table_name}
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);`}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTable.severity === 'medium' && (
+                    <div className="space-y-3 text-sm">
+                      <p className="text-muted-foreground">
+                        Políticas permissivas detectadas. Recomendações:
+                      </p>
+                      <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                        <li>Revise as condições USING e WITH CHECK</li>
+                        <li>Evite políticas com condição "true"</li>
+                        <li>Use auth.uid() ou funções SECURITY DEFINER</li>
+                        <li>Teste com usuários não-admin</li>
+                      </ul>
+                      <div className="mt-3 p-3 bg-background rounded border">
+                        <p className="text-xs font-mono mb-2 text-muted-foreground">Exemplo de política segura:</p>
+                        <pre className="text-xs overflow-x-auto">
+{`-- Política restritiva (recomendada)
+CREATE POLICY "Restrictive policy"
+ON ${selectedTable.schema_name}.${selectedTable.table_name}
+FOR SELECT
+USING (
+  auth.uid() = user_id 
+  OR is_admin(auth.uid())
+);`}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTable.severity === 'ok' && (
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>✅ Esta tabela está protegida adequadamente.</p>
+                      <p className="text-xs">
+                        Continue monitorando e revise as políticas periodicamente.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter>
