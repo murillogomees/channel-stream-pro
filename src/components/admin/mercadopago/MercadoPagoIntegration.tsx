@@ -137,7 +137,7 @@ export function MercadoPagoIntegration() {
         .from('mercado_pago_config')
         .select('*')
         .eq('id', '00000000-0000-0000-0000-000000000001')
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       
