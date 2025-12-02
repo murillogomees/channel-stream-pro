@@ -21,32 +21,14 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-interface RLSPolicy {
-  schemaname: string;
-  tablename: string;
-  policyname: string;
-  permissive: string;
-  roles: string[];
-  cmd: string;
-  qual: string | null;
-  with_check: string | null;
-}
-
-interface RLSIssue {
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  table: string;
-  issue: string;
-  recommendation: string;
-  policy_name?: string;
-}
+import { rlsAuditService, RLSPolicy, RLSIssue } from '@/services/rlsAuditService';
 
 export function RLSAuditPanel() {
   const [policies, setPolicies] = useState<RLSPolicy[]>([]);
   const [issues, setIssues] = useState<RLSIssue[]>([]);
   const [tablesWithoutRLS, setTablesWithoutRLS] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scanning, setScanning] = useState(false);
+  const [fixing, setFixing] = useState<string | null>(null);
 
   useEffect(() => {
     loadRLSData();
@@ -56,21 +38,33 @@ export function RLSAuditPanel() {
     setLoading(true);
     try {
       // Get all RLS policies
-      const { data: policiesData, error: policiesError } = await supabase.rpc('get_all_rls_policies' as any);
-      
-      if (!policiesError && policiesData) {
-        setPolicies(policiesData);
-      }
+      const policiesData = await rlsAuditService.getAllPolicies();
+      setPolicies(policiesData);
 
       // Get tables without RLS
-      const { data: tablesData, error: tablesError } = await supabase.rpc('get_tables_without_rls' as any);
-      
-      if (!tablesError && tablesData) {
-        setTablesWithoutRLS(tablesData.map((t: any) => t.tablename));
-      }
+      const tablesData = await rlsAuditService.getTablesWithoutRLS();
+      setTablesWithoutRLS(tablesData);
 
       // Analyze for issues
-      await analyzeRLSIssues();
+      const detectedIssues = rlsAuditService.analyzePolicies(policiesData);
+      
+      // Add critical issues for tables without RLS
+      tablesData.forEach(table => {
+        detectedIssues.push({
+          severity: 'critical',
+          table: table,
+          issue: 'RLS não habilitado',
+          recommendation: `Execute: ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`
+        });
+      });
+
+      setIssues(detectedIssues);
+      
+      if (detectedIssues.length > 0) {
+        toast.warning(`${detectedIssues.length} problemas de segurança detectados`);
+      } else {
+        toast.success('Nenhum problema de segurança encontrado!');
+      }
       
     } catch (error) {
       console.error('Error loading RLS data:', error);
@@ -80,76 +74,6 @@ export function RLSAuditPanel() {
     }
   };
 
-  const analyzeRLSIssues = async () => {
-    setScanning(true);
-    try {
-      const foundIssues: RLSIssue[] = [];
-
-      // Check for tables without RLS
-      const { data: publicTables } = await supabase
-        .from('information_schema.tables' as any)
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .not('table_name', 'like', 'pg_%');
-
-      if (publicTables) {
-        publicTables.forEach((table: any) => {
-          const hasRLS = policies.some(p => p.tablename === table.table_name);
-          if (!hasRLS && !table.table_name.startsWith('_')) {
-            foundIssues.push({
-              severity: 'critical',
-              table: table.table_name,
-              issue: 'RLS não habilitado',
-              recommendation: `Execute: ALTER TABLE ${table.table_name} ENABLE ROW LEVEL SECURITY;`
-            });
-          }
-        });
-      }
-
-      // Check for overly permissive policies (using true or similar)
-      policies.forEach(policy => {
-        const qualLower = policy.qual?.toLowerCase() || '';
-        const withCheckLower = policy.with_check?.toLowerCase() || '';
-        
-        if (qualLower.includes('true') || qualLower === '(true)') {
-          foundIssues.push({
-            severity: 'high',
-            table: policy.tablename,
-            policy_name: policy.policyname,
-            issue: 'Política muito permissiva (USING true)',
-            recommendation: 'Restrinja o acesso com condições específicas baseadas em auth.uid() ou roles'
-          });
-        }
-
-        if (withCheckLower.includes('true') || withCheckLower === '(true)') {
-          foundIssues.push({
-            severity: 'high',
-            table: policy.tablename,
-            policy_name: policy.policyname,
-            issue: 'Política muito permissiva (WITH CHECK true)',
-            recommendation: 'Adicione validações específicas no WITH CHECK'
-          });
-        }
-
-        // Check for missing WITH CHECK on INSERT/UPDATE
-        if ((policy.cmd === 'INSERT' || policy.cmd === 'UPDATE') && !policy.with_check) {
-          foundIssues.push({
-            severity: 'medium',
-            table: policy.tablename,
-            policy_name: policy.policyname,
-            issue: `${policy.cmd} sem WITH CHECK`,
-            recommendation: 'Adicione cláusula WITH CHECK para validar dados inseridos/atualizados'
-          });
-        }
-      });
-
-      setIssues(foundIssues);
-    } catch (error) {
-      console.error('Error analyzing RLS:', error);
-    } finally {
-      setScanning(false);
-    }
-  };
 
   const getSeverityBadge = (severity: string) => {
     const variants: Record<string, { variant: any; icon: any; label: string }> = {
@@ -170,6 +94,22 @@ export function RLSAuditPanel() {
     );
   };
 
+  const fixTableRLS = async (tableName: string) => {
+    setFixing(tableName);
+    try {
+      // Create migration to enable RLS on the table
+      const sql = `ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;`;
+      
+      toast.info(`Execute a seguinte migration:\n${sql}`);
+      
+    } catch (error) {
+      console.error('Error fixing RLS:', error);
+      toast.error('Erro ao corrigir RLS');
+    } finally {
+      setFixing(null);
+    }
+  };
+
   const criticalCount = issues.filter(i => i.severity === 'critical').length;
   const highCount = issues.filter(i => i.severity === 'high').length;
   const securityScore = Math.max(0, 100 - (criticalCount * 20 + highCount * 10));
@@ -185,9 +125,9 @@ export function RLSAuditPanel() {
           </h2>
           <p className="text-muted-foreground">Análise de segurança de políticas Row Level Security</p>
         </div>
-        <Button onClick={loadRLSData} disabled={loading || scanning}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${(loading || scanning) ? 'animate-spin' : ''}`} />
-          Atualizar
+        <Button onClick={loadRLSData} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Atualizar Scan
         </Button>
       </div>
 
@@ -235,8 +175,8 @@ export function RLSAuditPanel() {
               <Alert key={i} variant={issue.severity === 'critical' || issue.severity === 'high' ? 'destructive' : 'default'}>
                 <div className="flex items-start gap-3">
                   {getSeverityBadge(issue.severity)}
-                  <div className="flex-1">
-                    <AlertTitle className="flex items-center gap-2">
+                  <div className="flex-1 space-y-2">
+                    <AlertTitle className="flex items-center gap-2 flex-wrap">
                       <code className="text-sm">{issue.table}</code>
                       {issue.policy_name && (
                         <Badge variant="outline" className="font-mono text-xs">
@@ -244,9 +184,21 @@ export function RLSAuditPanel() {
                         </Badge>
                       )}
                     </AlertTitle>
-                    <AlertDescription className="mt-2 space-y-2">
-                      <p><strong>Problema:</strong> {issue.issue}</p>
-                      <p><strong>Recomendação:</strong> {issue.recommendation}</p>
+                    <AlertDescription className="space-y-3">
+                      <div>
+                        <strong className="text-foreground">Problema:</strong> {issue.issue}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Recomendação:</strong> {issue.recommendation}
+                      </div>
+                      {issue.policy_definition && (
+                        <div className="mt-2">
+                          <strong className="text-foreground">Definição atual:</strong>
+                          <pre className="mt-1 p-2 bg-muted rounded text-xs overflow-x-auto">
+                            {issue.policy_definition}
+                          </pre>
+                        </div>
+                      )}
                     </AlertDescription>
                   </div>
                 </div>
@@ -299,26 +251,52 @@ export function RLSAuditPanel() {
         {/* Tables without RLS Tab */}
         <TabsContent value="tables" className="space-y-4">
           {tablesWithoutRLS.length > 0 ? (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Atenção: Tabelas sem RLS</AlertTitle>
-              <AlertDescription>
-                As seguintes tabelas não têm Row Level Security habilitado:
-                <div className="mt-3 space-y-1">
-                  {tablesWithoutRLS.map((table, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Unlock className="w-4 h-4" />
-                      <code className="text-sm font-mono">{table}</code>
+            <div className="space-y-4">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>⚠️ Atenção Crítica: Tabelas sem RLS</AlertTitle>
+                <AlertDescription>
+                  As seguintes tabelas não têm Row Level Security habilitado e estão TOTALMENTE EXPOSTAS:
+                </AlertDescription>
+              </Alert>
+              
+              {tablesWithoutRLS.map((table, i) => (
+                <Card key={i} className="border-red-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Unlock className="w-5 h-5 text-red-500" />
+                        <div>
+                          <code className="text-sm font-mono font-medium">{table}</code>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Todos os dados desta tabela estão acessíveis sem restrição
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={fixing === table}
+                        onClick={() => {
+                          toast.info(
+                            `Para corrigir ${table}, execute:\nALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`,
+                            { duration: 8000 }
+                          );
+                        }}
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Ver SQL
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </AlertDescription>
-            </Alert>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ) : (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Lock className="w-12 h-12 text-green-500 mb-4" />
-                <p className="text-lg font-medium">Todas as tabelas protegidas!</p>
+                <p className="text-lg font-medium">✅ Todas as tabelas protegidas!</p>
                 <p className="text-sm text-muted-foreground">RLS habilitado em todas as tabelas públicas</p>
               </CardContent>
             </Card>

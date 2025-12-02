@@ -5779,6 +5779,17 @@ export type Database = {
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       cleanup_orphaned_downloads: { Args: never; Returns: number }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      detect_permissive_rls_policies: {
+        Args: never
+        Returns: {
+          command: string
+          issue_type: string
+          policy_definition: string
+          policy_name: unknown
+          severity: string
+          table_name: unknown
+        }[]
+      }
       detect_vod_channels: {
         Args: never
         Returns: {
@@ -5880,6 +5891,19 @@ export type Database = {
           read_at: string
           sent_at: string
           severity: string
+        }[]
+      }
+      get_all_rls_policies: {
+        Args: never
+        Returns: {
+          cmd: string
+          permissive: string
+          policyname: unknown
+          qual: string
+          roles: unknown[]
+          schemaname: unknown
+          tablename: unknown
+          with_check: string
         }[]
       }
       get_auth_statistics: {
@@ -6094,6 +6118,14 @@ export type Database = {
           policy_with_check: string
         }[]
       }
+      get_tables_without_rls: {
+        Args: never
+        Returns: {
+          rowsecurity: boolean
+          schemaname: unknown
+          tablename: unknown
+        }[]
+      }
       get_top_threat_ips: {
         Args: { _limit?: number }
         Returns: {
@@ -6218,6 +6250,7 @@ export type Database = {
         Args: { p_key: string; p_locked_by: string }
         Returns: boolean
       }
+      run_complete_rls_audit: { Args: never; Returns: Json }
       scan_schema_drift: {
         Args: never
         Returns: {
