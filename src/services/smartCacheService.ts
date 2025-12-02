@@ -73,7 +73,7 @@ export interface UpdateCacheRuleParams extends Partial<CreateCacheRuleParams> {
 
 export interface InvalidateCacheParams {
   pattern: string;
-  type: 'url' | 'prefix' | 'tag';
+  type: 'pattern' | 'key' | 'tag' | 'all';
   scope?: string;
   metadata?: any;
 }

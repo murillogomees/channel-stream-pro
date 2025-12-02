@@ -15,8 +15,8 @@ const corsHeaders = {
 };
 
 interface InvalidationRequest {
-  pattern: string;           // URL pattern, prefix, or tag
-  type: 'url' | 'prefix' | 'tag'; // Type of invalidation
+  pattern: string;           // URL pattern, key, or tag
+  type: 'pattern' | 'key' | 'tag' | 'all'; // Type of invalidation
   scope?: string;           // Optional scope (e.g., 'global', 'user-specific')
   metadata?: Record<string, any>; // Additional metadata
 }
@@ -123,9 +123,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!body.type || !['url', 'prefix', 'tag'].includes(body.type)) {
+    if (!body.type || !['pattern', 'key', 'tag', 'all'].includes(body.type)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid "type" field. Must be: url, prefix, or tag' }),
+        JSON.stringify({ error: 'Invalid "type" field. Must be: pattern, key, tag, or all' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -170,12 +170,13 @@ Deno.serve(async (req) => {
     
     try {
       // Placeholder for actual purge logic:
-      // - If type === 'url': purge exact cache key
-      // - If type === 'prefix': purge all keys matching prefix
+      // - If type === 'key': purge exact cache key
+      // - If type === 'pattern': purge all keys matching pattern
       // - If type === 'tag': purge all keys tagged with this tag
+      // - If type === 'all': purge all cache entries
       
       // For demonstration, we'll simulate success
-      keysInvalidated = body.type === 'prefix' ? 10 : 1; // Mock value
+      keysInvalidated = body.type === 'pattern' || body.type === 'all' ? 10 : 1; // Mock value
 
       // Update status to completed
       await supabase

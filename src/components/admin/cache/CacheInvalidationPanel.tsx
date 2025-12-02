@@ -16,7 +16,7 @@ export function CacheInvalidationPanel({ onInvalidate }: CacheInvalidationPanelP
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [pattern, setPattern] = useState('');
-  const [type, setType] = useState<'url' | 'prefix' | 'tag'>('url');
+  const [type, setType] = useState<'pattern' | 'key' | 'tag' | 'all'>('key');
   const [scope, setScope] = useState('');
 
   const handleInvalidate = async () => {
@@ -69,15 +69,17 @@ export function CacheInvalidationPanel({ onInvalidate }: CacheInvalidationPanelP
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="url">URL Exata</SelectItem>
-              <SelectItem value="prefix">Prefixo de URL</SelectItem>
+              <SelectItem value="key">Chave Exata</SelectItem>
+              <SelectItem value="pattern">Padrão de URL</SelectItem>
               <SelectItem value="tag">Tag de Cache</SelectItem>
+              <SelectItem value="all">Limpar Tudo</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground mt-1">
-            {type === 'url' && 'Invalida apenas a URL exata especificada'}
-            {type === 'prefix' && 'Invalida todas as URLs que começam com o prefixo'}
+            {type === 'key' && 'Invalida apenas a chave de cache exata especificada'}
+            {type === 'pattern' && 'Invalida todas as URLs que correspondem ao padrão'}
             {type === 'tag' && 'Invalida todas as URLs marcadas com a tag especificada'}
+            {type === 'all' && '⚠️ Invalida TODO o cache - use com extrema cautela'}
           </p>
         </div>
 
@@ -86,14 +88,17 @@ export function CacheInvalidationPanel({ onInvalidate }: CacheInvalidationPanelP
           <Input
             id="invalidation-pattern"
             placeholder={
-              type === 'url' 
+              type === 'key' 
                 ? 'https://example.com/api/data'
-                : type === 'prefix'
-                ? 'https://example.com/api/'
-                : 'api-v1'
+                : type === 'pattern'
+                ? 'https://example.com/api/*'
+                : type === 'tag'
+                ? 'api-v1'
+                : 'all'
             }
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
+            disabled={type === 'all'}
           />
         </div>
 
