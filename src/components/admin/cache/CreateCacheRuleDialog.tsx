@@ -139,8 +139,11 @@ export function CreateCacheRuleDialog({ open, onOpenChange, onSuccess }: CreateC
               <Input
                 id="swr"
                 type="number"
-                value={formData.stale_while_revalidate || ''}
-                onChange={(e) => setFormData({ ...formData, stale_while_revalidate: parseInt(e.target.value) || undefined })}
+                value={formData.stale_while_revalidate ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setFormData({ ...formData, stale_while_revalidate: val ? parseInt(val) : undefined });
+                }}
               />
             </div>
 
@@ -149,8 +152,11 @@ export function CreateCacheRuleDialog({ open, onOpenChange, onSuccess }: CreateC
               <Input
                 id="sie"
                 type="number"
-                value={formData.stale_if_error || ''}
-                onChange={(e) => setFormData({ ...formData, stale_if_error: parseInt(e.target.value) || undefined })}
+                value={formData.stale_if_error ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setFormData({ ...formData, stale_if_error: val ? parseInt(val) : undefined });
+                }}
               />
             </div>
           </div>
