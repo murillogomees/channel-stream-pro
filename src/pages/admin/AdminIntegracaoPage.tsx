@@ -13,7 +13,6 @@ import AdminTranscodeQueue from "../AdminTranscodeQueue";
 import AdminSmartCache from "../AdminSmartCache";
 import AdminRLSCoverage from "../AdminRLSCoverage";
 import AdminQADashboard from "../AdminQADashboard";
-import MigrationDashboard from "@/components/admin/MigrationDashboard";
 import MercadoPagoIntegration from "@/components/admin/mercadopago/MercadoPagoIntegration";
 import PaymentVariablesAdmin from "@/components/admin/payment/PaymentVariablesAdmin";
 
@@ -50,9 +49,6 @@ export default function AdminIntegracaoPage() {
             <TabsTrigger value="qa" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               🧪 QA Dashboard
             </TabsTrigger>
-            <TabsTrigger value="migration" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🚀 Migration
-            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" className="invisible" />
         </ScrollArea>
@@ -87,10 +83,6 @@ export default function AdminIntegracaoPage() {
 
         <TabsContent value="qa" className="space-y-4 mt-4">
           <AdminQADashboard />
-        </TabsContent>
-
-        <TabsContent value="migration" className="space-y-4 mt-4">
-          <MigrationDashboard />
         </TabsContent>
       </Tabs>
     </AdminShell>
