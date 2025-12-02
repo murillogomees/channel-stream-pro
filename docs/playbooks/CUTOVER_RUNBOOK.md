@@ -91,7 +91,7 @@ curl -X POST https://api.lovable.dev/admin/feature-flags \
   }'
 
 # 2. Executar verificação de integridade
-psql -c "SELECT COUNT(*) FROM clientes WHERE situacao IS NULL;"
+psql -c "SELECT COUNT(*) FROM profiles WHERE situacao IS NULL;"
 # Esperado: 0
 
 # 3. Verificar conversões
@@ -99,7 +99,7 @@ psql -c "
   SELECT 
     COUNT(*) as total,
     COUNT(*) FILTER (WHERE data_ultimo_pagamento IS NOT NULL) as with_payment
-  FROM clientes 
+  FROM profiles 
   WHERE data_cadastro > NOW() - INTERVAL '1 hour';
 "
 ```

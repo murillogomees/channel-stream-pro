@@ -231,7 +231,7 @@ pg_restore -d $DATABASE_URL -c $BACKUP_FILE
 
 # 4. Verificar integridade
 echo "Step 4: Verifying integrity..."
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM clientes;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM profiles;"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM notification_logs;"
 
 # 5. Restaurar serviço
@@ -255,7 +255,7 @@ echo "✅ Full Restore concluído"
 ```sql
 -- 1. Verificar contagem de registros críticos
 SELECT 
-  'clientes' as tabela, COUNT(*) as total FROM clientes
+  'profiles' as tabela, COUNT(*) as total FROM profiles
 UNION ALL
 SELECT 'notification_logs', COUNT(*) FROM notification_logs
 UNION ALL
@@ -263,9 +263,9 @@ SELECT 'security_events', COUNT(*) FROM security_events;
 
 -- 2. Verificar último registro de cada tabela
 SELECT 
-  'clientes' as tabela, 
+  'profiles' as tabela, 
   MAX(data_cadastro) as ultimo_registro 
-FROM clientes
+FROM profiles
 UNION ALL
 SELECT 'notification_logs', MAX(created_at) FROM notification_logs
 UNION ALL
@@ -287,7 +287,7 @@ ORDER BY executed_at DESC;
 
 - [ ] Dashboard carrega normalmente
 - [ ] Login funciona
-- [ ] Listagem de clientes funciona
+- [ ] Listagem de usuários funciona
 - [ ] Notificações estão sendo enviadas
 - [ ] Logs não mostram erros críticos
 - [ ] Métricas de latência normais
