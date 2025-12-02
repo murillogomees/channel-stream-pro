@@ -165,6 +165,34 @@ export function useEnhancedPlayer({
   }, [enableSegmentPrefetch, streamUrl, segmentPrefetch]);
 
   /**
+   * Handle playback error with fallback to alternative sources
+   */
+  const handlePlaybackError = useCallback(async (error: Error, source?: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin') => {
+    console.error('[EnhancedPlayer] Playback error:', error);
+    
+    // Report error to analytics if enabled
+    if (enableAnalytics) {
+      analytics.trackEvent('error', {
+        error: error.message,
+        contentId,
+        streamUrl,
+      });
+    }
+
+    // Try to get fallback URL via CDN routing
+    try {
+      const { cdnRoutingService } = await import('@/services/cdnRoutingService');
+      await cdnRoutingService.reportPlaybackIssue(
+        contentId,
+        error.message,
+        source || 'origin'
+      );
+    } catch (err) {
+      console.error('[EnhancedPlayer] Failed to report error:', err);
+    }
+  }, [enableAnalytics, analytics, contentId, streamUrl]);
+
+  /**
    * Prefetch on start (call when playback begins)
    */
   const onStart = useCallback(() => {
@@ -247,6 +275,9 @@ export function useEnhancedPlayer({
 
     // ABR
     getABRMetrics,
+
+    // Error handling
+    handlePlaybackError,
 
     // Feature flags status
     features: {

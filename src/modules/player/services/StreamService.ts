@@ -114,11 +114,12 @@ class StreamService {
    * Aceita Channel ou string diretamente
    * 
    * PRIORIDADE:
-   * 1. URL do R2 se disponível (conteúdo hospedado no CDN)
-   * 2. URL original com proxy se necessário
+   * 1. Cloudflare Stream (se disponível)
+   * 2. R2 via CDN Worker (VOD com JWT)
+   * 3. URL do R2 direto (fallback)
+   * 4. URL original com proxy se necessário
    * 
-   * NOTA: Não convertemos automaticamente para HLS (.m3u8) pois nem todos
-   * os servidores Xtream suportam isso e pode causar 404
+   * NOTA: Use getOptimizedUrl() para roteamento inteligente via CDN Worker
    */
   getPlayableUrl(channelOrUrl: Channel | string): string {
     // Se é objeto Channel, verificar se tem R2 URL disponível
@@ -156,6 +157,36 @@ class StreamService {
    */
   isOptimizedContent(channel: Channel): boolean {
     return Boolean(channel.r2_uploaded && channel.r2_url);
+  }
+
+  /**
+   * Obtém URL otimizada usando CDN Worker routing
+   * 
+   * Esta é a versão async que usa o CDN Routing Service
+   * para decisões inteligentes de roteamento.
+   */
+  async getOptimizedUrl(channel: Channel): Promise<{
+    url: string;
+    source: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin';
+    requiresToken: boolean;
+    fallbackUrl?: string;
+  }> {
+    // Import dynamically to avoid circular dependencies
+    const { cdnRoutingService } = await import('@/services/cdnRoutingService');
+    
+    return await cdnRoutingService.getPlaybackUrl(channel);
+  }
+
+  /**
+   * Verifica se CDN Worker está disponível
+   */
+  async checkCdnWorkerHealth(): Promise<{
+    status: 'healthy' | 'degraded' | 'down';
+    responseTime?: number;
+  }> {
+    const { cdnRoutingService } = await import('@/services/cdnRoutingService');
+    
+    return await cdnRoutingService.checkCdnWorkerHealth();
   }
 
   // ===========================================================================

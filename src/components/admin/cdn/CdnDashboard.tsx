@@ -36,6 +36,7 @@ import r2CdnService, {
   PrewarmPrediction,
   R2StorageObject 
 } from '@/services/r2CdnService';
+import { CdnWorkerStatus } from './CdnWorkerStatus';
 
 export function CdnDashboard() {
   const [stats, setStats] = useState<CdnStats | null>(null);
@@ -151,6 +152,9 @@ export function CdnDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* CDN Worker Status */}
+      <CdnWorkerStatus />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

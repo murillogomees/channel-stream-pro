@@ -499,6 +499,94 @@ export function parseR2Key(r2_key: string): {
 }
 
 /**
+ * Get CDN Worker URL for an R2 key
+ */
+export async function getCdnWorkerUrl(r2_key: string, options?: {
+  channel_id?: string;
+  expires_in_seconds?: number;
+}): Promise<string | null> {
+  try {
+    // Try to get CDN_WORKER_URL from edge function or env
+    const { data: config } = await supabase.functions.invoke('cdn-config');
+    const cdnWorkerUrl = config?.cdn_worker_url || import.meta.env.VITE_CDN_WORKER_URL;
+
+    if (!cdnWorkerUrl) {
+      console.warn('[R2CDN] CDN Worker URL not configured');
+      return null;
+    }
+
+    // Generate JWT token
+    const tokenResult = await generateCdnToken({
+      r2_key,
+      channel_id: options?.channel_id,
+      expires_in_seconds: options?.expires_in_seconds || 7200,
+      token_type: 'manifest',
+    });
+
+    if (!tokenResult.success || !tokenResult.token) {
+      console.error('[R2CDN] Failed to generate CDN token');
+      return null;
+    }
+
+    // Construct CDN Worker URL with JWT
+    return `${cdnWorkerUrl}/${r2_key}?jwt=${tokenResult.token}`;
+  } catch (error) {
+    console.error('[R2CDN] Get CDN Worker URL error:', error);
+    return null;
+  }
+}
+
+/**
+ * Health check CDN Worker
+ */
+export async function checkCdnWorkerHealth(): Promise<{
+  status: 'healthy' | 'degraded' | 'down';
+  responseTime?: number;
+  error?: string;
+}> {
+  try {
+    const { data: config } = await supabase.functions.invoke('cdn-config');
+    const cdnWorkerUrl = config?.cdn_worker_url || import.meta.env.VITE_CDN_WORKER_URL;
+
+    if (!cdnWorkerUrl) {
+      return {
+        status: 'down',
+        error: 'CDN Worker URL not configured',
+      };
+    }
+
+    const start = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(`${cdnWorkerUrl}/health`, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const responseTime = Date.now() - start;
+
+    if (response.ok) {
+      return {
+        status: responseTime > 2000 ? 'degraded' : 'healthy',
+        responseTime,
+      };
+    }
+
+    return {
+      status: 'degraded',
+      responseTime,
+      error: `HTTP ${response.status}`,
+    };
+  } catch (error) {
+    return {
+      status: 'down',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Get cache control header for content type
  */
 export function getCacheControlHeader(contentType: string): string {
