@@ -236,11 +236,21 @@ export async function generateCdnToken(options: GenerateTokenOptions): Promise<{
   error?: string;
 }> {
   try {
+    console.log('[R2CDN] Generating token with options:', options);
+    
     const { data, error } = await supabase.functions.invoke('cdn-token', {
-      body: options,
+      body: JSON.stringify(options),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[R2CDN] Edge function error:', error);
+      throw error;
+    }
+
+    console.log('[R2CDN] Token generated successfully:', data);
 
     return {
       success: true,
@@ -259,11 +269,21 @@ export async function generateCdnToken(options: GenerateTokenOptions): Promise<{
  */
 export async function revokeCdnToken(options: { token?: string; channel_id?: string }): Promise<boolean> {
   try {
+    console.log('[R2CDN] Revoking token with options:', options);
+    
     const { error } = await supabase.functions.invoke('cdn-token?action=revoke', {
-      body: options,
+      body: JSON.stringify(options),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[R2CDN] Edge function error:', error);
+      throw error;
+    }
+    
+    console.log('[R2CDN] Token revoked successfully');
     return true;
   } catch (error) {
     console.error('[R2CDN] Token revoke error:', error);
