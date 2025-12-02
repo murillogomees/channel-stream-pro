@@ -15,6 +15,8 @@ import AdminSuspiciousLogins from "../AdminSuspiciousLogins";
 import AdminIPBlocking from "../AdminIPBlocking";
 import AdminIPWhitelist from "../AdminIPWhitelist";
 import Admin2FASettings from "../Admin2FASettings";
+import { SecurityAuditDashboard } from "@/components/admin/security/SecurityAuditDashboard";
+import AdminRLSCoverage from "../AdminRLSCoverage";
 
 export default function AdminSegurancaPage() {
   return (
@@ -22,9 +24,15 @@ export default function AdminSegurancaPage() {
       title="Centro de Segurança"
       description="Monitoramento, alertas e controle de acesso"
     >
-      <Tabs defaultValue="alerts" className="space-y-4">
+      <Tabs defaultValue="audit" className="space-y-4">
         <ScrollArea className="w-full whitespace-nowrap pb-2">
           <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
+            <TabsTrigger value="audit" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              🔍 Audit
+            </TabsTrigger>
+            <TabsTrigger value="rls" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              🛡️ RLS
+            </TabsTrigger>
             <TabsTrigger value="alerts" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               🚨 Alertas
             </TabsTrigger>
@@ -52,6 +60,14 @@ export default function AdminSegurancaPage() {
           </TabsList>
           <ScrollBar orientation="horizontal" className="invisible" />
         </ScrollArea>
+
+        <TabsContent value="audit" className="space-y-4 mt-4">
+          <SecurityAuditDashboard />
+        </TabsContent>
+
+        <TabsContent value="rls" className="space-y-4 mt-4">
+          <AdminRLSCoverage />
+        </TabsContent>
 
         <TabsContent value="alerts" className="space-y-4 mt-4">
           <AdminSecurityAlerts />

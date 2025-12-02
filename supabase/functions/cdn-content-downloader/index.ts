@@ -280,7 +280,7 @@ async function uploadToR2(key: string, content: any, contentType: string) {
   const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
   const R2_ACCESS_KEY_ID = Deno.env.get('R2_ACCESS_KEY_ID');
   const R2_SECRET_ACCESS_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
-  const R2_BUCKET = 'iptvlink-cdn'; // Bucket fixo
+  const R2_BUCKET = Deno.env.get('R2_BUCKET_NAME') || 'iptvlink-cdn'; // Bucket padrão iptvlink-cdn
 
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
     throw new Error('R2 credentials not configured');
