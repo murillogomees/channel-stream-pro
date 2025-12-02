@@ -1,0 +1,31 @@
+path,status,proposta,pr_suggestion,estimated_effort,tags,implementation_percentage
+docs/AUTH_ARCHITECTURE.md,implemented,Update role hierarchy to include master role,docs/update-auth-architecture-master-role,pequeno,"architecture,auth,security",95
+docs/ALERT_SYSTEM_GUIDE.md,partial,Remove Telegram/SMS references and update to WhatsApp-only,docs/remove-unimplemented-channels,pequeno,"docs,security,notifications,critical",60
+docs/ARCHITECTURE_DIAGRAM.md,partial,Update ER diagram for profiles unification,docs/update-architecture-diagram-profiles,pequeno,"architecture,docs",85
+docs/AUTH_CHANGES_SUMMARY.md,redundant,Merge into AUTH_ARCHITECTURE.md and delete,docs/consolidate-auth-summary,pequeno,"docs,cleanup,consolidation",90
+docs/AUTH_TESTING_GUIDE.md,redundant,Merge into AUTH_ARCHITECTURE.md and delete,docs/merge-auth-testing,pequeno,"docs,cleanup,testing",80
+docs/cloudflare-worker-cdn.js,partial,MOVE to workers/cdn-router/ with wrangler.toml and README,refactor/move-cdn-worker,medio,"infra,cloudflare,deployment,critical",0
+docs/EXECUTIVE_ARCHITECTURE.md,implemented,None — Architecture fully implemented,null,null,"architecture,player,verified",100
+docs/GOVERNANCE_POLICIES.md,partial,Add aspirational disclaimer at top,docs/add-aspirational-disclaimer,pequeno,"docs,governance,clarification",20
+docs/KPI_METRICS.md,partial,Add implementation status table and clarify as roadmap,docs/clarify-kpi-roadmap,pequeno,"docs,metrics,roadmap",10
+docs/LAUNCH_CHECKLIST.md,partial,Populate with actual status or delete if unused,docs/populate-or-delete-launch-checklist,medio,"docs,launch,decision-needed",0
+docs/M3U_ACCESS_PATTERN.md,implemented,None — Security implementation perfect,null,null,"architecture,security,m3u,verified",100
+docs/M3U_SYNC_RUNBOOK.md,partial,MOVE to docs/archive/alternatives/ (never implemented),docs/archive-m3u-sync-runbook,pequeno,"docs,archive,m3u,cleanup",0
+docs/MIGRATION_GUIDE_PHONE_CONSOLIDATION.md,obsolete,Update status to EXECUTED and schedule archival,docs/update-phone-consolidation-status,pequeno,"docs,migration,status-update",100
+docs/MIGRATION_PLAN_FASE8.md,partial,Update checkboxes with actual progress status,docs/update-fase8-status,medio,"docs,migration,status-update",40
+docs/MOBILE_TESTING_GUIDE.md,implemented,None — Guide accurate and useful,null,null,"docs,mobile,testing,verified",100
+docs/NOTIFICATION_ARCHITECTURE.md,implemented,None — Perfect implementation match,null,null,"architecture,notifications,verified",100
+docs/PLAYER_ARCHITECTURE.md,implemented,None — Implementation complete,null,null,"architecture,player,verified",100
+docs/PRODUCT_MASTER.md,obsolete,MOVE to docs/archive/strategic/,docs/archive-product-master,pequeno,"docs,archive,strategic",10
+docs/QA_CHECKLIST.md,partial,Populate or delete if unused,docs/qa-checklist-decision,medio,"docs,qa,decision-needed",0
+docs/ROLLOUT_PLAN.md,redundant,DELETE — covered by other docs,docs/delete-rollout-plan,pequeno,"docs,cleanup,redundant",80
+docs/SECURITY_ESCALATION_SETUP.md,implemented,None — System fully operational,null,null,"docs,security,verified",100
+docs/SECURITY_RECOMMENDATIONS.md,implemented,Add configuration status checkboxes,docs/add-security-config-status,pequeno,"docs,security",95
+docs/SLA_DEFINITIONS.md,obsolete,MOVE to docs/archive/strategic/,docs/archive-sla-definitions,pequeno,"docs,archive,sla",0
+docs/STORE_PUBLICATION_GUIDE.md,recommend-delete,MOVE to docs/future/ (not current priority),docs/move-store-guide-to-future,pequeno,"docs,mobile,future",0
+docs/VALIDATION_GUIDELINES.md,implemented,None — Guidelines match implementation,null,null,"docs,validation,verified",100
+docs/WHATSAPP_WEBHOOK_SETUP.md,implemented,None — Complete implementation,null,null,"docs,webhooks,verified",100
+docs/playbooks/cost-control.md,implemented,None — Operational playbook,null,null,"playbook,ops,verified",100
+docs/playbooks/failover.md,implemented,None — Operational playbook,null,null,"playbook,ops,verified",100
+docs/playbooks/CUTOVER_RUNBOOK.md,implemented,None — Operational playbook,null,null,"playbook,ops,verified",100
+docs/playbooks/ROLLBACK_PROCEDURES.md,implemented,None — Operational playbook,null,null,"playbook,ops,verified",100
