@@ -370,7 +370,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           <div className="space-y-2">
             <Label className="text-sm font-medium">Data de Contratação</Label>
             <DatePicker
-              date={formData.data_contratacao ? parseISO(formData.data_contratacao) : undefined}
+              date={formData.data_contratacao && formData.data_contratacao.trim() ? parseISO(formData.data_contratacao) : undefined}
               onDateChange={(date) => updateField('data_contratacao', date ? format(date, 'yyyy-MM-dd') : '')}
               placeholder="Selecione a data"
               className="transition-all focus:ring-2 focus:ring-amber-500/20"
@@ -380,7 +380,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           <div className="space-y-2">
             <Label className="text-sm font-medium">Data de Vencimento</Label>
             <DatePicker
-              date={formData.data_vencimento ? parseISO(formData.data_vencimento) : undefined}
+              date={formData.data_vencimento && formData.data_vencimento.trim() ? parseISO(formData.data_vencimento) : undefined}
               onDateChange={(date) => updateField('data_vencimento', date ? format(date, 'yyyy-MM-dd') : '')}
               placeholder="Selecione a data"
               className="transition-all focus:ring-2 focus:ring-amber-500/20"
@@ -390,7 +390,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           <div className="space-y-2">
             <Label className="text-sm font-medium">Último Pagamento</Label>
             <DatePicker
-              date={formData.data_ultimo_pagamento ? parseISO(formData.data_ultimo_pagamento) : undefined}
+              date={formData.data_ultimo_pagamento && formData.data_ultimo_pagamento.trim() ? parseISO(formData.data_ultimo_pagamento) : undefined}
               onDateChange={(date) => updateField('data_ultimo_pagamento', date ? format(date, 'yyyy-MM-dd') : '')}
               placeholder="Selecione a data"
               className="transition-all focus:ring-2 focus:ring-amber-500/20"
@@ -485,7 +485,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
-              {formData.created_at && (
+              {formData.created_at && formData.created_at.trim() && (
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Data de Criação</Label>
                   <Input
@@ -496,7 +496,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
                 </div>
               )}
 
-              {formData.updated_at && (
+              {formData.updated_at && formData.updated_at.trim() && (
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Última Atualização</Label>
                   <Input
