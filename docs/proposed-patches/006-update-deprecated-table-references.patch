@@ -1,0 +1,119 @@
+--- Update references to deprecated tables (clientes → profiles)
++++ Ensure all active documentation references current schema
+
+RATIONALE:
+- Migration to unified profiles table completed (Patch 004)
+- Several active docs still reference deprecated clientes table
+- Can cause confusion about current data model
+- Archive docs should maintain references (historical context)
+
+SCOPE: ACTIVE DOCS ONLY (preserve archive/* for historical accuracy)
+
+AFFECTED FILES:
+1. docs/M3U_ACCESS_PATTERN.md - SQL examples
+2. docs/NOTIFICATION_ARCHITECTURE.md - Client references
+3. docs/VALIDATION_GUIDELINES.md - Schema examples
+4. docs/playbooks/CUTOVER_RUNBOOK.md - SQL scripts
+5. docs/playbooks/ROLLBACK_PROCEDURES.md - SQL scripts
+
+RISK: BAIXA (documentation only, no code changes)
+EFFORT: PEQUENO (search/replace with verification)
+
+---
+
+FILE 1: docs/M3U_ACCESS_PATTERN.md
+BEFORE (line ~171):
+        SELECT id FROM clientes WHERE user_id = auth.uid()
+
+AFTER:
+        SELECT id FROM profiles WHERE id = auth.uid()
+
+JUSTIFICATION:
+- profiles uses id (UUID from auth.users) directly
+- No need for user_id foreign key lookup
+
+---
+
+FILE 2: docs/NOTIFICATION_ARCHITECTURE.md
+CHANGES:
+- Line ~18: "NewClientDetector.ts" → "NewProfileDetector.ts" (conceptual rename)
+- Line ~19: "ClientChangeDetector.ts" → "ProfileChangeDetector.ts"
+- Line ~94: "novos clientes" → "novos perfis"
+- Line ~98: "dados de clientes" → "dados de perfis"
+- Line ~150-151: "clientes que pagaram" → "perfis que pagaram"
+
+JUSTIFICATION:
+- Aligns terminology with unified profiles model
+- "Cliente" now refers to business concept, not table name
+
+---
+
+FILE 3: docs/VALIDATION_GUIDELINES.md
+BEFORE (line ~107):
+const clienteSchema = z.object({
+
+AFTER:
+const profileSchema = z.object({
+
+JUSTIFICATION:
+- Schema should reflect current profiles table structure
+- Add note: "// Note: profiles table combines user + client data"
+
+---
+
+FILE 4: docs/playbooks/CUTOVER_RUNBOOK.md
+BEFORE (line ~94):
+psql -c "SELECT COUNT(*) FROM clientes WHERE situacao IS NULL;"
+
+AFTER:
+psql -c "SELECT COUNT(*) FROM profiles WHERE situacao IS NULL;"
+
+BEFORE (line ~102):
+  FROM clientes
+
+AFTER:
+  FROM profiles
+
+JUSTIFICATION:
+- Cutover scripts must reference current schema
+- Add comment: "-- Note: clientes table deprecated, use profiles"
+
+---
+
+FILE 5: docs/playbooks/ROLLBACK_PROCEDURES.md
+BEFORE (multiple lines):
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM clientes;"
+  'clientes' as tabela, COUNT(*) as total FROM clientes
+  'clientes' as tabela,
+FROM clientes
+
+AFTER:
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM profiles;"
+  'profiles' as tabela, COUNT(*) as total FROM profiles
+  'profiles' as tabela,
+FROM profiles
+
+JUSTIFICATION:
+- Rollback procedures must verify current table state
+- Even rollbacks should reference current schema
+
+---
+
+TESTING CHECKLIST:
+- [ ] All SQL queries syntactically valid against current schema
+- [ ] No references to clientes in active docs (except archive/)
+- [ ] Archive docs preserve clientes references (historical accuracy)
+- [ ] Markdown formatting intact after changes
+- [ ] Links and references still functional
+
+ACCEPTANCE CRITERIA:
+- [ ] grep -r "FROM clientes" docs/*.md returns 0 results
+- [ ] grep -r "clientes table" docs/*.md returns 0 results
+- [ ] Archive docs unchanged (historical integrity)
+- [ ] All active docs pass markdown lint
+
+NEXT STEPS AFTER PATCH:
+1. Run: grep -r "clientes" docs/*.md | grep -v archive
+2. Verify: Only archive/ contains clientes references
+3. Update: docs/QUALITY_VERIFICATION_REPORT.md status
+4. Document: Add to docs/PATCH_EXECUTION_REPORT.md

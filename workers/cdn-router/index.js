@@ -31,18 +31,26 @@
 
 const CONFIG = {
   // Rate limiting
-  RATE_LIMIT_REQUESTS_PER_MINUTE: 100,
-  RATE_LIMIT_BANDWIDTH_MB_PER_MINUTE: 100,
+  RATE_LIMIT_REQUESTS_PER_MINUTE: 200,
+  RATE_LIMIT_BANDWIDTH_MB_PER_MINUTE: 500,
   
-  // Cache settings
-  MANIFEST_MAX_AGE: 30,
-  MANIFEST_STALE_WHILE_REVALIDATE: 60,
-  SEGMENT_MAX_AGE: 86400,
+  // Aggressive cache settings for HLS optimization
+  MANIFEST_MAX_AGE: 10,                    // 10s browser cache (frequently updated)
+  MANIFEST_STALE_WHILE_REVALIDATE: 30,     // 30s stale grace period
+  MANIFEST_CDN_MAX_AGE: 30,                // 30s CDN cache
+  
+  SEGMENT_MAX_AGE: 3600,                   // 1h browser cache (immutable content)
+  SEGMENT_CDN_MAX_AGE: 86400,              // 24h CDN cache
+  SEGMENT_IMMUTABLE: true,                 // Enable immutable flag
   
   // Security
   ALLOWED_REFERRERS: ['iptvlink.com', 'localhost', '127.0.0.1'],
   ENABLE_CORS: true,
-  ENABLE_CSP: true
+  ENABLE_CSP: true,
+  
+  // Performance
+  ENABLE_BROTLI: true,
+  ENABLE_GZIP: true
 };
 
 // ============================================
@@ -242,6 +250,26 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     
+    // Health check endpoint
+    if (url.pathname === '/health') {
+      return new Response(JSON.stringify({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        config: {
+          rateLimit: `${CONFIG.RATE_LIMIT_REQUESTS_PER_MINUTE} req/min`,
+          bandwidth: `${CONFIG.RATE_LIMIT_BANDWIDTH_MB_PER_MINUTE} MB/min`,
+          manifestCache: `${CONFIG.MANIFEST_MAX_AGE}s browser, ${CONFIG.MANIFEST_CDN_MAX_AGE}s edge`,
+          segmentCache: `${CONFIG.SEGMENT_MAX_AGE}s browser, ${CONFIG.SEGMENT_CDN_MAX_AGE}s edge`
+        }
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+    
     // Handle OPTIONS (CORS preflight)
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -321,7 +349,10 @@ export default {
       
       const headers = getSecurityHeaders(request, allowedReferrers);
       headers.set('Content-Type', 'application/vnd.apple.mpegurl');
-      headers.set('Cache-Control', `public, max-age=${CONFIG.MANIFEST_MAX_AGE}, stale-while-revalidate=${CONFIG.MANIFEST_STALE_WHILE_REVALIDATE}`);
+      
+      // Layered caching: browser + CDN with different TTLs
+      headers.set('Cache-Control', `public, max-age=${CONFIG.MANIFEST_MAX_AGE}, s-maxage=${CONFIG.MANIFEST_CDN_MAX_AGE}, stale-while-revalidate=${CONFIG.MANIFEST_STALE_WHILE_REVALIDATE}`);
+      headers.set('CDN-Cache-Control', `max-age=${CONFIG.MANIFEST_CDN_MAX_AGE}`); // Cloudflare-specific
       headers.set('Vary', 'Accept-Encoding');
       
       // Add token expiry header for client reference
@@ -374,7 +405,20 @@ export default {
         
         const headers = getSecurityHeaders(request, allowedReferrers);
         headers.set('Content-Type', object.httpMetadata?.contentType || 'video/mp2t');
-        headers.set('Cache-Control', `public, max-age=${CONFIG.SEGMENT_MAX_AGE}`);
+        
+        // Ultra-aggressive caching for segments (immutable content)
+        const cacheDirectives = [
+          'public',
+          `max-age=${CONFIG.SEGMENT_MAX_AGE}`,
+          `s-maxage=${CONFIG.SEGMENT_CDN_MAX_AGE}`
+        ];
+        
+        if (CONFIG.SEGMENT_IMMUTABLE) {
+          cacheDirectives.push('immutable');
+        }
+        
+        headers.set('Cache-Control', cacheDirectives.join(', '));
+        headers.set('CDN-Cache-Control', `max-age=${CONFIG.SEGMENT_CDN_MAX_AGE}`); // Cloudflare-specific: 24h edge cache
         headers.set('Accept-Ranges', 'bytes');
         
         response = new Response(object.body, { headers });
