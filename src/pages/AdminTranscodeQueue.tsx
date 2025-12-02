@@ -13,6 +13,10 @@ import {
   TranscodeBandwidthOptimizer,
   TranscodeConcurrencyLimiter,
   TranscodeWebhookRetry,
+  TranscodeMLPredictor,
+  TranscodeRealtimeMonitor,
+  TranscodeCostForecasting,
+  TranscodeAdvancedAnalytics,
 } from '@/components/admin/transcode';
 import { 
   Video, 
@@ -24,6 +28,9 @@ import {
   TrendingDown,
   Settings,
   Webhook,
+  Brain,
+  Activity,
+  BarChart3,
 } from 'lucide-react';
 
 export default function AdminTranscodeQueue() {
@@ -34,7 +41,7 @@ export default function AdminTranscodeQueue() {
   return (
     <div className="container mx-auto py-8 px-4">
       <Tabs defaultValue="queue" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-9 max-w-full overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-13 max-w-full overflow-x-auto">
           <TabsTrigger value="queue" className="flex items-center gap-1 text-xs">
             <Video className="h-3 w-3" />
             Fila
@@ -70,6 +77,22 @@ export default function AdminTranscodeQueue() {
           <TabsTrigger value="compare" className="flex items-center gap-1 text-xs">
             <Maximize className="h-3 w-3" />
             Compare
+          </TabsTrigger>
+          <TabsTrigger value="ml" className="flex items-center gap-1 text-xs">
+            <Brain className="h-3 w-3" />
+            ML
+          </TabsTrigger>
+          <TabsTrigger value="realtime" className="flex items-center gap-1 text-xs">
+            <Activity className="h-3 w-3" />
+            Monitor
+          </TabsTrigger>
+          <TabsTrigger value="forecast" className="flex items-center gap-1 text-xs">
+            <DollarSign className="h-3 w-3" />
+            Forecast
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-1 text-xs">
+            <BarChart3 className="h-3 w-3" />
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -107,6 +130,22 @@ export default function AdminTranscodeQueue() {
 
         <TabsContent value="compare">
           <TranscodeQualityComparison />
+        </TabsContent>
+
+        <TabsContent value="ml">
+          <TranscodeMLPredictor />
+        </TabsContent>
+
+        <TabsContent value="realtime">
+          <TranscodeRealtimeMonitor />
+        </TabsContent>
+
+        <TabsContent value="forecast">
+          <TranscodeCostForecasting />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <TranscodeAdvancedAnalytics />
         </TabsContent>
       </Tabs>
     </div>

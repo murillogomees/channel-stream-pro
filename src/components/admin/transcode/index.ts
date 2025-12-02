@@ -11,3 +11,7 @@ export { TranscodePriorityManager } from './TranscodePriorityManager';
 export { TranscodeBandwidthOptimizer } from './TranscodeBandwidthOptimizer';
 export { TranscodeConcurrencyLimiter } from './TranscodeConcurrencyLimiter';
 export { TranscodeWebhookRetry } from './TranscodeWebhookRetry';
+export { TranscodeMLPredictor } from './TranscodeMLPredictor';
+export { TranscodeRealtimeMonitor } from './TranscodeRealtimeMonitor';
+export { TranscodeCostForecasting } from './TranscodeCostForecasting';
+export { TranscodeAdvancedAnalytics } from './TranscodeAdvancedAnalytics';
