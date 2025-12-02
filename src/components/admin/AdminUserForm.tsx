@@ -1,21 +1,19 @@
 /**
  * AdminUserForm - Enterprise-level User Management Form
- * Completely redesigned with modern UI/UX patterns and visual hierarchy
+ * Refactored: Consolidated phone fields, removed M3U/device fields, added role management
  */
 
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Eye, EyeOff, User, Mail, Phone, MapPin, CreditCard, Calendar, Tv, Shield, Info, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { User, Mail, Phone, MapPin, CreditCard, Calendar, Shield, Info, CheckCircle2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface UserFormData {
@@ -23,8 +21,7 @@ interface UserFormData {
   id?: string;
   nome: string;
   email: string;
-  telefone: string;
-  telefone_whatsapp: string;
+  contact_phone: string;
   
   // Status e Situação
   cliente_ativo: boolean;
@@ -42,19 +39,8 @@ interface UserFormData {
   data_vencimento: string;
   data_ultimo_pagamento: string;
   
-  // Dispositivo e M3U
-  dispositivo_contratado: string;
-  mac_smart_one: string;
-  usuario_m3u: string;
-  senha_m3u: string;
-  
-  // SmartOne (readonly)
-  smartone_playlist_id?: string;
-  smartone_status?: string;
-  smartone_last_sync_at?: string;
-  smartone_raw_response?: string;
-  
-  // Segurança
+  // Segurança e Preferências
+  user_role?: 'client' | 'admin' | 'master';
   theme?: string;
   totp_enabled: boolean;
   totp_secret?: string;
@@ -69,6 +55,7 @@ interface AdminUserFormProps {
   formData: Partial<UserFormData>;
   onChange: (data: Partial<UserFormData>) => void;
   isEdit?: boolean;
+  currentUserRole?: 'client' | 'admin' | 'master';
 }
 
 interface SectionHeaderProps {
@@ -121,20 +108,12 @@ const SectionHeader = ({ icon, title, description, variant = 'primary', badge }:
   );
 };
 
-export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserFormProps) {
-  const [showM3UPassword, setShowM3UPassword] = useState(false);
-
+export function AdminUserForm({ formData, onChange, isEdit = false, currentUserRole }: AdminUserFormProps) {
   const updateField = (field: keyof UserFormData, value: any) => {
     onChange({ ...formData, [field]: value });
   };
 
-  const formatMacAddress = (value: string) => {
-    // Remove tudo que não é hexadecimal
-    const cleaned = value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-    // Adiciona os dois pontos a cada 2 caracteres
-    const formatted = cleaned.match(/.{1,2}/g)?.join(':') || cleaned;
-    return formatted.substring(0, 17); // Máximo XX:XX:XX:XX:XX:XX
-  };
+  const canEditRole = currentUserRole === 'master';
 
   return (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
@@ -173,7 +152,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               value={formData.nome || ''}
               onChange={(e) => updateField('nome', e.target.value)}
               placeholder="Digite o nome completo"
-              className="transition-all focus:ring-2 focus:ring-primary/20"
+              className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
             />
           </div>
 
@@ -189,38 +168,26 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               value={formData.email || ''}
               onChange={(e) => updateField('email', e.target.value)}
               placeholder="email@exemplo.com"
-              className="transition-all focus:ring-2 focus:ring-primary/20"
+              className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="telefone" className="text-sm font-medium flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-              Telefone
-            </Label>
-            <PhoneInput
-              id="telefone"
-              value={formData.telefone || ''}
-              onChange={(value) => updateField('telefone', value)}
-              mask="brazilian"
-              placeholder="(11) 99999-9999"
-              className="transition-all focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="telefone_whatsapp" className="text-sm font-medium flex items-center gap-2">
+            <Label htmlFor="contact_phone" className="text-sm font-medium flex items-center gap-2">
               <Phone className="h-3.5 w-3.5 text-success" />
-              WhatsApp
+              Telefone / WhatsApp
             </Label>
             <PhoneInput
-              id="telefone_whatsapp"
-              value={formData.telefone_whatsapp || ''}
-              onChange={(value) => updateField('telefone_whatsapp', value)}
+              id="contact_phone"
+              value={formData.contact_phone || ''}
+              onChange={(value) => updateField('contact_phone', value)}
               mask="brazilian"
               placeholder="(11) 99999-9999"
-              className="transition-all focus:ring-2 focus:ring-success/20"
+              className="transition-all focus:ring-2 focus:ring-success/20 h-12"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              💡 Número principal para contato e notificações WhatsApp
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -229,7 +196,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               Como Conheceu?
             </Label>
             <Select value={formData.origem_cadastro || ''} onValueChange={(value) => updateField('origem_cadastro', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-12">
                 <SelectValue placeholder="Selecione a origem" />
               </SelectTrigger>
               <SelectContent>
@@ -262,7 +229,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
             <Label htmlFor="cliente_ativo" className="text-sm font-medium">
               Cliente Ativo
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-12">
               <Switch
                 id="cliente_ativo"
                 checked={formData.cliente_ativo || false}
@@ -282,7 +249,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               Situação
             </Label>
             <Select value={formData.situacao || ''} onValueChange={(value) => updateField('situacao', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-success/20">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-success/20 h-12">
                 <SelectValue placeholder="Selecione a situação" />
               </SelectTrigger>
               <SelectContent>
@@ -315,7 +282,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               Plano de Assinatura
             </Label>
             <Select value={formData.plano || ''} onValueChange={(value) => updateField('plano', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-12">
                 <SelectValue placeholder="Selecione o plano" />
               </SelectTrigger>
               <SelectContent>
@@ -343,7 +310,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
                 value={formData.valor_pago || ''}
                 onChange={(e) => updateField('valor_pago', parseFloat(e.target.value) || 0)}
                 placeholder="0,00"
-                className="pl-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                className="pl-10 transition-all focus:ring-2 focus:ring-blue-500/20 h-12"
               />
             </div>
           </div>
@@ -353,7 +320,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               Forma de Pagamento
             </Label>
             <Select value={formData.forma_ultimo_pagamento || ''} onValueChange={(value) => updateField('forma_ultimo_pagamento', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-12">
                 <SelectValue placeholder="Selecione a forma de pagamento" />
               </SelectTrigger>
               <SelectContent>
@@ -371,7 +338,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
             <Label htmlFor="is_recorrente" className="text-sm font-medium">
               Pagamento Recorrente
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-12">
               <Switch
                 id="is_recorrente"
                 checked={formData.is_recorrente || false}
@@ -434,178 +401,45 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
 
       <Separator className="my-6" />
 
-      {/* Seção 5: Dispositivo e Acesso M3U */}
-      <div className="space-y-4">
-        <SectionHeader
-          icon={<Tv className="h-5 w-5" />}
-          title="Dispositivo e Acesso M3U"
-          description="Configurações de streaming e dispositivos"
-          variant="info"
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
-          <div className="space-y-2">
-            <Label htmlFor="dispositivo_contratado" className="text-sm font-medium">
-              Dispositivo Contratado
-            </Label>
-            <Select value={formData.dispositivo_contratado || ''} onValueChange={(value) => updateField('dispositivo_contratado', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20">
-                <SelectValue placeholder="Selecione o dispositivo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SmartTV">📺 Smart TV</SelectItem>
-                <SelectItem value="TVBox">📦 TV Box</SelectItem>
-                <SelectItem value="Celular">📱 Celular</SelectItem>
-                <SelectItem value="Tablet">📋 Tablet</SelectItem>
-                <SelectItem value="Computador">💻 Computador</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mac_smart_one" className="text-sm font-medium">
-              Endereço MAC
-            </Label>
-            <Input
-              id="mac_smart_one"
-              value={formData.mac_smart_one || ''}
-              onChange={(e) => updateField('mac_smart_one', formatMacAddress(e.target.value))}
-              placeholder="XX:XX:XX:XX:XX:XX"
-              maxLength={17}
-              className="font-mono transition-all focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="usuario_m3u" className="text-sm font-medium">
-              Usuário M3U
-            </Label>
-            <Input
-              id="usuario_m3u"
-              value={formData.usuario_m3u || ''}
-              onChange={(e) => updateField('usuario_m3u', e.target.value)}
-              placeholder="usuario_m3u"
-              className="font-mono transition-all focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="senha_m3u" className="text-sm font-medium">
-              Senha M3U
-            </Label>
-            <div className="relative">
-              <Input
-                id="senha_m3u"
-                type={showM3UPassword ? 'text' : 'password'}
-                value={formData.senha_m3u || ''}
-                onChange={(e) => updateField('senha_m3u', e.target.value)}
-                placeholder="senha_m3u"
-                className="pr-10 font-mono transition-all focus:ring-2 focus:ring-blue-500/20"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-full hover:bg-transparent"
-                onClick={() => setShowM3UPassword(!showM3UPassword)}
-              >
-                {showM3UPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Seção 6: Integração SmartOne (Somente Leitura em modo de edição) */}
-      {isEdit && formData.smartone_playlist_id && (
-        <>
-          <Separator className="my-6" />
-          <div className="space-y-4">
-            <SectionHeader
-              icon={<Tv className="h-5 w-5" />}
-              title="Integração SmartOne"
-              description="Dados de sincronização com SmartOne IPTV"
-              variant="secondary"
-              badge="Somente Leitura"
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Playlist ID</Label>
-                <Input
-                  value={formData.smartone_playlist_id || 'Não sincronizado'}
-                  disabled
-                  className="bg-muted/50 border-muted"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Status de Sincronização</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={formData.smartone_status || 'nao_enviado'}
-                    disabled
-                    className="flex-1 bg-muted/50 border-muted"
-                  />
-                  {formData.smartone_status === 'criado' && (
-                    <Badge className="bg-success/20 text-success border-success/30">
-                      Sincronizado
-                    </Badge>
-                  )}
-                  {formData.smartone_status === 'erro' && (
-                    <Badge variant="destructive">Erro</Badge>
-                  )}
-                </div>
-              </div>
-
-              {formData.smartone_last_sync_at && (
-                <div className="space-y-2 lg:col-span-2">
-                  <Label className="text-sm text-muted-foreground">Última Sincronização</Label>
-                  <Input
-                    value={format(parseISO(formData.smartone_last_sync_at), "dd/MM/yyyy 'às' HH:mm")}
-                    disabled
-                    className="bg-muted/50 border-muted"
-                  />
-                </div>
-              )}
-
-              {formData.smartone_raw_response && (
-                <div className="space-y-2 lg:col-span-2">
-                  <Label className="text-sm text-muted-foreground">Resposta da API</Label>
-                  <Textarea
-                    value={formData.smartone_raw_response}
-                    disabled
-                    className="bg-muted/50 border-muted font-mono text-xs h-24 resize-none"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      <Separator className="my-6" />
-
-      {/* Seção 7: Segurança e Preferências */}
+      {/* Seção 5: Segurança e Preferências */}
       <div className="space-y-4">
         <SectionHeader
           icon={<Shield className="h-5 w-5" />}
           title="Segurança e Preferências"
-          description="Configurações de segurança e personalização"
-          variant="warning"
+          description="Configurações de acesso e permissões"
+          variant="secondary"
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
+          {canEditRole && (
+            <div className="space-y-2">
+              <Label htmlFor="user_role" className="text-sm font-medium flex items-center gap-2">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Função do Usuário
+                <Badge variant="outline" className="text-xs">Somente Master</Badge>
+              </Label>
+              <Select value={formData.user_role || 'client'} onValueChange={(value: any) => updateField('user_role', value)}>
+                <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-12">
+                  <SelectValue placeholder="Selecione a função" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="client">👤 Cliente</SelectItem>
+                  <SelectItem value="admin">🔧 Administrador</SelectItem>
+                  <SelectItem value="master">👑 Master</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                ⚠️ Alteração de função requer auditoria
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="theme" className="text-sm font-medium">
-              Tema do Sistema
+              Tema de Interface
             </Label>
             <Select value={formData.theme || 'system'} onValueChange={(value) => updateField('theme', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-amber-500/20">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-12">
                 <SelectValue placeholder="Selecione o tema" />
               </SelectTrigger>
               <SelectContent>
@@ -618,9 +452,9 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
 
           <div className="space-y-2">
             <Label htmlFor="totp_enabled" className="text-sm font-medium">
-              Autenticação de Dois Fatores (2FA)
+              Autenticação 2FA
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-12">
               <Switch
                 id="totp_enabled"
                 checked={formData.totp_enabled || false}
@@ -632,36 +466,20 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
               )}>
                 {formData.totp_enabled ? '🔒 Ativado' : '🔓 Desativado'}
               </span>
-              {formData.totp_verified_at && (
-                <Badge variant="outline" className="ml-auto text-xs">
-                  Verificado em {format(parseISO(formData.totp_verified_at), 'dd/MM/yyyy')}
-                </Badge>
-              )}
             </div>
           </div>
-
-          {isEdit && formData.totp_secret && (
-            <div className="space-y-2 lg:col-span-2">
-              <Label className="text-sm text-muted-foreground">Secret 2FA (Apenas Admin)</Label>
-              <Input
-                value={formData.totp_secret}
-                disabled
-                className="bg-muted/50 border-muted font-mono text-xs"
-              />
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Seção 8: Informações do Sistema (Somente em modo de edição) */}
+      {/* Seção 6: Informações do Sistema (Somente Leitura) */}
       {isEdit && (formData.created_at || formData.updated_at) && (
         <>
           <Separator className="my-6" />
           <div className="space-y-4">
             <SectionHeader
-              icon={<Clock className="h-5 w-5" />}
+              icon={<Info className="h-5 w-5" />}
               title="Informações do Sistema"
-              description="Timestamps e metadados do sistema"
+              description="Dados de auditoria e controle"
               variant="secondary"
               badge="Somente Leitura"
             />
@@ -669,11 +487,11 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
               {formData.created_at && (
                 <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Criado em</Label>
+                  <Label className="text-sm text-muted-foreground">Data de Criação</Label>
                   <Input
                     value={format(parseISO(formData.created_at), "dd/MM/yyyy 'às' HH:mm")}
                     disabled
-                    className="bg-muted/50 border-muted"
+                    className="bg-muted/50 border-muted h-12"
                   />
                 </div>
               )}
@@ -684,7 +502,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false }: AdminUserF
                   <Input
                     value={format(parseISO(formData.updated_at), "dd/MM/yyyy 'às' HH:mm")}
                     disabled
-                    className="bg-muted/50 border-muted"
+                    className="bg-muted/50 border-muted h-12"
                   />
                 </div>
               )}
