@@ -207,14 +207,14 @@ export default function AdminCoupons() {
               <div className="space-y-2">
                 <Label htmlFor="target_plan">Plano Alvo (opcional)</Label>
                 <Select 
-                  value={formData.target_plan} 
-                  onValueChange={(v) => setFormData({ ...formData, target_plan: v })}
+                  value={formData.target_plan || "all"} 
+                  onValueChange={(v) => setFormData({ ...formData, target_plan: v === "all" ? "" : v })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os planos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os planos</SelectItem>
+                    <SelectItem value="all">Todos os planos</SelectItem>
                     <SelectItem value="Mensal">Mensal</SelectItem>
                     <SelectItem value="Trimestral">Trimestral</SelectItem>
                     <SelectItem value="Semestral">Semestral</SelectItem>
