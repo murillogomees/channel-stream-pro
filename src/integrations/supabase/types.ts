@@ -559,6 +559,158 @@ export type Database = {
         }
         Relationships: []
       }
+      cache_invalidations: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          initiated_at: string
+          initiated_by: string | null
+          invalidation_type: string
+          keys_invalidated: number | null
+          metadata: Json | null
+          pattern: string
+          scope: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          initiated_at?: string
+          initiated_by?: string | null
+          invalidation_type: string
+          keys_invalidated?: number | null
+          metadata?: Json | null
+          pattern: string
+          scope?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          initiated_at?: string
+          initiated_by?: string | null
+          invalidation_type?: string
+          keys_invalidated?: number | null
+          metadata?: Json | null
+          pattern?: string
+          scope?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      cache_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          enabled: boolean
+          headers: Json | null
+          id: string
+          last_applied_at: string | null
+          match_pattern: string
+          match_type: string
+          name: string
+          priority: number
+          scope: Json | null
+          stale_if_error: number | null
+          stale_while_revalidate: number | null
+          ttl: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean
+          headers?: Json | null
+          id?: string
+          last_applied_at?: string | null
+          match_pattern: string
+          match_type?: string
+          name: string
+          priority?: number
+          scope?: Json | null
+          stale_if_error?: number | null
+          stale_while_revalidate?: number | null
+          ttl?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean
+          headers?: Json | null
+          id?: string
+          last_applied_at?: string | null
+          match_pattern?: string
+          match_type?: string
+          name?: string
+          priority?: number
+          scope?: Json | null
+          stale_if_error?: number | null
+          stale_while_revalidate?: number | null
+          ttl?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cache_stats: {
+        Row: {
+          avg_response_time_ms: number | null
+          bandwidth_saved_bytes: number | null
+          collected_at: string
+          errors: number
+          hits: number
+          id: string
+          misses: number
+          p95_response_time_ms: number | null
+          rule_id: string | null
+          stale_hits: number
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          avg_response_time_ms?: number | null
+          bandwidth_saved_bytes?: number | null
+          collected_at?: string
+          errors?: number
+          hits?: number
+          id?: string
+          misses?: number
+          p95_response_time_ms?: number | null
+          rule_id?: string | null
+          stale_hits?: number
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          avg_response_time_ms?: number | null
+          bandwidth_saved_bytes?: number | null
+          collected_at?: string
+          errors?: number
+          hits?: number
+          id?: string
+          misses?: number
+          p95_response_time_ms?: number | null
+          rule_id?: string | null
+          stale_hits?: number
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cache_stats_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "cache_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cdn_prewarm_jobs: {
         Row: {
           avg_prewarm_time_ms: number | null
@@ -6066,6 +6218,7 @@ export type Database = {
         }[]
       }
       get_auth_uid: { Args: never; Returns: string }
+      get_cache_coverage_summary: { Args: never; Returns: Json }
       get_cdn_stats: {
         Args: never
         Returns: {
