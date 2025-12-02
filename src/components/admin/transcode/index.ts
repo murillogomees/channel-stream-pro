@@ -1,5 +1,4 @@
 export { TranscodeQueueManager } from './TranscodeQueueManager';
-export { TranscodeQueueDashboard } from './TranscodeQueueDashboard';
 export { TranscodeStats } from './TranscodeStats';
 export { TranscodeJobList } from './TranscodeJobList';
 export { TranscodeJobDialog } from './TranscodeJobDialog';
@@ -15,3 +14,4 @@ export { TranscodeMLPredictor } from './TranscodeMLPredictor';
 export { TranscodeRealtimeMonitor } from './TranscodeRealtimeMonitor';
 export { TranscodeCostForecasting } from './TranscodeCostForecasting';
 export { TranscodeAdvancedAnalytics } from './TranscodeAdvancedAnalytics';
+export { TranscodeQueueDashboard } from './TranscodeQueueDashboard';

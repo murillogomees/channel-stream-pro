@@ -480,3 +480,116 @@ export async function scheduleStreamUploads(channelIds: string[]): Promise<{ suc
 
   return { success, failed };
 }
+
+// ========================================
+// NOVA LÓGICA: INTELLIGENT ROUTING
+// ========================================
+
+export type RoutingStrategy = 'r2-cdn' | 'stream-proxy' | 'cloudflare-stream' | 'origin';
+
+export interface RoutingDecision {
+  strategy: RoutingStrategy;
+  url: string;
+  reason: string;
+  fallbackUrl?: string;
+  cacheable: boolean;
+  ttl: number;
+}
+
+export interface ChannelInfo {
+  channelId: string;
+  channelName: string;
+  groupTitle: string;
+  streamUrl: string;
+  contentType?: string;
+  isLive?: boolean;
+}
+
+/**
+ * NOVA LÓGICA DE ROTEAMENTO:
+ * - Todo conteúdo é tratado como VOD por padrão (vai para R2)
+ * - Apenas /live/ OU "tv ao vivo" explícito usa Cloudflare Stream
+ */
+export async function routeContent(channel: ChannelInfo): Promise<RoutingDecision> {
+  try {
+    // 1. Verificar override manual
+    const { data: override } = await supabase
+      .from('channel_routing_overrides')
+      .select('*')
+      .eq('channel_id', channel.channelId)
+      .maybeSingle();
+
+    if (override && (!override.expires_at || new Date(override.expires_at) > new Date())) {
+      return {
+        strategy: override.strategy as RoutingStrategy,
+        url: buildUrlForStrategy(override.strategy, channel),
+        reason: `Override: ${override.reason || 'configurado manualmente'}`,
+        cacheable: override.strategy === 'r2-cdn',
+        ttl: override.strategy === 'r2-cdn' ? 86400 : 0
+      };
+    }
+
+    // 2. NOVA LÓGICA: Verificar se é LIVE explícito
+    const isExplicitLive = channel.streamUrl.toLowerCase().includes('/live/') ||
+                          channel.groupTitle.toLowerCase().includes('ao vivo') ||
+                          channel.groupTitle.toLowerCase().includes('live tv') ||
+                          channel.contentType === 'live';
+
+    if (isExplicitLive) {
+      return {
+        strategy: 'cloudflare-stream',
+        url: buildCloudflareStreamUrl(channel),
+        reason: 'TV ao vivo - Cloudflare Stream para real-time',
+        fallbackUrl: buildStreamProxyUrl(channel),
+        cacheable: false,
+        ttl: 0
+      };
+    }
+
+    // 3. Por padrão: tudo vai para R2 (assumimos VOD)
+    // Em produção, verificar se existe no R2
+
+    // 4. Por padrão: Stream Proxy (sempre funciona)
+    return {
+      strategy: 'stream-proxy',
+      url: buildStreamProxyUrl(channel),
+      reason: 'Não disponível no CDN - usando proxy',
+      cacheable: false,
+      ttl: 0
+    };
+
+  } catch (error) {
+    console.error('[Routing] Error:', error);
+    return {
+      strategy: 'stream-proxy',
+      url: buildStreamProxyUrl(channel),
+      reason: 'Erro no roteamento - fallback seguro',
+      cacheable: false,
+      ttl: 0
+    };
+  }
+}
+
+function buildUrlForStrategy(strategy: string, channel: ChannelInfo): string {
+  switch (strategy) {
+    case 'r2-cdn':
+      return `https://cdn.iptvlink.com/vod/${channel.channelId}/master.m3u8`;
+    case 'cloudflare-stream':
+      return buildCloudflareStreamUrl(channel);
+    case 'stream-proxy':
+    default:
+      return buildStreamProxyUrl(channel);
+  }
+}
+
+function buildStreamProxyUrl(channel: ChannelInfo): string {
+  const encodedUrl = encodeURIComponent(channel.streamUrl);
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?url=${encodedUrl}&channelId=${channel.channelId}`;
+}
+
+function buildCloudflareStreamUrl(channel: ChannelInfo): string {
+  return `https://customer-${import.meta.env.VITE_CF_ACCOUNT_ID}.cloudflarestream.com/${channel.channelId}/manifest/video.m3u8`;
+}
+
+// createR2Job já definido anteriormente na linha 176
+
