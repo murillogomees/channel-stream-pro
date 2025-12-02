@@ -1,187 +1,101 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/**
+ * Cloudflare Stream Webhook Handler
+ * Receives progress notifications from Cloudflare Stream for transcode jobs
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, webhook-signature, cf-webhook-auth",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-signature',
 };
 
-const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-interface StreamWebhookPayload {
-  uid?: string;
-  readyToStream?: boolean;
-  status?: {
-    state?: string;
-    pctComplete?: string;
-    errorReasonCode?: string;
-    errorReasonText?: string;
-  };
-  meta?: {
-    name?: string;
-    channel_id?: string;
-  };
-  duration?: number;
-  size?: number;
-  created?: string;
-  modified?: string;
-  input?: {
-    width?: number;
-    height?: number;
-  };
-}
-
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Handle GET requests (verification/health check)
-  if (req.method === "GET") {
-    console.log("[CF-Webhook] GET request received - verification/health check");
+  // Handle GET requests (health check)
+  if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
-      status: "ok", 
-      message: "Cloudflare Stream webhook endpoint ready",
+      status: 'ok', 
+      message: 'CF Stream webhook ready',
       timestamp: new Date().toISOString()
     }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
   try {
-    // Try to parse the body, but handle empty/invalid bodies gracefully
-    let payload: StreamWebhookPayload = {};
-    
-    try {
-      const bodyText = await req.text();
-      console.log("[CF-Webhook] Raw body:", bodyText);
-      
-      if (bodyText && bodyText.trim()) {
-        payload = JSON.parse(bodyText);
-      }
-    } catch (parseError) {
-      console.log("[CF-Webhook] Body parse error (might be test request):", parseError);
-    }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("[CF-Webhook] Parsed payload:", JSON.stringify(payload));
+    const payload = await req.json();
+    console.log('CF Stream webhook received:', payload);
 
-    // If no uid, this is likely a test/verification request - return success
-    if (!payload.uid) {
-      console.log("[CF-Webhook] No uid in payload - treating as test/verification request");
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "Webhook verification successful",
-        received: payload,
-        timestamp: new Date().toISOString()
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { uid, status, meta, readyToStream, thumbnail, preview, duration } = payload;
+
+    // Find job by cf_stream_uid
+    const { data: job, error: findError } = await supabase
+      .from('transcode_jobs')
+      .select('*')
+      .eq('cf_stream_uid', uid)
+      .single();
+
+    if (findError || !job) {
+      console.error('Job not found for uid:', uid);
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Real webhook payload processing
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    const { uid, readyToStream, status, meta, duration, size } = payload;
-    const statusState = status?.state || "unknown";
-    const channelId = meta?.channel_id;
-    
-    // Extract progress percentage from pctComplete
-    const progressPercent = status?.pctComplete 
-      ? parseFloat(status.pctComplete) 
-      : (readyToStream ? 100 : 0);
-
-    console.log(`[CF-Webhook] Processing ${uid} - State: ${statusState}, Progress: ${progressPercent}%`);
-
-    // Generate playback URL
-    const playbackUrl = readyToStream 
-      ? `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${uid}/manifest/video.m3u8`
-      : null;
-
-    // Update channel
-    const updateData: Record<string, unknown> = {
-      cf_stream_status: statusState,
+    // Update job based on Cloudflare Stream status
+    const updates: any = {
+      thumbnail_url: thumbnail,
+      preview_url: preview,
     };
 
-    if (readyToStream && playbackUrl) {
-      updateData.cf_stream_url = playbackUrl;
+    if (status?.state === 'ready' && readyToStream) {
+      updates.status = 'ready';
+      updates.completed_at = new Date().toISOString();
+      updates.progress_percent = 100;
+    } else if (status?.state === 'error') {
+      updates.status = 'failed';
+      updates.error_message = status?.errorReasonText || 'CF Stream processing error';
+      updates.completed_at = new Date().toISOString();
+    } else if (status?.state === 'inprogress') {
+      updates.status = 'processing';
+      updates.progress_percent = parseFloat(status?.pctComplete || '50');
     }
 
-    if (duration) {
-      updateData.cf_stream_duration_seconds = Math.floor(duration);
+    const { error: updateError } = await supabase
+      .from('transcode_jobs')
+      .update(updates)
+      .eq('id', job.id);
+
+    if (updateError) {
+      console.error('Error updating job:', updateError);
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    if (size) {
-      updateData.cf_stream_size_bytes = size;
-    }
+    console.log('Job updated successfully:', job.id, updates.status);
 
-    // Update by cf_stream_uid or channel_id
-    let updateQuery = supabase.from("m3u_channels").update(updateData);
-    
-    if (channelId) {
-      updateQuery = updateQuery.eq("id", channelId);
-    } else {
-      updateQuery = updateQuery.eq("cf_stream_uid", uid);
-    }
-
-    const { error: channelError } = await updateQuery;
-
-    if (channelError) {
-      console.error("[CF-Webhook] Failed to update channel:", channelError);
-    }
-
-    // Update upload record with progress percentage
-    const uploadUpdateData: Record<string, unknown> = {
-      status: readyToStream ? "ready" : statusState === "error" ? "error" : "processing",
-      progress_percent: progressPercent,
-      metadata: payload,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (status?.errorReasonText) {
-      uploadUpdateData.error_message = status.errorReasonText;
-    }
-
-    if (readyToStream) {
-      uploadUpdateData.completed_at = new Date().toISOString();
-      uploadUpdateData.progress_percent = 100;
-    }
-
-    const { error: uploadError } = await supabase
-      .from("cf_stream_uploads")
-      .update(uploadUpdateData)
-      .eq("cf_stream_uid", uid);
-
-    if (uploadError) {
-      console.error("[CF-Webhook] Failed to update upload record:", uploadError);
-    }
-
-    console.log(`[CF-Webhook] Updated ${uid} - Status: ${statusState}, Progress: ${progressPercent}%, Ready: ${readyToStream}`);
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      uid,
-      status: statusState,
-      progress: progressPercent,
-      readyToStream,
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: true, jobId: job.id }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error("[CF-Webhook] Error:", error);
-    // Return 200 even on error to prevent Cloudflare from marking webhook as failed
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message,
-      message: "Error processing webhook, but endpoint is reachable"
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error('Webhook error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
