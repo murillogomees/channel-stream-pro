@@ -393,11 +393,25 @@ export default function AppPlayer() {
     // For clients, do nothing - they stay on the player page
   }, true);
 
-  // Use StreamService for proxy URLs
+  // Use StreamService for proxy URLs (sync version for immediate use)
   const getStreamUrl = useCallback((channel: any) => {
     if (!channel?.stream_url) return '';
     return streamService.getPlayableUrl(channel);
   }, []);
+
+  // Prefetch optimized URL when channel is selected (async optimization)
+  useEffect(() => {
+    if (playerChannel) {
+      streamService.getOptimizedUrl(playerChannel)
+        .then(result => {
+          console.log('[AppPlayer] Optimized URL ready:', result.source);
+          // URL is cached internally for future use
+        })
+        .catch(err => {
+          console.warn('[AppPlayer] URL optimization failed:', err);
+        });
+    }
+  }, [playerChannel]);
 
   // Helper to extract series name from episode name
   const extractSeriesName = useCallback((name: string): string => {

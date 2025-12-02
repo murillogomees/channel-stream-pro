@@ -20,6 +20,7 @@ export interface ConnectionAwareConfig {
   lowLatency?: boolean;
   maxBitrate?: number;
   startLevel?: number;
+  source?: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin';
 }
 
 interface UseConnectionAwarePlayerReturn {
@@ -119,7 +120,7 @@ export function useConnectionAwarePlayer(): UseConnectionAwarePlayerReturn {
     };
   }, []);
 
-  // Get optimized HLS config based on connection + user preferences
+  // Get optimized HLS config based on connection + user preferences + source
   const getOptimizedHlsConfig = useCallback((userConfig?: ConnectionAwareConfig): Partial<Hls['config']> => {
     const quality = connectionInfo?.quality || 'good';
     const baseConfig = CONNECTION_CONFIGS[quality];
@@ -131,6 +132,29 @@ export function useConnectionAwarePlayer(): UseConnectionAwarePlayerReturn {
     if (lowLatencyEnabled) {
       config = { ...config, ...LOW_LATENCY_CONFIG };
       console.log('[ConnectionAware] Low latency mode enabled');
+    }
+
+    // Optimize config based on source
+    if (userConfig?.source === 'cdn_worker' || userConfig?.source === 'r2_direct') {
+      // CDN/R2 sources have better reliability, can use more aggressive buffering
+      config = {
+        ...config,
+        maxBufferLength: Math.min((config.maxBufferLength || 30) * 1.5, 60),
+        maxMaxBufferLength: Math.min((config.maxMaxBufferLength || 60) * 1.5, 120),
+        fragLoadingMaxRetry: 3, // Fewer retries needed for CDN
+        fragLoadingRetryDelay: 200, // Faster retries
+        fragLoadingTimeOut: 30000, // Shorter timeout
+      };
+      console.log('[ConnectionAware] CDN optimizations applied');
+    } else if (userConfig?.source === 'cloudflare_stream') {
+      // Cloudflare Stream already optimized
+      config = {
+        ...config,
+        maxBufferLength: 20,
+        fragLoadingMaxRetry: 2,
+        fragLoadingRetryDelay: 100,
+      };
+      console.log('[ConnectionAware] Cloudflare Stream optimizations applied');
     }
 
     // Apply max bitrate cap if set
@@ -153,6 +177,7 @@ export function useConnectionAwarePlayer(): UseConnectionAwarePlayerReturn {
       maxBuffer: config.maxBufferLength,
       startLevel: config.startLevel,
       lowLatency: lowLatencyEnabled,
+      source: userConfig?.source || 'unknown',
     });
 
     return config;
