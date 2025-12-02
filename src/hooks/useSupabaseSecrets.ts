@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SecretStatus {
   name: string;
@@ -31,22 +32,16 @@ export function useSupabaseSecrets() {
     setLoading(true);
     
     try {
-      // Por segurança, secrets não podem ser lidos diretamente
-      // Vamos usar uma edge function para verificar se estão configurados
-      const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/check-secrets`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak',
-          },
-          body: JSON.stringify({ secrets: EXPECTED_SECRETS }),
-        }
-      );
+      // Use Supabase client to call edge function with proper auth handling
+      const { data, error } = await supabase.functions.invoke('check-secrets', {
+        body: { secrets: EXPECTED_SECRETS },
+      });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
         setSecrets(data);
       } else {
         // Se a edge function não existe ainda, assume que os principais estão configurados
