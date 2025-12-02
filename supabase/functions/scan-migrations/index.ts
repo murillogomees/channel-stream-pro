@@ -87,7 +87,7 @@ serve(async (req) => {
     for (const expected of expectedTables || []) {
       const { data: tableExists } = await supabase.rpc('pg_table_is_visible', {
         table_name: expected.object_name
-      }).single();
+      });
 
       if (!tableExists) {
         findings.push({
@@ -143,8 +143,7 @@ USING (is_admin_or_master(auth.uid()));`,
       const { data: indexExists } = await supabase
         .rpc('pg_index_exists', {
           index_name: expected.object_name
-        })
-        .single();
+        });
 
       if (!indexExists) {
         findings.push({
