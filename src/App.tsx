@@ -33,7 +33,7 @@ const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
-const AdminMigrations = lazy(() => import("./pages/AdminMigrations"));
+const AdminMigrations = lazy(() => import("./pages/AdminMigracoes"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
