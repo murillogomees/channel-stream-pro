@@ -9,7 +9,7 @@
 
 2. **Ativar Cloudflare R2**
    - Dashboard → R2 → Get Started
-   - Criar bucket: `iptv-m3u-lists`
+   - Criar bucket: `iptvlink-cdn`
 
 3. **Gerar Access Keys**
    - R2 → Manage R2 API Tokens
@@ -29,7 +29,7 @@ Execute no terminal ou via Supabase Dashboard:
 supabase secrets set R2_ACCOUNT_ID="seu_account_id"
 supabase secrets set R2_ACCESS_KEY_ID="sua_access_key"
 supabase secrets set R2_SECRET_ACCESS_KEY="sua_secret_key"
-supabase secrets set R2_BUCKET_NAME="iptv-m3u-lists"
+supabase secrets set R2_BUCKET_NAME="iptvlink-cdn"
 supabase secrets set R2_PUBLIC_DOMAIN="cdn.seudominio.com.br"
 ```
 
@@ -41,7 +41,7 @@ supabase secrets set R2_PUBLIC_DOMAIN="cdn.seudominio.com.br"
 
 1. **Criar bucket S3**
    - Console AWS → S3 → Create bucket
-   - Nome: `iptv-m3u-lists`
+   - Nome: `iptvlink-cdn`
    - Região: `us-east-1`
    - Desabilitar "Block all public access"
 
@@ -61,7 +61,7 @@ supabase secrets set R2_PUBLIC_DOMAIN="cdn.seudominio.com.br"
 supabase secrets set S3_REGION="us-east-1"
 supabase secrets set S3_ACCESS_KEY_ID="sua_access_key"
 supabase secrets set S3_SECRET_ACCESS_KEY="sua_secret_key"
-supabase secrets set S3_BUCKET_NAME="iptv-m3u-lists"
+supabase secrets set S3_BUCKET_NAME="iptvlink-cdn"
 supabase secrets set S3_PUBLIC_URL="https://d123abc.cloudfront.net"
 ```
 

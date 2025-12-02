@@ -24,7 +24,7 @@ Client Request → CDN Worker (Edge) → JWT Validation → Subscription Check �
 ### 1. Cloudflare Account
 - Active Cloudflare account
 - Workers subscription (free tier works)
-- R2 bucket `iptv-m3u-lists` created
+- R2 bucket `iptvlink-cdn` created
 
 ### 2. GitHub Secrets
 Configure these secrets in GitHub repository settings:
@@ -98,7 +98,7 @@ Update `wrangler.toml` to change bucket:
 ```toml
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "iptv-m3u-lists"  # Change here
+bucket_name = "iptvlink-cdn"  # Bucket padrão do sistema
 ```
 
 ## Usage
