@@ -3726,6 +3726,7 @@ export type Database = {
       profiles: {
         Row: {
           cliente_ativo: boolean | null
+          contact_phone: string | null
           created_at: string | null
           data_contratacao: string | null
           data_ultimo_pagamento: string | null
@@ -3759,6 +3760,7 @@ export type Database = {
         }
         Insert: {
           cliente_ativo?: boolean | null
+          contact_phone?: string | null
           created_at?: string | null
           data_contratacao?: string | null
           data_ultimo_pagamento?: string | null
@@ -3794,6 +3796,7 @@ export type Database = {
         }
         Update: {
           cliente_ativo?: boolean | null
+          contact_phone?: string | null
           created_at?: string | null
           data_contratacao?: string | null
           data_ultimo_pagamento?: string | null
