@@ -195,6 +195,9 @@ flowchart LR
 erDiagram
     PROFILES ||--o{ USER_SUBSCRIPTIONS : "profile_id"
     PROFILES ||--o{ USER_ROLES : "user_id"
+    PROFILES ||--o{ WATCH_PROGRESS : tracks
+    PROFILES ||--o{ FAVORITES : has
+    PROFILES ||--o{ CHANNEL_USAGE_STATS : records
     
     PROFILES {
         uuid id PK
@@ -207,6 +210,8 @@ erDiagram
         boolean cliente_ativo
         string situacao
         string mac_smart_one
+        string dispositivo_contratado
+        number valor_pago
     }
     USER_SUBSCRIPTIONS {
         uuid id PK
@@ -225,29 +230,10 @@ erDiagram
     M3U_CUSTOM_LISTS ||--o{ M3U_CATEGORIES : contains
     M3U_CATEGORIES ||--o{ M3U_CHANNELS : contains
     
-    USER_PROFILES ||--o{ WATCH_PROGRESS : tracks
-    USER_PROFILES ||--o{ FAVORITES : has
-    USER_PROFILES ||--o{ CHANNEL_USAGE_STATS : records
-    
     SECURITY_EVENTS ||--o{ SECURITY_ALERT_DELIVERIES : triggers
     ADMIN_PHONES ||--o{ SECURITY_ALERT_DELIVERIES : receives
     
     FEATURE_FLAG_CONFIG ||--o{ MIGRATION_AUDIT : tracks
-
-    USERS {
-        uuid id PK
-        string email
-        timestamp created_at
-    }
-    
-    PROFILES {
-        uuid id PK
-        uuid user_id FK
-        string full_name
-        string contact_phone
-        string email
-        string plano
-        date data_vencimento
         boolean cliente_ativo
     }
     

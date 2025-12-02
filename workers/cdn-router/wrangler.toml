@@ -7,11 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ALLOWED_REFERRERS = "localhost,127.0.0.1,iptvlink.com"
 
-# R2 Bucket binding
+# R2 Bucket binding (UPDATED: novo bucket iptv-m3u-lists)
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "iptvlink-cdn"
-preview_bucket_name = "iptvlink-cdn-preview"
+bucket_name = "iptv-m3u-lists"
+preview_bucket_name = "iptv-m3u-lists-preview"
 
 # Environment: Staging
 [env.staging]
@@ -20,7 +20,7 @@ vars = { ENVIRONMENT = "staging" }
 
 [[env.staging.r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "iptvlink-cdn-staging"
+bucket_name = "iptv-m3u-lists-staging"
 
 # Environment: Production
 [env.production]
@@ -29,7 +29,7 @@ vars = { ENVIRONMENT = "production", ALLOWED_REFERRERS = "localhost,127.0.0.1,ip
 
 [[env.production.r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "iptvlink-cdn"
+bucket_name = "iptv-m3u-lists"
 
 # Secrets (set via wrangler secret put)
 # - JWT_SECRET: JWT signing secret (same as STREAM_PROXY_SECRET in Supabase)
