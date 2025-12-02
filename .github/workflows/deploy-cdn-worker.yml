@@ -1,0 +1,56 @@
+name: Deploy CDN Worker to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'workers/cdn-router/**'
+      - '.github/workflows/deploy-cdn-worker.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy CDN Router Worker
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: workers/cdn-router
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler deploy --env production
+
+      - name: Configure Production Secrets
+        working-directory: workers/cdn-router
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "$JWT_SECRET" | wrangler secret put JWT_SECRET --env production
+          echo "$SUPABASE_URL" | wrangler secret put SUPABASE_URL --env production
+          echo "$SUPABASE_ANON_KEY" | wrangler secret put SUPABASE_ANON_KEY --env production
+
+      - name: Verify Deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "✅ CDN Worker deployed successfully"
+          echo "🔗 Production URL: https://iptvlink-cdn-router-production.<your-subdomain>.workers.dev"
+          echo "🏥 Health Check: https://iptvlink-cdn-router-production.<your-subdomain>.workers.dev/health"
