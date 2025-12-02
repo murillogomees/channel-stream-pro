@@ -87,7 +87,7 @@ async function verifyJWT(token, secret) {
     
     // Verify signature
     const data = `${headerB64}.${payloadB64}`;
-    const signatureStr = signatureB64.replace(/-/g, '+').replace(/_/g, '/');
+    let signatureStr = signatureB64.replace(/-/g, '+').replace(/_/g, '/');
     while (signatureStr.length % 4) signatureStr += '=';
     const signatureBytes = Uint8Array.from(atob(signatureStr), c => c.charCodeAt(0));
     

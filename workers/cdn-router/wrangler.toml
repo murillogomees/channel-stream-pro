@@ -25,7 +25,7 @@ bucket_name = "iptvlink-cdn-staging"
 # Environment: Production
 [env.production]
 name = "iptvlink-cdn-router-production"
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", ALLOWED_REFERRERS = "localhost,127.0.0.1,iptvlink.com" }
 
 [[env.production.r2_buckets]]
 binding = "R2_BUCKET"
