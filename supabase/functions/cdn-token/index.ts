@@ -121,17 +121,11 @@ serve(async (req) => {
 
     if (action === 'generate') {
       // Generate new signed token
-      let body;
+      let body: any;
       try {
-        const text = await req.text();
-        if (!text || text.trim() === '') {
-          return new Response(
-            JSON.stringify({ error: 'Request body is required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        body = JSON.parse(text);
+        body = await req.json();
       } catch (parseError) {
+        console.error('[CDN-Token] Invalid JSON body for generate:', parseError);
         return new Response(
           JSON.stringify({ error: 'Invalid JSON in request body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -300,17 +294,11 @@ serve(async (req) => {
 
     } else if (action === 'revoke') {
       // Revoke token
-      let body;
+      let body: any;
       try {
-        const text = await req.text();
-        if (!text || text.trim() === '') {
-          return new Response(
-            JSON.stringify({ error: 'Request body is required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        body = JSON.parse(text);
+        body = await req.json();
       } catch (parseError) {
+        console.error('[CDN-Token] Invalid JSON body for revoke:', parseError);
         return new Response(
           JSON.stringify({ error: 'Invalid JSON in request body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
