@@ -466,23 +466,25 @@ export default function AdminUserList() {
 
       {/* Dialog de Edição */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0">
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
             <DialogDescription>
               Altere as informações do usuário {selectedUser?.nome}
             </DialogDescription>
           </DialogHeader>
-          <AdminUserForm
-            formData={editFormData}
-            onChange={setEditFormData}
-            isEdit={true}
-          />
+          <div className="px-6">
+            <AdminUserForm
+              formData={editFormData}
+              onChange={setEditFormData}
+              isEdit={true}
+            />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEditSubmit}>
+            <Button onClick={handleEditSubmit} className="bg-primary hover:bg-primary/90">
               Salvar Alterações
             </Button>
           </DialogFooter>
