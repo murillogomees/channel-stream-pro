@@ -180,6 +180,10 @@ verify_jwt = false
 [functions.cdn-token]
 verify_jwt = false
 
+# Cache Invalidation - admin-only endpoint for purging cache
+[functions.cache-invalidate]
+verify_jwt = true
+
 # CDN Prewarm - nightly edge cache warming
 [functions.cdn-prewarm]
 verify_jwt = false
