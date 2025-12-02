@@ -45,7 +45,6 @@ export interface ClienteData {
   data_vencimento: string | null;
   valor_pago: number;
   cliente_ativo: boolean;
-  mac_smart_one?: string;
 }
 
 export interface SubscriptionData {

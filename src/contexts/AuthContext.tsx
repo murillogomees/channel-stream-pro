@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const [profileResult, rolesResult, clienteResult, subscriptionResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo, mac_smart_one').eq('user_id', userId).maybeSingle(),
+        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo').eq('user_id', userId).maybeSingle(),
         supabase.from('user_subscriptions').select('id, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, mercado_pago_subscription_id').eq('user_id', userId).maybeSingle()
       ]);
 
@@ -110,7 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           data_vencimento: clienteData.data_vencimento,
           valor_pago: clienteData.valor_pago,
           cliente_ativo: clienteData.cliente_ativo,
-          mac_smart_one: clienteData.mac_smart_one,
         } : undefined,
         // Dados de subscription
         subscriptionData: subscriptionData ? {
