@@ -17,6 +17,7 @@ import {
   TranscodeRealtimeMonitor,
   TranscodeCostForecasting,
   TranscodeAdvancedAnalytics,
+  TranscodeQueueDashboard,
 } from '@/components/admin/transcode';
 import { 
   Video, 
@@ -146,6 +147,10 @@ export default function AdminTranscodeQueue() {
 
         <TabsContent value="analytics">
           <TranscodeAdvancedAnalytics />
+        </TabsContent>
+
+        <TabsContent value="dashboard">
+          <TranscodeQueueDashboard />
         </TabsContent>
       </Tabs>
     </div>
