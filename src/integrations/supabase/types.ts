@@ -4091,6 +4091,156 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_drift_log: {
+        Row: {
+          created_at: string
+          current_state: string | null
+          drift_type: string
+          expected_state: string | null
+          fix_applied: boolean
+          fix_applied_at: string | null
+          fix_applied_by: string | null
+          fix_sql: string | null
+          id: string
+          metadata: Json | null
+          notes: string | null
+          object_name: string
+          object_type: string
+          resolved_at: string | null
+          scan_id: string
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          current_state?: string | null
+          drift_type: string
+          expected_state?: string | null
+          fix_applied?: boolean
+          fix_applied_at?: string | null
+          fix_applied_by?: string | null
+          fix_sql?: string | null
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          object_name: string
+          object_type: string
+          resolved_at?: string | null
+          scan_id: string
+          severity: string
+        }
+        Update: {
+          created_at?: string
+          current_state?: string | null
+          drift_type?: string
+          expected_state?: string | null
+          fix_applied?: boolean
+          fix_applied_at?: string | null
+          fix_applied_by?: string | null
+          fix_sql?: string | null
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          object_name?: string
+          object_type?: string
+          resolved_at?: string | null
+          scan_id?: string
+          severity?: string
+        }
+        Relationships: []
+      }
+      schema_expected_state: {
+        Row: {
+          check_enabled: boolean
+          created_at: string
+          definition: string
+          id: string
+          is_critical: boolean
+          metadata: Json | null
+          object_name: string
+          object_schema: string
+          object_type: string
+          parent_object: string | null
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          check_enabled?: boolean
+          created_at?: string
+          definition: string
+          id?: string
+          is_critical?: boolean
+          metadata?: Json | null
+          object_name: string
+          object_schema?: string
+          object_type: string
+          parent_object?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          check_enabled?: boolean
+          created_at?: string
+          definition?: string
+          id?: string
+          is_critical?: boolean
+          metadata?: Json | null
+          object_name?: string
+          object_schema?: string
+          object_type?: string
+          parent_object?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      schema_migrations_tracking: {
+        Row: {
+          applied_at: string
+          applied_by: string | null
+          checksum: string
+          created_at: string
+          error_message: string | null
+          execution_time_ms: number | null
+          id: string
+          metadata: Json | null
+          migration_file: string
+          migration_name: string
+          rollback_sql: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string
+          applied_by?: string | null
+          checksum: string
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          metadata?: Json | null
+          migration_file: string
+          migration_name: string
+          rollback_sql?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string
+          applied_by?: string | null
+          checksum?: string
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          metadata?: Json | null
+          migration_file?: string
+          migration_name?: string
+          rollback_sql?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_alert_config: {
         Row: {
           alert_name: string
@@ -5655,6 +5805,10 @@ export type Database = {
           should_download: boolean
         }[]
       }
+      execute_sql_as_service_role: {
+        Args: { sql_query: string }
+        Returns: undefined
+      }
       find_vod_by_hash: {
         Args: { p_sha256: string }
         Returns: {
@@ -5929,6 +6083,17 @@ export type Database = {
           status: Database["public"]["Enums"]["subscription_status"]
         }[]
       }
+      get_table_policies: {
+        Args: { table_name: string }
+        Returns: {
+          policy_cmd: string
+          policy_name: string
+          policy_permissive: string
+          policy_qual: string
+          policy_roles: string[]
+          policy_with_check: string
+        }[]
+      }
       get_top_threat_ips: {
         Args: { _limit?: number }
         Returns: {
@@ -6027,6 +6192,8 @@ export type Database = {
         Returns: string
       }
       make_user_admin: { Args: { user_email: string }; Returns: undefined }
+      pg_index_exists: { Args: { index_name: string }; Returns: boolean }
+      pg_table_is_visible: { Args: { table_name: string }; Returns: boolean }
       record_channel_view: {
         Args: {
           p_channel_id: string
@@ -6050,6 +6217,15 @@ export type Database = {
       release_playlist_sync_lock: {
         Args: { p_key: string; p_locked_by: string }
         Returns: boolean
+      }
+      scan_schema_drift: {
+        Args: never
+        Returns: {
+          critical_count: number
+          drift_count: number
+          high_count: number
+          scan_id: string
+        }[]
       }
       search_m3u_entries: {
         Args: {
@@ -6150,6 +6326,7 @@ export type Database = {
           valid: boolean
         }[]
       }
+      validate_sql_syntax: { Args: { sql: string }; Returns: boolean }
     }
     Enums: {
       app_role: "client" | "admin" | "super_admin" | "master"

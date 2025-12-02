@@ -33,6 +33,7 @@ const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
+const AdminMigrations = lazy(() => import("./pages/AdminMigrations"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
@@ -148,6 +149,7 @@ const App = () => (
             <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
             <Route path="/admin/roles" element={<ProtectedRoute requireAdmin><AdminRolesManagement /></ProtectedRoute>} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
+            <Route path="/admin/migrations" element={<ProtectedRoute requireAdmin><AdminMigrations /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
             
