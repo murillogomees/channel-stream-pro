@@ -23,12 +23,15 @@ import { CacheRulesTable } from './CacheRulesTable';
 import { CacheStatsChart } from './CacheStatsChart';
 import { CacheInvalidationPanel } from './CacheInvalidationPanel';
 import { CreateCacheRuleDialog } from './CreateCacheRuleDialog';
+import { CachePerformanceCharts } from './CachePerformanceCharts';
+import { CacheBatchInvalidation } from './CacheBatchInvalidation';
 
 export function SmartCacheMonitor() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<CacheSummary | null>(null);
   const [rules, setRules] = useState<CacheRule[]>([]);
+  const [stats, setStats] = useState<any[]>([]);
   const [selectedTab, setSelectedTab] = useState('overview');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
@@ -39,16 +42,19 @@ export function SmartCacheMonitor() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [summaryRes, rulesRes] = await Promise.all([
+      const [summaryRes, rulesRes, statsRes] = await Promise.all([
         smartCacheService.getSummary(),
         smartCacheService.listRules(),
+        smartCacheService.getStats({ hoursAgo: 24 }),
       ]);
 
       if (summaryRes.error) throw summaryRes.error;
       if (rulesRes.error) throw rulesRes.error;
+      if (statsRes.error) throw statsRes.error;
 
       setSummary(summaryRes.data);
       setRules(rulesRes.data || []);
+      setStats(statsRes.data || []);
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar dados',
@@ -290,23 +296,16 @@ export function SmartCacheMonitor() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CacheStatsChart />
+              <CachePerformanceCharts stats={stats} />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="invalidation">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invalidação de Cache</CardTitle>
-              <CardDescription>
-                Limpe cache manualmente por URL, prefixo ou tag
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CacheInvalidationPanel onInvalidate={() => loadData()} />
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CacheInvalidationPanel onInvalidate={() => loadData()} />
+            <CacheBatchInvalidation onInvalidate={() => loadData()} />
+          </div>
         </TabsContent>
       </Tabs>
 
