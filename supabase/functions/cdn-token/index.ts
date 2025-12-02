@@ -118,14 +118,24 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'generate';
+    
+    console.log('[CDN-Token] Received request', { 
+      method: req.method, 
+      action,
+      hasBody: req.body !== null,
+      contentType: req.headers.get('content-type')
+    });
 
     if (action === 'generate') {
       // Generate new signed token
       let body: any = {};
       try {
         const text = await req.text();
+        console.log('[CDN-Token] Raw body text:', text?.substring(0, 200));
+        
         if (text && text.trim() !== '') {
           body = JSON.parse(text);
+          console.log('[CDN-Token] Parsed body:', body);
         }
       } catch (parseError) {
         console.error('[CDN-Token] Invalid JSON body for generate:', parseError);
@@ -145,6 +155,8 @@ serve(async (req) => {
         max_uses = 1,
         token_type = 'manifest'
       } = body;
+      
+      console.log('[CDN-Token] Extracted fields:', { r2_key, channel_id, token_type });
 
       if (!r2_key) {
         return new Response(
