@@ -239,7 +239,7 @@ export async function generateCdnToken(options: GenerateTokenOptions): Promise<{
     console.log('[R2CDN] Generating token with options:', options);
     
     const { data, error } = await supabase.functions.invoke('cdn-token', {
-      body: JSON.stringify(options),
+      body: options,
       headers: {
         'Content-Type': 'application/json'
       }
@@ -272,7 +272,7 @@ export async function revokeCdnToken(options: { token?: string; channel_id?: str
     console.log('[R2CDN] Revoking token with options:', options);
     
     const { error } = await supabase.functions.invoke('cdn-token?action=revoke', {
-      body: JSON.stringify(options),
+      body: options,
       headers: {
         'Content-Type': 'application/json'
       }
