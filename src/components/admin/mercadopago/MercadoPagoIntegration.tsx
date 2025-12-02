@@ -136,18 +136,18 @@ export function MercadoPagoIntegration() {
       const { data, error } = await supabase
         .from('mercado_pago_config')
         .select('*')
-        .eq('id', '00000000-0000-0000-0000-000000000001')
-        .maybeSingle();
+        .eq('id', '00000000-0000-0000-0000-000000000001');
       
       if (error) throw error;
       
-      if (data) {
+      const row = data?.[0];
+      if (row) {
         setConfig({
-          sandboxAccessToken: data.sandbox_access_token || "",
-          productionAccessToken: data.production_access_token || "",
-          publicKey: data.public_key || "",
-          webhookSecret: data.webhook_secret || "",
-          useSandbox: data.use_sandbox ?? true
+          sandboxAccessToken: row.sandbox_access_token || "",
+          productionAccessToken: row.production_access_token || "",
+          publicKey: row.public_key || "",
+          webhookSecret: row.webhook_secret || "",
+          useSandbox: row.use_sandbox ?? true
         });
       }
     } catch (error) {
@@ -160,16 +160,18 @@ export function MercadoPagoIntegration() {
   const saveConfig = async () => {
     setSaving(true);
     try {
+      const payload = {
+        id: '00000000-0000-0000-0000-000000000001',
+        sandbox_access_token: config.sandboxAccessToken || null,
+        production_access_token: config.productionAccessToken || null,
+        public_key: config.publicKey || null,
+        webhook_secret: config.webhookSecret || null,
+        use_sandbox: config.useSandbox
+      };
+
       const { error } = await supabase
         .from('mercado_pago_config')
-        .update({
-          sandbox_access_token: config.sandboxAccessToken || null,
-          production_access_token: config.productionAccessToken || null,
-          public_key: config.publicKey || null,
-          webhook_secret: config.webhookSecret || null,
-          use_sandbox: config.useSandbox
-        })
-        .eq('id', '00000000-0000-0000-0000-000000000001');
+        .upsert(payload, { onConflict: 'id' });
       
       if (error) throw error;
       
