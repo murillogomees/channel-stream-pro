@@ -121,7 +121,23 @@ serve(async (req) => {
 
     if (action === 'generate') {
       // Generate new signed token
-      const body = await req.json();
+      let body;
+      try {
+        const text = await req.text();
+        if (!text || text.trim() === '') {
+          return new Response(
+            JSON.stringify({ error: 'Request body is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        body = JSON.parse(text);
+      } catch (parseError) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in request body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const {
         r2_key,
         channel_id,
@@ -284,7 +300,23 @@ serve(async (req) => {
 
     } else if (action === 'revoke') {
       // Revoke token
-      const body = await req.json();
+      let body;
+      try {
+        const text = await req.text();
+        if (!text || text.trim() === '') {
+          return new Response(
+            JSON.stringify({ error: 'Request body is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        body = JSON.parse(text);
+      } catch (parseError) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in request body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const { token, channel_id } = body;
 
       if (token) {
