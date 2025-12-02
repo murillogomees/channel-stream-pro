@@ -8,3 +8,5 @@ export { CacheBatchInvalidation } from './CacheBatchInvalidation';
 export { CacheABTesting } from './CacheABTesting';
 export { CacheExportImport } from './CacheExportImport';
 export { CacheAlertMonitor } from './CacheAlertMonitor';
+export { CachePredictionML } from './CachePredictionML';
+export { CacheRealtimeDashboard } from './CacheRealtimeDashboard';
