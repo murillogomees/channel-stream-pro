@@ -14,9 +14,8 @@ Sistema completo de notificação de alertas de segurança com suporte a:
 
 #### `admin_phones`
 Armazena informações dos administradores e suas configurações de notificação:
-- `notification_channels`: Array de canais habilitados (whatsapp, telegram, sms)
-- `telegram_id`: ID do Telegram para notificações
-- `phone_sms`: Telefone para SMS (formato E.164)
+- `notification_channels`: Canal habilitado (whatsapp)
+- `phone`: Telefone WhatsApp para notificações
 - `schedule_enabled`: Se o sistema de plantão está ativo
 - `schedule_config`: Configuração de horários por dia da semana
 
