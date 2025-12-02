@@ -18,6 +18,10 @@ import {
   TranscodeCostForecasting,
   TranscodeAdvancedAnalytics,
   TranscodeQueueDashboard,
+  TranscodeQualityControl,
+  TranscodeBatchOperations,
+  TranscodeAPIRateLimiting,
+  TranscodeMultiCDN,
 } from '@/components/admin/transcode';
 import { 
   Video, 
@@ -32,6 +36,10 @@ import {
   Brain,
   Activity,
   BarChart3,
+  CheckCircle2,
+  Package,
+  Shield,
+  Globe,
 } from 'lucide-react';
 
 export default function AdminTranscodeQueue() {
@@ -42,7 +50,7 @@ export default function AdminTranscodeQueue() {
   return (
     <div className="container mx-auto py-8 px-4">
       <Tabs defaultValue="queue" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-13 max-w-full overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-17 max-w-full overflow-x-auto">
           <TabsTrigger value="queue" className="flex items-center gap-1 text-xs">
             <Video className="h-3 w-3" />
             Fila
@@ -94,6 +102,22 @@ export default function AdminTranscodeQueue() {
           <TabsTrigger value="analytics" className="flex items-center gap-1 text-xs">
             <BarChart3 className="h-3 w-3" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="quality" className="flex items-center gap-1 text-xs">
+            <CheckCircle2 className="h-3 w-3" />
+            Quality
+          </TabsTrigger>
+          <TabsTrigger value="batch" className="flex items-center gap-1 text-xs">
+            <Package className="h-3 w-3" />
+            Batch
+          </TabsTrigger>
+          <TabsTrigger value="ratelimit" className="flex items-center gap-1 text-xs">
+            <Shield className="h-3 w-3" />
+            Rate Limit
+          </TabsTrigger>
+          <TabsTrigger value="multicdn" className="flex items-center gap-1 text-xs">
+            <Globe className="h-3 w-3" />
+            Multi-CDN
           </TabsTrigger>
         </TabsList>
 
@@ -151,6 +175,22 @@ export default function AdminTranscodeQueue() {
 
         <TabsContent value="dashboard">
           <TranscodeQueueDashboard />
+        </TabsContent>
+
+        <TabsContent value="quality">
+          <TranscodeQualityControl />
+        </TabsContent>
+
+        <TabsContent value="batch">
+          <TranscodeBatchOperations />
+        </TabsContent>
+
+        <TabsContent value="ratelimit">
+          <TranscodeAPIRateLimiting />
+        </TabsContent>
+
+        <TabsContent value="multicdn">
+          <TranscodeMultiCDN />
         </TabsContent>
       </Tabs>
     </div>
