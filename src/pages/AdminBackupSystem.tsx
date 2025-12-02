@@ -136,7 +136,6 @@ export default function AdminBackupSystem() {
         'Data Vencimento',
         'MAC SmartOne',
         'Cliente Ativo',
-        'SmartOne Status',
         'Origem Cadastro',
         'M3U Lists',
       ];
@@ -152,7 +151,6 @@ export default function AdminBackupSystem() {
         cliente.data_vencimento || '',
         cliente.mac_smart_one || '',
         cliente.cliente_ativo ? 'Sim' : 'Não',
-        cliente.smartone_status || '',
         cliente.origem_cadastro || '',
         cliente.client_m3u_lists?.map((m: any) => m.m3u_lists?.name).filter(Boolean).join('; ') || '',
       ]);

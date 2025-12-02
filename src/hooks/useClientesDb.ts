@@ -29,8 +29,6 @@ export function useClientesDb() {
     dataCadastro: p.created_at,
     dataUltimaEdicao: p.updated_at,
     clienteAtivo: p.cliente_ativo ?? true,
-    smartone_status: p.smartone_status as any,
-    smartone_playlist_id: p.smartone_playlist_id,
     origemCadastro: p.origem_cadastro as any,
     isRecorrente: p.is_recorrente,
     dispositivoContratado: p.dispositivo_contratado as any,

@@ -153,9 +153,6 @@ export default function AdminClienteForm() {
               cliente_ativo: data.cliente_ativo,
               is_recorrente: data.is_recorrente,
               dispositivo_contratado: data.dispositivo_contratado,
-              smartone_status: data.smartone_status,
-              smartone_playlist_id: data.smartone_playlist_id,
-              smartone_last_sync_at: data.smartone_last_sync_at,
             };
 
             setClienteOriginal(cliente);
@@ -330,7 +327,6 @@ export default function AdminClienteForm() {
       clienteAtivo: data.clienteAtivo ?? false,
       origemCadastro: data.origemCadastro as any || null,
       dispositivoContratado: data.dispositivoContratado as any || undefined,
-      smartone_status: 'nao_enviado',
     };
 
     let clientId: string;
@@ -513,7 +509,6 @@ export default function AdminClienteForm() {
             forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
             mac_smart_one: clienteData.macSmartOne || null,
             cliente_ativo: clienteData.clienteAtivo,
-            smartone_status: 'nao_enviado',
             origem_cadastro: clienteData.origemCadastro || null,
             dispositivo_contratado: clienteData.dispositivoContratado || null,
             data_cadastro: new Date().toISOString(),

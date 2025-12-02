@@ -27,9 +27,6 @@ export interface UnifiedProfile {
   mac_smart_one?: string;
   is_recorrente?: boolean;
   dispositivo_contratado?: string;
-  smartone_status?: string;
-  smartone_playlist_id?: string;
-  smartone_last_sync_at?: string;
 }
 
 export function useProfiles() {

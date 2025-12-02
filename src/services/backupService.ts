@@ -70,7 +70,6 @@ export const backupService = {
       cliente.data_vencimento || '',
       cliente.mac_smart_one || '',
       cliente.cliente_ativo ? 'Sim' : 'Não',
-      cliente.smartone_status || '',
       cliente.origem_cadastro || '',
       cliente.m3u_lists?.map((m: any) => m.name).join('; ') || '',
     ]);

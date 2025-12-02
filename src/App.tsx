@@ -35,7 +35,6 @@ const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 
 // Public standalone pages
-const TutorialSmartOne = lazy(() => import("./pages/TutorialSmartOne"));
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
 // Checkout pages
@@ -87,7 +86,6 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/cadastro" element={<SignUp />} />
-            <Route path="/tutorial" element={<TutorialSmartOne />} />
             <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
             <Route path="/login" element={<Login />} />
             <Route path="/install" element={<Navigate to="/app/install" replace />} />

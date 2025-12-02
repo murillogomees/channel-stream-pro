@@ -104,8 +104,7 @@ export default function AdminUserList() {
 
     try {
       // Preparar dados para update (remover campos readonly e undefined)
-      const { id, created_at, updated_at, smartone_playlist_id, smartone_status, 
-              smartone_last_sync_at, smartone_raw_response, totp_secret, totp_verified_at, 
+      const { id, created_at, updated_at, totp_secret, totp_verified_at, 
               roles, ...updateData } = editFormData;
 
       const { error } = await supabase
