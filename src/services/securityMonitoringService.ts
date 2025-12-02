@@ -196,16 +196,19 @@ export const securityMonitoringService = {
     unresolvedEvents: number;
   }> {
     try {
+      // Calculate timestamp in JavaScript instead of using SQL expressions
       const intervals = {
-        day: '1 day',
-        week: '7 days',
-        month: '30 days'
+        day: 24 * 60 * 60 * 1000, // 1 day in milliseconds
+        week: 7 * 24 * 60 * 60 * 1000, // 7 days
+        month: 30 * 24 * 60 * 60 * 1000 // 30 days
       };
+
+      const since = new Date(Date.now() - intervals[timeRange]).toISOString();
 
       const { data, error } = await supabase
         .from('security_events')
         .select('event_type, severity, resolved')
-        .gte('created_at', `now() - interval '${intervals[timeRange]}'`);
+        .gte('created_at', since);
 
       if (error) {
         console.error('[Security] Failed to get statistics:', error);
