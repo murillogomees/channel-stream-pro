@@ -311,8 +311,35 @@ Deno.serve(async (req) => {
     const isVod = isVodContent(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
     
+    // VOD content: Redirect to direct URL instead of proxying
+    // Edge Functions cannot handle large file streaming (timeout/disconnection)
+    if (isVod && !isHlsContent(decodedUrl, null)) {
+      console.log(`[Proxy] VOD detected, redirecting to direct URL: ${decodedUrl.substring(0, 50)}...`);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...CORS_HEADERS,
+          'Location': decodedUrl,
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
+    
+    // Direct live stream: Redirect to direct URL
+    if (isLiveStream) {
+      console.log(`[Proxy] Direct live stream, redirecting: ${decodedUrl.substring(0, 50)}...`);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...CORS_HEADERS,
+          'Location': decodedUrl,
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
+    
     // Determine content type for logging
-    const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : isLiveStream ? 'LIVE' : 'M3U';
+    const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : 'M3U';
     const cacheKey = `proxy:${decodedUrl}`;
     
     // Check memory cache for manifests and keys
