@@ -647,10 +647,10 @@ export function useM3USyncEditor() {
     return m3uContent;
   }, [entries]);
 
-  // Generate M3U and upload to CDN
+  // Generate M3U and upload to CDN (server-side generation)
   const generateM3UCDN = useCallback(async (): Promise<{ success: boolean; cdnUrl?: string; error?: string }> => {
-    if (!selectedSourceId || entries.length === 0) {
-      return { success: false, error: 'Nenhuma fonte selecionada ou sem entradas' };
+    if (!selectedSourceId) {
+      return { success: false, error: 'Nenhuma fonte selecionada' };
     }
 
     try {
@@ -665,18 +665,17 @@ export function useM3USyncEditor() {
         return { success: false, error: 'Fonte não encontrada' };
       }
 
-      // Generate M3U content
-      const m3uContent = generateM3UContent();
-      const fileSize = new TextEncoder().encode(m3uContent).length;
+      toast({
+        title: 'Gerando M3U CDN...',
+        description: 'O servidor está processando as entradas. Isso pode levar alguns segundos.',
+      });
 
-      // Call edge function to upload to R2
+      // Call edge function - M3U is now generated server-side
       const { data, error } = await supabase.functions.invoke('generate-m3u-from-sync', {
         body: {
           sourceId: selectedSourceId,
           sourceKey: source.key,
           sourceName: source.name,
-          m3uContent,
-          entriesCount: entries.length,
         }
       });
 
@@ -684,7 +683,7 @@ export function useM3USyncEditor() {
 
       toast({
         title: 'M3U CDN gerada com sucesso',
-        description: `${entries.length.toLocaleString()} entradas • ${(fileSize / 1024).toFixed(1)} KB`,
+        description: `${data?.entriesCount?.toLocaleString() || '?'} entradas • ${((data?.fileSize || 0) / 1024 / 1024).toFixed(2)} MB`,
       });
 
       return { success: true, cdnUrl: data?.cdnUrl };
@@ -697,7 +696,7 @@ export function useM3USyncEditor() {
       });
       return { success: false, error: error.message };
     }
-  }, [selectedSourceId, entries, generateM3UContent]);
+  }, [selectedSourceId]);
 
   // Statistics
   const stats = useMemo(
