@@ -44,12 +44,16 @@ export default function AdminUserList() {
   const [createDialog, setCreateDialog] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [createFormData, setCreateFormData] = useState({
+  const [createFormData, setCreateFormData] = useState<any>({
     email: '',
     password: '',
     nome: '',
-    telefone: '',
-    role: 'client' as 'client' | 'admin' | 'master',
+    contact_phone: '',
+    cliente_ativo: true,
+    situacao: 'Testando',
+    plano: 'Mensal',
+    valor_pago: 0,
+    is_recorrente: false,
   });
 
   useEffect(() => {
@@ -168,7 +172,7 @@ export default function AdminUserList() {
     if (!createFormData.email || !createFormData.password || !createFormData.nome) {
       toast({
         title: 'Erro',
-        description: 'Preencha todos os campos obrigatórios',
+        description: 'Preencha todos os campos obrigatórios (nome, email e senha)',
         variant: 'destructive',
       });
       return;
@@ -188,6 +192,7 @@ export default function AdminUserList() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão não encontrada');
 
+      // Always create user with 'client' role
       const response = await fetch(
         `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/create-admin-user`,
         {
@@ -196,7 +201,13 @@ export default function AdminUserList() {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(createFormData),
+          body: JSON.stringify({
+            email: createFormData.email,
+            password: createFormData.password,
+            name: createFormData.nome,
+            phone: createFormData.contact_phone || '',
+            role: 'client', // Always client
+          }),
         }
       );
 
@@ -204,6 +215,24 @@ export default function AdminUserList() {
 
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao criar usuário');
+      }
+
+      // Update profile with additional data if user was created
+      if (result.user?.id) {
+        await supabase
+          .from('profiles')
+          .update({
+            cliente_ativo: createFormData.cliente_ativo,
+            situacao: createFormData.situacao,
+            plano: createFormData.plano,
+            valor_pago: createFormData.valor_pago,
+            is_recorrente: createFormData.is_recorrente,
+            origem_cadastro: createFormData.origem_cadastro,
+            data_contratacao: createFormData.data_contratacao,
+            data_vencimento: createFormData.data_vencimento,
+            forma_ultimo_pagamento: createFormData.forma_ultimo_pagamento,
+          })
+          .eq('id', result.user.id);
       }
 
       toast({
@@ -216,8 +245,12 @@ export default function AdminUserList() {
         email: '',
         password: '',
         nome: '',
-        telefone: '',
-        role: 'client',
+        contact_phone: '',
+        cliente_ativo: true,
+        situacao: 'Testando',
+        plano: 'Mensal',
+        valor_pago: 0,
+        is_recorrente: false,
       });
       refresh();
       loadUsersWithRoles();
@@ -513,85 +546,78 @@ export default function AdminUserList() {
 
       {/* Dialog de Criar Usuário */}
       <Dialog open={createDialog} onOpenChange={setCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
             <DialogTitle>Criar Novo Usuário</DialogTitle>
             <DialogDescription>
-              Preencha os dados para criar um novo usuário no sistema
+              Preencha os dados para criar um novo usuário no sistema (sempre como Cliente)
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-nome">Nome Completo *</Label>
-              <Input
-                id="create-nome"
-                placeholder="Digite o nome completo"
-                value={createFormData.nome}
-                onChange={(e) => setCreateFormData({ ...createFormData, nome: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-email">Email *</Label>
-              <Input
-                id="create-email"
-                type="email"
-                placeholder="usuario@exemplo.com"
-                value={createFormData.email}
-                onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-password">Senha *</Label>
-              <div className="relative">
-                <Input
-                  id="create-password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Mínimo 8 caracteres"
-                  value={createFormData.password}
-                  onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+          
+          {/* Campos de Autenticação */}
+          <div className="px-6 space-y-4 border-b pb-4">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Dados de Acesso
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-email" className="text-sm font-medium flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Email <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="create-email"
+                    type="email"
+                    placeholder="usuario@exemplo.com"
+                    value={createFormData.email || ''}
+                    onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-password" className="text-sm font-medium flex items-center gap-2">
+                    Senha <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="create-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Mínimo 8 caracteres"
+                      value={createFormData.password || ''}
+                      onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                      className="h-12 pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-12"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-telefone">Telefone</Label>
-              <Input
-                id="create-telefone"
-                placeholder="(00) 00000-0000"
-                value={createFormData.telefone}
-                onChange={(e) => setCreateFormData({ ...createFormData, telefone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-role">Tipo de Usuário *</Label>
-              <Select 
-                value={createFormData.role} 
-                onValueChange={(value: any) => setCreateFormData({ ...createFormData, role: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">Cliente</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="master">Master</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
-          <DialogFooter>
+          
+          {/* Form completo usando AdminUserForm */}
+          <div className="px-6">
+            <AdminUserForm
+              formData={createFormData}
+              onChange={setCreateFormData}
+              isEdit={false}
+            />
+          </div>
+          
+          <DialogFooter className="px-6 pb-6 border-t pt-4">
             <Button variant="outline" onClick={() => setCreateDialog(false)} disabled={createLoading}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateUser} disabled={createLoading}>
+            <Button onClick={handleCreateUser} disabled={createLoading} className="bg-primary hover:bg-primary/90">
               {createLoading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
