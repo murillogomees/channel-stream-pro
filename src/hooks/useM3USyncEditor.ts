@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { getCachedEntries, setCachedEntries, clearCache, getCacheMeta } from "./useM3UCache";
 
 export type ContentClass = "tv" | "movies" | "series" | "other";
 
@@ -41,6 +42,7 @@ export interface LoadingProgress {
   total: number;
   percent: number;
   phase: 'counting' | 'fetching' | 'processing' | 'done';
+  fromCache?: boolean;
 }
 
 // Classify content based on group_title patterns
@@ -124,13 +126,14 @@ const CLASS_PREFIXES: Record<ContentClass, string> = {
 
 export { CLASS_LABELS, CLASS_PREFIXES };
 
-// Helper to chunk array
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
+// Process raw entries into M3UEntry format
+function processEntries(rawEntries: any[]): M3UEntry[] {
+  return rawEntries.map((entry) => ({
+    ...entry,
+    content_class: classifyContent(entry.group_title),
+    parent_category: extractParentCategory(entry.group_title),
+    metadata: entry.metadata as Record<string, any> | null,
+  }));
 }
 
 export function useM3USyncEditor() {
@@ -146,19 +149,55 @@ export function useM3USyncEditor() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState<ContentClass | "all">("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Abort controller for cancelling ongoing loads
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load ALL entries from a source using optimized parallel pagination
-  const loadEntries = useCallback(async (sourceId: string) => {
+  // Load ALL entries from a source using optimized parallel pagination with progressive loading
+  const loadEntries = useCallback(async (sourceId: string, forceRefresh = false) => {
+    // Cancel any ongoing load
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setIsLoading(true);
     setSelectedSourceId(sourceId);
     setEntries([]); // Clear previous entries
     setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'counting' });
 
     try {
-      const PAGE_SIZE = 1000; // Supabase default limit
-      const PARALLEL_REQUESTS = 3; // Reduced to avoid statement timeouts
-      const BATCH_DELAY_MS = 200; // Delay between batches to let DB recover
-      const MAX_RETRIES = 3;
+      // Check cache first (unless force refresh)
+      if (!forceRefresh) {
+        const cachedData = await getCachedEntries(sourceId);
+        if (cachedData && cachedData.length > 0) {
+          const cacheMeta = await getCacheMeta(sourceId);
+          const cacheAge = cacheMeta ? Math.round((Date.now() - cacheMeta.timestamp) / 60000) : 0;
+          
+          console.log(`[M3USyncEditor] Using cache: ${cachedData.length} entries (${cacheAge}min old)`);
+          
+          setLoadingProgress({ 
+            loaded: cachedData.length, 
+            total: cachedData.length, 
+            percent: 100, 
+            phase: 'done',
+            fromCache: true 
+          });
+          setEntries(processEntries(cachedData));
+          setIsLoading(false);
+          
+          toast({
+            title: "Cache carregado",
+            description: `${cachedData.length.toLocaleString()} entradas (cache de ${cacheAge}min)`,
+          });
+          return;
+        }
+      }
+
+      const PAGE_SIZE = 5000; // Increased from 1000 to 5000 (5x faster)
+      const PARALLEL_REQUESTS = 4; // Increased parallelism
+      const MAX_RETRIES = 2;
 
       console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
 
@@ -169,10 +208,8 @@ export function useM3USyncEditor() {
         .eq("source_id", sourceId)
         .eq("is_valid", true);
 
-      if (countError) {
-        console.error("[M3USyncEditor] Count error:", countError);
-        throw countError;
-      }
+      if (signal.aborted) return;
+      if (countError) throw countError;
 
       const totalCount = count || 0;
       console.log(`[M3USyncEditor] Total count: ${totalCount}`);
@@ -192,23 +229,19 @@ export function useM3USyncEditor() {
 
       // Calculate total pages
       const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-      const pageNumbers = Array.from({ length: totalPages }, (_, i) => i);
-      const pageBatches = chunkArray(pageNumbers, PARALLEL_REQUESTS);
-
-      console.log(`[M3USyncEditor] Total pages: ${totalPages}, batches: ${pageBatches.length}`);
-
-      let allData: any[] = [];
-      let failedPages: number[] = [];
+      let loadedEntries: any[] = [];
 
       // Helper function to fetch a single page with retry
       const fetchPage = async (page: number, retryCount = 0): Promise<any[]> => {
+        if (signal.aborted) return [];
+        
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
         try {
           const { data, error } = await supabase
             .from("m3u_sync_entries")
-            .select("*")
+            .select("id,source_id,title,stream_url,group_title,tvg_id,tvg_name,tvg_logo,tvg_language,duration,is_valid,metadata")
             .eq("source_id", sourceId)
             .eq("is_valid", true)
             .order("group_title")
@@ -217,81 +250,69 @@ export function useM3USyncEditor() {
 
           if (error) {
             if (retryCount < MAX_RETRIES) {
-              console.log(`[M3USyncEditor] Page ${page} retry ${retryCount + 1}/${MAX_RETRIES}...`);
-              await new Promise(r => setTimeout(r, 500 * (retryCount + 1))); // Exponential backoff
+              await new Promise(r => setTimeout(r, 300 * (retryCount + 1)));
               return fetchPage(page, retryCount + 1);
             }
-            console.error(`[M3USyncEditor] Page ${page} failed after ${MAX_RETRIES} retries:`, error);
-            failedPages.push(page);
+            console.error(`[M3USyncEditor] Page ${page} failed:`, error);
             return [];
           }
           return data || [];
         } catch (e) {
           if (retryCount < MAX_RETRIES) {
-            console.log(`[M3USyncEditor] Page ${page} retry ${retryCount + 1}/${MAX_RETRIES}...`);
-            await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
+            await new Promise(r => setTimeout(r, 300 * (retryCount + 1)));
             return fetchPage(page, retryCount + 1);
           }
-          console.error(`[M3USyncEditor] Page ${page} exception after ${MAX_RETRIES} retries:`, e);
-          failedPages.push(page);
+          console.error(`[M3USyncEditor] Page ${page} exception:`, e);
           return [];
         }
       };
 
-      // Fetch pages in parallel batches with delay between batches
-      for (let batchIndex = 0; batchIndex < pageBatches.length; batchIndex++) {
-        const batch = pageBatches[batchIndex];
+      // Progressive loading - fetch and display as data comes in
+      for (let i = 0; i < totalPages; i += PARALLEL_REQUESTS) {
+        if (signal.aborted) return;
         
-        const requests = batch.map((page) => fetchPage(page));
-        const results = await Promise.all(requests);
+        const batch = Array.from(
+          { length: Math.min(PARALLEL_REQUESTS, totalPages - i) },
+          (_, idx) => i + idx
+        );
+        
+        const results = await Promise.all(batch.map(page => fetchPage(page)));
         const batchData = results.flat();
-        allData = [...allData, ...batchData];
+        loadedEntries = [...loadedEntries, ...batchData];
+
+        // Progressive update - show entries as they load
+        const processedSoFar = processEntries(loadedEntries);
+        setEntries(processedSoFar);
 
         // Update progress
         setLoadingProgress({
-          loaded: allData.length,
+          loaded: loadedEntries.length,
           total: totalCount,
-          percent: Math.round((allData.length / totalCount) * 100),
+          percent: Math.round((loadedEntries.length / totalCount) * 100),
           phase: 'fetching',
         });
 
-        console.log(`[M3USyncEditor] Batch ${batchIndex + 1}/${pageBatches.length}: ${allData.length}/${totalCount} loaded`);
-
-        // Add delay between batches to prevent overwhelming the database
-        if (batchIndex < pageBatches.length - 1) {
-          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
-        }
+        console.log(`[M3USyncEditor] Progress: ${loadedEntries.length}/${totalCount}`);
       }
 
-      if (failedPages.length > 0) {
-        console.warn(`[M3USyncEditor] ${failedPages.length} pages failed: ${failedPages.join(', ')}`);
-      }
+      if (signal.aborted) return;
 
-      // Process entries
-      setLoadingProgress(prev => ({ ...prev, phase: 'processing' }));
+      // Cache the loaded entries
+      await setCachedEntries(sourceId, loadedEntries);
 
-      const processedEntries: M3UEntry[] = allData.map((entry) => ({
-        ...entry,
-        content_class: classifyContent(entry.group_title),
-        parent_category: extractParentCategory(entry.group_title),
-        metadata: entry.metadata as Record<string, any> | null,
-      }));
-
-      console.log(`[M3USyncEditor] Final processed entries: ${processedEntries.length}`);
-
-      setEntries(processedEntries);
       setLoadingProgress({ 
-        loaded: processedEntries.length, 
-        total: processedEntries.length, 
+        loaded: loadedEntries.length, 
+        total: loadedEntries.length, 
         percent: 100, 
         phase: 'done' 
       });
 
       toast({
         title: "Conteúdo carregado",
-        description: `${processedEntries.length.toLocaleString()} entradas carregadas`,
+        description: `${loadedEntries.length.toLocaleString()} entradas carregadas e em cache`,
       });
     } catch (error: any) {
+      if (signal.aborted) return;
       console.error("[M3USyncEditor] Error loading entries:", error);
       toast({
         title: "Erro",
@@ -300,9 +321,19 @@ export function useM3USyncEditor() {
       });
       setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'done' });
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, []);
+
+  // Force refresh (bypass cache)
+  const forceRefresh = useCallback(async () => {
+    if (selectedSourceId) {
+      await clearCache(selectedSourceId);
+      await loadEntries(selectedSourceId, true);
+    }
+  }, [selectedSourceId, loadEntries]);
 
   // Group entries by class and category
   const groupedData = useMemo((): ClassGroup[] => {
@@ -765,6 +796,7 @@ export function useM3USyncEditor() {
     setSelectedClass,
     setSelectedCategory,
     loadEntries,
+    forceRefresh,
     updateEntry,
     bulkUpdateCategory,
     deleteEntry,
