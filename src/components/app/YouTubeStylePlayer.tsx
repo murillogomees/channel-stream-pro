@@ -418,12 +418,10 @@ export default function YouTubeStylePlayer({
       hasConnectedOnceRef.current = true;
       setConnectionStatus('connected');
       onReady?.();
-      if (autoplay && video.readyState >= 2) {
-        video.play().catch(() => {});
-      } else if (autoplay) {
-        video.addEventListener('canplay', () => {
-          if (video.src) video.play().catch(() => {});
-        }, { once: true });
+      // Simple autoplay - let browser handle
+      video.autoplay = autoplay;
+      if (autoplay) {
+        video.play().catch(() => { video.muted = true; });
       }
     });
 
@@ -511,10 +509,34 @@ export default function YouTubeStylePlayer({
   // Initialize player
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !url) return;
+    
+    // Debug log
+    console.log('[YouTubeStylePlayer] Initializing with URL:', url ? url.substring(0, 100) + '...' : 'EMPTY');
+    
+    if (!video || !url) {
+      console.error('[YouTubeStylePlayer] Missing video element or URL', { hasVideo: !!video, hasUrl: !!url });
+      setHasError(true);
+      setErrorMessage('URL do stream não fornecida');
+      setConnectionStatus('error');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      console.error('[YouTubeStylePlayer] Invalid URL:', url);
+      setHasError(true);
+      setErrorMessage('URL inválida');
+      setConnectionStatus('error');
+      setIsLoading(false);
+      return;
+    }
 
     // Reset connection state for new URL
     hasConnectedOnceRef.current = false;
+    hasStartedPlayingRef.current = false;
     setIsLoading(true);
     setIsBuffering(false);
     setHasError(false);
@@ -527,54 +549,63 @@ export default function YouTubeStylePlayer({
       hlsRef.current = null;
     }
     if (mpegtsRef.current) {
-      mpegtsRef.current.pause();
-      mpegtsRef.current.unload();
-      mpegtsRef.current.detachMediaElement();
-      mpegtsRef.current.destroy();
+      try {
+        mpegtsRef.current.pause();
+        mpegtsRef.current.unload();
+        mpegtsRef.current.detachMediaElement();
+        mpegtsRef.current.destroy();
+      } catch (e) {
+        console.warn('[Player] MPEGTS cleanup error:', e);
+      }
       mpegtsRef.current = null;
     }
 
     const originalUrl = getOriginalUrl(url);
     const info = detectStreamType(originalUrl);
+    
+    // Global error handler for video element
+    const handleVideoError = () => {
+      const errorCode = video.error?.code || 0;
+      const errorMessages: Record<number, string> = {
+        1: 'Carregamento interrompido',
+        2: 'Erro de rede - verifique sua conexão',
+        3: 'Erro de decodificação - formato não suportado',
+        4: 'Stream não encontrado ou inacessível',
+      };
+      console.error('[Player] Video error:', video.error, 'URL:', url.substring(0, 100));
+      setHasError(true);
+      setErrorMessage(errorMessages[errorCode] || 'Erro ao carregar stream');
+      setConnectionStatus('error');
+      setIsLoading(false);
+    };
+    video.addEventListener('error', handleVideoError);
+    
+    // Connection timeout - show error after 10 seconds if not connected
+    const connectionTimeout = setTimeout(() => {
+      if (!hasConnectedOnceRef.current) {
+        console.warn('[Player] Connection timeout - still not connected after 10s');
+        setHasError(true);
+        setErrorMessage('Tempo limite de conexão excedido');
+        setConnectionStatus('error');
+        setIsLoading(false);
+      }
+    }, 10000);
 
-    // VOD playback - Optimized for smooth experience
+    // VOD playback - Simplified for reliability
     if (info.isVod) {
       video.preload = 'auto';
-      
-      // Set up buffering events for VOD
-      const handleProgress = () => {
-        if (video.buffered.length > 0) {
-          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-          // If we have at least 5 seconds buffered ahead, we're good
-          if (bufferedEnd - video.currentTime > 5) {
-            setIsBuffering(false);
-          }
-        }
-      };
-      video.addEventListener('progress', handleProgress);
-      
       video.src = url;
       video.load();
       
+      // Let autoplay attribute handle playback
       if (autoplay) {
-        // Wait for canplay event before attempting play
-        const handleCanPlay = () => {
-          video.removeEventListener('canplay', handleCanPlay);
-          // Verify source is still valid
-          if (video.src && video.readyState >= 2) {
-            video.play().catch(() => {
-              video.muted = true;
-              if (video.src && video.readyState >= 2) {
-                video.play().catch(() => {});
-              }
-            });
-          }
-        };
-        video.addEventListener('canplay', handleCanPlay);
+        video.autoplay = true;
+        video.muted = true; // Required for autoplay in most browsers
       }
       
       return () => {
-        video.removeEventListener('progress', handleProgress);
+        clearTimeout(connectionTimeout);
+        video.removeEventListener('error', handleVideoError);
       };
     }
 
@@ -612,14 +643,9 @@ export default function YouTubeStylePlayer({
             initHlsPlayer(url, video);
           } else {
             video.src = url;
+            video.autoplay = autoplay;
+            video.muted = true;
             video.load();
-            if (autoplay) {
-              video.addEventListener('canplay', () => {
-                if (video.src && video.readyState >= 2) {
-                  video.play().catch(() => {});
-                }
-              }, { once: true });
-            }
           }
         }
       }, 8000);
@@ -683,12 +709,10 @@ export default function YouTubeStylePlayer({
         setConnectionStatus('connected');
         networkErrorCount = 0; // Reset on successful metadata
         onReady?.();
-        if (autoplay && video.readyState >= 2) {
-          video.play().catch(() => {});
-        } else if (autoplay) {
-          video.addEventListener('canplay', () => {
-            if (video.src) video.play().catch(() => {});
-          }, { once: true });
+        // Let video autoplay attribute handle playback
+        video.autoplay = autoplay;
+        if (autoplay) {
+          video.play().catch(() => { video.muted = true; });
         }
       });
       
@@ -723,14 +747,9 @@ export default function YouTubeStylePlayer({
 
     // Native HLS fallback
     video.src = url;
+    video.autoplay = autoplay;
+    video.muted = true;
     video.load();
-    if (autoplay) {
-      video.addEventListener('canplay', () => {
-        if (video.src && video.readyState >= 2) {
-          video.play().catch(() => {});
-        }
-      }, { once: true });
-    }
     
     // Global connection timeout - prevent infinite "Conectando"
     const globalTimeout = setTimeout(() => {
