@@ -8,6 +8,8 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
+const PAGE_SIZE = 500; // Smaller batches for memory efficiency
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -48,17 +50,98 @@ serve(async (req) => {
       );
     }
 
-    const { sourceId, sourceKey, sourceName, m3uContent, entriesCount } = await req.json();
+    // Parse request - now only needs sourceId
+    const body = await req.text();
+    const { sourceId, sourceKey, sourceName } = body ? JSON.parse(body) : {};
 
-    if (!sourceId || !sourceKey || !m3uContent) {
+    if (!sourceId || !sourceKey) {
       return new Response(
-        JSON.stringify({ error: 'sourceId, sourceKey e m3uContent são obrigatórios' }),
+        JSON.stringify({ error: 'sourceId e sourceKey são obrigatórios' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const startTime = Date.now();
+    console.log(`[GenerateM3U] Starting server-side generation for source: ${sourceId}`);
+
+    // Use service role for database queries
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Get total count first
+    const { count: totalCount, error: countError } = await supabaseService
+      .from('m3u_sync_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', sourceId)
+      .eq('is_valid', true);
+
+    if (countError) {
+      throw new Error(`Failed to count entries: ${countError.message}`);
+    }
+
+    console.log(`[GenerateM3U] Total entries to process: ${totalCount}`);
+
+    // Generate M3U header
+    const m3uParts: string[] = ['#EXTM3U\n'];
+    let processedCount = 0;
+    let page = 0;
+
+    // Fetch and process entries in batches
+    while (processedCount < (totalCount || 0)) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data: entries, error: fetchError } = await supabaseService
+        .from('m3u_sync_entries')
+        .select('title, stream_url, tvg_id, tvg_name, tvg_logo, group_title, extra_tags')
+        .eq('source_id', sourceId)
+        .eq('is_valid', true)
+        .order('group_title')
+        .order('title')
+        .range(from, to);
+
+      if (fetchError) {
+        console.error(`[GenerateM3U] Batch ${page} error:`, fetchError);
+        break;
+      }
+
+      if (!entries || entries.length === 0) break;
+
+      // Convert entries to M3U format
+      for (const entry of entries) {
+        let extinf = '#EXTINF:-1';
+        
+        if (entry.tvg_id) extinf += ` tvg-id="${entry.tvg_id}"`;
+        if (entry.tvg_name) extinf += ` tvg-name="${entry.tvg_name}"`;
+        if (entry.tvg_logo) extinf += ` tvg-logo="${entry.tvg_logo}"`;
+        if (entry.group_title) extinf += ` group-title="${entry.group_title}"`;
+        if (entry.extra_tags) extinf += ` ${entry.extra_tags}`;
+        
+        extinf += `,${entry.title}\n${entry.stream_url}\n`;
+        m3uParts.push(extinf);
+      }
+
+      processedCount += entries.length;
+      page++;
+
+      // Log progress every 10 pages
+      if (page % 10 === 0) {
+        console.log(`[GenerateM3U] Progress: ${processedCount}/${totalCount} entries`);
+      }
+
+      // Clear reference to allow GC
+      entries.length = 0;
+    }
+
+    console.log(`[GenerateM3U] Finished fetching ${processedCount} entries in ${Date.now() - startTime}ms`);
+
+    // Join all parts into final M3U content
+    const m3uContent = m3uParts.join('');
     const fileSize = new TextEncoder().encode(m3uContent).length;
+
+    console.log(`[GenerateM3U] M3U content size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
 
     // Upload to Cloudflare R2
     let cdnUrl: string | null = null;
@@ -66,20 +149,15 @@ serve(async (req) => {
     let cdnUploadStatus = 'skipped';
 
     try {
+      const uploadStart = Date.now();
       cdnUrl = await uploadToR2(sourceKey, m3uContent);
-      uploadTime = Date.now() - startTime;
+      uploadTime = Date.now() - uploadStart;
       cdnUploadStatus = 'success';
-      console.log(`✅ M3U uploaded to R2: ${cdnUrl}`);
+      console.log(`[GenerateM3U] ✅ Uploaded to R2 in ${uploadTime}ms: ${cdnUrl}`);
     } catch (uploadError) {
-      console.error('⚠️ R2 upload failed:', uploadError.message);
+      console.error('[GenerateM3U] ⚠️ R2 upload failed:', uploadError.message);
       cdnUploadStatus = 'failed';
     }
-
-    // Use service role for database update
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     // Update source with CDN URL
     if (cdnUrl) {
@@ -90,21 +168,22 @@ serve(async (req) => {
             cdn_url: cdnUrl,
             cdn_generated_at: new Date().toISOString(),
             cdn_file_size: fileSize,
-            cdn_entries_count: entriesCount,
+            cdn_entries_count: processedCount,
           }
         })
         .eq('id', sourceId);
     }
 
-    console.log(`✅ M3U CDN gerada: ${sourceName} (${entriesCount} entradas, ${fileSize} bytes, CDN: ${cdnUploadStatus})`);
+    const totalTime = Date.now() - startTime;
+    console.log(`[GenerateM3U] ✅ Complete: ${sourceName} (${processedCount} entries, ${(fileSize / 1024 / 1024).toFixed(2)} MB) in ${totalTime}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
         cdnUrl,
         fileSize,
-        entriesCount,
-        generationTime: Date.now() - startTime,
+        entriesCount: processedCount,
+        generationTime: totalTime,
         uploadTime,
         cdnStatus: cdnUploadStatus
       }),
@@ -112,7 +191,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Erro ao gerar M3U CDN:', error);
+    console.error('[GenerateM3U] ❌ Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
