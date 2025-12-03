@@ -56,6 +56,7 @@ interface AdminUserFormProps {
   onChange: (data: Partial<UserFormData>) => void;
   isEdit?: boolean;
   currentUserRole?: 'client' | 'admin' | 'master';
+  hideEmail?: boolean; // Oculta campo de email (quando já coletado em outro lugar)
 }
 
 interface SectionHeaderProps {
@@ -108,7 +109,7 @@ const SectionHeader = ({ icon, title, description, variant = 'primary', badge }:
   );
 };
 
-export function AdminUserForm({ formData, onChange, isEdit = false, currentUserRole }: AdminUserFormProps) {
+export function AdminUserForm({ formData, onChange, isEdit = false, currentUserRole, hideEmail = false }: AdminUserFormProps) {
   const updateField = (field: keyof UserFormData, value: any) => {
     onChange({ ...formData, [field]: value });
   };
@@ -156,21 +157,23 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium flex items-center gap-2">
-              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-              Email
-              <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email || ''}
-              onChange={(e) => updateField('email', e.target.value)}
-              placeholder="email@exemplo.com"
-              className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
-            />
-          </div>
+          {!hideEmail && (
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium flex items-center gap-2">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                Email
+                <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email || ''}
+                onChange={(e) => updateField('email', e.target.value)}
+                placeholder="email@exemplo.com"
+                className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="contact_phone" className="text-sm font-medium flex items-center gap-2">
