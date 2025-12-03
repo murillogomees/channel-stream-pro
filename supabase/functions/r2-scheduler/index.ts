@@ -213,12 +213,12 @@ serve(async (req) => {
       stoppedEarly: false,
     };
 
-    // STEP 1: Check stuck processing jobs
+    // STEP 1: Check stuck processing jobs (including validating)
     if (!shouldStopExecution()) {
       const { data: processingJobs } = await supabase
         .from("r2_download_jobs")
-        .select("id, channel_id, status, retry_count, updated_at, source_url")
-        .in("status", ["downloading", "uploading", "processing"])
+        .select("id, channel_id, status, retry_count, updated_at, original_url")
+        .in("status", ["downloading", "uploading", "processing", "validating"])
         .limit(CONFIG.BATCH_SIZE);
 
       result.statusChecked = processingJobs?.length || 0;
@@ -235,51 +235,27 @@ serve(async (req) => {
         const updatedAt = new Date(job.updated_at);
         
         if (updatedAt < stuckThreshold) {
-          log('warn', 'Job stuck detected', { jobId: job.id, channelId: job.channel_id });
+          log('warn', `Job stuck in ${job.status}`, { jobId: job.id, channelId: job.channel_id });
           
-          if (CONFIG.AUTO_RESTART_ON_STUCK) {
-            await supabase.from("vod_downloads")
-              .update({
-                status: "queued",
-                segments_downloaded: 0,
-                error_message: `Auto-restart: stuck for ${CONFIG.STUCK_TIMEOUT_MINUTES}min`,
-                metadata: { auto_restarted: true, restart_at: new Date().toISOString() }
-              })
-              .eq("channel_id", job.channel_id)
-              .in("status", ["downloading", "processing", "paused"]);
-            
-            const nextRetry = new Date(Date.now() + 5000);
-            
-            await supabase.from("r2_download_jobs").update({
-              status: "retry_scheduled",
-              error_message: `Auto-restart after ${CONFIG.STUCK_TIMEOUT_MINUTES}min stuck`,
-              retry_count: (job.retry_count || 0) + 1,
-              next_retry_at: nextRetry.toISOString(),
-            }).eq("id", job.id);
-
-            result.retriesScheduled++;
-            result.resetStuck++;
-          } else if ((job.retry_count || 0) < CONFIG.MAX_RETRIES) {
-            const nextRetry = calculateNextRetryTime(job.retry_count || 0, 1);
-            
-            await supabase.from("r2_download_jobs").update({
-              status: "retry_scheduled",
-              error_message: `Job stuck for ${CONFIG.STUCK_TIMEOUT_MINUTES} minutes`,
-              retry_count: (job.retry_count || 0) + 1,
-              next_retry_at: nextRetry.toISOString(),
-            }).eq("id", job.id);
-
-            result.retriesScheduled++;
-            result.resetStuck++;
-          } else {
-            await supabase.from("r2_download_jobs").update({
-              status: "failed",
-              error_message: "Job stuck - max retries exceeded",
-            }).eq("id", job.id);
-            
-            result.statusError++;
-            result.resetStuck++;
+          // Reset job to queued and trigger download
+          await supabase.from("r2_download_jobs").update({
+            status: "queued",
+            error_message: null,
+            started_at: null,
+            retry_count: Math.min((job.retry_count || 0) + 1, CONFIG.MAX_RETRIES),
+          }).eq("id", job.id);
+          
+          // Trigger download-vod directly
+          try {
+            await supabase.functions.invoke('download-vod', {
+              body: { channelId: job.channel_id }
+            });
+            log('info', 'Re-triggered download', { channelId: job.channel_id });
+          } catch (e: any) {
+            log('warn', 'Failed to trigger download', { error: e.message });
           }
+          
+          result.resetStuck++;
         }
         
         await periodicCooldown();
