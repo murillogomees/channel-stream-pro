@@ -255,3 +255,23 @@ verify_jwt = false
 # Check secrets configuration - public endpoint
 [functions.check-secrets]
 verify_jwt = false
+
+# ==========================================
+# CDN BULK DOWNLOAD SYSTEM
+# ==========================================
+
+# Bulk content downloader
+[functions.cdn-bulk-downloader]
+verify_jwt = false
+
+# Content downloader individual
+[functions.cdn-content-downloader]
+verify_jwt = false
+
+# Scheduled download cron job
+[functions.cdn-scheduled-download]
+verify_jwt = false
+
+# R2 connection test
+[functions.test-r2-connection]
+verify_jwt = false
