@@ -196,9 +196,11 @@ export default function YouTubeStylePlayer({
   // Playback controls
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !video.src) return;
     if (video.paused) {
-      video.play().catch(console.warn);
+      if (video.readyState >= 2) {
+        video.play().catch(() => {});
+      }
     } else {
       video.pause();
     }
@@ -416,7 +418,13 @@ export default function YouTubeStylePlayer({
       hasConnectedOnceRef.current = true;
       setConnectionStatus('connected');
       onReady?.();
-      if (autoplay) video.play().catch(console.warn);
+      if (autoplay && video.readyState >= 2) {
+        video.play().catch(() => {});
+      } else if (autoplay) {
+        video.addEventListener('canplay', () => {
+          if (video.src) video.play().catch(() => {});
+        }, { once: true });
+      }
     });
 
     hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
@@ -549,14 +557,20 @@ export default function YouTubeStylePlayer({
       video.load();
       
       if (autoplay) {
-        // Small delay to allow initial buffering
-        setTimeout(() => {
-          video.play().catch(() => {
-            // Fallback: try with muted first
-            video.muted = true;
-            video.play().catch(console.warn);
-          });
-        }, 100);
+        // Wait for canplay event before attempting play
+        const handleCanPlay = () => {
+          video.removeEventListener('canplay', handleCanPlay);
+          // Verify source is still valid
+          if (video.src && video.readyState >= 2) {
+            video.play().catch(() => {
+              video.muted = true;
+              if (video.src && video.readyState >= 2) {
+                video.play().catch(() => {});
+              }
+            });
+          }
+        };
+        video.addEventListener('canplay', handleCanPlay);
       }
       
       return () => {
@@ -599,7 +613,13 @@ export default function YouTubeStylePlayer({
           } else {
             video.src = url;
             video.load();
-            if (autoplay) video.play().catch(console.warn);
+            if (autoplay) {
+              video.addEventListener('canplay', () => {
+                if (video.src && video.readyState >= 2) {
+                  video.play().catch(() => {});
+                }
+              }, { once: true });
+            }
           }
         }
       }, 8000);
@@ -663,7 +683,13 @@ export default function YouTubeStylePlayer({
         setConnectionStatus('connected');
         networkErrorCount = 0; // Reset on successful metadata
         onReady?.();
-        if (autoplay) video.play().catch(console.warn);
+        if (autoplay && video.readyState >= 2) {
+          video.play().catch(() => {});
+        } else if (autoplay) {
+          video.addEventListener('canplay', () => {
+            if (video.src) video.play().catch(() => {});
+          }, { once: true });
+        }
       });
       
       // Additional event for tracking playback stability
@@ -698,7 +724,13 @@ export default function YouTubeStylePlayer({
     // Native HLS fallback
     video.src = url;
     video.load();
-    if (autoplay) video.play().catch(console.warn);
+    if (autoplay) {
+      video.addEventListener('canplay', () => {
+        if (video.src && video.readyState >= 2) {
+          video.play().catch(() => {});
+        }
+      }, { once: true });
+    }
     
     // Global connection timeout - prevent infinite "Conectando"
     const globalTimeout = setTimeout(() => {
