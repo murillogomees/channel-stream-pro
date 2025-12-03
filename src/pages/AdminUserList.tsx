@@ -617,6 +617,7 @@ export default function AdminUserList() {
               formData={createFormData}
               onChange={setCreateFormData}
               isEdit={false}
+              hideEmail={true}
             />
           </div>
           
