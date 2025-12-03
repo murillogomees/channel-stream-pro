@@ -155,8 +155,8 @@ export function useM3USyncEditor() {
     setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'counting' });
 
     try {
-      const PAGE_SIZE = 10000; // Increased for better performance
-      const PARALLEL_REQUESTS = 4;
+      const PAGE_SIZE = 1000; // Supabase default limit
+      const PARALLEL_REQUESTS = 10; // More parallel requests to compensate
 
       console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
 
