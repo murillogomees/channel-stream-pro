@@ -92,21 +92,29 @@ const DEFAULT_CONFIG: EngineConfig = {
 const HLS_CONFIG: Partial<Hls['config']> = {
   enableWorker: true,
   lowLatencyMode: false,
-  backBufferLength: 60,
-  maxBufferLength: 60,
-  maxMaxBufferLength: 120,
-  maxBufferSize: 60 * 1000 * 1000,
-  maxBufferHole: 0.5,
+  // Reduced buffers for faster startup
+  backBufferLength: 30,
+  maxBufferLength: 15,
+  maxMaxBufferLength: 60,
+  maxBufferSize: 30 * 1000 * 1000,
+  maxBufferHole: 0.8,
+  // Fast startup optimizations
   startFragPrefetch: true,
-  testBandwidth: true,
-  progressive: true,
-  fragLoadingTimeOut: 20000,
-  fragLoadingMaxRetry: 6,
-  fragLoadingRetryDelay: 1000,
-  manifestLoadingTimeOut: 15000,
-  manifestLoadingMaxRetry: 4,
-  levelLoadingTimeOut: 15000,
-  levelLoadingMaxRetry: 4,
+  testBandwidth: false, // Skip bandwidth test for faster start
+  progressive: false, // Disable for faster first frame
+  startLevel: 0, // Start at lowest quality
+  // Aggressive timeouts
+  fragLoadingTimeOut: 10000,
+  fragLoadingMaxRetry: 4,
+  fragLoadingRetryDelay: 500,
+  manifestLoadingTimeOut: 5000,
+  manifestLoadingMaxRetry: 3,
+  levelLoadingTimeOut: 5000,
+  levelLoadingMaxRetry: 3,
+  // ABR tuning
+  abrEwmaDefaultEstimate: 500000,
+  abrBandWidthFactor: 0.8,
+  abrBandWidthUpFactor: 0.6,
 };
 
 // =============================================================================
