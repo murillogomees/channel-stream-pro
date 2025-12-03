@@ -1,170 +1,188 @@
 # 📦 DEPRECATION NOTES
 
-## Data: 2025-11-29
+## Data: 2025-12-03
 ## Autor: lovable-agent
-## Motivo: Consolidação de arquitetura admin
+## Status: ✅ FASE 2 COMPLETA - Redirects Removidos
 
 ---
 
-## Status Geral
+## Histórico de Execução
 
-| Item | Status | Data Prevista Remoção |
-|------|--------|----------------------|
-| Rotas Legacy | 🟡 Redirect Ativo | 2025-12-29 (30 dias) |
-| Páginas Órfãs | ✅ Nenhuma identificada | N/A |
-| Tabelas DB | ✅ Nenhuma marcada | N/A |
-
----
-
-## Rotas Legacy (Scheduled for Removal)
-
-As seguintes rotas estão configuradas como redirects e devem ser **REMOVIDAS após 30 dias** (2025-12-29):
-
-### M3U Routes → /admin/m3u
-```
-/admin/m3u-lists
-/admin/m3u-stats
-/admin/m3u-custom-dashboard
-/admin/m3u/custom
-/admin/m3u-usage-report
-/admin/m3u-builder
-/admin/m3u-import-history
-```
-
-### Notification Routes → /admin/notifications
-```
-/admin/notificacoes
-/admin/notification-settings
-/admin/auto-notifications
-/admin/templates
-/admin/notification-queue
-```
-
-### Security Routes → /admin/security
-```
-/admin/security-alerts
-/admin/security-monitor
-/admin/security-analytics
-/admin/security-escalation
-/admin/suspicious-logins
-/admin/ip-blocking
-/admin/ip-whitelist
-/admin/2fa-settings
-```
-
-### System Routes → /admin/system
-```
-/admin/system-health
-/admin/playlist-health
-/admin/backup-system
-/admin/customize
-/admin/variables
-/admin/status-history
-/admin/custom-status-badges
-```
-
-### User Routes → /admin/users
-```
-/admin/user-roles
-/admin/role-audit
-/admin/permission-test
-```
-
-### Analytics Routes → /admin/analytics
-```
-/admin/conversion-dashboard
-/admin/coupons
-```
-
-### Auth Routes
-```
-/admin/login → /login
-/auth → /login
-/admin/dashboard → /dashboard
-```
+| Fase | Status | Data Execução |
+|------|--------|---------------|
+| Fase 1 - Consolidação Admin Hubs | ✅ Completo | 2025-11-29 |
+| Fase 2 - Remoção Redirects Legacy | ✅ Completo | 2025-12-03 |
 
 ---
 
-## Páginas Sub-componentes (NÃO DEPRECADAS)
+## Rotas Legacy REMOVIDAS (Fase 2)
 
-As seguintes páginas são usadas como **tabs dentro dos hubs** e NÃO devem ser deprecadas:
+### Dashboard Routes (REMOVIDAS)
+```
+/dashboard → /admin/dashboard ❌ REMOVIDO
+/dashboard/* → /admin/dashboard ❌ REMOVIDO
+```
 
-### AdminM3UManagement (Hub)
-- AdminM3ULists.tsx
-- AdminM3UCustomDashboard.tsx
-- AdminM3UCustomBuilder.tsx
-- AdminM3UImportHistory.tsx
-- AdminM3UListStats.tsx
-- AdminM3UUsageReport.tsx
-- AdminVODStorage.tsx
+### Cliente Routes (REMOVIDAS)
+```
+/admin/clientes/novo ❌ REMOVIDO
+/admin/clientes/editar/:id ❌ REMOVIDO
+/admin/clientes/:id/m3u ❌ REMOVIDO
+```
 
-### AdminNotifications (Hub)
-- AdminNotificacoes.tsx
-- AdminNotificationSettings.tsx
-- AdminAutoNotifications.tsx
-- AdminNotificationQueue.tsx
-- AdminTemplates.tsx
+### M3U Routes (REMOVIDAS)
+```
+/admin/m3u-builder ❌ REMOVIDO
+/admin/m3u-import-history ❌ REMOVIDO
+/admin/m3u-sync ❌ REMOVIDO
+/admin/m3u-lists ❌ REMOVIDO
+/admin/m3u-stats ❌ REMOVIDO
+/admin/m3u-custom-dashboard ❌ REMOVIDO
+/admin/m3u/custom ❌ REMOVIDO
+/admin/m3u-usage-report ❌ REMOVIDO
+```
 
-### AdminSecurity (Hub)
-- AdminSecurityAlerts.tsx
-- AdminSecurityMonitor.tsx
-- AdminSecurityAnalytics.tsx
-- AdminSecurityEscalation.tsx
-- AdminSuspiciousLogins.tsx
-- AdminIPBlocking.tsx
-- AdminIPWhitelist.tsx
-- Admin2FASettings.tsx
+### Notification Routes (REMOVIDAS)
+```
+/admin/notifications ❌ REMOVIDO
+/admin/notification-queue ❌ REMOVIDO
+/admin/notification-settings ❌ REMOVIDO
+/admin/auto-notifications ❌ REMOVIDO
+/admin/templates ❌ REMOVIDO
+```
 
-### AdminSystemSettings (Hub)
-- AdminSystemHealth.tsx
-- AdminPlaylistHealth.tsx
-- AdminBackupSystem.tsx
-- AdminCustomize.tsx
-- AdminVariables.tsx
-- AdminStatusHistory.tsx
-- AdminCustomStatusBadges.tsx
+### Security Routes (REMOVIDAS)
+```
+/admin/security ❌ REMOVIDO
+/admin/security-alerts ❌ REMOVIDO
+/admin/security-monitor ❌ REMOVIDO
+/admin/security-analytics ❌ REMOVIDO
+/admin/security-escalation ❌ REMOVIDO
+/admin/suspicious-logins ❌ REMOVIDO
+/admin/ip-blocking ❌ REMOVIDO
+/admin/ip-whitelist ❌ REMOVIDO
+/admin/2fa-settings ❌ REMOVIDO
+```
 
-### AdminUsersPermissions (Hub)
-- AdminUserRoles.tsx
-- AdminCreateUser.tsx
-- AdminRoleAudit.tsx
-- AdminPermissionTest.tsx
+### System Routes (REMOVIDAS)
+```
+/admin/system ❌ REMOVIDO
+/admin/system-health ❌ REMOVIDO
+/admin/playlist-health ❌ REMOVIDO
+/admin/backup-system ❌ REMOVIDO
+/admin/customize ❌ REMOVIDO
+/admin/variables ❌ REMOVIDO
+/admin/status-history ❌ REMOVIDO
+/admin/custom-status-badges ❌ REMOVIDO
+/dashboard/homepage ❌ REMOVIDO
+/dashboard/plans ❌ REMOVIDO
+```
 
-### AdminAnalyticsHub (Hub)
-- AdminAnalytics.tsx
-- AdminConversionDashboard.tsx
-- AdminCoupons.tsx
+### Analytics Routes (REMOVIDAS)
+```
+/admin/conversion-dashboard ❌ REMOVIDO
+/admin/coupons ❌ REMOVIDO
+```
 
----
+### User Routes (REMOVIDAS)
+```
+/admin/users ❌ REMOVIDO
+/admin/create-user ❌ REMOVIDO
+/admin/user-roles ❌ REMOVIDO
+/admin/role-audit ❌ REMOVIDO
+/admin/permission-test ❌ REMOVIDO
+```
 
-## Processo de Remoção de Rotas Legacy
+### Integration Routes (REMOVIDAS)
+```
+/admin/integrations ❌ REMOVIDO
+/admin/whatsapp-config ❌ REMOVIDO
+/admin/cdn ❌ REMOVIDO
+/admin/transcode-queue ❌ REMOVIDO
+/admin/iptv-test ❌ REMOVIDO
+/admin/smart-cache ❌ REMOVIDO
+/admin/qa ❌ REMOVIDO
+```
 
-### Pré-requisitos (antes de 2025-12-29):
-1. [ ] Verificar analytics de uso das rotas legacy
-2. [ ] Confirmar que nenhum link externo aponta para rotas antigas
-3. [ ] Rodar testes E2E completos
-4. [ ] Backup do App.tsx atual
-
-### Passos para Remoção:
-1. Remover todas as linhas `<Navigate to="..." replace />` do App.tsx
-2. Manter apenas as rotas canônicas
-3. Rodar build e testes
-4. Deploy para staging
-5. Monitorar erros 404 por 7 dias
-6. Deploy para produção
-
-### Comando para Remoção (executar após 2025-12-29):
-```tsx
-// Em App.tsx, remover linhas 120-154 (rotas legacy)
+### Other Legacy Routes (REMOVIDAS)
+```
+/admin/login ❌ REMOVIDO
+/auth ❌ REMOVIDO
+/settings ❌ REMOVIDO
+/subscription ❌ REMOVIDO
+/install ❌ REMOVIDO
+/conta ❌ REMOVIDO
+/cliente/account ❌ REMOVIDO
+/app/login ❌ REMOVIDO
+/app/signup ❌ REMOVIDO
+/app/home ❌ REMOVIDO
+/app/favorites ❌ REMOVIDO
+/app/account ❌ REMOVIDO
 ```
 
 ---
 
-## Rollback
+## Rotas Canônicas Ativas
 
-Para restaurar as rotas legacy:
+### Public Routes
+| Rota | Descrição |
+|------|-----------|
+| `/` | Landing page |
+| `/signup` | Cadastro |
+| `/cadastro` | Cadastro (alias PT) |
+| `/login` | Login |
+| `/checkout` | Checkout |
+| `/checkout/success` | Checkout sucesso |
+| `/checkout/failure` | Checkout falha |
+| `/checkout/pending` | Checkout pendente |
+| `/afiliado` | Dashboard afiliado |
+
+### App Routes (IPTV Player)
+| Rota | Descrição |
+|------|-----------|
+| `/app` | Entry point |
+| `/app/install` | Instalação |
+| `/app/player` | Player principal |
+| `/app/profile` | Perfil |
+| `/app/mylist` | Minha lista |
+| `/tv-player` | TV Player |
+
+### Admin Routes (Hub Pages)
+| Rota | Hub | Tabs |
+|------|-----|------|
+| `/admin/dashboard` | Dashboard | Overview |
+| `/admin/clientes` | Clientes | Lista, Criar, Editar |
+| `/admin/m3u` | M3U | Listas, Builder, Import, Stats |
+| `/admin/notificacoes` | Notificações | Queue, Templates, Config |
+| `/admin/seguranca` | Segurança | Monitor, Alertas, IPs, 2FA, RLS |
+| `/admin/sistema` | Sistema | Health, Backup, Status, Config |
+| `/admin/analytics` | Analytics | Overview, Conversão, Cupons |
+| `/admin/usuarios` | Usuários | Lista, Pagamentos, Atividades, Roles |
+| `/admin/roles` | Roles | Gestão avançada |
+| `/admin/integracao` | Integração | WhatsApp, CDN, Transcode, Cache |
+| `/admin/migrations` | Migrations | Schema, Drift, Fixes |
+| `/admin/rls-coverage` | RLS | Cobertura, Políticas |
+| `/admin/perfil` | Perfil Admin | Settings |
+| `/admin/afiliados` | Afiliados | Gestão |
+
+---
+
+## Métricas da Limpeza
+
+| Métrica | Antes | Depois | Redução |
+|---------|-------|--------|---------|
+| Total de rotas | 85 | 34 | -60% |
+| Redirects legacy | 51 | 0 | -100% |
+| Linhas App.tsx | 250 | 137 | -45% |
+| Bundle size estimado | - | - | ~2KB |
+
+---
+
+## Rollback (se necessário)
+
+Para restaurar os redirects legacy:
 ```bash
-git revert <commit-hash-da-remocao>
+git revert <commit-hash-fase-2>
 ```
 
 ---
@@ -173,10 +191,10 @@ git revert <commit-hash-da-remocao>
 
 | Data | Ação | Responsável |
 |------|------|-------------|
-| 2025-11-29 | Criação do AdminHub consolidado | lovable-agent |
-| 2025-11-29 | Configuração de redirects legacy | lovable-agent |
-| 2025-11-29 | Documentação de deprecação | lovable-agent |
+| 2025-11-29 | Criação AdminHubs consolidados | lovable-agent |
+| 2025-11-29 | Configuração redirects legacy | lovable-agent |
+| 2025-12-03 | **FASE 2: Remoção de 51 redirects** | lovable-agent |
 
 ---
 
-*Última atualização: 2025-11-29*
+*Última atualização: 2025-12-03*
