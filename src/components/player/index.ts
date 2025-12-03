@@ -6,16 +6,19 @@ export { VideoPlayer, default } from './VideoPlayer';
 export { SignedStreamPlayer } from './SignedStreamPlayer';
 export { PreloadIndicator } from './PreloadIndicator';
 export { PreloadStats } from './PreloadStats';
+export { PlayerControls } from './PlayerControls';
 export { QualitySelector } from './QualitySelector';
 export { QualityBadge } from './QualityBadge';
 export { ConnectionIndicator } from './ConnectionIndicator';
 export { RecoveryStatus } from './RecoveryStatus';
 export { ResumeDialog } from './ResumeDialog';
+export { SeekBar } from './SeekBar';
 export { StatsOverlay } from './StatsOverlay';
 export { SleepTimerDialog } from './SleepTimerDialog';
 export { CastButton } from './CastButton';
 export { GestureIndicator } from './GestureIndicator';
 export { DoubleTapIndicator } from './DoubleTapIndicator';
+export { ThumbnailPreview } from './ThumbnailPreview';
 
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
@@ -23,6 +26,8 @@ export { useAdvancedHlsConfig, applyDynamicConfig } from '@/hooks/useAdvancedHls
 export { useStreamPreloader } from '@/hooks/useStreamPreloader';
 export { usePlayerErrorRecovery } from '@/hooks/usePlayerErrorRecovery';
 export { useEnhancedPlayer } from '@/hooks/useEnhancedPlayer';
+export { useThumbnailPreview } from '@/hooks/useThumbnailPreview';
+export { usePlayerStats } from '@/hooks/usePlayerStats';
 
 // Re-export stability hooks
 export { usePlayerStability } from '@/hooks/usePlayerStability';
