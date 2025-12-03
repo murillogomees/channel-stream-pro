@@ -30,6 +30,7 @@ import Hls from "hls.js";
 import mpegts from "mpegts.js";
 import { useMovieMetadata } from "@/features/player/hooks/useMovieMetadata";
 import { usePlayerPerformance } from "@/hooks/usePlayerPerformance";
+import { getOptimizedHlsConfig, getMpegtsConfig, detectConnectionQuality } from "@/config/playerBufferConfig";
 
 interface ContentMetadata {
   title?: string;
@@ -380,51 +381,21 @@ export default function YouTubeStylePlayer({
     // Start performance timing
     performance.startTiming();
     
-    // Get optimized config from performance hook
-    const optimizedConfig = performance.getOptimizedHlsConfig();
+    // Detect connection quality for adaptive config
+    const connectionQuality = detectConnectionQuality();
+    console.log(`[Player] Connection quality: ${connectionQuality}`);
+    
+    // Get optimized config based on connection quality
+    const bufferConfig = getOptimizedHlsConfig(connectionQuality, streamInfo.isLive ? 'live' : 'vod');
     
     const hls = new Hls({
-      ...optimizedConfig,
-      // === BUFFER STABILITY (prevents restarts) ===
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60,
-      maxBufferSize: 60 * 1000 * 1000,
-      maxBufferHole: 0.5,
+      ...bufferConfig,
       
-      // === FAST STARTUP ===
-      startLevel: -1,
-      startFragPrefetch: true,
-      abrEwmaDefaultEstimate: 2000000,
-      abrEwmaFastLive: 3,
-      abrEwmaSlowLive: 9,
-      abrBandWidthFactor: 0.95,
-      abrBandWidthUpFactor: 0.7,
+      // Enable worker for better performance
+      enableWorker: true,
       
-      // === NETWORK RESILIENCE ===
-      fragLoadingTimeOut: 20000,
-      fragLoadingMaxRetry: 6,
-      fragLoadingRetryDelay: 500,
-      fragLoadingMaxRetryTimeout: 64000,
-      manifestLoadingTimeOut: 15000,
-      manifestLoadingMaxRetry: 4,
-      manifestLoadingRetryDelay: 1000,
-      levelLoadingTimeOut: 15000,
-      levelLoadingMaxRetry: 4,
-      levelLoadingRetryDelay: 1000,
-      
-      // === PLAYBACK CONTINUITY ===
-      lowLatencyMode: false,
-      backBufferLength: 30,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 10,
-      liveDurationInfinity: true,
-      
-      // === STALL RECOVERY ===
-      nudgeOffset: 0.1,
-      nudgeMaxRetry: 5,
-      maxStarvationDelay: 4,
-      maxLoadingDelay: 4,
-      highBufferWatchdogPeriod: 3,
+      // Live stream infinity
+      liveDurationInfinity: streamInfo.isLive,
     });
     hlsRef.current = hls;
 
@@ -437,7 +408,7 @@ export default function YouTubeStylePlayer({
     // Track recovery attempts
     let networkRecoveryAttempts = 0;
     let mediaRecoveryAttempts = 0;
-    const MAX_RECOVERY_ATTEMPTS = 5;
+    const MAX_RECOVERY_ATTEMPTS = 8;
     
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       performance.recordManifestLoaded();
@@ -595,37 +566,14 @@ export default function YouTubeStylePlayer({
 
     // MPEG-TS live - PERFORMANCE OPTIMIZED
     if (info.type === 'MPEG-TS' && mpegts.isSupported()) {
+      const connectionQuality = detectConnectionQuality();
+      const mpegtsConfig = getMpegtsConfig(connectionQuality);
+      
       const player = mpegts.createPlayer({
         type: 'mpegts',
         isLive: true,
         url: url,
-      }, {
-        // === PERFORMANCE OPTIMIZATION ===
-        enableWorker: true,              // Use web worker for parsing
-        enableStashBuffer: true,         // Enable stash buffer
-        stashInitialSize: 128 * 1024,    // 128KB initial stash
-        
-        // === BUFFER STABILITY (prevents restarts) ===
-        autoCleanupSourceBuffer: true,
-        autoCleanupMaxBackwardDuration: 60,  // Keep 60s back buffer
-        autoCleanupMinBackwardDuration: 30,  // Minimum 30s back buffer
-        
-        // === LIVE SYNC (prevents drift and restarts) ===
-        liveBufferLatencyChasing: false,    // DISABLED - causes restarts when catching up
-        liveSync: false,                     // DISABLED - prevents aggressive seeks
-        lazyLoad: false,
-        lazyLoadMaxDuration: 0,
-        lazyLoadRecoverDuration: 0,
-        deferLoadAfterSourceOpen: false,
-        
-        // === TIMESTAMP FIXES ===
-        fixAudioTimestampGap: true,
-        accurateSeek: true,
-        seekType: 'range',
-        
-        // === NETWORK RESILIENCE ===
-        reuseRedirectedURL: true,           // Reuse redirected URLs
-      });
+      }, mpegtsConfig);
       
       mpegtsRef.current = player;
       player.attachMediaElement(video);
