@@ -3,6 +3,7 @@
  * Rota: /admin/dashboard
  */
 
+import { memo, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { QuickShortcuts } from "@/components/admin/QuickShortcuts";
@@ -25,7 +26,8 @@ interface QuickStatProps {
   variant?: "default" | "success" | "warning" | "danger";
 }
 
-const QuickStat = ({ icon, label, value, variant = "default" }: QuickStatProps) => {
+// Memoized QuickStat to prevent unnecessary re-renders
+const QuickStat = memo(({ icon, label, value, variant = "default" }: QuickStatProps) => {
   const variantClasses = {
     default: "bg-primary/10 text-primary",
     success: "bg-green-500/10 text-green-600 dark:text-green-500",
@@ -48,7 +50,8 @@ const QuickStat = ({ icon, label, value, variant = "default" }: QuickStatProps) 
       </CardContent>
     </Card>
   );
-};
+});
+QuickStat.displayName = 'QuickStat';
 
 interface NavCardProps {
   title: string;
@@ -60,15 +63,20 @@ interface NavCardProps {
   isHighlighted?: boolean;
 }
 
-const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }: NavCardProps) => {
+// Memoized NavCard to prevent unnecessary re-renders
+const NavCard = memo(({ title, description, icon, path, badge, isNew, isHighlighted }: NavCardProps) => {
   const navigate = useNavigate();
+  
+  const handleClick = useCallback(() => {
+    navigate(path);
+  }, [navigate, path]);
 
   return (
     <Card 
       className={`hover:shadow-lg transition-all duration-300 cursor-pointer group animate-scale-in hover:border-primary/50 relative overflow-hidden ${
         isHighlighted ? 'ring-2 ring-primary/50 bg-primary/5' : ''
       }`}
-      onClick={() => navigate(path)}
+      onClick={handleClick}
     >
       {isNew && (
         <div className="absolute top-0 right-0">
@@ -96,7 +104,8 @@ const NavCard = ({ title, description, icon, path, badge, isNew, isHighlighted }
       </CardHeader>
     </Card>
   );
-};
+});
+NavCard.displayName = 'NavCard';
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
