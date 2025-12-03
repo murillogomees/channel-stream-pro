@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
+import { useFastStartupV2 } from '@/hooks/useFastStartupV2';
 
 interface VideoPlayerProps {
   url: string;
@@ -31,12 +32,19 @@ export function VideoPlayer({
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
 
+  // Fast startup optimization
+  const fastStartup = useFastStartupV2({
+    startLowQuality: true,
+    upgradeDelay: 2,
+  });
+
   const cleanup = useCallback(() => {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-  }, []);
+    fastStartup.reset();
+  }, [fastStartup]);
 
   const attemptPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -78,25 +86,21 @@ export function VideoPlayer({
     setNeedsManualPlay(false);
     cleanup();
 
-    // HLS Stream
+    // HLS Stream with fast startup optimization
     if (isHls && Hls.isSupported()) {
+      const fastConfig = fastStartup.getConfig();
       const hls = new Hls({
-        enableWorker: false,
-        lowLatencyMode: false,
-        startLevel: -1,
+        ...fastConfig,
+        enableWorker: true,
         capLevelToPlayerSize: true,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
-        maxBufferSize: 10 * 1024 * 1024,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 2,
-        levelLoadingTimeOut: 10000,
-        fragLoadingTimeOut: 15000,
       });
 
       hlsRef.current = hls;
       hls.loadSource(url);
       hls.attachMedia(video);
+      
+      // Attach fast startup for quality upgrade
+      const cleanupFastStartup = fastStartup.attach(hls, video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
@@ -117,7 +121,10 @@ export function VideoPlayer({
         }
       });
 
-      return cleanup;
+      return () => {
+        cleanupFastStartup?.();
+        cleanup();
+      };
     }
 
     // Safari native HLS or direct video
@@ -151,7 +158,7 @@ export function VideoPlayer({
       video.removeEventListener('playing', handlePlaying);
       cleanup();
     };
-  }, [url, cleanup, attemptPlay, onReady, onError]);
+  }, [url, cleanup, attemptPlay, onReady, onError, fastStartup]);
 
   const toggleMute = () => {
     if (videoRef.current) {
