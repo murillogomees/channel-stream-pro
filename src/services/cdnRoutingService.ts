@@ -179,13 +179,28 @@ export function getCdnWorkerHealth(): CdnWorkerHealth {
 // ============================================
 
 /**
+ * Check if URL is VOD content
+ */
+function isVodContent(url: string): boolean {
+  if (!url) return false;
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('/movie/') || 
+         urlLower.includes('/series/') || 
+         urlLower.includes('/vod/') ||
+         urlLower.includes('.mp4') ||
+         urlLower.includes('.mkv') ||
+         urlLower.includes('.avi');
+}
+
+/**
  * Get optimized playback URL for a channel
  * 
  * Priority:
  * 1. Cloudflare Stream (if available)
  * 2. R2 via CDN Worker (if VOD uploaded)
  * 3. R2 direct (if CDN Worker down)
- * 4. Stream proxy (fallback for live/origin)
+ * 4. Direct URL for VOD (no proxy - avoid timeouts)
+ * 5. Stream proxy (only for live streams)
  */
 export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> {
   await initializeConfig();
@@ -246,7 +261,17 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     }
   }
 
-  // Priority 4: Stream proxy (live streams and fallback)
+  // Priority 4: VOD content - use direct URL (no proxy to avoid timeouts)
+  if (isVodContent(channel.stream_url)) {
+    console.log('[CDN Routing] VOD content - using direct URL (no proxy):', channel.name);
+    return {
+      url: channel.stream_url,
+      source: 'origin',
+      requiresToken: false,
+    };
+  }
+
+  // Priority 5: Stream proxy (only for live streams)
   const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
   
   metrics.stream_proxy_requests++;
