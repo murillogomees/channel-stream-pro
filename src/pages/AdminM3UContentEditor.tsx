@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink
+  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink, RefreshCw, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +78,7 @@ export default function AdminM3UContentEditor() {
     setSelectedClass,
     setSelectedCategory,
     loadEntries,
+    forceRefresh,
     updateEntry,
     bulkUpdateCategory,
     deleteEntry,
@@ -232,12 +233,30 @@ export default function AdminM3UContentEditor() {
           </p>
         </div>
         
-        <div className="flex gap-2 items-center w-full sm:w-auto">
+        <div className="flex gap-2 items-center w-full sm:w-auto flex-wrap">
           {selectedSourceId && (
-            <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-600/30 bg-green-500/10">
-              <Check className="w-3 h-3" />
-              Auto-save ativo
-            </Badge>
+            <>
+              <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-600/30 bg-green-500/10">
+                <Check className="w-3 h-3" />
+                Auto-save
+              </Badge>
+              {loadingProgress.fromCache && (
+                <Badge variant="outline" className="text-xs gap-1 text-blue-600 border-blue-600/30 bg-blue-500/10">
+                  <Database className="w-3 h-3" />
+                  Cache
+                </Badge>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={forceRefresh}
+                disabled={isLoading}
+                className="gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </>
           )}
           <Select onValueChange={handleSourceChange} value={selectedSourceId || ''}>
             <SelectTrigger className="w-full sm:w-[250px]">
