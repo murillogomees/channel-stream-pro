@@ -156,7 +156,9 @@ export function useM3USyncEditor() {
 
     try {
       const PAGE_SIZE = 1000; // Supabase default limit
-      const PARALLEL_REQUESTS = 10; // More parallel requests to compensate
+      const PARALLEL_REQUESTS = 3; // Reduced to avoid statement timeouts
+      const BATCH_DELAY_MS = 200; // Delay between batches to let DB recover
+      const MAX_RETRIES = 3;
 
       console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
 
@@ -196,39 +198,51 @@ export function useM3USyncEditor() {
       console.log(`[M3USyncEditor] Total pages: ${totalPages}, batches: ${pageBatches.length}`);
 
       let allData: any[] = [];
-      let errorCount = 0;
+      let failedPages: number[] = [];
 
-      // Fetch pages in parallel batches
+      // Helper function to fetch a single page with retry
+      const fetchPage = async (page: number, retryCount = 0): Promise<any[]> => {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        try {
+          const { data, error } = await supabase
+            .from("m3u_sync_entries")
+            .select("*")
+            .eq("source_id", sourceId)
+            .eq("is_valid", true)
+            .order("group_title")
+            .order("title")
+            .range(from, to);
+
+          if (error) {
+            if (retryCount < MAX_RETRIES) {
+              console.log(`[M3USyncEditor] Page ${page} retry ${retryCount + 1}/${MAX_RETRIES}...`);
+              await new Promise(r => setTimeout(r, 500 * (retryCount + 1))); // Exponential backoff
+              return fetchPage(page, retryCount + 1);
+            }
+            console.error(`[M3USyncEditor] Page ${page} failed after ${MAX_RETRIES} retries:`, error);
+            failedPages.push(page);
+            return [];
+          }
+          return data || [];
+        } catch (e) {
+          if (retryCount < MAX_RETRIES) {
+            console.log(`[M3USyncEditor] Page ${page} retry ${retryCount + 1}/${MAX_RETRIES}...`);
+            await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
+            return fetchPage(page, retryCount + 1);
+          }
+          console.error(`[M3USyncEditor] Page ${page} exception after ${MAX_RETRIES} retries:`, e);
+          failedPages.push(page);
+          return [];
+        }
+      };
+
+      // Fetch pages in parallel batches with delay between batches
       for (let batchIndex = 0; batchIndex < pageBatches.length; batchIndex++) {
         const batch = pageBatches[batchIndex];
         
-        const requests = batch.map(async (page) => {
-          const from = page * PAGE_SIZE;
-          const to = from + PAGE_SIZE - 1;
-
-          try {
-            const { data, error } = await supabase
-              .from("m3u_sync_entries")
-              .select("*")
-              .eq("source_id", sourceId)
-              .eq("is_valid", true)
-              .order("group_title")
-              .order("title")
-              .range(from, to);
-
-            if (error) {
-              console.error(`[M3USyncEditor] Page ${page} error:`, error);
-              errorCount++;
-              return [];
-            }
-            return data || [];
-          } catch (e) {
-            console.error(`[M3USyncEditor] Page ${page} exception:`, e);
-            errorCount++;
-            return [];
-          }
-        });
-
+        const requests = batch.map((page) => fetchPage(page));
         const results = await Promise.all(requests);
         const batchData = results.flat();
         allData = [...allData, ...batchData];
@@ -242,10 +256,15 @@ export function useM3USyncEditor() {
         });
 
         console.log(`[M3USyncEditor] Batch ${batchIndex + 1}/${pageBatches.length}: ${allData.length}/${totalCount} loaded`);
+
+        // Add delay between batches to prevent overwhelming the database
+        if (batchIndex < pageBatches.length - 1) {
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
       }
 
-      if (errorCount > 0) {
-        console.warn(`[M3USyncEditor] ${errorCount} pages had errors`);
+      if (failedPages.length > 0) {
+        console.warn(`[M3USyncEditor] ${failedPages.length} pages failed: ${failedPages.join(', ')}`);
       }
 
       // Process entries
