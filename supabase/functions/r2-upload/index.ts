@@ -1,60 +1,29 @@
 /**
  * R2 Upload Service
  * 
- * Uploads content to Cloudflare R2 with:
- * - Naming convention: iptvlink/{env}/{content_type}/{id}
- * - Automatic content-type detection
- * - Checksum verification
- * - CDN URL generation
+ * Uses shared R2 config helper for standardized operations.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
+import { 
+  getR2Client, 
+  getR2Config,
+  checkR2Config,
+  uploadToR2,
+  deleteFromR2,
+  objectExists,
+  generateR2Key,
+  getMimeType,
+  getCdnUrl,
+  R2_BUCKET_NAME,
+  HeadObjectCommand
+} from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Initialize R2 client
-function getR2Client() {
-  const accountId = Deno.env.get('R2_ACCOUNT_ID') || Deno.env.get('CLOUDFLARE_ACCOUNT_ID');
-  const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!;
-  const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!;
-  
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey
-    }
-  });
-}
-
-// Generate R2 key following naming convention
-function generateR2Key(env: string, contentType: string, id: string, extension?: string): string {
-  const key = `iptvlink/${env}/${contentType}/${id}`;
-  return extension ? `${key}.${extension}` : key;
-}
-
-// Detect MIME type from extension
-function getMimeType(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    'm3u8': 'application/vnd.apple.mpegurl',
-    'ts': 'video/mp2t',
-    'mp4': 'video/mp4',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'webp': 'image/webp',
-    'vtt': 'text/vtt',
-    'srt': 'text/plain'
-  };
-  return mimeTypes[ext || ''] || 'application/octet-stream';
-}
 
 // Get cache control based on content type
 function getCacheControl(contentType: string): string {
@@ -85,14 +54,24 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Check R2 config first
+  const configStatus = checkR2Config();
+  if (!configStatus.configured) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'R2 not configured', 
+        missing: configStatus.missing,
+        bucket: R2_BUCKET_NAME 
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const r2Bucket = Deno.env.get('R2_BUCKET_NAME') || 'iptvlink-cdn';
-  const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.example.com';
-  const env = Deno.env.get('ENVIRONMENT') || 'prod';
+  const env = Deno.env.get('ENVIRONMENT') || 'production';
   
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const r2Client = getR2Client();
 
   try {
     const url = new URL(req.url);
@@ -135,46 +114,40 @@ serve(async (req) => {
         );
       }
 
-      // Generate R2 key
+      // Generate R2 key using shared helper
       const ext = extension || filename.split('.').pop();
-      const r2Key = generateR2Key(env, contentType, customId, ext);
+      const r2Key = generateR2Key(contentType as any, customId, ext);
       const mimeType = getMimeType(filename);
       const cacheControl = getCacheControl(contentType);
       const checksum = await calculateMD5(fileData);
 
-      // Upload to R2
+      // Upload to R2 using shared helper
       console.log('[R2-Upload] Uploading to R2:', { r2Key, size: fileData.length, mimeType });
       
-      await r2Client.send(new PutObjectCommand({
-        Bucket: r2Bucket,
-        Key: r2Key,
-        Body: fileData,
-        ContentType: mimeType,
-        CacheControl: cacheControl,
-        ContentEncoding: 'identity', // Brotli applied by CDN
-        Metadata: {
+      const uploadResult = await uploadToR2({
+        key: r2Key,
+        body: fileData,
+        contentType: mimeType,
+        cacheControl,
+        metadata: {
           'channel-id': channelId || '',
           'upload-time': new Date().toISOString()
         }
-      }));
-
-      // Generate proper public CDN URL
-      const cdnUrl = `https://${r2Domain}/${r2Key}`;
-      console.log('[R2-Upload] Generated CDN URL:', cdnUrl);
+      });
 
       // Store in database
       const { data: record, error: dbError } = await supabase
         .from('r2_storage_objects')
         .upsert({
           r2_key: r2Key,
-          r2_bucket: r2Bucket,
+          r2_bucket: R2_BUCKET_NAME,
           content_type: contentType,
           mime_type: mimeType,
           size_bytes: fileData.length,
           checksum_md5: checksum,
           source_channel_id: channelId,
           source_url: sourceUrl,
-          cdn_url: cdnUrl,
+          cdn_url: uploadResult.cdnUrl,
           cache_control: cacheControl,
           status: 'ready',
           updated_at: new Date().toISOString()
@@ -192,7 +165,7 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           r2_key: r2Key,
-          cdn_url: cdnUrl,
+          cdn_url: uploadResult.cdnUrl,
           size_bytes: fileData.length,
           checksum: checksum,
           cache_control: cacheControl,
@@ -213,10 +186,7 @@ serve(async (req) => {
         );
       }
 
-      await r2Client.send(new DeleteObjectCommand({
-        Bucket: r2Bucket,
-        Key: r2_key
-      }));
+      await deleteFromR2(r2_key);
 
       // Update database
       await supabase
@@ -240,9 +210,13 @@ serve(async (req) => {
         );
       }
 
-      try {
-        const head = await r2Client.send(new HeadObjectCommand({
-          Bucket: r2Bucket,
+      const exists = await objectExists(r2Key);
+      
+      if (exists) {
+        const client = getR2Client();
+        const config = getR2Config();
+        const head = await client.send(new HeadObjectCommand({
+          Bucket: config.bucketName,
           Key: r2Key
         }));
 
@@ -255,12 +229,12 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      } catch {
-        return new Response(
-          JSON.stringify({ exists: false }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
+
+      return new Response(
+        JSON.stringify({ exists: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
 
     } else if (action === 'stats') {
       // Get CDN stats

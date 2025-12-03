@@ -1,5 +1,17 @@
+/**
+ * CDN Content Downloader
+ * 
+ * Downloads content to Cloudflare R2 using shared config helper.
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { 
+  uploadToR2, 
+  checkR2Config,
+  R2_BUCKET_NAME,
+  R2_CDN_BASE_URL 
+} from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,6 +34,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Check R2 config first
+  const configStatus = checkR2Config();
+  if (!configStatus.configured) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'R2 not configured', 
+        missing: configStatus.missing,
+        bucket: R2_BUCKET_NAME 
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -39,10 +64,8 @@ serve(async (req) => {
     // Determinar estratégia baseado no tipo
     let downloadResult;
     if (job.contentType === 'live') {
-      // Para LIVE: apenas validar e cachear manifest
       downloadResult = await downloadLiveManifest(job, supabase);
     } else {
-      // Para VOD: download completo com retry robusto
       downloadResult = await downloadVODContent(job, supabase);
     }
 
@@ -74,7 +97,7 @@ serve(async (req) => {
  */
 async function downloadLiveManifest(job: DownloadJob, supabase: any) {
   const maxRetries = 5;
-  const baseDelay = 2000; // 2 segundos
+  const baseDelay = 2000;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -86,19 +109,17 @@ async function downloadLiveManifest(job: DownloadJob, supabase: any) {
         'Connection': 'keep-alive',
       };
 
-      // Adicionar credenciais se existirem
       if (job.credentials?.username && job.credentials?.password) {
         const auth = btoa(`${job.credentials.username}:${job.credentials.password}`);
         headers['Authorization'] = `Basic ${auth}`;
       }
 
-      // Adicionar headers customizados
       if (job.credentials?.headers) {
         Object.assign(headers, job.credentials.headers);
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const timeout = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(job.sourceUrl, {
         headers,
@@ -114,30 +135,37 @@ async function downloadLiveManifest(job: DownloadJob, supabase: any) {
 
       const manifestContent = await response.text();
       
-      // Salvar manifest no R2
+      // Upload using shared helper
       const r2Key = `live/${job.channelId}/playlist.m3u8`;
-      await uploadToR2(r2Key, manifestContent, 'application/vnd.apple.mpegurl');
+      const uploadResult = await uploadToR2({
+        key: r2Key,
+        body: manifestContent,
+        contentType: 'application/vnd.apple.mpegurl',
+        cacheControl: 'public, max-age=10, s-maxage=30'
+      });
 
-      // Atualizar registro no Supabase
+      // Update Supabase
       await supabase
         .from('r2_storage_objects')
         .upsert({
-          key: r2Key,
+          r2_key: r2Key,
+          r2_bucket: R2_BUCKET_NAME,
           channel_id: job.channelId,
           content_type: 'live',
           size_bytes: new Blob([manifestContent]).size,
+          cdn_url: uploadResult.cdnUrl,
           status: 'ready',
           last_accessed_at: new Date().toISOString(),
         });
 
       console.log(`[Live] Success: ${r2Key}`);
-      return { r2Key, size: manifestContent.length, attempts: attempt };
+      return { r2Key, cdnUrl: uploadResult.cdnUrl, size: manifestContent.length, attempts: attempt };
 
     } catch (error: any) {
       console.error(`[Live] Attempt ${attempt} failed:`, error.message);
       
       if (attempt < maxRetries) {
-        const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        const delay = baseDelay * Math.pow(2, attempt - 1);
         console.log(`[Live] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
@@ -156,7 +184,13 @@ async function downloadVODContent(job: DownloadJob, supabase: any) {
   // 1. Download manifest principal
   const manifestContent = await downloadWithRetry(job.sourceUrl, job.credentials);
   const manifestKey = `vod/${job.channelId}/master.m3u8`;
-  await uploadToR2(manifestKey, manifestContent, 'application/vnd.apple.mpegurl');
+  
+  const manifestUpload = await uploadToR2({
+    key: manifestKey,
+    body: manifestContent,
+    contentType: 'application/vnd.apple.mpegurl',
+    cacheControl: 'public, max-age=10, s-maxage=30'
+  });
 
   // 2. Parse manifest e extrair segmentos
   const segments = parseM3U8Segments(manifestContent, job.sourceUrl);
@@ -176,9 +210,14 @@ async function downloadVODContent(job: DownloadJob, supabase: any) {
           const segmentName = segmentUrl.split('/').pop() || `segment_${i}.ts`;
           const segmentKey = `vod/${job.channelId}/${segmentName}`;
           
-          await uploadToR2(segmentKey, segmentData, 'video/mp2t');
-          downloadedCount++;
+          await uploadToR2({
+            key: segmentKey,
+            body: new Uint8Array(segmentData),
+            contentType: 'video/mp2t',
+            cacheControl: 'public, max-age=3600, s-maxage=86400'
+          });
           
+          downloadedCount++;
           console.log(`[VOD] Downloaded ${downloadedCount}/${segments.length}: ${segmentName}`);
         } catch (error: any) {
           console.error(`[VOD] Failed to download segment ${segmentUrl}:`, error.message);
@@ -189,15 +228,22 @@ async function downloadVODContent(job: DownloadJob, supabase: any) {
 
   // 4. Atualizar manifest com URLs do R2
   const updatedManifest = updateManifestUrls(manifestContent, job.channelId);
-  await uploadToR2(manifestKey, updatedManifest, 'application/vnd.apple.mpegurl');
+  await uploadToR2({
+    key: manifestKey,
+    body: updatedManifest,
+    contentType: 'application/vnd.apple.mpegurl',
+    cacheControl: 'public, max-age=10, s-maxage=30'
+  });
 
   // 5. Salvar metadata no Supabase
   await supabase
     .from('r2_storage_objects')
     .upsert({
-      key: manifestKey,
+      r2_key: manifestKey,
+      r2_bucket: R2_BUCKET_NAME,
       channel_id: job.channelId,
       content_type: 'vod',
+      cdn_url: manifestUpload.cdnUrl,
       size_bytes: new Blob([updatedManifest]).size,
       status: 'ready',
       metadata: { totalSegments: segments.length, downloadedSegments: downloadedCount },
@@ -205,6 +251,7 @@ async function downloadVODContent(job: DownloadJob, supabase: any) {
 
   return { 
     manifestKey, 
+    cdnUrl: manifestUpload.cdnUrl,
     totalSegments: segments.length, 
     downloadedSegments: downloadedCount 
   };
@@ -227,7 +274,7 @@ async function downloadWithRetry(
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': '*/*',
         'Connection': 'keep-alive',
-        'Range': 'bytes=0-', // Suporta partial content
+        'Range': 'bytes=0-',
       };
 
       if (credentials?.username && credentials?.password) {
@@ -240,7 +287,7 @@ async function downloadWithRetry(
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeout = setTimeout(() => controller.abort(), 60000);
 
       const response = await fetch(url, {
         headers,
@@ -274,39 +321,6 @@ async function downloadWithRetry(
 }
 
 /**
- * Upload para Cloudflare R2
- */
-async function uploadToR2(key: string, content: any, contentType: string) {
-  const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
-  const R2_ACCESS_KEY_ID = Deno.env.get('R2_ACCESS_KEY_ID');
-  const R2_SECRET_ACCESS_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
-  const R2_BUCKET = Deno.env.get('R2_BUCKET_NAME') || 'iptvlink-cdn'; // Bucket padrão iptvlink-cdn
-
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-    throw new Error('R2 credentials not configured');
-  }
-
-  const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${key}`;
-  
-  const body = typeof content === 'string' ? content : content;
-  
-  const response = await fetch(endpoint, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-      'Authorization': `Bearer ${R2_ACCESS_KEY_ID}:${R2_SECRET_ACCESS_KEY}`,
-    },
-    body,
-  });
-
-  if (!response.ok) {
-    throw new Error(`R2 upload failed: ${response.statusText}`);
-  }
-
-  console.log(`[R2] Uploaded: ${key}`);
-}
-
-/**
  * Parse M3U8 e extrair URLs de segmentos
  */
 function parseM3U8Segments(content: string, baseUrl: string): string[] {
@@ -317,11 +331,9 @@ function parseM3U8Segments(content: string, baseUrl: string): string[] {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     
-    // Se for URL absoluta, usar direto
     if (trimmed.startsWith('http')) {
       segments.push(trimmed);
     } else {
-      // Resolver URL relativa
       const base = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
       segments.push(base + trimmed);
     }
@@ -338,14 +350,10 @@ function updateManifestUrls(content: string, channelId: string): string {
   const updatedLines = lines.map(line => {
     const trimmed = line.trim();
     
-    // Ignorar comentários e linhas vazias
     if (!trimmed || trimmed.startsWith('#')) return line;
     
-    // Extrair nome do arquivo
     const filename = trimmed.split('/').pop() || trimmed;
-    
-    // Retornar URL do R2
-    return `https://cdn.iptvlink.com/vod/${channelId}/${filename}`;
+    return `${R2_CDN_BASE_URL}/vod/${channelId}/${filename}`;
   });
   
   return updatedLines.join('\n');

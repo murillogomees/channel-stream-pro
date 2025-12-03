@@ -2,16 +2,12 @@
  * CDN Prewarm Service
  * 
  * Nightly job to prefetch first N segments of top predicted assets.
- * Uses ML predictions if available, falls back to moving average of views.
- * 
- * Prewarm pattern:
- * 1. Get top predicted assets from cdn_prewarm_predictions
- * 2. For each asset, fetch manifest and first N segments
- * 3. Segments are fetched through CDN to populate edge cache
+ * Uses shared R2 config helper for CDN URL generation.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { R2_CDN_BASE_URL } from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,11 +36,9 @@ function parseHlsManifest(content: string, baseUrl: string): string[] {
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed && !trimmed.startsWith('#')) {
-      // This is a segment URL
       if (trimmed.startsWith('http')) {
         segments.push(trimmed);
       } else {
-        // Relative URL - resolve against base
         const base = new URL(baseUrl);
         const segmentUrl = new URL(trimmed, base).toString();
         segments.push(segmentUrl);
@@ -65,12 +59,10 @@ async function prewarmAsset(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     
-    // Detect content type from URL
     const isHlsManifest = cdnUrl.includes('.m3u8');
     const isMp4 = cdnUrl.includes('.mp4') || cdnUrl.includes('/vod/');
     
     if (isHlsManifest) {
-      // HLS manifest - fetch and prewarm segments
       const manifestResponse = await fetch(cdnUrl, {
         signal: controller.signal,
         headers: {
@@ -87,7 +79,6 @@ async function prewarmAsset(
       const manifestContent = await manifestResponse.text();
       const segments = parseHlsManifest(manifestContent, cdnUrl);
       
-      // Fetch first N segments
       let fetchedSegments = 0;
       let totalBytes = 0;
       const segmentsToPrewarm = segments.slice(0, segmentsToFetch);
@@ -118,8 +109,7 @@ async function prewarmAsset(
       return { success: true, segments: fetchedSegments, bytes: totalBytes };
       
     } else if (isMp4) {
-      // Direct video file (MP4) - fetch first 5MB to prewarm cache
-      const rangeSize = 5 * 1024 * 1024; // 5MB
+      const rangeSize = 5 * 1024 * 1024;
       
       const response = await fetch(cdnUrl, {
         signal: controller.signal,
@@ -141,7 +131,6 @@ async function prewarmAsset(
       return { success: true, segments: 1, bytes: body.byteLength };
       
     } else {
-      // Unknown content type - try simple HEAD request
       const response = await fetch(cdnUrl, {
         method: 'HEAD',
         signal: controller.signal,
@@ -182,7 +171,6 @@ async function processPrewarmQueue(
   let totalBytes = 0;
   const errors: string[] = [];
   
-  // Process in batches for concurrency control
   for (let i = 0; i < assets.length; i += config.concurrency) {
     const batch = assets.slice(i, i + config.concurrency);
     
@@ -203,7 +191,6 @@ async function processPrewarmQueue(
       }
     }
     
-    // Update progress
     await updateProgress(prewarmed, failed, totalBytes);
   }
   
@@ -218,11 +205,10 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const cronSecret = Deno.env.get('CRON_SECRET');
-  const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.example.com';
   
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Auth check - accept cron secret, service key, or authenticated admin
+  // Auth check
   const authHeader = req.headers.get('authorization');
   const providedSecret = req.headers.get('x-cron-secret');
   
@@ -230,7 +216,6 @@ serve(async (req) => {
     providedSecret === cronSecret ||
     (authHeader && authHeader.includes(supabaseServiceKey));
   
-  // Also check for authenticated admin user
   if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace('Bearer ', '');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -240,13 +225,12 @@ serve(async (req) => {
     
     const { data: { user }, error } = await authSupabase.auth.getUser();
     if (!error && user) {
-      // Check if user is admin using user_roles table
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
       
-      const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+      const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'master');
       if (isAdmin) {
         isAuthorized = true;
         console.log('[CDN-Prewarm] Admin user authorized:', user.email);
@@ -274,9 +258,9 @@ serve(async (req) => {
       segmentsPerAsset
     };
 
-    console.log('[CDN-Prewarm] Starting prewarm job', { jobType, config });
+    console.log('[CDN-Prewarm] Starting prewarm job', { jobType, config, cdnBaseUrl: R2_CDN_BASE_URL });
 
-    // First, recalculate predictions
+    // Recalculate predictions
     const { data: predictionCount, error: predError } = await supabase.rpc('calculate_prewarm_predictions');
     if (predError) {
       console.error('[CDN-Prewarm] Prediction calculation error:', predError);
@@ -284,7 +268,7 @@ serve(async (req) => {
       console.log('[CDN-Prewarm] Updated predictions:', predictionCount);
     }
 
-    // Get top predicted assets with CDN URLs from r2_storage_objects
+    // Get top predicted assets
     const { data: predictions, error: fetchError } = await supabase
       .from('cdn_prewarm_predictions')
       .select(`
@@ -306,7 +290,6 @@ serve(async (req) => {
     let assetsWithUrls = [];
     
     if (predictions && predictions.length > 0) {
-    // Get CDN URLs from r2_storage_objects for predicted keys
       const { data: r2Objects, error: r2Error } = await supabase
         .from('r2_storage_objects')
         .select('r2_key, cdn_url, source_channel_id')
@@ -319,7 +302,6 @@ serve(async (req) => {
       
       console.log('[CDN-Prewarm] Found R2 objects:', r2Objects?.length || 0);
       
-      // Map predictions to r2_storage_objects to get cdn_url
       assetsWithUrls = predictions
         .map(p => {
           const r2Object = r2Objects?.find(r => r.r2_key === p.r2_key);
@@ -332,7 +314,6 @@ serve(async (req) => {
     }
     
     if (!assetsWithUrls || assetsWithUrls.length === 0) {
-      // Fallback: get R2 objects with highest access count
       const { data: fallbackAssets } = await supabase
         .from('r2_storage_objects')
         .select('r2_key, source_channel_id, cdn_url')
@@ -353,7 +334,6 @@ serve(async (req) => {
         );
       }
       
-      // Use fallback assets
       assetsWithUrls = fallbackAssets.map(a => ({
         channel_id: a.source_channel_id,
         r2_key: a.r2_key,
@@ -384,7 +364,7 @@ serve(async (req) => {
       throw new Error(`Failed to create job: ${jobError.message}`);
     }
 
-    // Prepare assets for prewarming using cdn_url from database
+    // Prepare assets for prewarming
     const assets = assetsWithUrls
       .filter(p => {
         if (!p.cdn_url) {
@@ -392,7 +372,6 @@ serve(async (req) => {
           return false;
         }
         
-        // Validate URL format
         if (p.cdn_url.includes('https://https//')) {
           console.error('[CDN-Prewarm] Malformed URL detected:', p.cdn_url);
           return false;
@@ -404,7 +383,7 @@ serve(async (req) => {
         console.log('[CDN-Prewarm] Preparing asset:', { r2_key: p.r2_key, cdn_url: p.cdn_url });
         return {
           r2_key: p.r2_key!,
-          cdn_url: p.cdn_url!, // Use cdn_url directly from database
+          cdn_url: p.cdn_url!,
           channel_id: p.channel_id
         };
       });
@@ -438,7 +417,7 @@ serve(async (req) => {
         failed_assets: result.failed,
         total_bytes_prewarmed: result.totalBytes,
         avg_prewarm_time_ms: avgTime,
-        error_log: result.errors.slice(0, 100) // Keep first 100 errors
+        error_log: result.errors.slice(0, 100)
       })
       .eq('id', job.id);
 
