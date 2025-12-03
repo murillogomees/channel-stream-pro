@@ -42,6 +42,14 @@ function getContentType(url: string): 'hls' | 'vod' | 'direct' {
   return 'direct';
 }
 
+// Verifica se é Mixed Content (HTTP em página HTTPS)
+function isMixedContent(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const pageIsHttps = window.location.protocol === 'https:';
+  const urlIsHttp = url.toLowerCase().startsWith('http://');
+  return pageIsHttps && urlIsHttp;
+}
+
 // Configuração HLS básica e otimizada
 const HLS_CONFIG: Partial<Hls['config']> = {
   enableWorker: true,
@@ -106,6 +114,15 @@ export default function SimplePlayer({
     }
 
     console.log('[SimplePlayer] Iniciando:', url.substring(0, 80));
+    
+    // Verifica Mixed Content ANTES de tentar carregar
+    if (isMixedContent(url)) {
+      console.error('[SimplePlayer] Mixed Content bloqueado:', url);
+      setError('Conteúdo HTTP bloqueado pelo navegador. O servidor de origem não suporta HTTPS.');
+      setIsLoading(false);
+      onError?.('Mixed Content blocked');
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
