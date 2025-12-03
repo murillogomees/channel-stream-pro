@@ -29,9 +29,7 @@ import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
 import { useMovieMetadata } from "@/features/player/hooks/useMovieMetadata";
-import { useFastStartup } from "@/hooks/useFastStartup";
-import { useAdaptiveBuffer } from "@/hooks/useAdaptiveBuffer";
-import { useStreamServiceWorker } from "@/hooks/useStreamServiceWorker";
+import { usePlayerPerformance } from "@/hooks/usePlayerPerformance";
 
 interface ContentMetadata {
   title?: string;
@@ -116,10 +114,9 @@ export default function YouTubeStylePlayer({
   seriesEpisodes = [],
   onPlayEpisode,
 }: YouTubeStylePlayerProps) {
-  // Performance Optimization Hooks
-  const fastStartup = useFastStartup();
-  const adaptiveBuffer = useAdaptiveBuffer({ isLive: !detectStreamType(url).isVod });
-  const streamSW = useStreamServiceWorker();
+  // Unified Performance Hook
+  const streamInfo = detectStreamType(url);
+  const performance = usePlayerPerformance({ isLive: !streamInfo.isVod, enablePreload: true });
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -155,9 +152,6 @@ export default function YouTubeStylePlayer({
   // Refs for debouncing
   const hasConnectedOnceRef = useRef(false);
   const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Detect stream info
-  const streamInfo = detectStreamType(url);
 
   // Auto-fetch metadata if not provided
   const { 
@@ -320,9 +314,10 @@ export default function YouTubeStylePlayer({
           hasConnectedOnceRef.current = true;
           setConnectionStatus('connected');
         }
-        // Track playback start
+        // Track playback start and record first frame for metrics
         if (!hasStartedPlayingRef.current) {
           hasStartedPlayingRef.current = true;
+          performance.recordFirstFrame();
           onPlaybackStart?.();
         }
       },
@@ -382,28 +377,35 @@ export default function YouTubeStylePlayer({
 
   // HLS Player initialization function - PERFORMANCE OPTIMIZED
   const initHlsPlayer = useCallback((streamUrl: string, video: HTMLVideoElement) => {
+    // Start performance timing
+    performance.startTiming();
+    
+    // Get optimized config from performance hook
+    const optimizedConfig = performance.getOptimizedHlsConfig();
+    
     const hls = new Hls({
+      ...optimizedConfig,
       // === BUFFER STABILITY (prevents restarts) ===
-      maxBufferLength: 30,              // 30s buffer for stability
-      maxMaxBufferLength: 60,           // Allow up to 60s when bandwidth is good
-      maxBufferSize: 60 * 1000 * 1000,  // 60MB max buffer
-      maxBufferHole: 0.5,               // Allow small gaps
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      maxBufferSize: 60 * 1000 * 1000,
+      maxBufferHole: 0.5,
       
       // === FAST STARTUP ===
-      startLevel: -1,                   // Auto quality selection
-      startFragPrefetch: true,          // Prefetch next fragment
-      abrEwmaDefaultEstimate: 2000000,  // Assume 2Mbps for faster initial quality
+      startLevel: -1,
+      startFragPrefetch: true,
+      abrEwmaDefaultEstimate: 2000000,
       abrEwmaFastLive: 3,
       abrEwmaSlowLive: 9,
-      abrBandWidthFactor: 0.95,         // Conservative bandwidth estimation
-      abrBandWidthUpFactor: 0.7,        // Slow quality increase
+      abrBandWidthFactor: 0.95,
+      abrBandWidthUpFactor: 0.7,
       
-      // === NETWORK RESILIENCE (prevents restarts on hiccups) ===
-      fragLoadingTimeOut: 20000,        // 20s timeout
-      fragLoadingMaxRetry: 6,           // More retries before giving up
-      fragLoadingRetryDelay: 500,       // Start with 500ms retry delay
-      fragLoadingMaxRetryTimeout: 64000,// Max 64s between retries
-      manifestLoadingTimeOut: 15000,    // 15s manifest timeout
+      // === NETWORK RESILIENCE ===
+      fragLoadingTimeOut: 20000,
+      fragLoadingMaxRetry: 6,
+      fragLoadingRetryDelay: 500,
+      fragLoadingMaxRetryTimeout: 64000,
+      manifestLoadingTimeOut: 15000,
       manifestLoadingMaxRetry: 4,
       manifestLoadingRetryDelay: 1000,
       levelLoadingTimeOut: 15000,
@@ -411,20 +413,23 @@ export default function YouTubeStylePlayer({
       levelLoadingRetryDelay: 1000,
       
       // === PLAYBACK CONTINUITY ===
-      lowLatencyMode: false,            // Prioritize stability over latency
-      backBufferLength: 30,             // Keep 30s back buffer for seeking
-      liveSyncDurationCount: 3,         // Sync 3 segments behind live edge
-      liveMaxLatencyDurationCount: 10,  // Allow 10 segments latency before catchup
-      liveDurationInfinity: true,       // Treat as infinite live stream
+      lowLatencyMode: false,
+      backBufferLength: 30,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 10,
+      liveDurationInfinity: true,
       
       // === STALL RECOVERY ===
-      nudgeOffset: 0.1,                 // Small nudge to recover stalls
-      nudgeMaxRetry: 5,                 // Try nudging up to 5 times
-      maxStarvationDelay: 4,            // 4s max delay on starvation
-      maxLoadingDelay: 4,               // 4s max loading delay
-      highBufferWatchdogPeriod: 3,      // Check buffer every 3s
+      nudgeOffset: 0.1,
+      nudgeMaxRetry: 5,
+      maxStarvationDelay: 4,
+      maxLoadingDelay: 4,
+      highBufferWatchdogPeriod: 3,
     });
     hlsRef.current = hls;
+
+    // Attach to adaptive buffer for monitoring
+    performance.attachHls(hls, video);
 
     hls.loadSource(streamUrl);
     hls.attachMedia(video);
@@ -435,6 +440,7 @@ export default function YouTubeStylePlayer({
     const MAX_RECOVERY_ATTEMPTS = 5;
     
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      performance.recordManifestLoaded();
       setIsLoading(false);
       hasConnectedOnceRef.current = true;
       setConnectionStatus('connected');
@@ -515,12 +521,13 @@ export default function YouTubeStylePlayer({
     });
 
     return () => {
+      performance.detach();
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [autoplay, onReady, onError]);
+  }, [autoplay, onReady, onError, performance]);
 
   // Initialize player
   useEffect(() => {
