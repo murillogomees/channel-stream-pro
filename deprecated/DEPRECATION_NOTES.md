@@ -2,7 +2,7 @@
 
 ## Data: 2025-12-03
 ## Autor: lovable-agent
-## Status: ✅ FASE 2 COMPLETA - Redirects Removidos
+## Status: ✅ FASE 3 COMPLETA - /admin/roles consolidado
 
 ---
 
@@ -12,6 +12,23 @@
 |------|--------|---------------|
 | Fase 1 - Consolidação Admin Hubs | ✅ Completo | 2025-11-29 |
 | Fase 2 - Remoção Redirects Legacy | ✅ Completo | 2025-12-03 |
+| Fase 3 - Consolidação /admin/roles | ✅ Completo | 2025-12-03 |
+
+---
+
+## Fase 3: Consolidação /admin/roles → /admin/usuarios
+
+### O que foi feito:
+- ❌ Removido `AdminRolesManagement.tsx` (303 linhas)
+- ✅ Rota `/admin/roles` agora redireciona para `/admin/usuarios?tab=roles`
+- ✅ `AdminUsuariosPage` atualizado com suporte a URL params (`?tab=roles`)
+- ✅ Removido card duplicado "Gerenciamento de Roles" do Dashboard
+- ✅ Card "Usuários & Permissões" consolidado com badge "Consolidado"
+
+### Funcionalidade preservada:
+- `AdminUserRoles.tsx` (644 linhas) já continha toda funcionalidade de roles
+- Filtros avançados, ações em lote, histórico de auditoria mantidos
+- Zero perda de funcionalidade
 
 ---
 
