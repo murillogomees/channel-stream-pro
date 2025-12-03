@@ -100,16 +100,13 @@ class StreamService {
   }
 
   /**
-   * Verifica se uma URL precisa de proxy
-   * VOD: Nunca usa proxy (carrega direto)
-   * Live: Usa proxy para CORS/Mixed Content
+   * Verifica se uma URL precisa de proxy (apenas para live streams)
    */
   needsProxy(url: string): boolean {
     if (!url) return false;
     
     // VOD NUNCA usa proxy - carrega direto
     if (this.isVodContent(url)) {
-      console.log('[StreamService] VOD content - loading direct (no proxy):', url.substring(0, 50));
       return false;
     }
 
@@ -131,19 +128,12 @@ class StreamService {
   }
 
   /**
-   * Retorna URL pronta para o player (com proxy se necessário)
-   * Aceita Channel ou string diretamente
-   * 
-   * PRIORIDADE:
-   * 1. Cloudflare Stream (se disponível)
-   * 2. R2 via CDN Worker (VOD com JWT)
-   * 3. URL do R2 direto (fallback)
-   * 4. URL original com proxy se necessário
-   * 
-   * NOTA: Use getOptimizedUrl() para roteamento inteligente via CDN Worker
+   * Retorna URL pronta para o player
+   * VOD: carrega DIRETO da origem (sem proxy)
+   * Live: usa proxy para resolver CORS/Mixed Content
    */
   getPlayableUrl(channelOrUrl: Channel | string): string {
-    // Se é objeto Channel, verificar se tem R2 URL disponível
+    // Se é objeto Channel
     if (typeof channelOrUrl === 'object' && channelOrUrl) {
       // Priorizar R2 URL se o VOD foi uploaded
       if (channelOrUrl.r2_uploaded && channelOrUrl.r2_url) {
@@ -151,11 +141,18 @@ class StreamService {
         return channelOrUrl.r2_url;
       }
       
-      // Fallback para stream_url original
       const streamUrl = channelOrUrl.stream_url;
       if (!streamUrl) return '';
       
+      // VOD: SEMPRE carrega direto, sem proxy
+      if (this.isVodContent(streamUrl)) {
+        console.log('[StreamService] 🎬 VOD DIRECT (no proxy):', streamUrl.substring(0, 80));
+        return streamUrl;
+      }
+      
+      // Live streams: usa proxy para CORS/Mixed Content
       if (this.needsProxy(streamUrl)) {
+        console.log('[StreamService] 📺 Live stream - using proxy');
         return this.getProxyUrl(streamUrl);
       }
       return streamUrl;
@@ -165,8 +162,15 @@ class StreamService {
     const streamUrl = channelOrUrl as string;
     if (!streamUrl) return '';
     
-    // Usar proxy para resolver CORS e mixed content (HTTP em HTTPS)
+    // VOD: SEMPRE carrega direto, sem proxy
+    if (this.isVodContent(streamUrl)) {
+      console.log('[StreamService] 🎬 VOD DIRECT (no proxy):', streamUrl.substring(0, 80));
+      return streamUrl;
+    }
+    
+    // Live streams: usa proxy para resolver CORS e mixed content
     if (this.needsProxy(streamUrl)) {
+      console.log('[StreamService] 📺 Live stream - using proxy');
       return this.getProxyUrl(streamUrl);
     }
     
@@ -182,9 +186,6 @@ class StreamService {
 
   /**
    * Obtém URL otimizada usando CDN Worker routing
-   * 
-   * Esta é a versão async que usa o CDN Routing Service
-   * para decisões inteligentes de roteamento.
    */
   async getOptimizedUrl(channel: Channel): Promise<{
     url: string;
@@ -192,9 +193,7 @@ class StreamService {
     requiresToken: boolean;
     fallbackUrl?: string;
   }> {
-    // Import dynamically to avoid circular dependencies
     const { cdnRoutingService } = await import('@/services/cdnRoutingService');
-    
     return await cdnRoutingService.getPlaybackUrl(channel);
   }
 
@@ -206,7 +205,6 @@ class StreamService {
     responseTime?: number;
   }> {
     const { cdnRoutingService } = await import('@/services/cdnRoutingService');
-    
     return await cdnRoutingService.checkCdnWorkerHealth();
   }
 
