@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
-import { useFastStartupV2 } from '@/hooks/useFastStartupV2';
 
 interface VideoPlayerProps {
   url: string;
@@ -13,6 +12,14 @@ interface VideoPlayerProps {
   className?: string;
 }
 
+/**
+ * VideoPlayer - Ultra-simplified for maximum reliability
+ * 
+ * Principle: Reliability > Optimization
+ * - Minimal HLS.js config
+ * - Fast timeouts (5s)
+ * - Quick fallback to native
+ */
 export function VideoPlayer({ 
   url, 
   title, 
@@ -24,6 +31,7 @@ export function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -32,19 +40,16 @@ export function VideoPlayer({
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
 
-  // Fast startup optimization
-  const fastStartup = useFastStartupV2({
-    startLowQuality: true,
-    upgradeDelay: 2,
-  });
-
   const cleanup = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-    fastStartup.reset();
-  }, [fastStartup]);
+  }, []);
 
   const attemptPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -86,59 +91,93 @@ export function VideoPlayer({
     setNeedsManualPlay(false);
     cleanup();
 
-    // HLS Stream with fast startup optimization
+    // Timeout de 5 segundos - se não conectar, mostra erro
+    timeoutRef.current = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[Player] Timeout - stream demorou demais');
+        setHasError(true);
+        setErrorMessage('Conexão lenta - tente novamente');
+        setIsLoading(false);
+      }
+    }, 5000);
+
+    // HLS Stream - configuração MÍNIMA
     if (isHls && Hls.isSupported()) {
-      const fastConfig = fastStartup.getConfig();
       const hls = new Hls({
-        ...fastConfig,
-        enableWorker: true,
+        // APENAS o essencial
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        manifestLoadingTimeOut: 5000,    // 5s timeout
+        manifestLoadingMaxRetry: 1,       // 1 retry apenas
+        levelLoadingTimeOut: 5000,
+        fragLoadingTimeOut: 8000,
+        fragLoadingMaxRetry: 2,
+        startLevel: -1,                   // Auto-select
         capLevelToPlayerSize: true,
       });
 
       hlsRef.current = hls;
-      hls.loadSource(url);
-      hls.attachMedia(video);
       
-      // Attach fast startup for quality upgrade
-      const cleanupFastStartup = fastStartup.attach(hls, video);
-
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[Player] Manifest loaded');
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         setIsLoading(false);
         attemptPlay();
         onReady?.();
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        console.error('[Player] HLS Error:', data.type, data.details);
+        
         if (data.fatal) {
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            console.log('[Player] Tentando recuperar erro de mídia...');
             hls.recoverMediaError();
           } else {
             setHasError(true);
-            setErrorMessage('Erro ao carregar stream');
+            setErrorMessage('Stream indisponível');
             setIsLoading(false);
             onError?.('HLS Error');
           }
         }
       });
 
-      return () => {
-        cleanupFastStartup?.();
-        cleanup();
-      };
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      return cleanup;
     }
 
-    // Safari native HLS or direct video
+    // Safari native HLS ou vídeo direto - mais simples
     video.src = url;
 
     const handleCanPlay = () => {
+      console.log('[Player] Can play');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       setIsLoading(false);
       attemptPlay();
       onReady?.();
     };
 
     const handleError = () => {
+      console.error('[Player] Video error');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       setHasError(true);
-      setErrorMessage('Erro ao carregar vídeo');
+      setErrorMessage('Erro ao carregar');
       setIsLoading(false);
       onError?.('Video Error');
     };
@@ -158,7 +197,7 @@ export function VideoPlayer({
       video.removeEventListener('playing', handlePlaying);
       cleanup();
     };
-  }, [url, cleanup, attemptPlay, onReady, onError, fastStartup]);
+  }, [url, cleanup, attemptPlay, onReady, onError]);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -189,7 +228,16 @@ export function VideoPlayer({
     if (video) {
       setIsLoading(true);
       setHasError(false);
-      video.load();
+      cleanup();
+      // Force reload
+      const currentUrl = url;
+      video.src = '';
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.src = currentUrl;
+          videoRef.current.load();
+        }
+      }, 100);
     }
   };
 
@@ -225,7 +273,7 @@ export function VideoPlayer({
       {isLoading && !hasError && !needsManualPlay && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-white text-sm">Carregando...</p>
+          <p className="text-white text-sm">Conectando...</p>
         </div>
       )}
 
