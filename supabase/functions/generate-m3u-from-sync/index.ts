@@ -95,7 +95,7 @@ serve(async (req) => {
 
       const { data: entries, error: fetchError } = await supabaseService
         .from('m3u_sync_entries')
-        .select('title, stream_url, tvg_id, tvg_name, tvg_logo, group_title, extra_tags')
+        .select('title, stream_url, tvg_id, tvg_name, tvg_logo, group_title')
         .eq('source_id', sourceId)
         .eq('is_valid', true)
         .order('group_title')
@@ -117,8 +117,6 @@ serve(async (req) => {
         if (entry.tvg_name) extinf += ` tvg-name="${entry.tvg_name}"`;
         if (entry.tvg_logo) extinf += ` tvg-logo="${entry.tvg_logo}"`;
         if (entry.group_title) extinf += ` group-title="${entry.group_title}"`;
-        if (entry.extra_tags) extinf += ` ${entry.extra_tags}`;
-        
         extinf += `,${entry.title}\n${entry.stream_url}\n`;
         m3uParts.push(extinf);
       }
