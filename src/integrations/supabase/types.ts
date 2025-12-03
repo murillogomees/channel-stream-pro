@@ -6060,6 +6060,14 @@ export type Database = {
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_cf_stream_uploads: { Args: never; Returns: undefined }
       cleanup_old_import_cache: { Args: never; Returns: undefined }
+      cleanup_old_logs: {
+        Args: { days_to_keep?: number }
+        Returns: {
+          activity_deleted: number
+          notifications_deleted: number
+          sessions_deleted: number
+        }[]
+      }
       cleanup_old_m3u_sync_data: { Args: never; Returns: undefined }
       cleanup_old_metrics: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
