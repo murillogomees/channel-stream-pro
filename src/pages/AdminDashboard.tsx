@@ -250,17 +250,11 @@ const AdminDashboard = () => {
               path="/admin/clientes/novo"
             />
             <NavCard
-              title="Gerenciamento de Roles"
-              description="Controle de permissões e acessos"
-              icon={<UserCog className="h-5 w-5" />}
-              path="/admin/roles"
-              isNew
-            />
-            <NavCard
-              title="Gestão de Usuários"
-              description="Criar usuários e auditoria"
+              title="Usuários & Permissões"
+              description="Gestão completa de usuários, roles, auditoria e acessos"
               icon={<Users className="h-5 w-5" />}
               path="/admin/usuarios"
+              badge="Consolidado"
             />
             <NavCard
               title="Gestão M3U & Playlists"
