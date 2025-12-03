@@ -9,15 +9,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
-import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
 import { webVitalsService } from "./services/webVitalsService";
-import { streamCacheService } from "./services/streamCacheService";
 
-// Force clear ALL caches on startup to prevent React duplicate instances
+// Force clear ALL caches and UNREGISTER all service workers
 if ('caches' in window) {
   caches.keys().then(names => {
-    names.forEach(name => {
-      caches.delete(name);
+    names.forEach(name => caches.delete(name));
+  });
+}
+
+// Force unregister ALL service workers
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => {
+      registration.unregister();
+      console.log('[SW] Unregistered:', registration.scope);
     });
   });
 }
@@ -49,16 +55,10 @@ const queryClient = new QueryClient({
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
 
-// Register Service Worker
-registerServiceWorker();
-
 // Initialize Web Vitals monitoring
 webVitalsService.init((report) => {
   console.log('[WebVitals] Report:', report.score, 'score');
 });
-
-// Initialize stream cache service
-streamCacheService.init();
 
 // Suprimir ruídos de console para melhor experiência de desenvolvimento
 const originalConsoleError = console.error;
