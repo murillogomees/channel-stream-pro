@@ -179,58 +179,58 @@ export interface HlsPreset {
 }
 
 export const HLS_PRESETS: Record<string, HlsPreset> = {
-  // For live TV - balance between latency and stability
+  // For live TV - ULTRA-FAST STARTUP prioritizado
   live: {
     name: 'Live TV',
     config: {
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60,
-      maxBufferSize: 30 * 1000 * 1000,
-      maxBufferHole: 0.5,
+      maxBufferLength: 10,       // Reduzido para startup rápido
+      maxMaxBufferLength: 30,
+      maxBufferSize: 15 * 1000 * 1000,
+      maxBufferHole: 1.0,        // Mais tolerante
       lowLatencyMode: false,
-      backBufferLength: 30,
+      backBufferLength: 5,       // Menos back buffer
       startFragPrefetch: true,
     },
   },
   
-  // For VOD - prioritize quality and seeking
+  // For VOD - startup rápido, depois expande
   vod: {
     name: 'VOD',
     config: {
-      maxBufferLength: 60,
-      maxMaxBufferLength: 120,
-      maxBufferSize: 60 * 1000 * 1000,
-      maxBufferHole: 0.5,
+      maxBufferLength: 15,       // Começa baixo
+      maxMaxBufferLength: 60,
+      maxBufferSize: 30 * 1000 * 1000,
+      maxBufferHole: 0.8,
       lowLatencyMode: false,
-      backBufferLength: 60,
+      backBufferLength: 15,
       startFragPrefetch: true,
     },
   },
   
-  // For low bandwidth connections
+  // For low bandwidth connections - MUITO tolerante
   lowBandwidth: {
     name: 'Low Bandwidth',
     config: {
-      maxBufferLength: 60,
-      maxMaxBufferLength: 180,
-      maxBufferSize: 20 * 1000 * 1000,
-      maxBufferHole: 1.0,
+      maxBufferLength: 20,       // Buffer maior para compensar
+      maxMaxBufferLength: 60,
+      maxBufferSize: 15 * 1000 * 1000,
+      maxBufferHole: 2.0,        // Muito tolerante
       lowLatencyMode: false,
-      backBufferLength: 30,
-      startFragPrefetch: false,
+      backBufferLength: 5,
+      startFragPrefetch: true,   // Prefetch habilitado
     },
   },
   
-  // For Smart TVs with limited memory
+  // For Smart TVs - startup rápido com memória limitada
   smartTv: {
     name: 'Smart TV',
     config: {
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60,
-      maxBufferSize: 20 * 1000 * 1000,
-      maxBufferHole: 0.5,
+      maxBufferLength: 10,
+      maxMaxBufferLength: 30,
+      maxBufferSize: 12 * 1000 * 1000,
+      maxBufferHole: 1.0,
       lowLatencyMode: false,
-      backBufferLength: 15,
+      backBufferLength: 3,
       startFragPrefetch: true,
     },
   },
