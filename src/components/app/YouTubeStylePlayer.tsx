@@ -1,6 +1,12 @@
 /**
  * YouTube-Style IPTV Player
  * Player com layout estilo YouTube: vídeo no topo + detalhes embaixo
+ * 
+ * OTIMIZAÇÕES DE PERFORMANCE:
+ * - Web Worker Preloading para canais adjacentes
+ * - Service Worker Cache para manifests e segments
+ * - Buffer Adaptativo baseado em conexão
+ * - Fast Startup com codec detection
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -9,7 +15,7 @@ import {
   SkipBack, SkipForward, X, Radio, Film, Clock, Calendar,
   Signal, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp,
   Heart, Share2, Info, AlertCircle, CheckCircle2, Star, Users, Loader2,
-  Tv
+  Tv, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -23,6 +29,9 @@ import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
 import { useMovieMetadata } from "@/features/player/hooks/useMovieMetadata";
+import { useFastStartup } from "@/hooks/useFastStartup";
+import { useAdaptiveBuffer } from "@/hooks/useAdaptiveBuffer";
+import { useStreamServiceWorker } from "@/hooks/useStreamServiceWorker";
 
 interface ContentMetadata {
   title?: string;
@@ -107,17 +116,24 @@ export default function YouTubeStylePlayer({
   seriesEpisodes = [],
   onPlayEpisode,
 }: YouTubeStylePlayerProps) {
+  // Performance Optimization Hooks
+  const fastStartup = useFastStartup();
+  const adaptiveBuffer = useAdaptiveBuffer({ isLive: !detectStreamType(url).isVod });
+  const streamSW = useStreamServiceWorker();
+  
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const mpegtsRef = useRef<mpegts.Player | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [startupTime, setStartupTime] = useState<number>(0);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [volume, setVolume] = useState(muted ? 0 : 100);
