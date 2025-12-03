@@ -2,7 +2,7 @@
 
 ## Data: 2025-12-03
 ## Autor: lovable-agent
-## Status: ✅ FASE 3 COMPLETA - /admin/roles consolidado
+## Status: ✅ FASE 4 COMPLETA - AdminShell Enforced
 
 ---
 
@@ -13,22 +13,24 @@
 | Fase 1 - Consolidação Admin Hubs | ✅ Completo | 2025-11-29 |
 | Fase 2 - Remoção Redirects Legacy | ✅ Completo | 2025-12-03 |
 | Fase 3 - Consolidação /admin/roles | ✅ Completo | 2025-12-03 |
+| Fase 4 - AdminShell Enforcement | ✅ Completo | 2025-12-03 |
 
 ---
 
-## Fase 3: Consolidação /admin/roles → /admin/usuarios
+## Fase 4: AdminShell Enforcement
 
-### O que foi feito:
-- ❌ Removido `AdminRolesManagement.tsx` (303 linhas)
-- ✅ Rota `/admin/roles` agora redireciona para `/admin/usuarios?tab=roles`
-- ✅ `AdminUsuariosPage` atualizado com suporte a URL params (`?tab=roles`)
-- ✅ Removido card duplicado "Gerenciamento de Roles" do Dashboard
-- ✅ Card "Usuários & Permissões" consolidado com badge "Consolidado"
+### Páginas verificadas:
+| Página | AdminShell | Status |
+|--------|------------|--------|
+| AdminMigracoes.tsx | ✅ Já usava | OK |
+| AdminRLSCoverage.tsx | ✅ Já usava | OK |
+| AdminAffiliates.tsx | ✅ Adicionado | ATUALIZADO |
+| UnifiedProfile.tsx | ⚠️ Exceção | Compartilhado admin/client |
 
-### Funcionalidade preservada:
-- `AdminUserRoles.tsx` (644 linhas) já continha toda funcionalidade de roles
-- Filtros avançados, ações em lote, histórico de auditoria mantidos
-- Zero perda de funcionalidade
+### Notas:
+- `UnifiedProfile.tsx` é compartilhado entre `/admin/perfil` e `/app/profile`
+- Não usa AdminShell pois precisa funcionar para clientes também
+- Mantido como exceção documentada
 
 ---
 

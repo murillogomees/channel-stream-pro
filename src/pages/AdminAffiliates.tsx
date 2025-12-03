@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useAffiliates, useAffiliateReferrals, useAffiliateWithdrawals, Affiliate } from "@/hooks/useAffiliates";
 import { useCoupons } from "@/hooks/useCoupons";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -187,25 +188,27 @@ export default function AdminAffiliates() {
 
   if (affiliatesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <AdminShell title="Programa de Afiliados" description="Carregando...">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AdminShell>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Programa de Afiliados</h1>
-          <p className="text-muted-foreground">Gerencie afiliados e suas comissões</p>
+    <AdminShell 
+      title="Programa de Afiliados"
+      description="Gerencie afiliados, comissões e saques"
+    >
+      <div className="space-y-6">
+        {/* Header Actions */}
+        <div className="flex justify-end">
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Afiliado
+          </Button>
         </div>
-        <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Afiliado
-        </Button>
-      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -653,6 +656,7 @@ export default function AdminAffiliates() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </AdminShell>
   );
 }
