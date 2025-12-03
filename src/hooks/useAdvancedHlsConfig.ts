@@ -62,112 +62,126 @@ export function useAdvancedHlsConfig(options: AdvancedHlsConfigOptions = {}) {
 
     console.log('[HlsConfig] Device:', deviceType, 'Connection:', connectionQuality, 'Stream:', streamType);
 
-    // Base config otimizada
+    // =========================================================================
+    // ULTRA-FAST STARTUP CONFIG - Prioriza TTFF (Time To First Frame)
+    // =========================================================================
     const baseConfig: Partial<Hls['config']> = {
       enableWorker: true,
       
-      // Progressive download para início mais rápido
+      // CRITICAL: Sempre começar na qualidade mais baixa para primeiro frame rápido
+      startLevel: 0,
+      
+      // Progressive download - crítico para startup
       progressive: true,
       
-      // Prefetch do primeiro fragmento
+      // Prefetch agressivo do primeiro fragmento
       startFragPrefetch: true,
       
-      // Bandwidth testing
+      // STARTUP RÁPIDO: Começar a tocar com menos buffer
+      // Estes são os parâmetros mais importantes para TTFF
+      maxBufferLength: 10,           // Reduzido de 30 para 10s
+      maxMaxBufferLength: 30,        // Limite máximo
+      
+      // Bandwidth testing rápido
       testBandwidth: true,
       
-      // Cap para tamanho do player (não carrega 4K em tela pequena)
+      // Cap para tamanho do player
       capLevelToPlayerSize: true,
-      
-      // Cap quando FPS cai (evita travamentos)
       capLevelOnFPSDrop: true,
-      fpsDroppedMonitoringPeriod: 3000,
-      fpsDroppedMonitoringThreshold: 0.1,
+      fpsDroppedMonitoringPeriod: 2000,
+      fpsDroppedMonitoringThreshold: 0.15,
       
-      // Memory limit baseado no dispositivo
+      // Memory limit
       maxBufferSize: memoryLimit,
       
-      // Tolerância a buracos no buffer
-      maxBufferHole: 0.5,
+      // Tolerância maior a buracos no buffer para não travar
+      maxBufferHole: 1.0,
       
-      // Retry com backoff exponencial
-      fragLoadingMaxRetry: 6,
-      manifestLoadingMaxRetry: 4,
-      levelLoadingMaxRetry: 4,
-      fragLoadingRetryDelay: 1000,
-      manifestLoadingRetryDelay: 1000,
-      levelLoadingRetryDelay: 1000,
+      // Retry configuração agressiva
+      fragLoadingMaxRetry: 4,
+      manifestLoadingMaxRetry: 3,
+      levelLoadingMaxRetry: 3,
+      fragLoadingRetryDelay: 500,     // 500ms ao invés de 1000ms
+      manifestLoadingRetryDelay: 500,
+      levelLoadingRetryDelay: 500,
       
-      // Timeouts otimizados
-      fragLoadingTimeOut: 20000,
-      manifestLoadingTimeOut: 10000,
-      levelLoadingTimeOut: 10000,
+      // TIMEOUTS AGRESSIVOS - Falhar rápido e tentar de novo
+      fragLoadingTimeOut: 10000,      // 10s ao invés de 20s
+      manifestLoadingTimeOut: 5000,   // 5s ao invés de 10s
+      levelLoadingTimeOut: 5000,
+      
+      // ABR otimizado para startup rápido
+      abrEwmaDefaultEstimate: 500000,  // Assumir 500kbps inicialmente
+      
+      // Live sync - começar mais perto do live edge
+      liveSyncDurationCount: 2,        // Reduzido de 3
+      liveMaxLatencyDurationCount: 6,  // Reduzido de 10
     };
 
-    // Configuração por tipo de dispositivo
+    // Configuração por tipo de dispositivo - OTIMIZADO para startup rápido
     const deviceConfig: Partial<Hls['config']> = {};
     
     switch (deviceType) {
       case 'tv':
-        // Smart TVs: memória limitada, priorizar estabilidade
-        deviceConfig.backBufferLength = 15;
-        deviceConfig.maxBufferLength = 30;
-        deviceConfig.maxMaxBufferLength = 60;
-        deviceConfig.maxBufferSize = 20 * 1000 * 1000;
-        break;
-        
-      case 'mobile':
-        // Mobile: economizar bateria e dados
-        deviceConfig.backBufferLength = 10;
-        deviceConfig.maxBufferLength = 20;
-        deviceConfig.maxMaxBufferLength = 40;
+        // Smart TVs: buffer reduzido para startup rápido
+        deviceConfig.backBufferLength = 5;
+        deviceConfig.maxBufferLength = 15;
+        deviceConfig.maxMaxBufferLength = 30;
         deviceConfig.maxBufferSize = 15 * 1000 * 1000;
         break;
         
+      case 'mobile':
+        // Mobile: startup ultra-rápido
+        deviceConfig.backBufferLength = 3;
+        deviceConfig.maxBufferLength = 10;
+        deviceConfig.maxMaxBufferLength = 20;
+        deviceConfig.maxBufferSize = 10 * 1000 * 1000;
+        break;
+        
       case 'tablet':
-        deviceConfig.backBufferLength = 20;
-        deviceConfig.maxBufferLength = 30;
-        deviceConfig.maxMaxBufferLength = 60;
+        deviceConfig.backBufferLength = 5;
+        deviceConfig.maxBufferLength = 15;
+        deviceConfig.maxMaxBufferLength = 30;
         break;
         
       default: // desktop
-        deviceConfig.backBufferLength = 30;
-        deviceConfig.maxBufferLength = 40;
-        deviceConfig.maxMaxBufferLength = 120;
+        deviceConfig.backBufferLength = 10;
+        deviceConfig.maxBufferLength = 20;
+        deviceConfig.maxMaxBufferLength = 60;
     }
 
     // Configuração por qualidade de conexão
-    const connectionConfig: Partial<Hls['config']> = {};
+    // IMPORTANTE: Sempre startLevel: 0 para TTFF rápido, depois sobe automaticamente
+    const connectionConfig: Partial<Hls['config']> = {
+      startLevel: 0, // SEMPRE começar baixo para primeiro frame rápido
+    };
     
     switch (connectionQuality) {
       case 'poor':
-        connectionConfig.startLevel = 0; // Começa no mais baixo
-        connectionConfig.abrEwmaDefaultEstimate = 500000; // 500kbps
-        connectionConfig.abrBandWidthFactor = 0.7;
-        connectionConfig.abrBandWidthUpFactor = 0.5;
-        connectionConfig.fragLoadingMaxRetry = 10;
-        connectionConfig.fragLoadingRetryDelay = 500;
+        connectionConfig.abrEwmaDefaultEstimate = 300000; // 300kbps
+        connectionConfig.abrBandWidthFactor = 0.6;
+        connectionConfig.abrBandWidthUpFactor = 0.4;
+        connectionConfig.fragLoadingMaxRetry = 8;
+        connectionConfig.fragLoadingRetryDelay = 300;
         break;
         
       case 'fair':
-        connectionConfig.startLevel = 0;
-        connectionConfig.abrEwmaDefaultEstimate = 1500000;
-        connectionConfig.abrBandWidthFactor = 0.8;
-        connectionConfig.abrBandWidthUpFactor = 0.6;
-        connectionConfig.fragLoadingMaxRetry = 8;
+        connectionConfig.abrEwmaDefaultEstimate = 800000;
+        connectionConfig.abrBandWidthFactor = 0.75;
+        connectionConfig.abrBandWidthUpFactor = 0.55;
+        connectionConfig.fragLoadingMaxRetry = 6;
         break;
         
       case 'excellent':
-        connectionConfig.startLevel = -1; // Auto (pode começar alto)
-        connectionConfig.abrEwmaDefaultEstimate = 5000000;
-        connectionConfig.abrBandWidthFactor = 0.95;
-        connectionConfig.abrBandWidthUpFactor = 0.8;
+        connectionConfig.abrEwmaDefaultEstimate = 3000000;
+        connectionConfig.abrBandWidthFactor = 0.9;
+        connectionConfig.abrBandWidthUpFactor = 0.75;
         break;
         
       default: // good
-        connectionConfig.startLevel = -1;
-        connectionConfig.abrEwmaDefaultEstimate = 2000000;
-        connectionConfig.abrBandWidthFactor = 0.9;
-        connectionConfig.abrBandWidthUpFactor = 0.7;
+        connectionConfig.abrEwmaDefaultEstimate = 1500000;
+        connectionConfig.abrBandWidthFactor = 0.85;
+        connectionConfig.abrBandWidthUpFactor = 0.65;
         connectionConfig.abrMaxWithRealBitrate = true;
     }
 
