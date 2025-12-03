@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -17,7 +17,52 @@ const iconOptions = [
   'Settings', 'User', 'Palette', 'FileText', 'Activity'
 ];
 
-export function QuickShortcuts() {
+// Memoized icon getter to prevent recreation
+const getIcon = (iconName: string) => {
+  const IconComponent = (Icons as any)[iconName] || Icons.Star;
+  return <IconComponent className="h-4 w-4" />;
+};
+
+// Memoized shortcut card component
+const ShortcutCard = memo(({ shortcut, onRemove, onClick }: { 
+  shortcut: AdminShortcut; 
+  onRemove: (id: string) => void;
+  onClick: (path: string) => void;
+}) => {
+  const handleClick = useCallback(() => onClick(shortcut.path), [onClick, shortcut.path]);
+  const handleRemove = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRemove(shortcut.id);
+  }, [onRemove, shortcut.id]);
+
+  return (
+    <div
+      className="group relative p-4 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer"
+      onClick={handleClick}
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={handleRemove}
+      >
+        <X className="h-3 w-3" />
+      </Button>
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          {getIcon(shortcut.icon)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium leading-none mb-1">{shortcut.title}</p>
+          <p className="text-xs text-muted-foreground line-clamp-2">{shortcut.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+});
+ShortcutCard.displayName = 'ShortcutCard';
+
+export const QuickShortcuts = memo(function QuickShortcuts() {
   const [shortcuts, setShortcuts] = useState<AdminShortcut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -29,11 +74,7 @@ export function QuickShortcuts() {
   });
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadShortcuts();
-  }, []);
-
-  const loadShortcuts = async () => {
+  const loadShortcuts = useCallback(async () => {
     try {
       const data = await shortcutService.getShortcuts();
       setShortcuts(data);
@@ -42,9 +83,13 @@ export function QuickShortcuts() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleAdd = async () => {
+  useEffect(() => {
+    loadShortcuts();
+  }, [loadShortcuts]);
+
+  const handleAdd = useCallback(async () => {
     try {
       await shortcutService.addShortcut(
         formData.title,
@@ -59,9 +104,9 @@ export function QuickShortcuts() {
     } catch (error) {
       toast.error('Erro ao adicionar atalho');
     }
-  };
+  }, [formData, loadShortcuts]);
 
-  const handleRemove = async (id: string) => {
+  const handleRemove = useCallback(async (id: string) => {
     try {
       await shortcutService.removeShortcut(id);
       toast.success('Atalho removido!');
@@ -69,12 +114,11 @@ export function QuickShortcuts() {
     } catch (error) {
       toast.error('Erro ao remover atalho');
     }
-  };
+  }, [loadShortcuts]);
 
-  const getIcon = (iconName: string) => {
-    const IconComponent = (Icons as any)[iconName] || Icons.Star;
-    return <IconComponent className="h-4 w-4" />;
-  };
+  const handleNavigate = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
 
   if (isLoading) {
     return null;
@@ -167,38 +211,16 @@ export function QuickShortcuts() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {shortcuts.map((shortcut) => (
-              <div
-                key={shortcut.id}
-                className="group relative p-4 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer"
-                onClick={() => navigate(shortcut.path)}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemove(shortcut.id);
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                    {getIcon(shortcut.icon)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-none mb-1">{shortcut.title}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {shortcut.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <ShortcutCard 
+                key={shortcut.id} 
+                shortcut={shortcut} 
+                onRemove={handleRemove}
+                onClick={handleNavigate}
+              />
             ))}
           </div>
         )}
       </CardContent>
     </Card>
   );
-}
+});

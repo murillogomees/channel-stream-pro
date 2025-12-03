@@ -63,20 +63,27 @@ export default function AdminUserList() {
   const loadUsersWithRoles = async () => {
     setLoading(true);
     try {
-      // Buscar roles para cada perfil
-      const usersWithRoles: UserWithRole[] = await Promise.all(
-        profiles.map(async (profile) => {
-          const { data: roles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', profile.id);
+      // OTIMIZAÇÃO: Buscar todas as roles em uma única query (batch)
+      const userIds = profiles.map(p => p.id);
+      
+      const { data: allRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
 
-          return {
-            ...profile,
-            roles: roles?.map(r => r.role) || ['client'],
-          };
-        })
-      );
+      // Criar mapa de roles por user_id
+      const rolesMap = new Map<string, string[]>();
+      allRoles?.forEach(r => {
+        const existing = rolesMap.get(r.user_id) || [];
+        existing.push(r.role);
+        rolesMap.set(r.user_id, existing);
+      });
+
+      // Mapear profiles com roles
+      const usersWithRoles: UserWithRole[] = profiles.map(profile => ({
+        ...profile,
+        roles: rolesMap.get(profile.id) || ['client'],
+      }));
 
       setUsers(usersWithRoles);
     } catch (error) {
