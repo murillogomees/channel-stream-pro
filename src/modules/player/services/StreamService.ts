@@ -78,11 +78,11 @@ class StreamService {
   // ===========================================================================
 
   /**
-   * Constrói URL de proxy para um stream
+   * Constrói URL de proxy para um stream (DESABILITADO - carrega direto)
    */
   getProxyUrl(streamUrl: string): string {
-    if (!streamUrl) return '';
-    return `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`;
+    // Proxy desabilitado - retorna URL original sempre
+    return streamUrl;
   }
 
   /**
@@ -100,37 +100,15 @@ class StreamService {
   }
 
   /**
-   * Verifica se uma URL precisa de proxy (apenas para live streams)
+   * Verifica se uma URL precisa de proxy - SEMPRE retorna false agora
    */
-  needsProxy(url: string): boolean {
-    if (!url) return false;
-    
-    // VOD NUNCA usa proxy - carrega direto
-    if (this.isVodContent(url)) {
-      return false;
-    }
-
-    // Live streams precisam proxy por CORS/Mixed Content
-    if (window.location.protocol === 'https:' && url.startsWith('http://')) {
-      return true;
-    }
-
-    // IPTV servers geralmente precisam proxy por CORS
-    const iptvPatterns = [
-      /:\d{4,5}\//, // Portas altas (8080, 8880, etc)
-      /get\.php/,
-      /playlist\.m3u/,
-      /live\//,
-      /hls\//,
-    ];
-
-    return iptvPatterns.some(pattern => pattern.test(url));
+  needsProxy(_url: string): boolean {
+    // Proxy desabilitado - carrega direto sempre
+    return false;
   }
 
   /**
-   * Retorna URL pronta para o player
-   * VOD: carrega DIRETO da origem (sem proxy)
-   * Live: usa proxy para resolver CORS/Mixed Content
+   * Retorna URL pronta para o player - SEMPRE carrega direto
    */
   getPlayableUrl(channelOrUrl: Channel | string): string {
     // Se é objeto Channel
@@ -144,17 +122,8 @@ class StreamService {
       const streamUrl = channelOrUrl.stream_url;
       if (!streamUrl) return '';
       
-      // VOD: SEMPRE carrega direto, sem proxy
-      if (this.isVodContent(streamUrl)) {
-        console.log('[StreamService] 🎬 VOD DIRECT (no proxy):', streamUrl.substring(0, 80));
-        return streamUrl;
-      }
-      
-      // Live streams: usa proxy para CORS/Mixed Content
-      if (this.needsProxy(streamUrl)) {
-        console.log('[StreamService] 📺 Live stream - using proxy');
-        return this.getProxyUrl(streamUrl);
-      }
+      // CARREGA DIRETO - sem proxy
+      console.log('[StreamService] 🎬 DIRECT LOAD:', streamUrl.substring(0, 80));
       return streamUrl;
     }
     
@@ -162,18 +131,8 @@ class StreamService {
     const streamUrl = channelOrUrl as string;
     if (!streamUrl) return '';
     
-    // VOD: SEMPRE carrega direto, sem proxy
-    if (this.isVodContent(streamUrl)) {
-      console.log('[StreamService] 🎬 VOD DIRECT (no proxy):', streamUrl.substring(0, 80));
-      return streamUrl;
-    }
-    
-    // Live streams: usa proxy para resolver CORS e mixed content
-    if (this.needsProxy(streamUrl)) {
-      console.log('[StreamService] 📺 Live stream - using proxy');
-      return this.getProxyUrl(streamUrl);
-    }
-    
+    // CARREGA DIRETO - sem proxy
+    console.log('[StreamService] 🎬 DIRECT LOAD:', streamUrl.substring(0, 80));
     return streamUrl;
   }
   
@@ -183,7 +142,7 @@ class StreamService {
   isOptimizedContent(channel: Channel): boolean {
     return Boolean(channel.r2_uploaded && channel.r2_url);
   }
-
+  
   /**
    * Obtém URL otimizada usando CDN Worker routing
    */

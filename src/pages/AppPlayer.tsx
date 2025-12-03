@@ -4,7 +4,7 @@ import { Loader2, Tv, ArrowLeft, Settings, RefreshCw, Database } from 'lucide-re
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
-import { SecureYouTubePlayer } from '@/components/app/SecureYouTubePlayer';
+import SimplePlayer from '@/components/app/SimplePlayer';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useBackendSearch } from '@/hooks/useBackendSearch';
@@ -702,54 +702,24 @@ export default function AppPlayer() {
         </div>
       </main>
 
-      {/* Player Dialog */}
+      {/* Player Dialog - Simplificado */}
       {showPlayerDialog && playerChannel && (
-        <SecureYouTubePlayer
-          url={getStreamUrl(playerChannel)}
-          cfStreamUid={playerChannel.cf_stream_uid}
-          title={playerChannel.name}
-          logo={playerChannel.tvg_logo}
-          category={playerChannel.category_name || 'Geral'}
-          autoplay
-          onBack={() => {
-            setShowPlayerDialog(false);
-            setPlayerChannel(null);
-            // Refresh continue watching when player closes
-            refreshContinueWatching();
-          }}
-          onError={(err) => console.error('Player error:', err)}
-          isFavorite={isFavorite(playerChannel.id)}
-          onToggleFavorite={() => toggleFavorite(playerChannel.id)}
-          seriesEpisodes={relatedSeriesEpisodes}
-          onPlayEpisode={handlePlayEpisode}
-          onTimeUpdate={(time, dur) => {
-            // Track watch progress
-            if (time > 10 && dur > 0) {
-              const contentType = streamService.needsProxy(playerChannel.stream_url) ? 'live' : 'movie';
-              watchProgressService.updateProgress(
-                playerChannel.id,
-                contentType,
-                playerChannel.name,
-                Math.floor(time),
-                Math.floor(dur),
-                {
-                  contentLogo: playerChannel.tvg_logo,
-                  contentCategory: playerChannel.category_name,
-                }
-              ).catch(console.warn);
-            }
-          }}
-          onPlaybackStart={() => {
-            // Track play start
-            analyticsService.trackPlay(
-              playerChannel.id,
-              'live',
-              {
-                category: playerChannel.category_name,
-              }
-            ).catch(console.warn);
-          }}
-        />
+        <div className="fixed inset-0 z-50 bg-black">
+          <SimplePlayer
+            url={playerChannel.stream_url}
+            title={playerChannel.name}
+            logo={playerChannel.tvg_logo}
+            category={playerChannel.category_name || 'Geral'}
+            autoplay
+            onBack={() => {
+              setShowPlayerDialog(false);
+              setPlayerChannel(null);
+              refreshContinueWatching();
+            }}
+            onError={(err) => console.error('Player error:', err)}
+            className="w-full h-full"
+          />
+        </div>
       )}
     </div>
   );
