@@ -181,9 +181,10 @@ export function VideoPlayer({
     
     const playUrl = resolved.url;
     const isHls = isHlsUrl(playUrl);
-    const isDirect = isDirectVideoUrl(playUrl) || resolved.contentType === 'vod' || resolved.contentType === 'live';
+    // Force direct for VOD/live - never proxy video files
+    const isDirect = resolved.type === 'direct' || resolved.contentType === 'vod' || resolved.contentType === 'live';
     
-    console.log(`[VideoPlayer] Init: ${playUrl.substring(0, 60)}... type: ${resolved.type}, content: ${resolved.contentType}`);
+    console.log(`[VideoPlayer] Init: ${playUrl.substring(0, 80)}... type: ${resolved.type}, content: ${resolved.contentType}, isDirect: ${isDirect}`);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -191,11 +192,12 @@ export function VideoPlayer({
 
     cleanup();
 
-    // DIRECT VIDEO STREAM (VOD, MP4, TS, Xtream live/movie)
-    // VOD content MUST go direct - Edge Functions timeout on large files
-    if (isDirect && !isHls) {
-      console.log('[VideoPlayer] Using DIRECT video playback (no proxy)');
+    // DIRECT VIDEO STREAM - Always prefer direct for non-HLS content
+    // Edge Functions timeout on video streaming
+    if (isDirect || !isHls) {
+      console.log('[VideoPlayer] DIRECT playback:', playUrl.substring(0, 80));
       video.src = playUrl;
+      video.crossOrigin = 'anonymous';
       const onLoadedData = () => {
         console.log('[VideoPlayer] Direct stream loaded');
         setIsLoading(false);
