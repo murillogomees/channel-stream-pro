@@ -374,13 +374,21 @@ Deno.serve(async (req) => {
     const isHls = isHlsContent(decodedUrl, contentType);
     
     if (!contentType || contentType === 'application/octet-stream') {
-      contentType = isHls 
-        ? 'application/vnd.apple.mpegurl' 
-        : isKey
-          ? 'application/octet-stream'
-          : (isVideoSegment || isLiveStream)
-            ? 'video/mp2t' 
-            : 'application/octet-stream';
+      // Detect correct content type based on URL
+      const urlLower = decodedUrl.toLowerCase();
+      if (isHls) {
+        contentType = 'application/vnd.apple.mpegurl';
+      } else if (isKey) {
+        contentType = 'application/octet-stream';
+      } else if (urlLower.includes('.mp4') || urlLower.includes('/movie/')) {
+        contentType = 'video/mp4';
+      } else if (urlLower.includes('.mkv')) {
+        contentType = 'video/x-matroska';
+      } else if (urlLower.includes('.ts') || isVideoSegment || isLiveStream) {
+        contentType = 'video/mp2t';
+      } else {
+        contentType = 'application/octet-stream';
+      }
     }
 
     // Build response headers
