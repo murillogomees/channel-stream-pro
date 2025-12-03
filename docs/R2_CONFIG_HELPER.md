@@ -109,10 +109,10 @@ console.log({
 |--------|--------|
 | `test-r2-connection` | ✅ Atualizado |
 | `cdn-health` | ✅ Atualizado |
-| `r2-upload` | ⏳ Pendente |
-| `cdn-content-downloader` | ⏳ Pendente |
-| `cdn-prewarm` | ⏳ Pendente |
-| `generate-m3u-file` | ⏳ Pendente |
+| `r2-upload` | ✅ Atualizado |
+| `cdn-content-downloader` | ✅ Atualizado |
+| `cdn-prewarm` | ✅ Atualizado |
+| `generate-m3u-file` | ✅ Atualizado |
 
 ## Convenção de Chaves
 

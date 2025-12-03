@@ -1,5 +1,17 @@
+/**
+ * Generate M3U File
+ * 
+ * Generates M3U playlist and uploads to R2 CDN using shared config helper.
+ */
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { 
+  uploadToR2, 
+  checkR2Config,
+  R2_BUCKET_NAME,
+  R2_CDN_BASE_URL
+} from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    // ✅ SECURITY: Require admin authentication
+    // Security: Require admin authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(
@@ -56,6 +68,10 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Check R2 config
+    const configStatus = checkR2Config();
+    let cdnConfigured = configStatus.configured;
 
     // Use service role for database operations
     const supabaseService = createClient(
@@ -103,11 +119,11 @@ serve(async (req) => {
         for (const channel of channels) {
           let streamUrl;
           
-          // ✅ LÓGICA VOD: Se é VOD e já foi uploadado para R2, usar URL do R2 diretamente
+          // VOD logic: If VOD and uploaded to R2, use R2 URL directly
           if (channel.is_vod && channel.r2_uploaded && channel.r2_url) {
-            streamUrl = channel.r2_url; // URL direta do R2, sem proxy
+            streamUrl = channel.r2_url;
           } else {
-            // Live stream ou VOD ainda não baixado: usar proxy
+            // Live stream or VOD not downloaded: use proxy
             const encodedStreamUrl = encodeURIComponent(channel.stream_url);
             streamUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedStreamUrl}&list=${customListId}`;
           }
@@ -127,33 +143,45 @@ serve(async (req) => {
     const generationTime = Date.now() - startTime;
     const fileSize = new TextEncoder().encode(m3uContent).length;
 
-    // Upload para CDN (Cloudflare R2)
+    // Upload to CDN (Cloudflare R2)
     let cdnUrl: string | null = null;
     let uploadTime = 0;
     let cdnUploadStatus = 'skipped';
 
-    try {
-      cdnUrl = await uploadToR2(customList.slug, m3uContent);
-      uploadTime = Date.now() - startTime - generationTime;
-      cdnUploadStatus = 'success';
-    } catch (uploadError) {
-      console.error('⚠️ R2 upload failed, continuing without CDN:', uploadError.message);
-      cdnUploadStatus = 'failed';
+    if (cdnConfigured) {
+      try {
+        const r2Key = `playlists/${customList.slug}.m3u`;
+        const uploadResult = await uploadToR2({
+          key: r2Key,
+          body: m3uContent,
+          contentType: 'audio/x-mpegurl',
+          cacheControl: 'public, max-age=3600'
+        });
+        
+        cdnUrl = uploadResult.cdnUrl;
+        uploadTime = Date.now() - startTime - generationTime;
+        cdnUploadStatus = 'success';
+      } catch (uploadError: any) {
+        console.error('⚠️ R2 upload failed, continuing without CDN:', uploadError.message);
+        cdnUploadStatus = 'failed';
+      }
+    } else {
+      console.log('⚠️ R2 not configured, skipping CDN upload. Missing:', configStatus.missing);
     }
 
-    // Atualizar lista com CDN URL (ou null se falhou)
+    // Update list with CDN URL
     await supabaseService
       .from('m3u_custom_lists')
       .update({
         cdn_url: cdnUrl,
-        bucket_path: cdnUrl ? `${customList.slug}.m3u` : null,
+        bucket_path: cdnUrl ? `playlists/${customList.slug}.m3u` : null,
         total_channels: totalChannels,
         total_categories: categories.length,
         last_generated_at: new Date().toISOString()
       })
       .eq('id', customListId);
 
-    // Registrar log
+    // Log generation
     await supabaseService
       .from('m3u_generation_logs')
       .insert({
@@ -171,6 +199,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         cdnUrl,
+        cdnBaseUrl: R2_CDN_BASE_URL,
+        bucket: R2_BUCKET_NAME,
         fileSize,
         channelsCount: totalChannels,
         generationTime,
@@ -180,7 +210,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Erro ao gerar M3U:', error);
 
     return new Response(
@@ -189,137 +219,3 @@ serve(async (req) => {
     );
   }
 });
-
-/**
- * Upload para Cloudflare R2 usando API S3 nativa com assinatura AWS v4
- */
-async function uploadToR2(slug: string, content: string): Promise<string> {
-  const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
-  const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
-  const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
-  const R2_BUCKET = Deno.env.get('R2_BUCKET_NAME');
-  const R2_PUBLIC_DOMAIN = Deno.env.get('R2_PUBLIC_DOMAIN');
-
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY || !R2_SECRET_KEY || !R2_BUCKET) {
-    throw new Error('R2 credentials not configured. Please set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME secrets.');
-  }
-
-  const fileName = `playlists/${slug}.m3u`;
-  const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-  const url = `${endpoint}/${R2_BUCKET}/${fileName}`;
-  const body = new TextEncoder().encode(content);
-
-  // AWS Signature V4
-  const region = 'auto';
-  const service = 's3';
-  const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
-  const dateStamp = amzDate.slice(0, 8);
-  const contentType = 'audio/x-mpegurl';
-
-  // Create canonical request
-  const method = 'PUT';
-  const canonicalUri = `/${R2_BUCKET}/${fileName}`;
-  const canonicalQueryString = '';
-  
-  // Hash the payload
-  const payloadHash = await sha256Hex(body);
-  
-  const canonicalHeaders = [
-    `content-type:${contentType}`,
-    `host:${host}`,
-    `x-amz-content-sha256:${payloadHash}`,
-    `x-amz-date:${amzDate}`,
-  ].join('\n') + '\n';
-  
-  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
-  
-  const canonicalRequest = [
-    method,
-    canonicalUri,
-    canonicalQueryString,
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash
-  ].join('\n');
-
-  // Create string to sign
-  const algorithm = 'AWS4-HMAC-SHA256';
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const canonicalRequestHash = await sha256Hex(new TextEncoder().encode(canonicalRequest));
-  
-  const stringToSign = [
-    algorithm,
-    amzDate,
-    credentialScope,
-    canonicalRequestHash
-  ].join('\n');
-
-  // Calculate signature
-  const signingKey = await getSignatureKey(R2_SECRET_KEY, dateStamp, region, service);
-  const signature = await hmacSha256Hex(signingKey, stringToSign);
-
-  // Create authorization header
-  const authorization = `${algorithm} Credential=${R2_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-  // Make request
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-      'Host': host,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
-      'Authorization': authorization,
-      'Cache-Control': 'public, max-age=3600',
-    },
-    body: body
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`R2 upload failed: ${response.status} - ${errorText}`);
-  }
-
-  // Remove https:// prefix if present to avoid duplication
-  const publicDomain = (R2_PUBLIC_DOMAIN || `${R2_BUCKET}.r2.dev`).replace(/^https?:\/\//, '');
-  return `https://${publicDomain}/${fileName}`;
-}
-
-// AWS Signature V4 helper functions
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function hmacSha256(key: ArrayBuffer, data: string): Promise<ArrayBuffer> {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    key,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data));
-}
-
-async function hmacSha256Hex(key: ArrayBuffer, data: string): Promise<string> {
-  const result = await hmacSha256(key, data);
-  return Array.from(new Uint8Array(result))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function getSignatureKey(
-  key: string,
-  dateStamp: string,
-  region: string,
-  service: string
-): Promise<ArrayBuffer> {
-  const kDate = await hmacSha256(new TextEncoder().encode('AWS4' + key), dateStamp);
-  const kRegion = await hmacSha256(kDate, region);
-  const kService = await hmacSha256(kRegion, service);
-  return hmacSha256(kService, 'aws4_request');
-}
