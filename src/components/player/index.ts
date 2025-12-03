@@ -14,6 +14,8 @@ export { ResumeDialog } from './ResumeDialog';
 export { StatsOverlay } from './StatsOverlay';
 export { SleepTimerDialog } from './SleepTimerDialog';
 export { CastButton } from './CastButton';
+export { GestureIndicator } from './GestureIndicator';
+export { DoubleTapIndicator } from './DoubleTapIndicator';
 
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
@@ -44,3 +46,8 @@ export { useSeekThumbnails } from '@/hooks/useSeekThumbnails';
 export { useSleepTimer } from '@/hooks/useSleepTimer';
 export { useAutoFullscreen } from '@/hooks/useAutoFullscreen';
 export { useChromecast } from '@/hooks/useChromecast';
+
+// Re-export mobile/UX hooks
+export { useMobileGestures } from '@/hooks/useMobileGestures';
+export { useDoubleTapSeek } from '@/hooks/useDoubleTapSeek';
+export { useSubtitles } from '@/hooks/useSubtitles';
