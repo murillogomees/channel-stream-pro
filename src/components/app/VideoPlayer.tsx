@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
 import { onPlayerOpen, onPlayerClose } from '@/services/downloadPriorityService';
 import { useConnectionAwarePlayer } from '@/hooks/useConnectionAwarePlayer';
+import { resolveStreamUrl, getFallbackUrl } from '@/services/smartStreamResolver';
 
 interface VideoPlayerProps {
   url: string;
@@ -20,49 +21,34 @@ interface VideoPlayerProps {
 // STREAM TYPE DETECTION
 // =============================================================================
 
-function extractOriginalUrl(url: string): string {
-  // If it's a proxy URL, extract the original URL from the query param
-  if (url.includes('stream-proxy') && url.includes('url=')) {
-    try {
-      const urlObj = new URL(url);
-      const originalUrl = urlObj.searchParams.get('url');
-      if (originalUrl) return decodeURIComponent(originalUrl);
-    } catch {
-      // Fall through
-    }
-  }
-  return url;
-}
-
 function isHlsUrl(url: string): boolean {
-  const checkUrl = extractOriginalUrl(url).toLowerCase();
-  return checkUrl.includes('.m3u8') || checkUrl.includes('.m3u');
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.m3u8') || urlLower.includes('.m3u');
 }
 
 function isDirectVideoUrl(url: string): boolean {
-  const checkUrl = extractOriginalUrl(url).toLowerCase();
+  const urlLower = url.toLowerCase();
   
   // Direct video files
-  if (checkUrl.includes('.mp4') || checkUrl.includes('.mkv') || 
-      checkUrl.includes('.avi') || checkUrl.includes('.ts') ||
-      checkUrl.includes('.webm')) {
+  if (urlLower.includes('.mp4') || urlLower.includes('.mkv') || 
+      urlLower.includes('.avi') || urlLower.includes('.ts') ||
+      urlLower.includes('.webm')) {
     return true;
   }
   
-  // Proxy URL without HLS extension = direct stream
-  if (url.includes('stream-proxy')) {
-    return !isHlsUrl(url);
-  }
-  
   // Xtream Codes patterns (direct streams without extension)
-  // /live/user/pass/123 or /movie/user/pass/123 or /user/pass/123
   const xtreamPattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
-  if (xtreamPattern.test(checkUrl)) {
+  if (xtreamPattern.test(urlLower) && !isHlsUrl(urlLower)) {
     return true;
   }
   
   // URLs ending in numeric ID without extension
-  if (/\/\d+$/.test(checkUrl) && !checkUrl.includes('.m3u')) {
+  if (/\/\d+$/.test(urlLower) && !urlLower.includes('.m3u')) {
+    return true;
+  }
+  
+  // VOD patterns
+  if (urlLower.includes('/movie/') || urlLower.includes('/series/') || urlLower.includes('/vod/')) {
     return true;
   }
   
@@ -157,10 +143,23 @@ export function VideoPlayer({
     };
   }, []);
 
+  // Smart stream resolution
+  const streamResolution = useRef(resolveStreamUrl(url));
+  
   // Try fallback URL if available
   const tryFallback = useCallback(() => {
+    // First try smart fallback
+    const smartFallback = getFallbackUrl(streamResolution.current);
+    if (smartFallback && !hasFallback) {
+      console.log('[VideoPlayer] Trying smart fallback:', smartFallback);
+      setHasFallback(true);
+      setCurrentUrl(smartFallback);
+      retryCount.current = 0;
+      return;
+    }
+    
     if (fallbackUrl && !hasFallback) {
-      console.log('[VideoPlayer] Trying fallback URL:', fallbackUrl);
+      console.log('[VideoPlayer] Trying provided fallback URL:', fallbackUrl);
       setHasFallback(true);
       setCurrentUrl(fallbackUrl);
       retryCount.current = 0;
@@ -176,10 +175,15 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video || !currentUrl) return;
 
-    const isHls = isHlsUrl(currentUrl);
-    const isDirect = isDirectVideoUrl(currentUrl);
+    // Use smart resolver to determine optimal playback
+    const resolved = resolveStreamUrl(currentUrl);
+    streamResolution.current = resolved;
     
-    console.log(`[VideoPlayer] Init: ${currentUrl.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}, source: ${source}`);
+    const playUrl = resolved.url;
+    const isHls = isHlsUrl(playUrl);
+    const isDirect = isDirectVideoUrl(playUrl) || resolved.contentType === 'vod' || resolved.contentType === 'live';
+    
+    console.log(`[VideoPlayer] Init: ${playUrl.substring(0, 60)}... type: ${resolved.type}, content: ${resolved.contentType}`);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
@@ -187,11 +191,11 @@ export function VideoPlayer({
 
     cleanup();
 
-    // DIRECT VIDEO STREAM (MP4, TS, Xtream live/movie)
+    // DIRECT VIDEO STREAM (VOD, MP4, TS, Xtream live/movie)
+    // VOD content MUST go direct - Edge Functions timeout on large files
     if (isDirect && !isHls) {
-      console.log('[VideoPlayer] Using direct video playback');
-      video.src = currentUrl;
-      
+      console.log('[VideoPlayer] Using DIRECT video playback (no proxy)');
+      video.src = playUrl;
       const onLoadedData = () => {
         console.log('[VideoPlayer] Direct stream loaded');
         setIsLoading(false);
@@ -209,7 +213,7 @@ export function VideoPlayer({
           console.log(`[VideoPlayer] Retry ${retryCount.current}/${maxRetries}`);
           setTimeout(() => {
             video.src = '';
-            video.src = currentUrl;
+            video.src = playUrl;
             video.load();
           }, 1000 * retryCount.current);
         } else {
@@ -251,7 +255,7 @@ export function VideoPlayer({
       });
 
       hlsRef.current = hls;
-      hls.loadSource(currentUrl);
+      hls.loadSource(playUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -299,7 +303,7 @@ export function VideoPlayer({
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS (Safari/iOS)
       console.log('[VideoPlayer] Using native HLS');
-      video.src = url;
+      video.src = playUrl;
       
       video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
@@ -316,7 +320,7 @@ export function VideoPlayer({
     } else {
       // Fallback: try direct playback
       console.log('[VideoPlayer] Fallback: direct playback');
-      video.src = url;
+      video.src = playUrl;
       
       video.addEventListener('loadeddata', () => {
         setIsLoading(false);
