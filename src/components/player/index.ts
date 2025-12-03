@@ -12,6 +12,8 @@ export { ConnectionIndicator } from './ConnectionIndicator';
 export { RecoveryStatus } from './RecoveryStatus';
 export { ResumeDialog } from './ResumeDialog';
 export { StatsOverlay } from './StatsOverlay';
+export { SleepTimerDialog } from './SleepTimerDialog';
+export { CastButton } from './CastButton';
 
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
@@ -37,3 +39,8 @@ export { useChannelPreloadEffect } from '@/hooks/useChannelPreloadEffect';
 export { useAudioTrackSelector } from '@/hooks/useAudioTrackSelector';
 export { useLowLatencyMode } from '@/hooks/useLowLatencyMode';
 export { useSeekThumbnails } from '@/hooks/useSeekThumbnails';
+
+// Re-export enterprise hooks
+export { useSleepTimer } from '@/hooks/useSleepTimer';
+export { useAutoFullscreen } from '@/hooks/useAutoFullscreen';
+export { useChromecast } from '@/hooks/useChromecast';
