@@ -623,12 +623,34 @@ export function useM3USyncEditor() {
     [selectedSourceId, entries],
   );
 
-  // Generate M3U content from entries
+  // Get filtered entries based on current filters
+  const filteredEntries = useMemo(() => {
+    let filtered = entries;
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (e) => e.title.toLowerCase().includes(query) || e.group_title?.toLowerCase().includes(query),
+      );
+    }
+    
+    if (selectedClass !== "all") {
+      filtered = filtered.filter((e) => e.content_class === selectedClass);
+    }
+    
+    if (selectedCategory) {
+      filtered = filtered.filter((e) => e.group_title === selectedCategory);
+    }
+    
+    return filtered;
+  }, [entries, searchQuery, selectedClass, selectedCategory]);
+
+  // Generate M3U content from filtered entries
   const generateM3UContent = useCallback((): string => {
     let m3uContent = '#EXTM3U\n\n';
     
     // Sort entries by group_title and then by title
-    const sortedEntries = [...entries].sort((a, b) => {
+    const sortedEntries = [...filteredEntries].sort((a, b) => {
       const groupCompare = (a.group_title || '').localeCompare(b.group_title || '');
       if (groupCompare !== 0) return groupCompare;
       return a.title.localeCompare(b.title);
@@ -645,12 +667,20 @@ export function useM3USyncEditor() {
     }
 
     return m3uContent;
-  }, [entries]);
+  }, [filteredEntries]);
 
-  // Generate M3U and upload to CDN (server-side generation)
+  // Generate M3U and upload to CDN (server-side generation with filters)
   const generateM3UCDN = useCallback(async (): Promise<{ success: boolean; cdnUrl?: string; error?: string }> => {
     if (!selectedSourceId) {
       return { success: false, error: 'Nenhuma fonte selecionada' };
+    }
+
+    // If we have filters applied, get entry IDs to send to server
+    const hasFilters = searchQuery || selectedClass !== 'all' || selectedCategory;
+    const entryIds = hasFilters ? filteredEntries.map(e => e.id) : null;
+
+    if (hasFilters && filteredEntries.length === 0) {
+      return { success: false, error: 'Nenhuma entrada para gerar (verifique os filtros)' };
     }
 
     try {
@@ -665,17 +695,26 @@ export function useM3USyncEditor() {
         return { success: false, error: 'Fonte não encontrada' };
       }
 
+      const entriesCount = hasFilters ? filteredEntries.length : entries.length;
       toast({
         title: 'Gerando M3U CDN...',
-        description: 'O servidor está processando as entradas. Isso pode levar alguns segundos.',
+        description: `Processando ${entriesCount.toLocaleString()} entradas${hasFilters ? ' (filtradas)' : ''}...`,
       });
 
-      // Call edge function - M3U is now generated server-side
+      // Call edge function with filters
       const { data, error } = await supabase.functions.invoke('generate-m3u-from-sync', {
         body: {
           sourceId: selectedSourceId,
           sourceKey: source.key,
           sourceName: source.name,
+          // Send entry IDs if filters are applied (for smaller sets)
+          entryIds: entryIds && entryIds.length <= 50000 ? entryIds : null,
+          // Send filter params for server-side filtering
+          filters: hasFilters ? {
+            searchQuery,
+            selectedClass: selectedClass !== 'all' ? selectedClass : null,
+            selectedCategory,
+          } : null,
         }
       });
 
@@ -696,7 +735,7 @@ export function useM3USyncEditor() {
       });
       return { success: false, error: error.message };
     }
-  }, [selectedSourceId]);
+  }, [selectedSourceId, filteredEntries, entries.length, searchQuery, selectedClass, selectedCategory]);
 
   // Statistics
   const stats = useMemo(
