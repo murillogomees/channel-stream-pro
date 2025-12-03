@@ -11,6 +11,7 @@ export { QualityBadge } from './QualityBadge';
 export { ConnectionIndicator } from './ConnectionIndicator';
 export { RecoveryStatus } from './RecoveryStatus';
 export { ResumeDialog } from './ResumeDialog';
+export { StatsOverlay } from './StatsOverlay';
 
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
@@ -31,3 +32,8 @@ export { usePlayerKeyboardShortcuts } from '@/hooks/usePlayerKeyboardShortcuts';
 export { useResumePlayback } from '@/hooks/useResumePlayback';
 export { useChannelPreload } from '@/hooks/useChannelPreload';
 export { useChannelPreloadEffect } from '@/hooks/useChannelPreloadEffect';
+
+// Re-export pro player hooks
+export { useAudioTrackSelector } from '@/hooks/useAudioTrackSelector';
+export { useLowLatencyMode } from '@/hooks/useLowLatencyMode';
+export { useSeekThumbnails } from '@/hooks/useSeekThumbnails';
