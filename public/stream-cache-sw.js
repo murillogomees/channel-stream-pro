@@ -67,6 +67,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
   
+  // NUNCA intercepta requests ao Supabase - deixa ir direto para a rede
+  if (url.includes('supabase.co') || url.includes('supabase.in')) {
+    return;
+  }
+  
   // Ignora requests que não são de stream
   if (!isManifest(url) && !isSegment(url)) {
     return;
