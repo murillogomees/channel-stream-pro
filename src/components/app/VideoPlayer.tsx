@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Hls from 'hls.js';
-import mpegts from 'mpegts.js';
 
 interface VideoPlayerProps {
   url: string;
@@ -11,23 +10,6 @@ interface VideoPlayerProps {
   onError?: (error: string) => void;
   onReady?: () => void;
   className?: string;
-}
-
-type StreamType = 'hls' | 'flv' | 'ts' | 'mp4' | 'unknown';
-
-function detectStreamType(url: string): StreamType {
-  const urlLower = url.toLowerCase();
-  
-  if (urlLower.includes('.m3u8') || urlLower.includes('.m3u')) return 'hls';
-  if (urlLower.includes('.flv')) return 'flv';
-  if (urlLower.includes('.ts')) return 'ts';
-  if (urlLower.includes('.mp4')) return 'mp4';
-  
-  // Xtream Codes live streams are usually TS
-  if (/\/live\/[^\/]+\/[^\/]+\/\d+/.test(urlLower)) return 'ts';
-  if (/\/[^\/]+\/[^\/]+\/\d+$/.test(urlLower)) return 'ts';
-  
-  return 'unknown';
 }
 
 export function VideoPlayer({ 
@@ -40,9 +22,7 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const mpegtsRef = useRef<mpegts.Player | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -50,25 +30,11 @@ export function VideoPlayer({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [needsManualPlay, setNeedsManualPlay] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState('Conectando...');
-  const retryCount = useRef(0);
 
   const cleanup = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
-    }
-    if (mpegtsRef.current) {
-      mpegtsRef.current.destroy();
-      mpegtsRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.src = '';
-      videoRef.current.load();
     }
   }, []);
 
@@ -95,209 +61,97 @@ export function VideoPlayer({
     try {
       await video.play();
       setNeedsManualPlay(false);
-      setIsLoading(false);
     } catch {
       setHasError(true);
       setErrorMessage('Não foi possível iniciar');
     }
   }, []);
 
-  const showError = useCallback((msg: string) => {
-    setHasError(true);
-    setErrorMessage(msg);
-    setIsLoading(false);
-    onError?.(msg);
-  }, [onError]);
-
-  const initPlayer = useCallback(() => {
+  useEffect(() => {
     const video = videoRef.current;
     if (!video || !url) return;
 
-    const streamType = detectStreamType(url);
-    console.log(`[VideoPlayer] Type: ${streamType}, URL: ${url.substring(0, 80)}`);
+    const isHls = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('.m3u');
     
     setIsLoading(true);
     setHasError(false);
     setNeedsManualPlay(false);
-    setLoadingStatus('Conectando...');
     cleanup();
 
-    // Timeout de 20 segundos
-    timeoutRef.current = setTimeout(() => {
-      console.log('[VideoPlayer] Timeout - trying fallback');
-      if (isLoading) {
-        retryCount.current++;
-        if (retryCount.current < 3) {
-          setLoadingStatus(`Tentativa ${retryCount.current + 1}...`);
-          cleanup();
-          setTimeout(initPlayer, 1000);
-        } else {
-          showError('Stream não respondeu. Tente outro canal.');
-        }
-      }
-    }, 20000);
-
-    // MPEG-TS / FLV streams (use mpegts.js)
-    if ((streamType === 'ts' || streamType === 'flv' || streamType === 'unknown') && mpegts.isSupported()) {
-      console.log('[VideoPlayer] Using mpegts.js');
-      setLoadingStatus('Carregando stream...');
-      
-      const player = mpegts.createPlayer({
-        type: streamType === 'flv' ? 'flv' : 'mpegts',
-        isLive: true,
-        url: url,
-      }, {
-        enableWorker: true,
-        enableStashBuffer: false,
-        stashInitialSize: 128,
-        lazyLoad: false,
-        lazyLoadMaxDuration: 0,
-        deferLoadAfterSourceOpen: false,
-        autoCleanupSourceBuffer: true,
-        autoCleanupMaxBackwardDuration: 30,
-        autoCleanupMinBackwardDuration: 15,
+    // HLS Stream
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: false,
+        lowLatencyMode: false,
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
+        maxBufferSize: 10 * 1024 * 1024,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 2,
+        levelLoadingTimeOut: 10000,
+        fragLoadingTimeOut: 15000,
       });
 
-      mpegtsRef.current = player;
-      player.attachMediaElement(video);
-      player.load();
+      hlsRef.current = hls;
+      hls.loadSource(url);
+      hls.attachMedia(video);
 
-      player.on(mpegts.Events.LOADING_COMPLETE, () => {
-        console.log('[VideoPlayer] mpegts loading complete');
-      });
-
-      player.on(mpegts.Events.METADATA_ARRIVED, () => {
-        console.log('[VideoPlayer] mpegts metadata arrived');
-        setLoadingStatus('Iniciando reprodução...');
-      });
-
-      player.on(mpegts.Events.ERROR, (errorType, errorDetail) => {
-        console.error('[VideoPlayer] mpegts error:', errorType, errorDetail);
-        if (retryCount.current < 2) {
-          retryCount.current++;
-          cleanup();
-          setTimeout(initPlayer, 1500);
-        } else {
-          showError('Erro ao carregar stream');
-        }
-      });
-
-      video.oncanplay = () => {
-        console.log('[VideoPlayer] mpegts can play');
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         attemptPlay();
         onReady?.();
-      };
+      });
 
-      video.onplaying = () => {
-        setIsLoading(false);
-        setNeedsManualPlay(false);
-      };
-
-      return;
-    }
-
-    // HLS streams
-    if (streamType === 'hls') {
-      if (Hls.isSupported()) {
-        console.log('[VideoPlayer] Using HLS.js');
-        setLoadingStatus('Carregando manifesto...');
-        
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          startLevel: 0,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          manifestLoadingTimeOut: 15000,
-          fragLoadingTimeOut: 20000,
-          levelLoadingTimeOut: 15000,
-        });
-
-        hlsRef.current = hls;
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('[VideoPlayer] HLS manifest ready');
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          setLoadingStatus('Iniciando...');
-          setIsLoading(false);
-          attemptPlay();
-          onReady?.();
-        });
-
-        hls.on(Hls.Events.FRAG_LOADED, () => {
-          setIsLoading(false);
-        });
-
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (!data.fatal) return;
-          
-          console.error('[VideoPlayer] HLS error:', data.type, data.details);
-          
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount.current < 2) {
-            retryCount.current++;
-            hls.startLoad();
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           } else {
-            showError('Erro no stream HLS');
+            setHasError(true);
+            setErrorMessage('Erro ao carregar stream');
+            setIsLoading(false);
+            onError?.('HLS Error');
           }
-        });
-
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari native HLS
-        console.log('[VideoPlayer] Native HLS (Safari)');
-        video.src = url;
-        
-        video.onloadedmetadata = () => {
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          setIsLoading(false);
-          attemptPlay();
-          onReady?.();
-        };
-        
-        video.onerror = () => showError('Erro ao carregar HLS');
-        video.load();
-      }
-      return;
-    }
-
-    // MP4 / Direct video
-    if (streamType === 'mp4') {
-      console.log('[VideoPlayer] Direct MP4 playback');
-      setLoadingStatus('Carregando vídeo...');
-      video.src = url;
-      
-      video.onloadeddata = () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setIsLoading(false);
-        attemptPlay();
-        onReady?.();
-      };
-      
-      video.onerror = () => {
-        if (retryCount.current < 2) {
-          retryCount.current++;
-          setTimeout(() => video.load(), 1500);
-        } else {
-          showError('Erro ao carregar vídeo');
         }
-      };
-      
-      video.oncanplay = () => setIsLoading(false);
-      video.onplaying = () => { setIsLoading(false); setNeedsManualPlay(false); };
-      video.load();
-    }
-  }, [url, cleanup, attemptPlay, onReady, showError, isLoading]);
+      });
 
-  useEffect(() => {
-    retryCount.current = 0;
-    initPlayer();
-    return cleanup;
-  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+      return cleanup;
+    }
+
+    // Safari native HLS or direct video
+    video.src = url;
+
+    const handleCanPlay = () => {
+      setIsLoading(false);
+      attemptPlay();
+      onReady?.();
+    };
+
+    const handleError = () => {
+      setHasError(true);
+      setErrorMessage('Erro ao carregar vídeo');
+      setIsLoading(false);
+      onError?.('Video Error');
+    };
+
+    const handlePlaying = () => {
+      setIsLoading(false);
+      setNeedsManualPlay(false);
+    };
+
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('error', handleError);
+    video.addEventListener('playing', handlePlaying);
+
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('playing', handlePlaying);
+      cleanup();
+    };
+  }, [url, cleanup, attemptPlay, onReady, onError]);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -319,13 +173,17 @@ export function VideoPlayer({
         setIsFullscreen(false);
       }
     } catch (err) {
-      console.error('[VideoPlayer] Fullscreen error:', err);
+      console.error('Fullscreen error:', err);
     }
   };
 
   const handleRetry = () => {
-    retryCount.current = 0;
-    initPlayer();
+    const video = videoRef.current;
+    if (video) {
+      setIsLoading(true);
+      setHasError(false);
+      video.load();
+    }
   };
 
   return (
@@ -360,7 +218,7 @@ export function VideoPlayer({
       {isLoading && !hasError && !needsManualPlay && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-white text-sm">{loadingStatus}</p>
+          <p className="text-white text-sm">Carregando...</p>
         </div>
       )}
 
