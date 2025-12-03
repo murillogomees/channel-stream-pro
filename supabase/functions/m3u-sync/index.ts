@@ -603,10 +603,10 @@ serve(async (req) => {
           const { data: { user }, error: authError } = await userClient.auth.getUser();
           
           if (!authError && user) {
-            const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
-            if (roles?.some(r => r.role === 'admin' || r.role === 'super_admin')) {
+          const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+            if (roles?.some(r => r.role === 'admin' || r.role === 'master')) {
               isAuthorized = true;
-              console.log(`[M3U-Sync] Authorized admin: ${user.email}`);
+              console.log(`[M3U-Sync] Authorized user (${roles?.map(r => r.role).join(', ')}): ${user.email}`);
             }
           }
         } catch (e) {
