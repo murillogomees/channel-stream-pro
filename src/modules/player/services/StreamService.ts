@@ -86,13 +86,34 @@ class StreamService {
   }
 
   /**
+   * Verifica se conteúdo é VOD (filme/série)
+   */
+  isVodContent(url: string): boolean {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    return urlLower.includes('/movie/') || 
+           urlLower.includes('/series/') || 
+           urlLower.includes('/vod/') ||
+           urlLower.includes('.mp4') ||
+           urlLower.includes('.mkv') ||
+           urlLower.includes('.avi');
+  }
+
+  /**
    * Verifica se uma URL precisa de proxy
-   * (HTTP em página HTTPS ou CORS restrito)
+   * VOD: Nunca usa proxy (carrega direto)
+   * Live: Usa proxy para CORS/Mixed Content
    */
   needsProxy(url: string): boolean {
     if (!url) return false;
     
-    // HTTP em HTTPS sempre precisa proxy
+    // VOD NUNCA usa proxy - carrega direto
+    if (this.isVodContent(url)) {
+      console.log('[StreamService] VOD content - loading direct (no proxy):', url.substring(0, 50));
+      return false;
+    }
+
+    // Live streams precisam proxy por CORS/Mixed Content
     if (window.location.protocol === 'https:' && url.startsWith('http://')) {
       return true;
     }
