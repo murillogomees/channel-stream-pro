@@ -149,4 +149,14 @@ O helper aplica headers de cache otimizados automaticamente:
 
 ---
 
+## CDN Worker Sync
+
+O `workers/cdn-router/index.js` está sincronizado com este helper:
+- Mesmo bucket: `iptvlink-cdn`
+- Mesma CDN URL: `https://cdn.iptvlink.app`
+- Mesmos cache headers
+- Mesmos MIME types
+
+---
+
 *Última atualização: 2025-12-03*
