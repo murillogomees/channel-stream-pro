@@ -62,12 +62,12 @@ const Navigation = () => {
           <div className="hidden md:flex items-center gap-4">
             {!loading && (
               isAuthenticated ? (
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/dashboard'}>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/admin/dashboard'}>
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/auth'}>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/login'}>
                   <User className="h-4 w-4" />
                   Login
                 </Button>
@@ -94,12 +94,12 @@ const Navigation = () => {
               <div className="px-4 pt-4 space-y-2">
                 {!loading && (
                   isAuthenticated ? (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/dashboard'}>
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/admin/dashboard'}>
                       <LayoutDashboard className="h-4 w-4" />
                       Dashboard
                     </Button>
                   ) : (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/auth'}>
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/login'}>
                       <User className="h-4 w-4" />
                       Login
                     </Button>

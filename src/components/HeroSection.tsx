@@ -177,7 +177,7 @@ const HeroSection = () => {
               className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
               onClick={() => {
                 trackEvent('InitiateCheckout', { content_name: 'Hero CTA - Ativar Acesso', content_category: 'button' });
-                window.location.href = "/tutorial";
+                window.location.href = "/signup";
               }}
             >
               <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
