@@ -26,7 +26,9 @@ function isVodContent(url: string): boolean {
          urlLower.includes('/vod/') ||
          urlLower.includes('.mp4') ||
          urlLower.includes('.mkv') ||
-         urlLower.includes('.avi');
+         urlLower.includes('.avi') ||
+         urlLower.includes('.ts') ||
+         urlLower.includes('.webm');
 }
 
 /**
@@ -83,47 +85,27 @@ function extractOriginalUrl(url: string): string {
 export function resolveStreamUrl(originalUrl: string): StreamResolution {
   const url = extractOriginalUrl(originalUrl);
   
-  // VOD content - ALWAYS use direct URL
-  // Edge Functions cannot handle large file streaming
-  if (isVodContent(url)) {
-    console.log('[SmartResolver] VOD detected, using direct URL');
-    return {
-      url: url,
-      type: 'direct',
-      contentType: 'vod',
-    };
-  }
+  // ALWAYS use direct URL for everything except HLS manifests
+  // Edge Functions have timeout limits that break video streaming
   
-  // HLS manifest - use proxy for URL rewriting
-  // Manifests are small text files, fast to process
-  if (isHlsManifest(url)) {
-    const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`;
-    console.log('[SmartResolver] HLS manifest, using proxy');
+  // HLS manifest ONLY - use proxy for URL rewriting (manifests are tiny)
+  if (isHlsManifest(url) && !isVodContent(url)) {
+    console.log('[SmartResolver] HLS manifest only, using proxy');
     return {
-      url: proxyUrl,
+      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
       type: 'proxy',
       contentType: 'hls',
-      fallbackUrl: url, // Fallback to direct if proxy fails
+      fallbackUrl: url,
     };
   }
   
-  // Direct live stream (Xtream) - use direct URL
-  // These are continuous streams that Edge Functions can't handle
-  if (isDirectLiveStream(url)) {
-    console.log('[SmartResolver] Direct live stream, using direct URL');
-    return {
-      url: url,
-      type: 'direct',
-      contentType: 'live',
-    };
-  }
-  
-  // Unknown - try direct first
-  console.log('[SmartResolver] Unknown content type, using direct URL');
+  // EVERYTHING ELSE - direct URL (VOD, live, unknown)
+  const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
+  console.log(`[SmartResolver] Using direct URL for ${contentType}`);
   return {
     url: url,
     type: 'direct',
-    contentType: 'unknown',
+    contentType: contentType,
   };
 }
 
