@@ -1,4 +1,13 @@
+/**
+ * Test R2 Connection Edge Function
+ * Uses shared R2 config helper
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { 
+  checkR2Config, 
+  testR2Connection, 
+  R2_BUCKET_NAME 
+} from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,55 +20,52 @@ serve(async (req) => {
   }
 
   try {
-    const { accountId, accessKeyId, secretAccessKey, bucketName } = await req.json();
-
-    if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
-      throw new Error('Missing R2 credentials');
-    }
-
-    // Testar listagem de objetos no bucket
-    const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucketName}?list-type=2&max-keys=1`;
+    // Check if basic config exists
+    const configStatus = checkR2Config();
     
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessKeyId}:${secretAccessKey}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`R2 API returned ${response.status}: ${response.statusText}`);
-    }
-
-    const xmlText = await response.text();
-    
-    // Verificar se XML contém tag de sucesso
-    if (xmlText.includes('<ListBucketResult')) {
+    if (!configStatus.configured) {
       return new Response(
         JSON.stringify({
-          success: true,
-          message: `Conexão bem-sucedida com bucket ${bucketName}`,
-          bucketName
+          success: false,
+          configured: false,
+          message: `Missing R2 configuration: ${configStatus.missing.join(', ')}`,
+          missing: configStatus.missing,
+          defaultBucket: R2_BUCKET_NAME,
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
+          status: 200 // Return 200 for config check, not 500
         }
       );
-    } else {
-      throw new Error('Invalid response from R2');
     }
 
-  } catch (error: any) {
-    console.error('[Test R2] Error:', error);
+    // Run full connection test
+    const testResult = await testR2Connection();
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
+      JSON.stringify({
+        success: testResult.connected && testResult.canRead,
+        configured: true,
+        ...testResult,
+        defaultBucket: R2_BUCKET_NAME,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
+      }
+    );
+  } catch (error) {
+    console.error('[test-r2-connection] Error:', error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: (error as Error).message,
+        defaultBucket: R2_BUCKET_NAME,
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
     );
   }
