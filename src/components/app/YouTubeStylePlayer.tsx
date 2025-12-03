@@ -364,34 +364,59 @@ export default function YouTubeStylePlayer({
     };
   }, []);
 
-  // HLS Player initialization function - OPTIMIZED for fast startup
+  // HLS Player initialization function - PERFORMANCE OPTIMIZED
   const initHlsPlayer = useCallback((streamUrl: string, video: HTMLVideoElement) => {
     const hls = new Hls({
-      // OPTIMIZED for absolute fastest startup
-      maxBufferLength: 5,           // Minimal buffer = instant start
-      maxMaxBufferLength: 15,       // Keep memory low
-      maxBufferHole: 0.5,
-      startFragPrefetch: true,
-      startLevel: -1,               // Auto quality
-      abrEwmaDefaultEstimate: 1000000, // Assume 1Mbps
+      // === BUFFER STABILITY (prevents restarts) ===
+      maxBufferLength: 30,              // 30s buffer for stability
+      maxMaxBufferLength: 60,           // Allow up to 60s when bandwidth is good
+      maxBufferSize: 60 * 1000 * 1000,  // 60MB max buffer
+      maxBufferHole: 0.5,               // Allow small gaps
+      
+      // === FAST STARTUP ===
+      startLevel: -1,                   // Auto quality selection
+      startFragPrefetch: true,          // Prefetch next fragment
+      abrEwmaDefaultEstimate: 2000000,  // Assume 2Mbps for faster initial quality
       abrEwmaFastLive: 3,
       abrEwmaSlowLive: 9,
-      // Aggressive timeouts for fast failure/recovery
-      fragLoadingTimeOut: 8000,
-      fragLoadingMaxRetry: 2,
-      fragLoadingRetryDelay: 300,
-      manifestLoadingTimeOut: 6000,
-      manifestLoadingMaxRetry: 2,
-      levelLoadingTimeOut: 6000,
-      levelLoadingMaxRetry: 2,
-      // Performance
-      lowLatencyMode: false,
-      backBufferLength: 20,
+      abrBandWidthFactor: 0.95,         // Conservative bandwidth estimation
+      abrBandWidthUpFactor: 0.7,        // Slow quality increase
+      
+      // === NETWORK RESILIENCE (prevents restarts on hiccups) ===
+      fragLoadingTimeOut: 20000,        // 20s timeout
+      fragLoadingMaxRetry: 6,           // More retries before giving up
+      fragLoadingRetryDelay: 500,       // Start with 500ms retry delay
+      fragLoadingMaxRetryTimeout: 64000,// Max 64s between retries
+      manifestLoadingTimeOut: 15000,    // 15s manifest timeout
+      manifestLoadingMaxRetry: 4,
+      manifestLoadingRetryDelay: 1000,
+      levelLoadingTimeOut: 15000,
+      levelLoadingMaxRetry: 4,
+      levelLoadingRetryDelay: 1000,
+      
+      // === PLAYBACK CONTINUITY ===
+      lowLatencyMode: false,            // Prioritize stability over latency
+      backBufferLength: 30,             // Keep 30s back buffer for seeking
+      liveSyncDurationCount: 3,         // Sync 3 segments behind live edge
+      liveMaxLatencyDurationCount: 10,  // Allow 10 segments latency before catchup
+      liveDurationInfinity: true,       // Treat as infinite live stream
+      
+      // === STALL RECOVERY ===
+      nudgeOffset: 0.1,                 // Small nudge to recover stalls
+      nudgeMaxRetry: 5,                 // Try nudging up to 5 times
+      maxStarvationDelay: 4,            // 4s max delay on starvation
+      maxLoadingDelay: 4,               // 4s max loading delay
+      highBufferWatchdogPeriod: 3,      // Check buffer every 3s
     });
     hlsRef.current = hls;
 
     hls.loadSource(streamUrl);
     hls.attachMedia(video);
+    
+    // Track recovery attempts
+    let networkRecoveryAttempts = 0;
+    let mediaRecoveryAttempts = 0;
+    const MAX_RECOVERY_ATTEMPTS = 5;
     
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       setIsLoading(false);
@@ -402,32 +427,74 @@ export default function YouTubeStylePlayer({
     });
 
     hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+      // Reset recovery counters on successful load
+      networkRecoveryAttempts = 0;
+      mediaRecoveryAttempts = 0;
       setStreamStats(prev => ({
         ...prev,
         bitrate: Math.round((data.details.totalduration * 8) / 1000),
       }));
     });
+    
+    // Buffer health monitoring
+    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+      // Fragment buffered successfully - clear any error states
+      if (hasConnectedOnceRef.current) {
+        setIsBuffering(false);
+      }
+    });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      console.warn('[Player] HLS error:', data.type, data.details);
+      console.warn('[Player] HLS error:', data.type, data.details, data.fatal);
       
-      if (data.fatal) {
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            console.log('[Player] HLS network recovery...');
-            hls.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            console.log('[Player] HLS media recovery...');
-            hls.recoverMediaError();
-            break;
-          default:
+      // Non-fatal errors - let HLS handle automatically
+      if (!data.fatal) {
+        return;
+      }
+      
+      // Fatal error handling with smart recovery
+      switch (data.type) {
+        case Hls.ErrorTypes.NETWORK_ERROR:
+          networkRecoveryAttempts++;
+          if (networkRecoveryAttempts <= MAX_RECOVERY_ATTEMPTS) {
+            console.log(`[Player] HLS network recovery attempt ${networkRecoveryAttempts}/${MAX_RECOVERY_ATTEMPTS}`);
+            // Exponential backoff
+            setTimeout(() => {
+              hls.startLoad();
+            }, Math.min(1000 * Math.pow(2, networkRecoveryAttempts - 1), 8000));
+          } else {
             setHasError(true);
-            setErrorMessage('Erro ao carregar stream');
+            setErrorMessage('Erro de rede - verifique sua conexão');
             setConnectionStatus('error');
             onError?.(data);
-            break;
-        }
+          }
+          break;
+          
+        case Hls.ErrorTypes.MEDIA_ERROR:
+          mediaRecoveryAttempts++;
+          if (mediaRecoveryAttempts <= MAX_RECOVERY_ATTEMPTS) {
+            console.log(`[Player] HLS media recovery attempt ${mediaRecoveryAttempts}/${MAX_RECOVERY_ATTEMPTS}`);
+            if (mediaRecoveryAttempts === 1) {
+              hls.recoverMediaError();
+            } else {
+              // Swap audio codec on subsequent attempts
+              hls.swapAudioCodec();
+              hls.recoverMediaError();
+            }
+          } else {
+            setHasError(true);
+            setErrorMessage('Erro de mídia - tente outro canal');
+            setConnectionStatus('error');
+            onError?.(data);
+          }
+          break;
+          
+        default:
+          setHasError(true);
+          setErrorMessage('Erro ao carregar stream');
+          setConnectionStatus('error');
+          onError?.(data);
+          break;
       }
     });
 
@@ -468,56 +535,91 @@ export default function YouTubeStylePlayer({
     const originalUrl = getOriginalUrl(url);
     const info = detectStreamType(originalUrl);
 
-    // VOD playback - Priority: Fast start
+    // VOD playback - Optimized for smooth experience
     if (info.isVod) {
       video.preload = 'auto';
+      
+      // Set up buffering events for VOD
+      const handleProgress = () => {
+        if (video.buffered.length > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          // If we have at least 5 seconds buffered ahead, we're good
+          if (bufferedEnd - video.currentTime > 5) {
+            setIsBuffering(false);
+          }
+        }
+      };
+      video.addEventListener('progress', handleProgress);
+      
       video.src = url;
       video.load();
+      
       if (autoplay) {
-        // Try to play immediately
-        video.play().catch(() => {
-          // Fallback: try with muted first
-          video.muted = true;
-          video.play().catch(console.warn);
-        });
+        // Small delay to allow initial buffering
+        setTimeout(() => {
+          video.play().catch(() => {
+            // Fallback: try with muted first
+            video.muted = true;
+            video.play().catch(console.warn);
+          });
+        }, 100);
       }
-      return;
+      
+      return () => {
+        video.removeEventListener('progress', handleProgress);
+      };
     }
 
-    // MPEG-TS live - OPTIMIZED for fast startup with shorter timeout
+    // MPEG-TS live - PERFORMANCE OPTIMIZED
     if (info.type === 'MPEG-TS' && mpegts.isSupported()) {
       const player = mpegts.createPlayer({
         type: 'mpegts',
         isLive: true,
         url: url,
       }, {
-        enableWorker: true,
-        liveBufferLatencyChasing: true,
-        liveSync: true,
+        // === PERFORMANCE OPTIMIZATION ===
+        enableWorker: true,              // Use web worker for parsing
+        enableStashBuffer: true,         // Enable stash buffer
+        stashInitialSize: 128 * 1024,    // 128KB initial stash
+        
+        // === BUFFER STABILITY (prevents restarts) ===
+        autoCleanupSourceBuffer: true,
+        autoCleanupMaxBackwardDuration: 60,  // Keep 60s back buffer
+        autoCleanupMinBackwardDuration: 30,  // Minimum 30s back buffer
+        
+        // === LIVE SYNC (prevents drift and restarts) ===
+        liveBufferLatencyChasing: false,    // DISABLED - causes restarts when catching up
+        liveSync: false,                     // DISABLED - prevents aggressive seeks
         lazyLoad: false,
         lazyLoadMaxDuration: 0,
         lazyLoadRecoverDuration: 0,
         deferLoadAfterSourceOpen: false,
-        stashInitialSize: 64 * 1024,  // 64KB - smaller for faster start
-        enableStashBuffer: true,
-        autoCleanupSourceBuffer: true,
-        autoCleanupMaxBackwardDuration: 20,
-        autoCleanupMinBackwardDuration: 10,
+        
+        // === TIMESTAMP FIXES ===
         fixAudioTimestampGap: true,
+        accurateSeek: true,
+        seekType: 'range',
+        
+        // === NETWORK RESILIENCE ===
+        reuseRedirectedURL: true,           // Reuse redirected URLs
       });
       
       mpegtsRef.current = player;
       player.attachMediaElement(video);
       player.load();
       
-      // SHORTER timeout - 5 seconds for MPEG-TS before fallback
+      // Connection timeout - 8 seconds before HLS fallback
       const connectionTimeout = setTimeout(() => {
         if (!hasConnectedOnceRef.current && mpegtsRef.current) {
-          console.log('[Player] MPEGTS timeout (5s), trying HLS fallback...');
-          player.pause();
-          player.unload();
-          player.detachMediaElement();
-          player.destroy();
+          console.log('[Player] MPEGTS timeout (8s), trying HLS fallback...');
+          try {
+            player.pause();
+            player.unload();
+            player.detachMediaElement();
+            player.destroy();
+          } catch (e) {
+            console.warn('[Player] MPEGTS cleanup error:', e);
+          }
           mpegtsRef.current = null;
           
           // Fallback to HLS
@@ -529,61 +631,89 @@ export default function YouTubeStylePlayer({
             if (autoplay) video.play().catch(console.warn);
           }
         }
-      }, 5000); // 5 seconds instead of 8
+      }, 8000);
       
-      // Track network error count to avoid infinite restarts
+      // Track network errors with exponential backoff
       let networkErrorCount = 0;
-      const MAX_NETWORK_ERRORS = 3;
+      let lastErrorTime = 0;
+      const MAX_NETWORK_ERRORS = 8;        // More tolerance
+      const ERROR_RESET_INTERVAL = 30000;  // Reset counter after 30s of success
       
       player.on(mpegts.Events.ERROR, (errorType, errorDetail) => {
         console.warn('[Player] MPEGTS error:', errorType, errorDetail);
         
-        // NetworkError - try to recover without restarting from beginning
+        const now = Date.now();
+        
+        // Reset error count if sufficient time passed since last error
+        if (now - lastErrorTime > ERROR_RESET_INTERVAL) {
+          networkErrorCount = 0;
+        }
+        lastErrorTime = now;
+        
+        // NetworkError - intelligent recovery
         if (errorType === 'NetworkError' && mpegtsRef.current) {
           networkErrorCount++;
           
-          // Only restart if we had too many errors
+          // If we're already playing and connected, just let it buffer naturally
+          if (hasConnectedOnceRef.current && !video.paused && video.readyState >= 2) {
+            console.log(`[Player] Network hiccup ${networkErrorCount}, buffering... (readyState: ${video.readyState})`);
+            setIsBuffering(true);
+            return; // Don't restart - let mpegts.js recover
+          }
+          
+          // Too many errors in quick succession - show error
           if (networkErrorCount >= MAX_NETWORK_ERRORS) {
-            console.log('[Player] Too many network errors, showing error state');
+            console.log('[Player] Too many network errors, showing retry option');
             clearTimeout(connectionTimeout);
             setHasError(true);
-            setErrorMessage('Conexão instável - tente novamente');
+            setErrorMessage('Conexão instável - clique para tentar novamente');
             setConnectionStatus('error');
             return;
           }
           
-          // Don't restart if already playing - just let it buffer
-          if (hasConnectedOnceRef.current && !video.paused) {
-            console.log('[Player] Network hiccup, buffering...');
-            return; // Let mpegts.js handle recovery automatically
-          }
-          return;
+          return; // Let mpegts handle recovery
         }
         
-        // Fatal errors - show error state
-        clearTimeout(connectionTimeout);
-        setHasError(true);
-        setErrorMessage('Falha na conexão com o stream');
-        setConnectionStatus('error');
-        onError?.({ type: errorType, details: errorDetail });
+        // Other errors - only fatal if not yet connected
+        if (!hasConnectedOnceRef.current) {
+          clearTimeout(connectionTimeout);
+          setHasError(true);
+          setErrorMessage('Falha ao conectar - verifique o stream');
+          setConnectionStatus('error');
+          onError?.({ type: errorType, details: errorDetail });
+        }
       });
       
       player.on(mpegts.Events.METADATA_ARRIVED, () => {
         clearTimeout(connectionTimeout);
         setIsLoading(false);
+        setIsBuffering(false);
         hasConnectedOnceRef.current = true;
         setConnectionStatus('connected');
+        networkErrorCount = 0; // Reset on successful metadata
         onReady?.();
         if (autoplay) video.play().catch(console.warn);
+      });
+      
+      // Additional event for tracking playback stability
+      player.on(mpegts.Events.STATISTICS_INFO, () => {
+        // Reset error counter on continuous successful playback
+        if (hasConnectedOnceRef.current && !video.paused) {
+          networkErrorCount = Math.max(0, networkErrorCount - 1);
+        }
       });
       
       return () => {
         clearTimeout(connectionTimeout);
         if (mpegtsRef.current) {
-          mpegtsRef.current.pause();
-          mpegtsRef.current.unload();
-          mpegtsRef.current.detachMediaElement();
-          mpegtsRef.current.destroy();
+          try {
+            mpegtsRef.current.pause();
+            mpegtsRef.current.unload();
+            mpegtsRef.current.detachMediaElement();
+            mpegtsRef.current.destroy();
+          } catch (e) {
+            console.warn('[Player] MPEGTS cleanup error:', e);
+          }
           mpegtsRef.current = null;
         }
       };
