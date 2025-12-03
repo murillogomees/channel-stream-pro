@@ -332,6 +332,50 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 500px;
   }
+
+  /* Form input height standardization - h-12 default */
+  .form-input-standard {
+    @apply h-12 flex items-center;
+  }
+
+  /* Card form inputs standardization */
+  .card-form input[type="text"],
+  .card-form input[type="email"],
+  .card-form input[type="password"],
+  .card-form input[type="number"],
+  .card-form input[type="tel"],
+  .card-form select {
+    @apply h-12 flex items-center;
+  }
+
+  /* Typography utilities */
+  .heading-1 {
+    @apply text-3xl sm:text-4xl font-bold tracking-tight font-heading;
+  }
+
+  .heading-2 {
+    @apply text-2xl sm:text-3xl font-semibold tracking-tight font-heading;
+  }
+
+  .heading-3 {
+    @apply text-xl sm:text-2xl font-semibold font-heading;
+  }
+
+  .body-large {
+    @apply text-lg leading-relaxed;
+  }
+
+  .body-default {
+    @apply text-base leading-relaxed;
+  }
+
+  .body-small {
+    @apply text-sm leading-normal text-muted-foreground;
+  }
+
+  .caption {
+    @apply text-xs text-muted-foreground;
+  }
 }
 
 /* =============================================================================
