@@ -151,11 +151,14 @@ export function useM3USyncEditor() {
   const loadEntries = useCallback(async (sourceId: string) => {
     setIsLoading(true);
     setSelectedSourceId(sourceId);
+    setEntries([]); // Clear previous entries
     setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'counting' });
 
     try {
-      const PAGE_SIZE = 5000;
-      const PARALLEL_REQUESTS = 5;
+      const PAGE_SIZE = 10000; // Increased for better performance
+      const PARALLEL_REQUESTS = 4;
+
+      console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
 
       // First, get total count
       const { count, error: countError } = await supabase
@@ -164,9 +167,14 @@ export function useM3USyncEditor() {
         .eq("source_id", sourceId)
         .eq("is_valid", true);
 
-      if (countError) throw countError;
+      if (countError) {
+        console.error("[M3USyncEditor] Count error:", countError);
+        throw countError;
+      }
 
       const totalCount = count || 0;
+      console.log(`[M3USyncEditor] Total count: ${totalCount}`);
+      
       if (totalCount === 0) {
         setEntries([]);
         setLoadingProgress({ loaded: 0, total: 0, percent: 100, phase: 'done' });
@@ -185,25 +193,40 @@ export function useM3USyncEditor() {
       const pageNumbers = Array.from({ length: totalPages }, (_, i) => i);
       const pageBatches = chunkArray(pageNumbers, PARALLEL_REQUESTS);
 
+      console.log(`[M3USyncEditor] Total pages: ${totalPages}, batches: ${pageBatches.length}`);
+
       let allData: any[] = [];
+      let errorCount = 0;
 
       // Fetch pages in parallel batches
-      for (const batch of pageBatches) {
+      for (let batchIndex = 0; batchIndex < pageBatches.length; batchIndex++) {
+        const batch = pageBatches[batchIndex];
+        
         const requests = batch.map(async (page) => {
           const from = page * PAGE_SIZE;
           const to = from + PAGE_SIZE - 1;
 
-          const { data, error } = await supabase
-            .from("m3u_sync_entries")
-            .select("*")
-            .eq("source_id", sourceId)
-            .eq("is_valid", true)
-            .order("group_title")
-            .order("title")
-            .range(from, to);
+          try {
+            const { data, error } = await supabase
+              .from("m3u_sync_entries")
+              .select("*")
+              .eq("source_id", sourceId)
+              .eq("is_valid", true)
+              .order("group_title")
+              .order("title")
+              .range(from, to);
 
-          if (error) throw error;
-          return data || [];
+            if (error) {
+              console.error(`[M3USyncEditor] Page ${page} error:`, error);
+              errorCount++;
+              return [];
+            }
+            return data || [];
+          } catch (e) {
+            console.error(`[M3USyncEditor] Page ${page} exception:`, e);
+            errorCount++;
+            return [];
+          }
         });
 
         const results = await Promise.all(requests);
@@ -211,12 +234,18 @@ export function useM3USyncEditor() {
         allData = [...allData, ...batchData];
 
         // Update progress
-        setLoadingProgress(prev => ({
+        setLoadingProgress({
           loaded: allData.length,
           total: totalCount,
           percent: Math.round((allData.length / totalCount) * 100),
           phase: 'fetching',
-        }));
+        });
+
+        console.log(`[M3USyncEditor] Batch ${batchIndex + 1}/${pageBatches.length}: ${allData.length}/${totalCount} loaded`);
+      }
+
+      if (errorCount > 0) {
+        console.warn(`[M3USyncEditor] ${errorCount} pages had errors`);
       }
 
       // Process entries
@@ -229,6 +258,8 @@ export function useM3USyncEditor() {
         metadata: entry.metadata as Record<string, any> | null,
       }));
 
+      console.log(`[M3USyncEditor] Final processed entries: ${processedEntries.length}`);
+
       setEntries(processedEntries);
       setLoadingProgress({ 
         loaded: processedEntries.length, 
@@ -239,13 +270,13 @@ export function useM3USyncEditor() {
 
       toast({
         title: "Conteúdo carregado",
-        description: `${processedEntries.length.toLocaleString()} entradas em ${totalPages} páginas`,
+        description: `${processedEntries.length.toLocaleString()} entradas carregadas`,
       });
     } catch (error: any) {
       console.error("[M3USyncEditor] Error loading entries:", error);
       toast({
         title: "Erro",
-        description: "Falha ao carregar entradas",
+        description: error.message || "Falha ao carregar entradas",
         variant: "destructive",
       });
       setLoadingProgress({ loaded: 0, total: 0, percent: 0, phase: 'done' });
