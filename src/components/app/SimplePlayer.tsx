@@ -94,7 +94,8 @@ export default function SimplePlayer({
   
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
   const retryCount = useRef(0);
-  const maxRetries = 3;
+  const maxRetries = 2; // Reduzido para evitar loops infinitos
+  const hasNetworkError = useRef(false);
 
   // Cleanup HLS
   const cleanupHls = useCallback(() => {
@@ -113,13 +114,20 @@ export default function SimplePlayer({
       return;
     }
 
+    // Se já teve erro de rede nessa sessão, não tenta mais
+    if (hasNetworkError.current) {
+      console.warn('[SimplePlayer] Bloqueado por erro de rede anterior');
+      return;
+    }
+
     console.log('[SimplePlayer] Iniciando:', url.substring(0, 80));
     
     // Verifica Mixed Content ANTES de tentar carregar
     if (isMixedContent(url)) {
       console.error('[SimplePlayer] Mixed Content bloqueado:', url);
-      setError('Conteúdo HTTP bloqueado pelo navegador. O servidor de origem não suporta HTTPS.');
+      setError('Conteúdo HTTP bloqueado. O servidor de origem não suporta conexão segura.');
       setIsLoading(false);
+      hasNetworkError.current = true;
       onError?.('Mixed Content blocked');
       return;
     }
@@ -140,6 +148,7 @@ export default function SimplePlayer({
         console.log('[SimplePlayer] Carregado com sucesso');
         setIsLoading(false);
         retryCount.current = 0;
+        hasNetworkError.current = false;
         onReady?.();
         
         if (autoplay) {
@@ -155,15 +164,28 @@ export default function SimplePlayer({
         const err = video.error;
         console.error('[SimplePlayer] Erro:', err?.code, err?.message);
         
-        if (retryCount.current < maxRetries) {
+        // MEDIA_ERR_NETWORK (2) ou MEDIA_ERR_SRC_NOT_SUPPORTED (4) - para de tentar
+        if (err?.code === 2 || err?.code === 4) {
+          hasNetworkError.current = true;
+          const errorMsg = err.code === 2 
+            ? 'Servidor de stream indisponível ou bloqueado'
+            : 'Formato de vídeo não suportado pelo navegador';
+          setError(errorMsg);
+          setIsLoading(false);
+          onError?.(errorMsg);
+          return;
+        }
+        
+        if (retryCount.current < maxRetries && !hasNetworkError.current) {
           retryCount.current++;
           console.log(`[SimplePlayer] Tentativa ${retryCount.current}/${maxRetries}`);
           setTimeout(() => {
             video.src = '';
             video.src = url;
             video.load();
-          }, 1500 * retryCount.current);
+          }, 2000 * retryCount.current);
         } else {
+          hasNetworkError.current = true;
           setError('Não foi possível carregar o conteúdo');
           setIsLoading(false);
           onError?.('Playback error');
@@ -321,6 +343,7 @@ export default function SimplePlayer({
 
   const handleRetry = () => {
     retryCount.current = 0;
+    hasNetworkError.current = false; // Reseta flag de erro
     initPlayer();
   };
 
