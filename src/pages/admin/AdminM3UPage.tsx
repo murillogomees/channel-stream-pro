@@ -16,6 +16,7 @@ import AdminM3UUsageReport from "../AdminM3UUsageReport";
 import AdminVODStorage from "../AdminVODStorage";
 import AdminCFStreamDashboard from "../AdminCFStreamDashboard";
 import AdminM3UCustomDashboard from "../AdminM3UCustomDashboard";
+import { PlaylistStorageManager } from "@/components/admin/m3u/PlaylistStorageManager";
 
 export default function AdminM3UPage() {
   return (
@@ -52,6 +53,9 @@ export default function AdminM3UPage() {
             </TabsTrigger>
             <TabsTrigger value="cfstream" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               ☁️ CF Stream
+            </TabsTrigger>
+            <TabsTrigger value="storage" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              💾 Storage
             </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" className="invisible" />
@@ -91,6 +95,10 @@ export default function AdminM3UPage() {
 
         <TabsContent value="cfstream" className="space-y-4 mt-4">
           <AdminCFStreamDashboard />
+        </TabsContent>
+
+        <TabsContent value="storage" className="space-y-4 mt-4">
+          <PlaylistStorageManager />
         </TabsContent>
       </Tabs>
     </AdminShell>
