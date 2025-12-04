@@ -7,7 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const PAGE_SIZE = 5000;
+// Smaller page size to avoid timeouts
+const PAGE_SIZE = 500;
 
 function matchesContentClass(groupTitle: string, targetClass: string): boolean {
   const lower = (groupTitle || '').toLowerCase();
@@ -39,7 +40,18 @@ function matchesContentClass(groupTitle: string, targetClass: string): boolean {
   return true;
 }
 
-// Background processing function
+// Format entry as M3U line - returns Uint8Array to avoid string concatenation
+function formatEntry(e: any): Uint8Array {
+  let line = `#EXTINF:-1`;
+  if (e.tvg_id) line += ` tvg-id="${e.tvg_id}"`;
+  if (e.tvg_name) line += ` tvg-name="${e.tvg_name}"`;
+  if (e.tvg_logo) line += ` tvg-logo="${e.tvg_logo}"`;
+  if (e.group_title) line += ` group-title="${e.group_title}"`;
+  line += `,${e.title}\n${e.stream_url}\n`;
+  return new TextEncoder().encode(line);
+}
+
+// Background processing function with streaming approach
 async function processInBackground(
   sourceId: string, 
   sourceKey: string, 
@@ -69,11 +81,15 @@ async function processInBackground(
       })
       .eq('id', sourceId);
 
-    let m3uContent = '#EXTM3U\n';
+    // Use array of Uint8Array chunks instead of string concatenation
+    const chunks: Uint8Array[] = [];
+    const header = new TextEncoder().encode('#EXTM3U\n');
+    chunks.push(header);
+    let totalSize = header.length;
     let actualCount = 0;
 
     if (useEntryIds) {
-      // Process by IDs
+      // Process by IDs in small batches
       for (let i = 0; i < entryIds!.length; i += PAGE_SIZE) {
         const batchIds = entryIds!.slice(i, i + PAGE_SIZE);
         
@@ -85,18 +101,20 @@ async function processInBackground(
 
         if (entries) {
           for (const e of entries) {
-            m3uContent += `#EXTINF:-1`;
-            if (e.tvg_id) m3uContent += ` tvg-id="${e.tvg_id}"`;
-            if (e.tvg_name) m3uContent += ` tvg-name="${e.tvg_name}"`;
-            if (e.tvg_logo) m3uContent += ` tvg-logo="${e.tvg_logo}"`;
-            if (e.group_title) m3uContent += ` group-title="${e.group_title}"`;
-            m3uContent += `,${e.title}\n${e.stream_url}\n`;
+            const chunk = formatEntry(e);
+            chunks.push(chunk);
+            totalSize += chunk.length;
             actualCount++;
           }
         }
+        
+        // Small delay to prevent CPU overload
+        if (i > 0 && i % 5000 === 0) {
+          await new Promise(r => setTimeout(r, 10));
+        }
       }
     } else {
-      // Paginated fetch
+      // Get total count first
       const { count: totalCount } = await supabaseService
         .from('m3u_sync_entries')
         .select('*', { count: 'exact', head: true })
@@ -105,21 +123,24 @@ async function processInBackground(
 
       console.log(`[GenerateM3U-BG] Total: ${totalCount}`);
 
-      let page = 0;
+      // Paginated fetch with cursor-based pagination using ID
+      let lastId: string | null = null;
       let processedCount = 0;
+      let consecutiveEmptyBatches = 0;
 
-      while (processedCount < (totalCount || 0)) {
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-
+      while (processedCount < (totalCount || 0) && consecutiveEmptyBatches < 3) {
         let query = supabaseService
           .from('m3u_sync_entries')
-          .select('title, stream_url, tvg_id, tvg_name, tvg_logo, group_title')
+          .select('id, title, stream_url, tvg_id, tvg_name, tvg_logo, group_title')
           .eq('source_id', sourceId)
           .eq('is_valid', true)
-          .order('group_title')
-          .order('title')
-          .range(from, to);
+          .order('id', { ascending: true })
+          .limit(PAGE_SIZE);
+
+        // Use cursor-based pagination instead of offset
+        if (lastId) {
+          query = query.gt('id', lastId);
+        }
 
         if (hasFilters?.selectedCategory) {
           query = query.eq('group_title', filters.selectedCategory);
@@ -130,40 +151,61 @@ async function processInBackground(
 
         const { data: entries, error } = await query;
 
-        if (error || !entries || entries.length === 0) break;
+        if (error) {
+          console.error(`[GenerateM3U-BG] Query error:`, error.message);
+          consecutiveEmptyBatches++;
+          await new Promise(r => setTimeout(r, 500)); // Wait before retry
+          continue;
+        }
+
+        if (!entries || entries.length === 0) {
+          consecutiveEmptyBatches++;
+          continue;
+        }
+
+        consecutiveEmptyBatches = 0;
+        lastId = entries[entries.length - 1].id;
 
         for (const e of entries) {
           if (hasFilters?.selectedClass && !matchesContentClass(e.group_title || '', filters.selectedClass)) {
             continue;
           }
 
-          m3uContent += `#EXTINF:-1`;
-          if (e.tvg_id) m3uContent += ` tvg-id="${e.tvg_id}"`;
-          if (e.tvg_name) m3uContent += ` tvg-name="${e.tvg_name}"`;
-          if (e.tvg_logo) m3uContent += ` tvg-logo="${e.tvg_logo}"`;
-          if (e.group_title) m3uContent += ` group-title="${e.group_title}"`;
-          m3uContent += `,${e.title}\n${e.stream_url}\n`;
+          const chunk = formatEntry(e);
+          chunks.push(chunk);
+          totalSize += chunk.length;
           actualCount++;
         }
 
         processedCount += entries.length;
-        page++;
 
-        if (page % 10 === 0) {
-          console.log(`[GenerateM3U-BG] Progress: ${processedCount}/${totalCount}`);
+        // Log progress every 10k entries
+        if (processedCount % 10000 < PAGE_SIZE) {
+          console.log(`[GenerateM3U-BG] Progress: ${processedCount}/${totalCount} (${actualCount} matching)`);
         }
 
-        if (entries.length < PAGE_SIZE) break;
+        // Small delay between batches to prevent CPU overload
+        await new Promise(r => setTimeout(r, 5));
       }
     }
 
-    const fileSize = new TextEncoder().encode(m3uContent).length;
-    console.log(`[GenerateM3U-BG] Generated: ${actualCount} entries, ${(fileSize/1024/1024).toFixed(2)}MB`);
+    console.log(`[GenerateM3U-BG] Generated: ${actualCount} entries, ${(totalSize/1024/1024).toFixed(2)}MB`);
+
+    // Combine chunks efficiently
+    const combined = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    // Clear chunks array to free memory
+    chunks.length = 0;
 
     // Upload to R2
     let cdnUrl: string | null = null;
     try {
-      cdnUrl = await uploadToR2(sourceKey, m3uContent);
+      cdnUrl = await uploadToR2(sourceKey, combined);
       console.log(`[GenerateM3U-BG] ✅ Uploaded: ${cdnUrl}`);
     } catch (e) {
       console.error(`[GenerateM3U-BG] R2 upload failed:`, e);
@@ -176,7 +218,7 @@ async function processInBackground(
         metadata: {
           cdn_url: cdnUrl,
           cdn_generated_at: new Date().toISOString(),
-          cdn_file_size: fileSize,
+          cdn_file_size: totalSize,
           cdn_entries_count: actualCount,
           generation_status: cdnUrl ? 'completed' : 'failed',
           generation_time_ms: Date.now() - startTime
@@ -279,7 +321,7 @@ serve(async (req) => {
   }
 });
 
-async function uploadToR2(sourceKey: string, content: string): Promise<string> {
+async function uploadToR2(sourceKey: string, content: Uint8Array): Promise<string> {
   const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
   const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
   const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
@@ -293,7 +335,6 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
   const fileName = `sync-playlists/${sourceKey}.m3u`;
   const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
   const url = `${endpoint}/${R2_BUCKET}/${fileName}`;
-  const body = new TextEncoder().encode(content);
 
   const region = 'auto';
   const service = 's3';
@@ -304,7 +345,7 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
 
   const method = 'PUT';
   const canonicalUri = `/${R2_BUCKET}/${fileName}`;
-  const payloadHash = await sha256Hex(body);
+  const payloadHash = await sha256Hex(content);
   
   const canonicalHeaders = [
     `content-type:${contentType}`,
@@ -333,7 +374,7 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
       'Authorization': authorization,
       'Cache-Control': 'public, max-age=3600',
     },
-    body
+    body: content
   });
 
   if (!response.ok) {

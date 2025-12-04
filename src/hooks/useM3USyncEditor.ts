@@ -236,14 +236,17 @@ export function useM3USyncEditor() {
       
       console.log(`[M3USyncEditor] Loading ${totalPages} pages of ${PAGE_SIZE} entries each`);
 
+      // Track if we hit a 500 error (server timeout on high offsets)
+      let hitServerError = false;
+      let consecutiveEmptyBatches = 0;
+
       // Helper function to fetch a single page with retry using offset/limit
-      const fetchPage = async (page: number, retryCount = 0): Promise<any[]> => {
-        if (signal.aborted) return [];
+      const fetchPage = async (page: number, retryCount = 0): Promise<{ data: any[]; error500: boolean }> => {
+        if (signal.aborted || hitServerError) return { data: [], error500: false };
         
         const offset = page * PAGE_SIZE;
 
         try {
-          // Use offset/limit instead of range for more reliable pagination
           const { data, error } = await supabase
             .from("m3u_sync_entries")
             .select("id,source_id,title,stream_url,group_title,tvg_id,tvg_name,tvg_logo,tvg_language,duration,is_valid,metadata")
@@ -254,30 +257,49 @@ export function useM3USyncEditor() {
             .range(offset, offset + PAGE_SIZE - 1);
 
           if (error) {
+            // Check if it's a 500 error (server timeout on high offsets)
+            const errorMessage = error.message || '';
+            const errorCode = error.code || '';
+            const is500Error = errorMessage.includes('500') || 
+                              errorCode === '500' || 
+                              errorMessage.includes('Internal Server Error') ||
+                              errorMessage.includes('statement timeout');
+            
+            if (is500Error) {
+              console.warn(`[M3USyncEditor] Page ${page} hit server limit (500) at offset ${offset}. Stopping.`);
+              return { data: [], error500: true };
+            }
+            
             console.warn(`[M3USyncEditor] Page ${page} error (attempt ${retryCount + 1}):`, error.message);
             if (retryCount < MAX_RETRIES) {
               await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
               return fetchPage(page, retryCount + 1);
             }
             console.error(`[M3USyncEditor] Page ${page} failed after ${MAX_RETRIES} retries`);
-            return [];
+            return { data: [], error500: false };
           }
           
-          return data || [];
+          return { data: data || [], error500: false };
         } catch (e: any) {
+          // Check for 500 errors in catch block too
+          const errorMessage = e.message || '';
+          if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+            console.warn(`[M3USyncEditor] Page ${page} exception 500 at offset ${offset}. Stopping.`);
+            return { data: [], error500: true };
+          }
+          
           console.warn(`[M3USyncEditor] Page ${page} exception (attempt ${retryCount + 1}):`, e.message);
           if (retryCount < MAX_RETRIES) {
             await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
             return fetchPage(page, retryCount + 1);
           }
-          console.error(`[M3USyncEditor] Page ${page} exception after ${MAX_RETRIES} retries`);
-          return [];
+          return { data: [], error500: false };
         }
       };
 
       // Progressive loading - fetch and display as data comes in
       let lastProgressLog = 0;
-      for (let i = 0; i < totalPages; i += PARALLEL_REQUESTS) {
+      for (let i = 0; i < totalPages && !hitServerError; i += PARALLEL_REQUESTS) {
         if (signal.aborted) return;
         
         const batch = Array.from(
@@ -286,25 +308,36 @@ export function useM3USyncEditor() {
         );
         
         const results = await Promise.all(batch.map(page => fetchPage(page)));
-        const batchData = results.flat();
         
-        // Check if we actually got data
-        if (batchData.length === 0 && i < totalPages - 1) {
-          console.warn(`[M3USyncEditor] Empty batch at page ${i}, retrying...`);
-          // Wait and retry this batch once
-          await new Promise(r => setTimeout(r, 1000));
-          const retryResults = await Promise.all(batch.map(page => fetchPage(page)));
-          const retryData = retryResults.flat();
-          if (retryData.length > 0) {
-            loadedEntries = [...loadedEntries, ...retryData];
+        // Check if any result hit a 500 error
+        if (results.some(r => r.error500)) {
+          hitServerError = true;
+          console.warn(`[M3USyncEditor] Server error detected at batch starting page ${i}. Using loaded data.`);
+          // Add whatever data we got before the error
+          const partialData = results.filter(r => !r.error500).flatMap(r => r.data);
+          if (partialData.length > 0) {
+            loadedEntries = [...loadedEntries, ...partialData];
+          }
+          break;
+        }
+        
+        const batchData = results.flatMap(r => r.data);
+        
+        // Track empty batches
+        if (batchData.length === 0) {
+          consecutiveEmptyBatches++;
+          if (consecutiveEmptyBatches >= 3) {
+            console.warn(`[M3USyncEditor] 3 consecutive empty batches. Stopping.`);
+            break;
           }
         } else {
+          consecutiveEmptyBatches = 0;
           loadedEntries = [...loadedEntries, ...batchData];
         }
 
-        // Progressive update - show entries as they load (every 10% or 20k entries)
+        // Progressive update - show entries as they load (every 5% or 10k entries)
         const currentPercent = Math.round((loadedEntries.length / totalCount) * 100);
-        if (currentPercent >= lastProgressLog + 5 || loadedEntries.length - lastProgressLog * (totalCount/100) >= 20000) {
+        if (currentPercent >= lastProgressLog + 5 || loadedEntries.length >= (lastProgressLog + 1) * (totalCount / 100) + 10000) {
           const processedSoFar = processEntries(loadedEntries);
           setEntries(processedSoFar);
           lastProgressLog = currentPercent;
@@ -324,9 +357,19 @@ export function useM3USyncEditor() {
         }
         
         // Small delay between batches to avoid rate limits
-        if (i + PARALLEL_REQUESTS < totalPages) {
+        if (i + PARALLEL_REQUESTS < totalPages && !hitServerError) {
           await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
         }
+      }
+      
+      // If we hit a server error, show a warning
+      if (hitServerError) {
+        console.warn(`[M3USyncEditor] Loaded ${loadedEntries.length}/${totalCount} entries before server limit`);
+        toast({
+          title: "Carregamento parcial",
+          description: `Carregadas ${loadedEntries.length.toLocaleString()} de ${totalCount.toLocaleString()} entradas. Limite do servidor atingido.`,
+          variant: "default",
+        });
       }
       
       // Final update with all entries
