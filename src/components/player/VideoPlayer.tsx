@@ -1,188 +1,49 @@
 /**
- * ============================================================================
- * VideoPlayer - Player IPTV Universal (Netflix-Grade Performance)
- * ============================================================================
- * 
- * Player 100% funcional compatível com:
- * - TV (Samsung Tizen, LG webOS, Android TV)
- * - Mobile (iOS, Android)
- * - Desktop (Chrome, Firefox, Safari)
- * - WebView
- * 
- * Features:
- * - HLS.js + fallback nativo
- * - Navegação por controle remoto
- * - Auto-reconnect inteligente
- * - Overlay elegante com auto-hide
- * - Muted-on-start para autoplay seguro
- * - Analytics de performance
- * - Configuração otimizada por dispositivo
- * - Enhanced ABR (aggressive up-switch, conservative down-switch)
- * - Resume playback support
- * 
- * @version 3.1.0
+ * VideoPlayer - Simplificado para Confiabilidade
+ * Prioriza startup rápido sobre otimizações complexas
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
-import { 
-  Play, Pause, Volume2, VolumeX, Maximize, Minimize, RefreshCw, ArrowLeft 
-} from "lucide-react";
-import { useRemoteInput } from "@/modules/player/hooks/useRemoteInput";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RefreshCw, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStreamAnalytics } from "@/hooks/useStreamAnalytics";
-import { streamOptimizer, detectStreamType } from "@/services/streamOptimizer";
-import { useABR } from "@/hooks/useABR";
-import { QualitySelector } from "./QualitySelector";
-import { QualityBadge } from "./QualityBadge";
-import { ResumeDialog } from "./ResumeDialog";
-import { useVisibilityOptimization } from "@/hooks/useVisibilityOptimization";
-import { usePlayerErrorRecovery } from "@/hooks/usePlayerErrorRecovery";
-import { useAdvancedHlsConfig } from "@/hooks/useAdvancedHlsConfig";
-import { onPlayerOpen, onPlayerClose } from "@/services/downloadPriorityService";
-import { enhancedABRService } from "@/services/enhancedABRService";
-import { featureFlagsService } from "@/services/featureFlagsService";
-import { playerEventsService } from "@/services/playerEventsService";
-
-// =============================================================================
-// TYPES
-// =============================================================================
 
 interface VideoPlayerProps {
-  /** URL do stream HLS */
   url: string;
-  /** Título do canal/conteúdo */
   title?: string;
-  /** Logo do canal */
   logo?: string;
-  /** Channel ID for analytics */
-  channelId?: string;
-  /** User ID for analytics */
-  userId?: string;
-  /** Content type for resume/analytics */
-  contentType?: 'live' | 'movie' | 'series' | 'episode';
-  /** Resume point in seconds (if available) */
-  resumePoint?: number;
-  /** Callback when resume is accepted */
-  onResumeAccepted?: () => void;
-  /** Callback when resume is declined */
-  onResumeDeclined?: () => void;
-  /** Autoplay ao carregar */
   autoPlay?: boolean;
-  /** Enable ABR quality selector */
-  enableABR?: boolean;
-  /** Show quality stats */
-  showQualityStats?: boolean;
-  /** Classes CSS adicionais */
   className?: string;
-  /** Callback de erro */
   onError?: (msg: string) => void;
-  /** Callback ao voltar */
   onBack?: () => void;
-  /** Callback quando pronto */
   onReady?: () => void;
 }
 
-// =============================================================================
-// HLS CONFIG - Device-optimized
-// =============================================================================
-
-function getHlsConfig(): Partial<Hls['config']> {
-  const preset = streamOptimizer.getHlsPresetForDevice();
-  
-  return {
-    enableWorker: true,
-    lowLatencyMode: preset.config.lowLatencyMode,
-    backBufferLength: preset.config.backBufferLength,
-    maxBufferLength: preset.config.maxBufferLength,
-    maxMaxBufferLength: preset.config.maxMaxBufferLength,
-    maxBufferSize: preset.config.maxBufferSize,
-    maxBufferHole: preset.config.maxBufferHole,
-    startFragPrefetch: preset.config.startFragPrefetch,
-    testBandwidth: true,
-    progressive: true,
-    fragLoadingTimeOut: 20000,
-    fragLoadingMaxRetry: 6,
-    fragLoadingRetryDelay: 1000,
-    manifestLoadingTimeOut: 15000,
-    manifestLoadingMaxRetry: 4,
-    levelLoadingTimeOut: 15000,
-    levelLoadingMaxRetry: 4,
-    // ABR config for smoother quality transitions
-    abrEwmaFastLive: 3.0,
-    abrEwmaSlowLive: 9.0,
-    abrEwmaFastVoD: 3.0,
-    abrEwmaSlowVoD: 9.0,
-    abrBandWidthFactor: 0.95,
-    abrBandWidthUpFactor: 0.7,
-  };
-}
-
-// =============================================================================
-// STREAM TYPE DETECTION
-// =============================================================================
-
-function extractOriginalUrl(url: string): string {
-  if (url.includes('stream-proxy') && url.includes('url=')) {
-    try {
-      const urlObj = new URL(url);
-      const originalUrl = urlObj.searchParams.get('url');
-      if (originalUrl) return decodeURIComponent(originalUrl);
-    } catch {
-      // Fall through
-    }
-  }
-  return url;
-}
+// HLS Config MÍNIMO para startup rápido
+const HLS_CONFIG: Partial<Hls['config']> = {
+  enableWorker: true,
+  lowLatencyMode: false,
+  maxBufferLength: 30,
+  maxMaxBufferLength: 60,
+  maxBufferSize: 30 * 1000 * 1000,
+  fragLoadingTimeOut: 20000,
+  fragLoadingMaxRetry: 3,
+  manifestLoadingTimeOut: 10000,
+  manifestLoadingMaxRetry: 3,
+  levelLoadingTimeOut: 10000,
+  levelLoadingMaxRetry: 3,
+};
 
 function isHlsUrl(url: string): boolean {
-  const checkUrl = extractOriginalUrl(url).toLowerCase();
-  return checkUrl.includes('.m3u8') || checkUrl.includes('.m3u');
+  const lower = url.toLowerCase();
+  return lower.includes('.m3u8') || lower.includes('.m3u');
 }
-
-function isDirectVideoUrl(url: string): boolean {
-  const checkUrl = extractOriginalUrl(url).toLowerCase();
-  
-  if (checkUrl.includes('.mp4') || checkUrl.includes('.mkv') || 
-      checkUrl.includes('.avi') || checkUrl.includes('.ts') ||
-      checkUrl.includes('.webm')) {
-    return true;
-  }
-  
-  // Proxy URL without HLS extension = direct stream
-  if (url.includes('stream-proxy')) {
-    return !isHlsUrl(url);
-  }
-  
-  const xtreamPattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
-  if (xtreamPattern.test(checkUrl)) {
-    return true;
-  }
-  
-  if (/\/\d+$/.test(checkUrl) && !checkUrl.includes('.m3u')) {
-    return true;
-  }
-  
-  return false;
-}
-
-// =============================================================================
-// COMPONENT
-// =============================================================================
 
 export function VideoPlayer({
   url,
   title = "",
   logo,
-  channelId,
-  userId,
-  contentType = 'live',
-  resumePoint,
-  onResumeAccepted,
-  onResumeDeclined,
   autoPlay = true,
-  enableABR = true,
-  showQualityStats = false,
   className,
   onError,
   onBack,
@@ -198,612 +59,320 @@ export function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCount = useRef(0);
-  const maxRetries = 3;
-  const startupTimeRef = useRef<number>(0);
-  const firstFrameTracked = useRef(false);
 
-  // Feature flags
-  const useEnhancedABRFlag = featureFlagsService.isEnabled('enhanced_abr');
-  const usePlayerAnalyticsFlag = featureFlagsService.isEnabled('player_analytics');
-
-  // Detect if VOD content (enables ABR UI)
-  const isVOD = detectStreamType(url) === 'vod' || url.includes('/movie/') || url.includes('/series/');
-
-  // Analytics tracking
-  const analytics = useStreamAnalytics(channelId, userId);
-
-  // Advanced HLS config based on device/network
-  const { getConfig: getAdvancedHlsConfig, videoProps } = useAdvancedHlsConfig({
-    streamType: isVOD ? 'vod' : 'live',
-  });
-
-  // Visibility optimization - reduces quality when tab hidden
-  useVisibilityOptimization(videoRef, hlsRef, {
-    pauseWhenHidden: isVOD, // Only pause VOD, not live
-    reduceQualityWhenHidden: true,
-    stopLoadWhenHidden: false,
-  });
-
-  // Advanced error recovery with exponential backoff
-  const errorRecovery = usePlayerErrorRecovery({
-    maxNetworkRetries: 6,
-    maxMediaRetries: 3,
-    initialDelay: 1000,
-    maxDelay: 30000,
-    onFatalError: (error) => {
-      setError('Stream indisponível. Tente outro canal.');
-      setLoading(false);
-      analytics.recordError(error.details, error.type);
-      onError?.(error.details);
-    },
-    onFallback: () => {
-      // Could implement fallback URL logic here
-      console.log('[VideoPlayer] Fallback triggered');
-    },
-  });
-
-  // ABR Hook
-  const abr = useABR({
-    onQualityChange: (level) => {
-      if (!level.isAuto) {
-        analytics.recordQualityChange(level.bitrate);
-      }
-    },
-  });
-
-  // ---------------------------------------------------------------------------
-  // Overlay Control
-  // ---------------------------------------------------------------------------
-
+  // Mostrar overlay
   const showOverlay = useCallback(() => {
     setOverlayVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setOverlayVisible(false), 3500);
+    hideTimer.current = setTimeout(() => setOverlayVisible(false), 4000);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Player Initialization
-  // ---------------------------------------------------------------------------
-
+  // Inicializar player
   const initPlayer = useCallback(() => {
     const video = videoRef.current;
     if (!video || !url) return;
 
+    console.log('[VideoPlayer] Iniciando:', url.substring(0, 80));
     setLoading(true);
     setError(null);
-    startupTimeRef.current = Date.now();
 
-    // Start analytics session
-    analytics.startSession();
-
-    // Cleanup previous instance
+    // Limpar instância anterior
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
 
-    const isHls = isHlsUrl(url);
-    const isDirect = isDirectVideoUrl(url);
-    
-    console.log(`[VideoPlayer] URL: ${url.substring(0, 60)}... isHLS: ${isHls}, isDirect: ${isDirect}`);
+    const tryPlay = () => {
+      if (autoPlay) {
+        video.play().catch(() => {
+          video.muted = true;
+          setMuted(true);
+          video.play().catch(() => {});
+        });
+      }
+    };
 
-    // DIRECT VIDEO STREAM (MP4, TS, MKV, Xtream live)
-    if (isDirect && !isHls) {
-      console.log('[VideoPlayer] Using direct video playback');
-      video.src = url;
-      
-      const onLoadedData = () => {
-        const startupMs = Date.now() - startupTimeRef.current;
-        console.log('[VideoPlayer] Direct stream loaded in', startupMs, 'ms');
-        setLoading(false);
-        retryCount.current = 0;
-        analytics.recordStartup(startupMs);
-        onReady?.();
-        
-        if (autoPlay) {
-          video.play().catch((e) => {
-            console.warn('[VideoPlayer] Autoplay blocked:', e);
-            video.muted = true;
-            setMuted(true);
-            video.play().catch(() => {});
-          });
-        }
-      };
-      
-      const onVideoError = () => {
-        const mediaError = video.error;
-        console.error('[VideoPlayer] Direct stream error:', mediaError?.code, mediaError?.message);
-        analytics.recordError(String(mediaError?.code || 'UNKNOWN'), mediaError?.message || 'Direct stream error');
-        
-        if (retryCount.current < maxRetries) {
-          retryCount.current++;
-          console.log(`[VideoPlayer] Retry ${retryCount.current}/${maxRetries}`);
-          setTimeout(() => {
-            video.src = '';
-            video.src = url;
-            video.load();
-          }, 1000 * retryCount.current);
-        } else {
-          setError('Stream indisponível. Tente outro canal.');
-          setLoading(false);
-          onError?.('Direct stream error');
-        }
-      };
-      
-      const onCanPlay = () => {
-        setLoading(false);
-      };
-      
-      video.addEventListener('loadeddata', onLoadedData, { once: true });
-      video.addEventListener('error', onVideoError, { once: true });
-      video.addEventListener('canplay', onCanPlay);
-      
-      video.load();
-      return;
-    }
-
-    // HLS.js for HLS streams
-    if (Hls.isSupported() && isHls) {
-      console.log('[VideoPlayer] Using HLS.js with advanced optimized config');
-      const hlsConfig = getAdvancedHlsConfig();
-      const hls = new Hls(hlsConfig);
+    // HLS via HLS.js
+    if (Hls.isSupported() && isHlsUrl(url)) {
+      console.log('[VideoPlayer] Usando HLS.js');
+      const hls = new Hls(HLS_CONFIG);
       hlsRef.current = hls;
 
       hls.loadSource(url);
       hls.attachMedia(video);
 
-      // Attach ABR service
-      if (enableABR) {
-        abr.attach(hls);
-      }
-
-      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
-        const startupMs = Date.now() - startupTimeRef.current;
-        console.log('[VideoPlayer] Manifest parsed in', startupMs, 'ms, levels:', data.levels.length);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[VideoPlayer] Manifest parsed');
         setLoading(false);
-        errorRecovery.resetStats(); // Reset error stats on successful load
-        analytics.recordStartup(startupMs);
+        retryCount.current = 0;
         onReady?.();
-        
-        if (autoPlay) {
-          video.play().catch((e) => {
-            console.warn('[VideoPlayer] Autoplay blocked:', e);
-            video.muted = true;
-            setMuted(true);
-            video.play().catch(() => {});
-          });
-        }
+        tryPlay();
       });
 
-      // Track quality changes
-      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
-        const level = hls.levels[data.level];
-        if (level) {
-          analytics.recordQualityChange(level.bitrate);
-          console.log('[VideoPlayer] Quality:', level.height + 'p', level.bitrate / 1000, 'kbps');
-        }
-      });
-
-      // Advanced error handling with exponential backoff
       hls.on(Hls.Events.ERROR, (_, data) => {
-        console.error('[VideoPlayer] HLS Error:', data.type, data.details, 'Fatal:', data.fatal);
+        console.error('[VideoPlayer] HLS Error:', data.type, data.details, data.fatal);
         
-        // Use advanced error recovery
-        const recovered = errorRecovery.handleHlsError(hls, {
-          type: data.type,
-          details: data.details,
-          fatal: data.fatal,
-          response: data.response as { code: number } | undefined,
-        });
-
-        if (!recovered && data.fatal) {
-          // Error recovery failed, already handled by onFatalError callback
-          console.log('[VideoPlayer] Error recovery failed');
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              if (retryCount.current < 3) {
+                retryCount.current++;
+                console.log(`[VideoPlayer] Retry ${retryCount.current}/3`);
+                hls.startLoad();
+              } else {
+                setError('Erro de conexão. Tente novamente.');
+                setLoading(false);
+                onError?.('Network error');
+              }
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('[VideoPlayer] Recuperando erro de mídia');
+              hls.recoverMediaError();
+              break;
+            default:
+              setError('Erro ao carregar stream');
+              setLoading(false);
+              onError?.('Fatal error');
+          }
         }
       });
 
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        setLoading(false);
-      });
-
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS (Safari, iOS, some Smart TVs)
-      console.log('[VideoPlayer] Using native HLS');
+      hls.on(Hls.Events.FRAG_LOADED, () => setLoading(false));
+      
+    } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHlsUrl(url)) {
+      // Safari nativo
+      console.log('[VideoPlayer] HLS nativo (Safari)');
       video.src = url;
       
       video.addEventListener('loadedmetadata', () => {
         setLoading(false);
         onReady?.();
-        
-        if (autoPlay) {
-          video.play().catch(() => {
-            video.muted = true;
-            setMuted(true);
-            video.play().catch(() => {});
-          });
-        }
-      });
+        tryPlay();
+      }, { once: true });
 
       video.addEventListener('error', () => {
         setError('Erro ao carregar stream');
         setLoading(false);
-        onError?.('Native playback error');
-      });
+        onError?.('Native HLS error');
+      }, { once: true });
+      
     } else {
-      // Fallback: try direct playback
-      console.log('[VideoPlayer] Fallback: direct playback');
+      // Playback direto (MP4, TS, etc)
+      console.log('[VideoPlayer] Playback direto');
       video.src = url;
-      video.load();
       
       video.addEventListener('loadeddata', () => {
+        console.log('[VideoPlayer] Video carregado');
         setLoading(false);
         onReady?.();
-        if (autoPlay) video.play().catch(() => {});
+        tryPlay();
       }, { once: true });
-      
+
+      video.addEventListener('canplay', () => setLoading(false), { once: true });
+
       video.addEventListener('error', () => {
-        setError('Formato não suportado');
-        setLoading(false);
-        onError?.('Format not supported');
+        if (retryCount.current < 2) {
+          retryCount.current++;
+          setTimeout(() => {
+            video.src = url;
+            video.load();
+          }, 1000);
+        } else {
+          setError('Vídeo indisponível');
+          setLoading(false);
+          onError?.('Direct playback error');
+        }
       }, { once: true });
+
+      video.load();
     }
   }, [url, autoPlay, onError, onReady]);
 
-  // Initialize on mount and URL change
+  // Inicializar
   useEffect(() => {
     initPlayer();
     showOverlay();
 
     return () => {
-      // End analytics session
-      analytics.endSession();
-      
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
-      if (hideTimer.current) {
-        clearTimeout(hideTimer.current);
-      }
+      if (hideTimer.current) clearTimeout(hideTimer.current);
     };
-  }, [initPlayer]);
+  }, [initPlayer, showOverlay]);
 
-  // ---------------------------------------------------------------------------
-  // Download Priority Management - Pause downloads when player opens
-  // ---------------------------------------------------------------------------
-
+  // Event handlers do vídeo
   useEffect(() => {
-    // Pausar downloads quando player abre
-    onPlayerOpen();
-    
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onPlay = () => setPaused(false);
+    const onPause = () => setPaused(true);
+    const onWaiting = () => setLoading(true);
+    const onPlaying = () => setLoading(false);
+
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
+
     return () => {
-      // Retomar downloads quando player fecha
-      onPlayerClose();
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
     };
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Video Event Handlers
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
+  // Controles
+  const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-
-    const handlePlay = () => setPaused(false);
-    const handlePause = () => setPaused(true);
-    const handleWaiting = () => {
-      setLoading(true);
-      analytics.recordBufferStart();
-    };
-    const handlePlaying = () => {
-      setLoading(false);
-      analytics.recordBufferEnd();
-    };
-
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('playing', handlePlaying);
-
-    return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('playing', handlePlaying);
-    };
-  }, [analytics]);
-
-  // ---------------------------------------------------------------------------
-  // Controls
-  // ---------------------------------------------------------------------------
-
-  const togglePlay = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
     if (video.paused) {
       video.play().catch(() => {});
     } else {
       video.pause();
     }
     showOverlay();
-  }, [showOverlay]);
+  };
 
-  const toggleMute = useCallback(() => {
+  const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
     setMuted(video.muted);
     showOverlay();
-  }, [showOverlay]);
+  };
 
-  const toggleFullscreen = useCallback(async () => {
+  const toggleFullscreen = async () => {
     const container = containerRef.current;
     if (!container) return;
-
+    
     try {
-      if (!document.fullscreenElement) {
-        await container.requestFullscreen?.();
-        setFullscreen(true);
-      } else {
-        await document.exitFullscreen?.();
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
         setFullscreen(false);
+      } else {
+        await container.requestFullscreen();
+        setFullscreen(true);
       }
     } catch (e) {
       console.warn('[VideoPlayer] Fullscreen error:', e);
     }
     showOverlay();
-  }, [showOverlay]);
+  };
 
-  const reload = useCallback(() => {
+  const handleRetry = () => {
     retryCount.current = 0;
     initPlayer();
-    showOverlay();
-  }, [initPlayer, showOverlay]);
-
-  const handleBack = useCallback(() => {
-    if (onBack) {
-      onBack();
-    } else {
-      window.history.back();
-    }
-  }, [onBack]);
-
-  const seekRelative = useCallback((delta: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = Math.max(0, video.currentTime + delta);
-    showOverlay();
-  }, [showOverlay]);
-
-  // ---------------------------------------------------------------------------
-  // Remote / TV Controls
-  // ---------------------------------------------------------------------------
-
-  useRemoteInput({
-    onLeft: () => {
-      seekRelative(-10);
-      showOverlay();
-    },
-    onRight: () => {
-      seekRelative(10);
-      showOverlay();
-    },
-    onUp: showOverlay,
-    onDown: showOverlay,
-    onOk: togglePlay,
-    onPlayPause: togglePlay,
-    onBack: handleBack,
-    onMute: toggleMute,
-  });
-
-  // Fullscreen change listener
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  };
 
   return (
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-full bg-black overflow-hidden select-none",
-        "focus:outline-none",
+        "relative w-full h-full bg-black overflow-hidden",
         className
       )}
       onMouseMove={showOverlay}
-      onClick={showOverlay}
-      tabIndex={0}
+      onTouchStart={showOverlay}
+      onClick={togglePlay}
     >
-      {/* Video element with optimized preload */}
+      {/* Video */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
         muted={muted}
-        onClick={togglePlay}
-        {...videoProps}
+        autoPlay={autoPlay}
       />
 
-      {/* Resume Dialog */}
-      {resumePoint && resumePoint > 0 && (
-        <ResumeDialog
-          isOpen={showResumeDialog}
-          resumePoint={resumePoint}
-          contentName={title}
-          onResume={() => {
-            setShowResumeDialog(false);
-            if (videoRef.current) {
-              videoRef.current.currentTime = resumePoint;
-            }
-            onResumeAccepted?.();
-          }}
-          onStartOver={() => {
-            setShowResumeDialog(false);
-            onResumeDeclined?.();
-          }}
-          onClose={() => setShowResumeDialog(false)}
-        />
-      )}
-
-      {/* Loading spinner */}
+      {/* Loading */}
       {loading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="flex flex-col items-center gap-3">
-            <RefreshCw className="w-12 h-12 text-primary animate-spin" />
-            <span className="text-muted-foreground text-sm">Carregando...</span>
-          </div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-white/80 text-sm">Carregando...</p>
         </div>
       )}
 
-      {/* Error state */}
+      {/* Error */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="flex flex-col items-center gap-4 p-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center">
-              <RefreshCw className="w-8 h-8 text-destructive" />
-            </div>
-            <p className="text-foreground font-medium">{error}</p>
-            <button
-              onClick={reload}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors tv-button"
-            >
-              Tentar Novamente
-            </button>
-          </div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
+          <p className="text-white mb-4">{error}</p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRetry();
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Tentar novamente
+          </button>
         </div>
       )}
 
       {/* Overlay */}
       <div
         className={cn(
-          "absolute inset-0 flex flex-col justify-between transition-opacity duration-300",
-          "bg-gradient-to-t from-black/80 via-transparent to-black/60",
+          "absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300 z-10",
           overlayVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-4">
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center gap-3">
           {onBack && (
             <button
-              onClick={handleBack}
-              className="p-2 rounded-full bg-background/20 hover:bg-background/40 transition-colors tv-button"
+              onClick={onBack}
+              className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white"
             >
-              <ArrowLeft className="w-6 h-6 text-foreground" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
           )}
-          
           {logo && (
-            <img
-              src={logo}
-              alt=""
-              className="w-10 h-10 rounded object-contain bg-background/20"
-              onError={(e) => (e.currentTarget.style.display = 'none')}
-            />
+            <img src={logo} alt="" className="w-10 h-10 rounded object-contain bg-black/50" />
           )}
-          
           {title && (
-            <span className="text-foreground text-xl font-medium line-clamp-1">
-              {title}
-            </span>
+            <h2 className="text-white font-medium text-lg truncate">{title}</h2>
           )}
         </div>
 
-        {/* Center play indicator */}
-        {paused && !loading && !error && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-20 h-20 rounded-full bg-background/30 flex items-center justify-center">
-              <Play className="w-10 h-10 text-foreground ml-1" />
-            </div>
-          </div>
-        )}
-
         {/* Controls */}
-        <div className="p-4">
-          {/* Seek hints */}
-          <div className="flex justify-center gap-8 mb-4 text-muted-foreground text-sm">
-            <span>◀ -10s</span>
-            <span>+10s ▶</span>
-          </div>
-
-          {/* Control buttons */}
-          <div className="flex items-center justify-center gap-6">
-            {/* Play/Pause */}
-            <button
-              onClick={togglePlay}
-              className="p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors tv-button"
-            >
-              {paused ? <Play className="w-8 h-8 ml-0.5" /> : <Pause className="w-8 h-8" />}
-            </button>
-
-            {/* Mute */}
-            <button
-              onClick={toggleMute}
-              className="p-2 rounded-full bg-background/20 hover:bg-background/40 transition-colors tv-button"
-            >
-              {muted ? <VolumeX className="w-6 h-6 text-foreground" /> : <Volume2 className="w-6 h-6 text-foreground" />}
-            </button>
-
-            {/* Reload */}
-            <button
-              onClick={reload}
-              className="p-2 rounded-full bg-background/20 hover:bg-background/40 transition-colors tv-button"
-            >
-              <RefreshCw className="w-6 h-6 text-foreground" />
-            </button>
-
-            {/* Fullscreen */}
-            <button
-              onClick={toggleFullscreen}
-              className="p-2 rounded-full bg-background/20 hover:bg-background/40 transition-colors tv-button"
-            >
-              {fullscreen ? (
-                <Minimize className="w-6 h-6 text-foreground" />
-              ) : (
-                <Maximize className="w-6 h-6 text-foreground" />
-              )}
-            </button>
-          </div>
-
-          {/* Quality selector (VOD only) or Live indicator */}
-          <div className="flex justify-center mt-4">
-            {enableABR && abr.isAttached && abr.levels.length > 1 ? (
-              <div className="flex items-center gap-3">
-                <QualitySelector
-                  levels={abr.levels}
-                  currentLevel={abr.currentLevel}
-                  mode={abr.mode}
-                  stats={showQualityStats ? abr.stats : null}
-                  onSelectLevel={abr.setQuality}
-                  showStats={showQualityStats}
-                />
-                {abr.currentLevel && !abr.currentLevel.isAuto && (
-                  <QualityBadge
-                    height={abr.currentLevel.height}
-                    isAuto={abr.mode === 'auto'}
-                    size="md"
-                  />
-                )}
-              </div>
-            ) : (
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                AO VIVO
-              </span>
-            )}
-          </div>
+        <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-center gap-4">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlay();
+            }}
+            className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white"
+          >
+            {paused ? <Play className="w-6 h-6" /> : <Pause className="w-6 h-6" />}
+          </button>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
+            className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white"
+          >
+            {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen();
+            }}
+            className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white"
+          >
+            {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          </button>
         </div>
       </div>
     </div>

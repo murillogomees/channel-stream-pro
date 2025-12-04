@@ -105,11 +105,7 @@ export function SignedStreamPlayer({
         url={playbackUrl}
         title={title}
         logo={logo}
-        channelId={channelId}
-        userId={userId}
         autoPlay={autoPlay}
-        enableABR={enableABR}
-        showQualityStats={showQualityStats}
         onError={onError}
         onBack={onBack}
         onReady={onReady}
