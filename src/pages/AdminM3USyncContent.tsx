@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { 
   RefreshCw, Plus, Trash2, Play, Search, 
   Clock, CheckCircle, XCircle, AlertTriangle, FileText,
-  Copy, Loader2, Pencil, Cloud, ExternalLink
+  Copy, Loader2, Pencil, Cloud, ExternalLink, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,8 @@ import { useM3USync, M3USyncSource, M3USyncJob, SyncProgress } from '@/hooks/use
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
+import { M3UCleanerDialog } from '@/components/admin/m3u/M3UCleanerDialog';
+import { CleanM3UResult } from '@/hooks/useCleanM3U';
 
 export default function AdminM3USyncContent() {
   const {
@@ -83,6 +86,11 @@ export default function AdminM3USyncContent() {
     sync_interval_minutes: 30,
   });
 
+  // M3U Cleaner integration
+  const [showCleanerDialog, setShowCleanerDialog] = useState(false);
+  const [cleanBeforeSync, setCleanBeforeSync] = useState(false);
+  const [cleanedSourceUrl, setCleanedSourceUrl] = useState<string | null>(null);
+
   useEffect(() => {
     fetchSources();
     fetchStats();
@@ -112,11 +120,27 @@ export default function AdminM3USyncContent() {
       return;
     }
 
-    const result = await createSource(newSource);
+    // Use cleaned URL if available
+    const finalUrl = cleanedSourceUrl || newSource.source_url;
+    const result = await createSource({ ...newSource, source_url: finalUrl });
     if (result) {
       setShowCreateDialog(false);
       setNewSource({ key: '', name: '', source_url: '', sync_interval_minutes: 30 });
+      setCleanedSourceUrl(null);
+      setCleanBeforeSync(false);
     }
+  };
+
+  const handleCleanComplete = (result: CleanM3UResult) => {
+    if (result.storageUrl) {
+      setCleanedSourceUrl(result.storageUrl);
+      setNewSource(prev => ({ ...prev, source_url: result.storageUrl! }));
+      toast({
+        title: 'URL limpa aplicada',
+        description: `${result.stats.cleanedChannels} canais válidos salvos no CDN`,
+      });
+    }
+    setShowCleanerDialog(false);
   };
 
   const handleViewJobs = async (source: M3USyncSource) => {
@@ -316,11 +340,43 @@ export default function AdminM3USyncContent() {
                 </div>
                 <div className="space-y-2">
                   <Label>URL da Fonte</Label>
-                  <Textarea
-                    placeholder="https://exemplo.com/playlist.m3u"
-                    value={newSource.source_url}
-                    onChange={(e) => setNewSource({ ...newSource, source_url: e.target.value })}
+                  <div className="flex gap-2">
+                    <Textarea
+                      placeholder="https://exemplo.com/playlist.m3u"
+                      value={newSource.source_url}
+                      onChange={(e) => {
+                        setNewSource({ ...newSource, source_url: e.target.value });
+                        setCleanedSourceUrl(null);
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setShowCleanerDialog(true)}
+                      disabled={!newSource.source_url.trim()}
+                      title="Limpar playlist antes de criar"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {cleanedSourceUrl && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>URL limpa aplicada</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="cleanBeforeSync"
+                    checked={cleanBeforeSync}
+                    onCheckedChange={(v) => setCleanBeforeSync(v === true)}
                   />
+                  <Label htmlFor="cleanBeforeSync" className="text-sm cursor-pointer">
+                    Limpar playlist antes de sincronizar (remove duplicatas e URLs inválidas)
+                  </Label>
                 </div>
                 <div className="space-y-2">
                   <Label>Intervalo de Sincronização</Label>
@@ -353,6 +409,14 @@ export default function AdminM3USyncContent() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* M3U Cleaner Dialog */}
+          <M3UCleanerDialog
+            open={showCleanerDialog}
+            onOpenChange={setShowCleanerDialog}
+            initialUrl={newSource.source_url}
+            onCleanComplete={handleCleanComplete}
+          />
         </div>
 
         {/* Search */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink, RefreshCw, Database
+  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink, RefreshCw, Database, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,8 @@ import { useM3USync } from '@/hooks/useM3USync';
 import { toast } from '@/hooks/use-toast';
 import { VirtualizedEntryList } from '@/components/admin/m3u/VirtualizedEntryList';
 import { LoadingProgressBar } from '@/components/admin/m3u/LoadingProgressBar';
+import { M3UCleanerDialog } from '@/components/admin/m3u/M3UCleanerDialog';
+import { CleanM3UResult } from '@/hooks/useCleanM3U';
 
 const CLASS_ICONS: Record<ContentClass, typeof Tv> = {
   tv: Tv,
@@ -97,6 +99,7 @@ export default function AdminM3UContentEditor() {
   const [targetCategory, setTargetCategory] = useState('');
   const [isGeneratingCDN, setIsGeneratingCDN] = useState(false);
   const [lastCdnUrl, setLastCdnUrl] = useState<string | null>(null);
+  const [showCleanerDialog, setShowCleanerDialog] = useState(false);
 
   useEffect(() => {
     fetchSources();
@@ -221,6 +224,23 @@ export default function AdminM3UContentEditor() {
   const handleDeleteEntry = useCallback((entryId: string) => {
     deleteEntry(entryId);
   }, [deleteEntry]);
+
+  const getSelectedSourceUrl = () => {
+    const selected = sources.find(s => s.id === selectedSourceId);
+    return selected?.source_url || '';
+  };
+
+  const handleCleanComplete = (result: CleanM3UResult) => {
+    toast({
+      title: 'Limpeza concluída',
+      description: `${result.stats.cleanedChannels} canais válidos. ${result.storageUrl ? 'URL CDN disponível.' : ''}`,
+    });
+    setShowCleanerDialog(false);
+    // Optionally reload entries after cleaning
+    if (selectedSourceId) {
+      forceRefresh();
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -372,8 +392,18 @@ export default function AdminM3UContentEditor() {
             </SelectContent>
           </Select>
 
-          {/* Generate CDN Button */}
+          {/* Clean & Generate CDN Buttons */}
           <div className="flex gap-2 items-center">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowCleanerDialog(true)}
+              disabled={!selectedSourceId || isLoading}
+              className="gap-1"
+            >
+              <Sparkles className="w-4 h-4" />
+              Limpar Fonte
+            </Button>
             <Button 
               size="sm" 
               variant="default"
@@ -763,6 +793,14 @@ export default function AdminM3UContentEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* M3U Cleaner Dialog */}
+      <M3UCleanerDialog
+        open={showCleanerDialog}
+        onOpenChange={setShowCleanerDialog}
+        initialUrl={getSelectedSourceUrl()}
+        onCleanComplete={handleCleanComplete}
+      />
     </div>
   );
 }
