@@ -195,9 +195,12 @@ export function useM3USyncEditor() {
         }
       }
 
-      const PAGE_SIZE = 5000; // Increased from 1000 to 5000 (5x faster)
-      const PARALLEL_REQUESTS = 4; // Increased parallelism
-      const MAX_RETRIES = 2;
+      // Supabase has a default limit of 1000 rows per request
+      // Use smaller pages with more parallelism to work within this limit
+      const PAGE_SIZE = 1000; // Match Supabase default limit
+      const PARALLEL_REQUESTS = 8; // More parallel requests to compensate
+      const MAX_RETRIES = 3;
+      const BATCH_DELAY_MS = 100; // Small delay between batches to avoid rate limits
 
       console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
 
@@ -230,44 +233,50 @@ export function useM3USyncEditor() {
       // Calculate total pages
       const totalPages = Math.ceil(totalCount / PAGE_SIZE);
       let loadedEntries: any[] = [];
+      
+      console.log(`[M3USyncEditor] Loading ${totalPages} pages of ${PAGE_SIZE} entries each`);
 
-      // Helper function to fetch a single page with retry
+      // Helper function to fetch a single page with retry using offset/limit
       const fetchPage = async (page: number, retryCount = 0): Promise<any[]> => {
         if (signal.aborted) return [];
         
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+        const offset = page * PAGE_SIZE;
 
         try {
+          // Use offset/limit instead of range for more reliable pagination
           const { data, error } = await supabase
             .from("m3u_sync_entries")
             .select("id,source_id,title,stream_url,group_title,tvg_id,tvg_name,tvg_logo,tvg_language,duration,is_valid,metadata")
             .eq("source_id", sourceId)
             .eq("is_valid", true)
-            .order("group_title")
-            .order("title")
-            .range(from, to);
+            .order("group_title", { ascending: true })
+            .order("title", { ascending: true })
+            .range(offset, offset + PAGE_SIZE - 1);
 
           if (error) {
+            console.warn(`[M3USyncEditor] Page ${page} error (attempt ${retryCount + 1}):`, error.message);
             if (retryCount < MAX_RETRIES) {
-              await new Promise(r => setTimeout(r, 300 * (retryCount + 1)));
+              await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
               return fetchPage(page, retryCount + 1);
             }
-            console.error(`[M3USyncEditor] Page ${page} failed:`, error);
+            console.error(`[M3USyncEditor] Page ${page} failed after ${MAX_RETRIES} retries`);
             return [];
           }
+          
           return data || [];
-        } catch (e) {
+        } catch (e: any) {
+          console.warn(`[M3USyncEditor] Page ${page} exception (attempt ${retryCount + 1}):`, e.message);
           if (retryCount < MAX_RETRIES) {
-            await new Promise(r => setTimeout(r, 300 * (retryCount + 1)));
+            await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
             return fetchPage(page, retryCount + 1);
           }
-          console.error(`[M3USyncEditor] Page ${page} exception:`, e);
+          console.error(`[M3USyncEditor] Page ${page} exception after ${MAX_RETRIES} retries`);
           return [];
         }
       };
 
       // Progressive loading - fetch and display as data comes in
+      let lastProgressLog = 0;
       for (let i = 0; i < totalPages; i += PARALLEL_REQUESTS) {
         if (signal.aborted) return;
         
@@ -278,22 +287,50 @@ export function useM3USyncEditor() {
         
         const results = await Promise.all(batch.map(page => fetchPage(page)));
         const batchData = results.flat();
-        loadedEntries = [...loadedEntries, ...batchData];
+        
+        // Check if we actually got data
+        if (batchData.length === 0 && i < totalPages - 1) {
+          console.warn(`[M3USyncEditor] Empty batch at page ${i}, retrying...`);
+          // Wait and retry this batch once
+          await new Promise(r => setTimeout(r, 1000));
+          const retryResults = await Promise.all(batch.map(page => fetchPage(page)));
+          const retryData = retryResults.flat();
+          if (retryData.length > 0) {
+            loadedEntries = [...loadedEntries, ...retryData];
+          }
+        } else {
+          loadedEntries = [...loadedEntries, ...batchData];
+        }
 
-        // Progressive update - show entries as they load
-        const processedSoFar = processEntries(loadedEntries);
-        setEntries(processedSoFar);
+        // Progressive update - show entries as they load (every 10% or 20k entries)
+        const currentPercent = Math.round((loadedEntries.length / totalCount) * 100);
+        if (currentPercent >= lastProgressLog + 5 || loadedEntries.length - lastProgressLog * (totalCount/100) >= 20000) {
+          const processedSoFar = processEntries(loadedEntries);
+          setEntries(processedSoFar);
+          lastProgressLog = currentPercent;
+        }
 
         // Update progress
         setLoadingProgress({
           loaded: loadedEntries.length,
           total: totalCount,
-          percent: Math.round((loadedEntries.length / totalCount) * 100),
+          percent: currentPercent,
           phase: 'fetching',
         });
 
-        console.log(`[M3USyncEditor] Progress: ${loadedEntries.length}/${totalCount}`);
+        // Log progress every 10%
+        if (currentPercent % 10 === 0 || i === 0) {
+          console.log(`[M3USyncEditor] Progress: ${loadedEntries.length.toLocaleString()}/${totalCount.toLocaleString()} (${currentPercent}%)`);
+        }
+        
+        // Small delay between batches to avoid rate limits
+        if (i + PARALLEL_REQUESTS < totalPages) {
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
       }
+      
+      // Final update with all entries
+      setEntries(processEntries(loadedEntries));
 
       if (signal.aborted) return;
 
