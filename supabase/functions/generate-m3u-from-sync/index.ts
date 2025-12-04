@@ -8,10 +8,12 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-const PAGE_SIZE = 500;
-const ID_BATCH_SIZE = 1000;
+// Larger batches = fewer DB queries = faster processing
+const PAGE_SIZE = 2000;
+const ID_BATCH_SIZE = 2000;
+const PROGRESS_LOG_INTERVAL = 5000;
 
-// Content class matching function (mirrors frontend logic)
+// Content class matching function
 function matchesContentClass(groupTitle: string, targetClass: string): boolean {
   const lower = (groupTitle || '').toLowerCase();
   
@@ -37,7 +39,6 @@ function matchesContentClass(groupTitle: string, targetClass: string): boolean {
            lower.includes('docs');
   }
   
-  // 'other' matches anything not in above categories
   if (targetClass === 'other') {
     return !matchesContentClass(groupTitle, 'series') &&
            !matchesContentClass(groupTitle, 'movies') &&
@@ -47,13 +48,23 @@ function matchesContentClass(groupTitle: string, targetClass: string): boolean {
   return true;
 }
 
+// Build EXTINF line efficiently (no string concatenation in loop)
+function buildExtinf(entry: any): string {
+  const parts = ['#EXTINF:-1'];
+  if (entry.tvg_id) parts.push(` tvg-id="${entry.tvg_id}"`);
+  if (entry.tvg_name) parts.push(` tvg-name="${entry.tvg_name}"`);
+  if (entry.tvg_logo) parts.push(` tvg-logo="${entry.tvg_logo}"`);
+  if (entry.group_title) parts.push(` group-title="${entry.group_title}"`);
+  parts.push(`,${entry.title}\n${entry.stream_url}\n`);
+  return parts.join('');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Require authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(
@@ -62,14 +73,12 @@ serve(async (req) => {
       );
     }
 
-    // Create authenticated Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return new Response(
@@ -78,7 +87,6 @@ serve(async (req) => {
       );
     }
 
-    // Check admin role
     const { data: isAdmin, error: roleError } = await supabase.rpc('is_admin', { uid: user.id });
     if (roleError || !isAdmin) {
       return new Response(
@@ -87,7 +95,6 @@ serve(async (req) => {
       );
     }
 
-    // Parse request
     const body = await req.text();
     const { sourceId, sourceKey, sourceName, entryIds, filters } = body ? JSON.parse(body) : {};
 
@@ -101,19 +108,27 @@ serve(async (req) => {
     const useEntryIds = Array.isArray(entryIds) && entryIds.length > 0;
     const hasFilters = filters && (filters.searchQuery || filters.selectedClass || filters.selectedCategory);
     
+    console.log(`[GenerateM3U] Starting for source: ${sourceId}`);
     console.log(`[GenerateM3U] Mode: ${useEntryIds ? 'entryIds' : hasFilters ? 'filters' : 'all'}`);
-    if (hasFilters) console.log(`[GenerateM3U] Filters:`, JSON.stringify(filters));
 
     const startTime = Date.now();
-    console.log(`[GenerateM3U] Starting for source: ${sourceId}`);
 
     const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const m3uParts: string[] = ['#EXTM3U\n'];
+    // Use TextEncoder for streaming - more memory efficient
+    const encoder = new TextEncoder();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
     let processedCount = 0;
+    let actualCount = 0;
+
+    // Add header
+    const header = encoder.encode('#EXTM3U\n');
+    chunks.push(header);
+    totalBytes += header.length;
 
     // Mode 1: Fetch by specific entry IDs
     if (useEntryIds) {
@@ -137,25 +152,22 @@ serve(async (req) => {
 
         if (entries) {
           for (const entry of entries) {
-            let extinf = '#EXTINF:-1';
-            if (entry.tvg_id) extinf += ` tvg-id="${entry.tvg_id}"`;
-            if (entry.tvg_name) extinf += ` tvg-name="${entry.tvg_name}"`;
-            if (entry.tvg_logo) extinf += ` tvg-logo="${entry.tvg_logo}"`;
-            if (entry.group_title) extinf += ` group-title="${entry.group_title}"`;
-            extinf += `,${entry.title}\n${entry.stream_url}\n`;
-            m3uParts.push(extinf);
+            const line = encoder.encode(buildExtinf(entry));
+            chunks.push(line);
+            totalBytes += line.length;
+            actualCount++;
           }
           processedCount += entries.length;
         }
 
-        if ((i / ID_BATCH_SIZE) % 5 === 0) {
-          console.log(`[GenerateM3U] ID progress: ${processedCount}/${entryIds.length}`);
+        if (processedCount % PROGRESS_LOG_INTERVAL < ID_BATCH_SIZE) {
+          console.log(`[GenerateM3U] Progress: ${processedCount}/${entryIds.length}`);
         }
       }
     } 
-    // Mode 2: Fetch with pagination (with optional filters)
+    // Mode 2: Fetch with pagination
     else {
-      // Build count query
+      // Get total count first
       let countQuery = supabaseService
         .from('m3u_sync_entries')
         .select('*', { count: 'exact', head: true })
@@ -175,7 +187,9 @@ serve(async (req) => {
       console.log(`[GenerateM3U] Total entries: ${totalCount}`);
 
       let page = 0;
-      while (processedCount < (totalCount || 0)) {
+      let hasMore = true;
+      
+      while (hasMore && processedCount < (totalCount || 0)) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
@@ -202,42 +216,52 @@ serve(async (req) => {
           break;
         }
 
-        if (!entries || entries.length === 0) break;
+        if (!entries || entries.length === 0) {
+          hasMore = false;
+          break;
+        }
 
         for (const entry of entries) {
-          // Apply class filter server-side
+          // Apply class filter server-side if needed
           if (hasFilters?.selectedClass) {
             if (!matchesContentClass(entry.group_title || '', filters.selectedClass)) {
               continue;
             }
           }
 
-          let extinf = '#EXTINF:-1';
-          if (entry.tvg_id) extinf += ` tvg-id="${entry.tvg_id}"`;
-          if (entry.tvg_name) extinf += ` tvg-name="${entry.tvg_name}"`;
-          if (entry.tvg_logo) extinf += ` tvg-logo="${entry.tvg_logo}"`;
-          if (entry.group_title) extinf += ` group-title="${entry.group_title}"`;
-          extinf += `,${entry.title}\n${entry.stream_url}\n`;
-          m3uParts.push(extinf);
+          const line = encoder.encode(buildExtinf(entry));
+          chunks.push(line);
+          totalBytes += line.length;
+          actualCount++;
         }
 
         processedCount += entries.length;
         page++;
 
-        if (page % 10 === 0) {
+        // Less entries than page size = no more data
+        if (entries.length < PAGE_SIZE) {
+          hasMore = false;
+        }
+
+        if (processedCount % PROGRESS_LOG_INTERVAL < PAGE_SIZE) {
           console.log(`[GenerateM3U] Progress: ${processedCount}/${totalCount}`);
         }
       }
     }
 
-    // Recalculate actual count (may differ due to class filter)
-    const actualCount = m3uParts.length - 1;
     console.log(`[GenerateM3U] Finished: ${actualCount} entries in ${Date.now() - startTime}ms`);
+    console.log(`[GenerateM3U] M3U size: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
 
-    const m3uContent = m3uParts.join('');
-    const fileSize = new TextEncoder().encode(m3uContent).length;
-
-    console.log(`[GenerateM3U] M3U size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+    // Combine chunks efficiently
+    const m3uContent = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      m3uContent.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    // Free memory from chunks array
+    chunks.length = 0;
 
     // Upload to R2
     let cdnUrl: string | null = null;
@@ -263,7 +287,7 @@ serve(async (req) => {
           metadata: {
             cdn_url: cdnUrl,
             cdn_generated_at: new Date().toISOString(),
-            cdn_file_size: fileSize,
+            cdn_file_size: totalBytes,
             cdn_entries_count: actualCount,
           }
         })
@@ -271,13 +295,13 @@ serve(async (req) => {
     }
 
     const totalTime = Date.now() - startTime;
-    console.log(`[GenerateM3U] ✅ Complete: ${sourceName} (${actualCount} entries, ${(fileSize / 1024 / 1024).toFixed(2)} MB) in ${totalTime}ms`);
+    console.log(`[GenerateM3U] ✅ Complete: ${sourceName} (${actualCount} entries, ${(totalBytes / 1024 / 1024).toFixed(2)} MB) in ${totalTime}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
         cdnUrl,
-        fileSize,
+        fileSize: totalBytes,
         entriesCount: actualCount,
         generationTime: totalTime,
         uploadTime,
@@ -295,7 +319,7 @@ serve(async (req) => {
   }
 });
 
-async function uploadToR2(sourceKey: string, content: string): Promise<string> {
+async function uploadToR2(sourceKey: string, content: Uint8Array): Promise<string> {
   const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID');
   const R2_ACCESS_KEY = Deno.env.get('R2_ACCESS_KEY_ID');
   const R2_SECRET_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY');
@@ -309,7 +333,6 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
   const fileName = `sync-playlists/${sourceKey}.m3u`;
   const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
   const url = `${endpoint}/${R2_BUCKET}/${fileName}`;
-  const body = new TextEncoder().encode(content);
 
   const region = 'auto';
   const service = 's3';
@@ -320,7 +343,7 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
 
   const method = 'PUT';
   const canonicalUri = `/${R2_BUCKET}/${fileName}`;
-  const payloadHash = await sha256Hex(body);
+  const payloadHash = await sha256Hex(content);
   
   const canonicalHeaders = [
     `content-type:${contentType}`,
@@ -350,7 +373,7 @@ async function uploadToR2(sourceKey: string, content: string): Promise<string> {
       'Authorization': authorization,
       'Cache-Control': 'public, max-age=3600',
     },
-    body: body
+    body: content
   });
 
   if (!response.ok) {
