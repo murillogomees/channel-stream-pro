@@ -20,9 +20,10 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Sparkles, Link, FileText, Upload, Settings, ChevronDown,
-  Loader2, Download, Cloud, CheckCircle, AlertTriangle, XCircle
+  Loader2, Download, Cloud, CheckCircle, AlertTriangle, XCircle, Info
 } from 'lucide-react';
 import { useCleanM3U, CleanM3UOptions, CleanM3UResult } from '@/hooks/useCleanM3U';
 
@@ -47,6 +48,7 @@ export function M3UCleanerDialog({
     isCleaning,
     progress,
     lastResult,
+    error,
     cleanFromUrl,
     cleanFromContent,
     cleanFromFile,
@@ -103,6 +105,23 @@ export function M3UCleanerDialog({
     reset();
     onOpenChange(false);
   };
+
+  // Check if error is about file size
+  const isFileTooLargeError = error?.includes('too large') || error?.includes('muito grande');
+
+  const renderSizeError = () => (
+    <Alert variant="destructive" className="mt-4">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Playlist muito grande</AlertTitle>
+      <AlertDescription className="space-y-2">
+        <p>Esta playlist excede o limite de 20MB para limpeza direta.</p>
+        <p className="text-sm">
+          <strong>Solução:</strong> Use o sistema de <strong>Sincronização M3U</strong> na aba "Sincronização" 
+          que processa playlists grandes em lotes, sem limites de tamanho.
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
 
   const renderStats = () => {
     if (!lastResult) return null;
@@ -337,7 +356,17 @@ export function M3UCleanerDialog({
         </div>
       )}
 
-      {!isCleaning && !lastResult && (
+      {isFileTooLargeError && renderSizeError()}
+
+      {error && !isFileTooLargeError && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {!isCleaning && !lastResult && !error && (
         <Button
           onClick={handleClean}
           disabled={
@@ -349,6 +378,12 @@ export function M3UCleanerDialog({
         >
           <Sparkles className="w-4 h-4" />
           Limpar & Analisar
+        </Button>
+      )}
+
+      {error && (
+        <Button variant="outline" onClick={reset} className="w-full">
+          Tentar novamente
         </Button>
       )}
 
