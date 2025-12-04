@@ -270,7 +270,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
+      (event, currentSession) => {
+        // Se sessão foi invalidada ou expirou, limpar estado
+        if (event === 'TOKEN_REFRESHED' && !currentSession) {
+          console.warn('[AuthContext] Token refresh falhou, limpando sessão');
+          setUser(null);
+          setSession(null);
+          setLoading(false);
+          return;
+        }
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSession(null);
+          setLoading(false);
+          return;
+        }
         setTimeout(() => {
           updateAuthState(currentSession);
         }, 0);
@@ -279,12 +293,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Verificar sessão inicial
     supabase.auth.getSession()
-      .then(({ data: { session: currentSession } }) => {
+      .then(({ data: { session: currentSession }, error }) => {
+        // Se houver erro de sessão (expirada, revogada, etc), limpar e continuar
+        if (error) {
+          console.warn('[AuthContext] Sessão inválida, limpando:', error.message);
+          supabase.auth.signOut().catch(() => {});
+          setUser(null);
+          setSession(null);
+          setLoading(false);
+          return;
+        }
         if (currentSession && checkRememberMe()) return;
         updateAuthState(currentSession);
       })
       .catch((error) => {
         console.error('[AuthContext] Erro ao obter sessão:', error);
+        // Limpar sessão corrompida
+        supabase.auth.signOut().catch(() => {});
+        setUser(null);
+        setSession(null);
         setLoading(false);
       });
 
