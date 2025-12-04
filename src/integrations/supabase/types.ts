@@ -451,6 +451,42 @@ export type Database = {
           },
         ]
       }
+      archives: {
+        Row: {
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          month: string
+          path: string
+          playlist_count: number | null
+          sha256: string | null
+          size_bytes: number | null
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          month: string
+          path: string
+          playlist_count?: number | null
+          sha256?: string | null
+          size_bytes?: number | null
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          month?: string
+          path?: string
+          playlist_count?: number | null
+          sha256?: string | null
+          size_bytes?: number | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       auth_sessions_log: {
         Row: {
           created_at: string
@@ -3942,6 +3978,7 @@ export type Database = {
           archived: boolean | null
           archived_at: string | null
           channel_count: number | null
+          content_hash: string | null
           created_at: string | null
           expires_at: string | null
           filename: string
@@ -3952,6 +3989,7 @@ export type Database = {
           quarantined_count: number | null
           sha256: string
           size_bytes: number | null
+          source_domain: string | null
           storage_path: string
           unique_count: number | null
           user_id: string | null
@@ -3962,6 +4000,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           channel_count?: number | null
+          content_hash?: string | null
           created_at?: string | null
           expires_at?: string | null
           filename: string
@@ -3972,6 +4011,7 @@ export type Database = {
           quarantined_count?: number | null
           sha256: string
           size_bytes?: number | null
+          source_domain?: string | null
           storage_path: string
           unique_count?: number | null
           user_id?: string | null
@@ -3982,6 +4022,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           channel_count?: number | null
+          content_hash?: string | null
           created_at?: string | null
           expires_at?: string | null
           filename?: string
@@ -3992,6 +4033,7 @@ export type Database = {
           quarantined_count?: number | null
           sha256?: string
           size_bytes?: number | null
+          source_domain?: string | null
           storage_path?: string
           unique_count?: number | null
           user_id?: string | null
@@ -6125,6 +6167,18 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_playlist_metrics: {
+        Row: {
+          active_playlists: number | null
+          archived_playlists: number | null
+          avg_channels_per_playlist: number | null
+          total_channels: number | null
+          total_playlists: number | null
+          total_size_bytes: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
       vw_stream_performance: {
         Row: {
           avg_bitrate_kbps: number | null
@@ -6224,6 +6278,10 @@ export type Database = {
       cleanup_old_vod_downloads: { Args: never; Returns: undefined }
       cleanup_orphaned_downloads: { Args: never; Returns: number }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delete_playlist: {
+        Args: { p_id: string; p_user_id: string }
+        Returns: boolean
+      }
       detect_permissive_policies: {
         Args: never
         Returns: {
@@ -6284,6 +6342,14 @@ export type Database = {
       execute_sql_as_service_role: {
         Args: { sql_query: string }
         Returns: undefined
+      }
+      find_playlist_by_hash: {
+        Args: { p_sha256: string }
+        Returns: {
+          created_at: string
+          id: string
+          storage_path: string
+        }[]
       }
       find_vod_by_hash: {
         Args: { p_sha256: string }
@@ -6510,6 +6576,25 @@ export type Database = {
         }[]
       }
       get_notification_retry_stats: { Args: never; Returns: Json }
+      get_playlist_metadata: {
+        Args: { p_id: string }
+        Returns: {
+          archived: boolean
+          channel_count: number
+          created_at: string
+          expires_at: string
+          filename: string
+          id: string
+          opts: Json
+          probe_summary: Json
+          quarantined_count: number
+          sha256: string
+          size_bytes: number
+          storage_path: string
+          unique_count: number
+          user_id: string
+        }[]
+      }
       get_playlists_for_archival: {
         Args: { target_month: string }
         Returns: {
@@ -6677,8 +6762,48 @@ export type Database = {
           total_cost_before: Json
         }[]
       }
+      insert_playlist: {
+        Args: {
+          p_channel_count: number
+          p_filename: string
+          p_opts: Json
+          p_original_source: string
+          p_probe_summary: Json
+          p_quarantined_count: number
+          p_retention_days?: number
+          p_sha256: string
+          p_size_bytes: number
+          p_source_domain: string
+          p_storage_path: string
+          p_unique_count: number
+          p_user_id: string
+        }
+        Returns: string
+      }
       is_admin: { Args: { uid: string }; Returns: boolean }
       is_admin_or_master: { Args: { _user_id: string }; Returns: boolean }
+      list_playlists: {
+        Args: {
+          p_from?: string
+          p_include_archived?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_to?: string
+          p_user_id?: string
+        }
+        Returns: {
+          archived: boolean
+          channel_count: number
+          created_at: string
+          expires_at: string
+          filename: string
+          id: string
+          sha256: string
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }[]
+      }
       log_activity: {
         Args: {
           _action_description: string
