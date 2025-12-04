@@ -291,3 +291,7 @@ verify_jwt = false
 # Archive playlists - monthly cron job for tar.gz compression
 [functions.archive-playlists]
 verify_jwt = false
+
+# Clean sync entries - analyze and remove duplicates/invalid from synced sources
+[functions.clean-sync-entries]
+verify_jwt = false
