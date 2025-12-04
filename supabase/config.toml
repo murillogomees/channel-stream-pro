@@ -275,3 +275,11 @@ verify_jwt = false
 # R2 connection test
 [functions.test-r2-connection]
 verify_jwt = false
+
+# ==========================================
+# M3U CLEANING & OPTIMIZATION
+# ==========================================
+
+# Clean and sanitize M3U playlists - public with optional auth
+[functions.clean-m3u]
+verify_jwt = false
