@@ -3553,6 +3553,83 @@ export type Database = {
           },
         ]
       }
+      playlist_access_logs: {
+        Row: {
+          access_type: string | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          playlist_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_type?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          playlist_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_type?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          playlist_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_access_logs_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_archives: {
+        Row: {
+          archive_month: string
+          archive_path: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          playlist_count: number | null
+          sha256: string
+          size_bytes: number | null
+          verified: boolean | null
+          verified_at: string | null
+        }
+        Insert: {
+          archive_month: string
+          archive_path: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          playlist_count?: number | null
+          sha256: string
+          size_bytes?: number | null
+          verified?: boolean | null
+          verified_at?: string | null
+        }
+        Update: {
+          archive_month?: string
+          archive_path?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          playlist_count?: number | null
+          sha256?: string
+          size_bytes?: number | null
+          verified?: boolean | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       playlist_entries: {
         Row: {
           created_at: string | null
@@ -3858,6 +3935,69 @@ export type Database = {
             referencedColumns: ["key"]
           },
         ]
+      }
+      playlists: {
+        Row: {
+          archive_id: string | null
+          archived: boolean | null
+          archived_at: string | null
+          channel_count: number | null
+          created_at: string | null
+          expires_at: string | null
+          filename: string
+          id: string
+          opts: Json | null
+          original_source: string | null
+          probe_summary: Json | null
+          quarantined_count: number | null
+          sha256: string
+          size_bytes: number | null
+          storage_path: string
+          unique_count: number | null
+          user_id: string | null
+          version: number | null
+        }
+        Insert: {
+          archive_id?: string | null
+          archived?: boolean | null
+          archived_at?: string | null
+          channel_count?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          filename: string
+          id?: string
+          opts?: Json | null
+          original_source?: string | null
+          probe_summary?: Json | null
+          quarantined_count?: number | null
+          sha256: string
+          size_bytes?: number | null
+          storage_path: string
+          unique_count?: number | null
+          user_id?: string | null
+          version?: number | null
+        }
+        Update: {
+          archive_id?: string | null
+          archived?: boolean | null
+          archived_at?: string | null
+          channel_count?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          filename?: string
+          id?: string
+          opts?: Json | null
+          original_source?: string | null
+          probe_summary?: Json | null
+          quarantined_count?: number | null
+          sha256?: string
+          size_bytes?: number | null
+          storage_path?: string
+          unique_count?: number | null
+          user_id?: string | null
+          version?: number | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -6048,6 +6188,13 @@ export type Database = {
         Returns: Json
       }
       cleanup_cdn_data: { Args: never; Returns: undefined }
+      cleanup_expired_playlists: {
+        Args: { retention_days?: number }
+        Returns: {
+          deleted_count: number
+          deleted_paths: string[]
+        }[]
+      }
       cleanup_fase8_old_data: {
         Args: { p_dry_run?: boolean }
         Returns: {
@@ -6363,6 +6510,15 @@ export type Database = {
         }[]
       }
       get_notification_retry_stats: { Args: never; Returns: Json }
+      get_playlists_for_archival: {
+        Args: { target_month: string }
+        Returns: {
+          id: string
+          sha256: string
+          size_bytes: number
+          storage_path: string
+        }[]
+      }
       get_r2_download_candidates: {
         Args: { p_limit?: number }
         Returns: {
@@ -6544,8 +6700,13 @@ export type Database = {
         Returns: string
       }
       make_user_admin: { Args: { user_email: string }; Returns: undefined }
+      mark_playlists_archived: {
+        Args: { p_archive_id: string; playlist_ids: string[] }
+        Returns: number
+      }
       pg_index_exists: { Args: { index_name: string }; Returns: boolean }
       pg_table_is_visible: { Args: { table_name: string }; Returns: boolean }
+      prune_old_versions: { Args: { keep_versions?: number }; Returns: number }
       record_channel_view: {
         Args: {
           p_channel_id: string
