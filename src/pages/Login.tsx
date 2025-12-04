@@ -1,6 +1,6 @@
 /**
  * PÁGINA DE LOGIN RESPONSIVA
- *
+ * @version 2.0.1
  * Mobile: Uma coluna por vez com botões de navegação
  * Desktop/TV: Duas colunas lado a lado, clique expande para tela cheia
  */
