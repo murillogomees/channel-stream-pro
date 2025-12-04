@@ -42,13 +42,16 @@ export interface CleaningProgress {
 }
 
 const DEFAULT_OPTIONS: CleanM3UOptions = {
-  skipProbe: false,
-  maxChannels: 2000,
+  skipProbe: true, // Default to skip probe for better performance
+  maxChannels: 5000, // Reduced for memory safety
   probeTimeoutMs: 4000,
   concurrency: 10,
   save: false,
   retentionDays: 30,
 };
+
+// Maximum content size: 20MB (Edge functions have memory limits)
+const MAX_CONTENT_SIZE = 20 * 1024 * 1024;
 
 export function useCleanM3U() {
   const [isCleaning, setIsCleaning] = useState(false);
@@ -126,6 +129,20 @@ export function useCleanM3U() {
     m3u: string,
     options: CleanM3UOptions = {}
   ): Promise<CleanM3UResult | null> => {
+    // Check size before sending
+    if (m3u.length > MAX_CONTENT_SIZE) {
+      const sizeMB = (m3u.length / (1024 * 1024)).toFixed(1);
+      const error = `Conteúdo muito grande (${sizeMB}MB). Máximo permitido: 20MB. Use o sistema de Sync para playlists grandes.`;
+      setError(error);
+      setProgress({ phase: 'error', percent: 0, message: error });
+      toast({
+        title: 'Playlist muito grande',
+        description: error,
+        variant: 'destructive',
+      });
+      return null;
+    }
+
     setIsCleaning(true);
     setError(null);
     setProgress({ phase: 'uploading', percent: 10, message: 'Enviando conteúdo...' });
