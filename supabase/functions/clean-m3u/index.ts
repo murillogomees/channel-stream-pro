@@ -81,9 +81,12 @@ interface PlaylistRecord {
 // CONSTANTS
 // ============================================================================
 
+// Maximum content size: 20MB (Edge functions have ~150MB memory limit)
+const MAX_CONTENT_SIZE = 20 * 1024 * 1024
+
 const DEFAULT_OPTIONS: CleanOptions = {
-  skipProbe: false,
-  maxChannels: 2000,
+  skipProbe: true, // Default to skip probe for large files
+  maxChannels: 5000, // Reduced default for safety
   probeTimeoutMs: 4000,
   concurrency: 10,
   download: false,
@@ -484,15 +487,25 @@ async function probeUrlsBatch(
 // MAIN PROCESSING PIPELINE
 // ============================================================================
 
-function tokenize(content: string): { channels: Channel[]; errors: QuarantinedChannel[] } {
+function tokenize(content: string, maxChannels: number): { channels: Channel[]; errors: QuarantinedChannel[]; totalParsed: number } {
   const channels: Channel[] = []
   const errors: QuarantinedChannel[] = []
   
-  const lines = content.split('\n')
+  // Process line by line without storing all lines in memory
   let currentExtinf: Partial<Channel> | null = null
+  let lineStart = 0
+  let totalParsed = 0
+  const maxErrors = 50 // Limit stored errors to save memory
   
-  for (const rawLine of lines) {
-    const line = sanitizeLine(rawLine)
+  while (lineStart < content.length && channels.length < maxChannels) {
+    // Find end of current line
+    let lineEnd = content.indexOf('\n', lineStart)
+    if (lineEnd === -1) lineEnd = content.length
+    
+    // Extract and sanitize line
+    const rawLine = content.substring(lineStart, lineEnd)
+    const line = rawLine.trim().replace(/\s+/g, ' ').replace(/[\u200B-\u200D\uFEFF]/g, '')
+    lineStart = lineEnd + 1
     
     if (!line) continue
     if (line === '#EXTM3U' || (line.startsWith('#') && !line.startsWith('#EXTINF'))) continue
@@ -504,21 +517,24 @@ function tokenize(content: string): { channels: Channel[]; errors: QuarantinedCh
     }
     
     if (currentExtinf && (line.startsWith('http') || line.startsWith('rtmp') || line.startsWith('rtsp'))) {
+      totalParsed++
       const urlValidation = isValidUrl(line)
       
       if (!urlValidation.valid) {
-        errors.push({
-          url: line.substring(0, 100),
-          title: currentExtinf.title || 'Unknown',
-          reason: urlValidation.reason === 'unsupported-protocol' ? 'unsupported-protocol' : 'invalid-url',
-          details: urlValidation.reason
-        })
+        if (errors.length < maxErrors) {
+          errors.push({
+            url: line.substring(0, 100),
+            title: currentExtinf.title || 'Unknown',
+            reason: urlValidation.reason === 'unsupported-protocol' ? 'unsupported-protocol' : 'invalid-url',
+            details: urlValidation.reason
+          })
+        }
         currentExtinf = null
         continue
       }
       
       channels.push({
-        raw: currentExtinf.raw || '',
+        raw: '', // Don't store raw to save memory
         url: line,
         title: currentExtinf.title || '',
         duration: currentExtinf.duration || -1,
@@ -530,16 +546,19 @@ function tokenize(content: string): { channels: Channel[]; errors: QuarantinedCh
       
       currentExtinf = null
     } else if (line.startsWith('http') || line.startsWith('rtmp') || line.startsWith('rtsp')) {
-      errors.push({
-        url: line.substring(0, 100),
-        title: 'No EXTINF',
-        reason: 'parse-error',
-        details: 'URL without preceding EXTINF'
-      })
+      totalParsed++
+      if (errors.length < maxErrors) {
+        errors.push({
+          url: line.substring(0, 100),
+          title: 'No EXTINF',
+          reason: 'parse-error',
+          details: 'URL without preceding EXTINF'
+        })
+      }
     }
   }
   
-  return { channels, errors }
+  return { channels, errors, totalParsed }
 }
 
 function deduplicate(channels: Channel[]): { unique: Channel[]; duplicates: QuarantinedChannel[] } {
@@ -585,49 +604,59 @@ async function cleanM3U(content: string, options: CleanOptions): Promise<CleanRe
   const startTime = Date.now()
   const quarantined: QuarantinedChannel[] = []
   
-  log('INFO', 'Starting M3U cleaning pipeline', { contentLength: content.length })
+  log('INFO', 'Starting M3U cleaning pipeline', { contentLength: content.length, maxChannels: options.maxChannels })
   
-  const sanitized = sanitizeContent(content)
-  const { channels: parsed, errors: parseErrors } = tokenize(sanitized)
+  // Sanitize content (lightweight - only BOM and line ending normalization)
+  const sanitized = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  
+  // Tokenize with early limit enforcement
+  const { channels: parsed, errors: parseErrors, totalParsed } = tokenize(sanitized, options.maxChannels)
   quarantined.push(...parseErrors)
   
-  log('INFO', 'Tokenization complete', { parsed: parsed.length, parseErrors: parseErrors.length })
+  log('INFO', 'Tokenization complete', { parsed: parsed.length, totalParsed, parseErrors: parseErrors.length })
   
-  const limited = parsed.slice(0, options.maxChannels)
-  if (parsed.length > options.maxChannels) {
-    log('WARN', 'Channel limit applied', { original: parsed.length, limited: options.maxChannels })
-  }
-  
-  const { unique, duplicates } = deduplicate(limited)
+  // Deduplicate
+  const { unique, duplicates } = deduplicate(parsed)
   quarantined.push(...duplicates)
   
   log('INFO', 'Deduplication complete', { unique: unique.length, duplicates: duplicates.length })
   
-  const probeResults = await probeUrlsBatch(unique, options)
-  
-  const cleaned: Channel[] = []
-  for (const ch of unique) {
-    const probeResult = probeResults.get(ch.url)
-    
-    if (probeResult && !probeResult.ok) {
-      quarantined.push({
-        url: ch.url.substring(0, 100),
-        title: ch.title,
-        reason: 'probe-failed',
-        details: probeResult.reason
-      })
-    } else {
-      cleaned.push(ch)
+  // URL probing (skip for very large sets or if option enabled)
+  let cleaned: Channel[]
+  if (options.skipProbe || unique.length > 2000) {
+    cleaned = unique
+    if (!options.skipProbe) {
+      log('WARN', 'Skipping probe due to large channel count', { count: unique.length })
     }
+  } else {
+    const probeResults = await probeUrlsBatch(unique, options)
+    cleaned = []
+    
+    for (const ch of unique) {
+      const probeResult = probeResults.get(ch.url)
+      
+      if (probeResult && !probeResult.ok) {
+        if (quarantined.length < 100) {
+          quarantined.push({
+            url: ch.url.substring(0, 100),
+            title: ch.title,
+            reason: 'probe-failed',
+            details: probeResult.reason
+          })
+        }
+      } else {
+        cleaned.push(ch)
+      }
+    }
+    
+    log('INFO', 'Probe filtering complete', { cleaned: cleaned.length, failed: unique.length - cleaned.length })
   }
-  
-  log('INFO', 'Probe filtering complete', { cleaned: cleaned.length, failed: unique.length - cleaned.length })
   
   const finalM3U = buildM3U(cleaned)
   const processingTimeMs = Date.now() - startTime
   
   log('INFO', 'Pipeline complete', { 
-    inChannels: parsed.length,
+    inChannels: totalParsed,
     cleanedChannels: cleaned.length,
     processingTimeMs
   })
@@ -635,7 +664,7 @@ async function cleanM3U(content: string, options: CleanOptions): Promise<CleanRe
   return {
     cleaned: finalM3U,
     stats: {
-      inChannels: parsed.length,
+      inChannels: totalParsed,
       uniqueChannels: unique.length,
       cleanedChannels: cleaned.length,
       quarantinedCount: quarantined.length,
@@ -840,6 +869,14 @@ serve(async (req: Request) => {
     
     if (!content || content.length < 10) {
       throw new Error('M3U content is empty or too short')
+    }
+    
+    // Check content size limit
+    if (content.length > MAX_CONTENT_SIZE) {
+      const sizeMB = (content.length / (1024 * 1024)).toFixed(1)
+      const maxMB = (MAX_CONTENT_SIZE / (1024 * 1024)).toFixed(0)
+      log('WARN', 'Content too large', { size: content.length, max: MAX_CONTENT_SIZE })
+      throw new Error(`M3U content too large (${sizeMB}MB). Maximum allowed: ${maxMB}MB. Use the m3u-sync system for large playlists.`)
     }
     
     const url = new URL(req.url)

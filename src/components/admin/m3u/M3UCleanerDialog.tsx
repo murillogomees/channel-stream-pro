@@ -60,8 +60,8 @@ export function M3UCleanerDialog({
   const [showOptions, setShowOptions] = useState(false);
 
   const [options, setOptions] = useState<CleanM3UOptions>({
-    skipProbe: false,
-    maxChannels: 2000,
+    skipProbe: true, // Skip probe by default for performance
+    maxChannels: 5000,
     probeTimeoutMs: 4000,
     concurrency: 10,
     save: false,
