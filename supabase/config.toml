@@ -283,3 +283,15 @@ verify_jwt = false
 # Clean and sanitize M3U playlists - public with optional auth
 [functions.clean-m3u]
 verify_jwt = false
+
+# Playlists API - CRUD operations
+[functions.playlists-api]
+verify_jwt = false
+
+# Playlists cleanup - daily cron job
+[functions.playlists-cleanup]
+verify_jwt = false
+
+# Playlists archive - monthly cron job
+[functions.playlists-archive]
+verify_jwt = false
