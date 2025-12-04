@@ -46,8 +46,7 @@ import { useM3USync } from '@/hooks/useM3USync';
 import { toast } from '@/hooks/use-toast';
 import { VirtualizedEntryList } from '@/components/admin/m3u/VirtualizedEntryList';
 import { LoadingProgressBar } from '@/components/admin/m3u/LoadingProgressBar';
-import { M3UCleanerDialog } from '@/components/admin/m3u/M3UCleanerDialog';
-import { CleanM3UResult } from '@/hooks/useCleanM3U';
+import { CleanSyncEntriesDialog } from '@/components/admin/m3u/CleanSyncEntriesDialog';
 
 const CLASS_ICONS: Record<ContentClass, typeof Tv> = {
   tv: Tv,
@@ -230,13 +229,17 @@ export default function AdminM3UContentEditor() {
     return selected?.source_url || '';
   };
 
-  const handleCleanComplete = (result: CleanM3UResult) => {
+  const getSelectedSource = () => {
+    return sources.find(s => s.id === selectedSourceId);
+  };
+
+  const handleCleanComplete = () => {
     toast({
       title: 'Limpeza concluída',
-      description: `${result.stats.cleanedChannels} canais válidos. ${result.storageUrl ? 'URL CDN disponível.' : ''}`,
+      description: 'Entradas inválidas removidas com sucesso.',
     });
     setShowCleanerDialog(false);
-    // Optionally reload entries after cleaning
+    // Reload entries after cleaning
     if (selectedSourceId) {
       forceRefresh();
     }
@@ -794,13 +797,17 @@ export default function AdminM3UContentEditor() {
         </DialogContent>
       </Dialog>
 
-      {/* M3U Cleaner Dialog */}
-      <M3UCleanerDialog
-        open={showCleanerDialog}
-        onOpenChange={setShowCleanerDialog}
-        initialUrl={getSelectedSourceUrl()}
-        onCleanComplete={handleCleanComplete}
-      />
+      {/* Clean Sync Entries Dialog */}
+      {selectedSourceId && getSelectedSource() && (
+        <CleanSyncEntriesDialog
+          open={showCleanerDialog}
+          onOpenChange={setShowCleanerDialog}
+          sourceId={selectedSourceId}
+          sourceName={getSelectedSource()?.name || ''}
+          entriesCount={getSelectedSource()?.entries_count || 0}
+          onCleanComplete={handleCleanComplete}
+        />
+      )}
     </div>
   );
 }

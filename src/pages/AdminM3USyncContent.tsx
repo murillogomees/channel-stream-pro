@@ -42,6 +42,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 import { M3UCleanerDialog } from '@/components/admin/m3u/M3UCleanerDialog';
+import { CleanSyncEntriesDialog } from '@/components/admin/m3u/CleanSyncEntriesDialog';
 import { CleanM3UResult } from '@/hooks/useCleanM3U';
 
 export default function AdminM3USyncContent() {
@@ -90,6 +91,15 @@ export default function AdminM3USyncContent() {
   const [showCleanerDialog, setShowCleanerDialog] = useState(false);
   const [cleanBeforeSync, setCleanBeforeSync] = useState(false);
   const [cleanedSourceUrl, setCleanedSourceUrl] = useState<string | null>(null);
+  
+  // Clean sync entries dialog
+  const [showCleanSyncDialog, setShowCleanSyncDialog] = useState(false);
+  const [cleanSyncSource, setCleanSyncSource] = useState<M3USyncSource | null>(null);
+
+  const handleOpenCleanSync = (source: M3USyncSource) => {
+    setCleanSyncSource(source);
+    setShowCleanSyncDialog(true);
+  };
 
   useEffect(() => {
     fetchSources();
@@ -572,6 +582,7 @@ export default function AdminM3USyncContent() {
                         size="icon"
                         onClick={() => triggerSync(source.key)}
                         disabled={isSyncing[source.key]}
+                        title="Sincronizar"
                       >
                         {isSyncing[source.key] ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -582,7 +593,18 @@ export default function AdminM3USyncContent() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleOpenCleanSync(source)}
+                        disabled={source.entries_count === 0}
+                        title="Limpar entradas"
+                        className="text-yellow-600 hover:text-yellow-700"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleViewJobs(source)}
+                        title="Ver histórico"
                       >
                         <FileText className="w-4 h-4" />
                       </Button>
@@ -830,6 +852,21 @@ export default function AdminM3USyncContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clean Sync Entries Dialog */}
+      {cleanSyncSource && (
+        <CleanSyncEntriesDialog
+          open={showCleanSyncDialog}
+          onOpenChange={setShowCleanSyncDialog}
+          sourceId={cleanSyncSource.id}
+          sourceName={cleanSyncSource.name}
+          entriesCount={cleanSyncSource.entries_count}
+          onCleanComplete={() => {
+            fetchSources();
+            fetchStats();
+          }}
+        />
+      )}
     </div>
   );
 }
