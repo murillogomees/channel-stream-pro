@@ -43,6 +43,7 @@ import { ptBR } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 import { M3UCleanerDialog } from '@/components/admin/m3u/M3UCleanerDialog';
 import { CleanSyncEntriesDialog } from '@/components/admin/m3u/CleanSyncEntriesDialog';
+import { M3UCleanPipeline } from '@/components/admin/m3u/M3UCleanPipeline';
 import { CleanM3UResult } from '@/hooks/useCleanM3U';
 
 export default function AdminM3USyncContent() {
@@ -855,13 +856,14 @@ export default function AdminM3USyncContent() {
 
       {/* Clean Sync Entries Dialog */}
       {cleanSyncSource && (
-        <CleanSyncEntriesDialog
+        <M3UCleanPipeline
           open={showCleanSyncDialog}
           onOpenChange={setShowCleanSyncDialog}
           sourceId={cleanSyncSource.id}
           sourceName={cleanSyncSource.name}
+          sourceKey={cleanSyncSource.key}
           entriesCount={cleanSyncSource.entries_count}
-          onCleanComplete={() => {
+          onComplete={() => {
             fetchSources();
             fetchStats();
           }}
