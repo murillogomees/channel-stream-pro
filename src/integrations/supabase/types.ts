@@ -2103,6 +2103,101 @@ export type Database = {
           },
         ]
       }
+      m3u_clean_jobs: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          diff_summary: Json | null
+          entries_after: number | null
+          entries_before: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          source_id: string | null
+          started_at: string | null
+          stats: Json | null
+          status: string
+          storage_path_after: string | null
+          storage_path_before: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          diff_summary?: Json | null
+          entries_after?: number | null
+          entries_before?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          source_id?: string | null
+          started_at?: string | null
+          stats?: Json | null
+          status?: string
+          storage_path_after?: string | null
+          storage_path_before?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          diff_summary?: Json | null
+          entries_after?: number | null
+          entries_before?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          source_id?: string | null
+          started_at?: string | null
+          stats?: Json | null
+          status?: string
+          storage_path_after?: string | null
+          storage_path_before?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "m3u_clean_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_sync_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      m3u_clean_presets: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       m3u_custom_lists: {
         Row: {
           bucket_path: string | null
@@ -2782,6 +2877,7 @@ export type Database = {
       m3u_sync_sources: {
         Row: {
           checksum: string | null
+          clean_config: Json | null
           created_at: string | null
           created_by: string | null
           enabled: boolean | null
@@ -2790,6 +2886,8 @@ export type Database = {
           id: string
           invalid_entries_count: number | null
           key: string
+          last_clean_job_id: string | null
+          last_cleaned_at: string | null
           last_error: string | null
           last_sync_at: string | null
           last_sync_status:
@@ -2803,6 +2901,7 @@ export type Database = {
         }
         Insert: {
           checksum?: string | null
+          clean_config?: Json | null
           created_at?: string | null
           created_by?: string | null
           enabled?: boolean | null
@@ -2811,6 +2910,8 @@ export type Database = {
           id?: string
           invalid_entries_count?: number | null
           key: string
+          last_clean_job_id?: string | null
+          last_cleaned_at?: string | null
           last_error?: string | null
           last_sync_at?: string | null
           last_sync_status?:
@@ -2824,6 +2925,7 @@ export type Database = {
         }
         Update: {
           checksum?: string | null
+          clean_config?: Json | null
           created_at?: string | null
           created_by?: string | null
           enabled?: boolean | null
@@ -2832,6 +2934,8 @@ export type Database = {
           id?: string
           invalid_entries_count?: number | null
           key?: string
+          last_clean_job_id?: string | null
+          last_cleaned_at?: string | null
           last_error?: string | null
           last_sync_at?: string | null
           last_sync_status?:
@@ -2843,7 +2947,15 @@ export type Database = {
           sync_interval_minutes?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "m3u_sync_sources_last_clean_job_id_fkey"
+            columns: ["last_clean_job_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_clean_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       m3u_view_history: {
         Row: {

@@ -65,9 +65,10 @@ serve(async (req) => {
       );
     }
 
-    // Fetch entries in batches
-    const BATCH_SIZE = 5000;
+    // Fetch entries in batches - Supabase limits to 1000 per query
+    const BATCH_SIZE = 1000;
     let offset = 0;
+    let totalFetched = 0;
     const allEntries: Array<{
       id: string;
       title: string;
@@ -75,24 +76,40 @@ serve(async (req) => {
       group_title: string;
     }> = [];
 
+    console.log(`[clean-sync-entries] Starting to fetch entries for source with ${source.entries_count} entries`);
+
     while (true) {
       const { data: batch, error: batchError } = await supabase
         .from('m3u_sync_entries')
         .select('id, title, stream_url, group_title')
         .eq('source_id', sourceId)
+        .order('id', { ascending: true })
         .range(offset, offset + BATCH_SIZE - 1);
 
       if (batchError) {
-        console.error('Batch fetch error:', batchError);
+        console.error(`Batch fetch error at offset ${offset}:`, batchError);
         break;
       }
 
-      if (!batch || batch.length === 0) break;
+      if (!batch || batch.length === 0) {
+        console.log(`[clean-sync-entries] No more entries at offset ${offset}`);
+        break;
+      }
 
       allEntries.push(...batch);
-      offset += BATCH_SIZE;
+      totalFetched += batch.length;
+      offset += batch.length;
 
-      if (batch.length < BATCH_SIZE) break;
+      // Log progress every 10k entries
+      if (totalFetched % 10000 === 0) {
+        console.log(`[clean-sync-entries] Fetched ${totalFetched.toLocaleString()} entries...`);
+      }
+
+      // Safety check - if we got less than batch size, we're done
+      if (batch.length < BATCH_SIZE) {
+        console.log(`[clean-sync-entries] Last batch had ${batch.length} entries, done fetching`);
+        break;
+      }
     }
 
     console.log(`[clean-sync-entries] Loaded ${allEntries.length} entries`);
