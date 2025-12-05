@@ -4,10 +4,10 @@
  * Shared configuration for Cloudflare R2 across all Edge Functions
  * Bucket: iptvlink-cdn (primary bucket for all CDN operations)
  * 
- * @version 1.0.0
+ * Uses native fetch with AWS4 signing (no npm dependencies)
+ * 
+ * @version 2.0.0
  */
-
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from "npm:@aws-sdk/client-s3";
 
 // =============================================
 // CONSTANTS
@@ -94,37 +94,123 @@ export function checkR2Config(): { configured: boolean; missing: string[]; confi
 }
 
 // =============================================
-// S3 CLIENT
+// AWS4 SIGNING (Native implementation)
 // =============================================
 
-let _r2Client: S3Client | null = null;
-
-/**
- * Get or create R2 S3-compatible client
- * Singleton pattern for efficiency
- */
-export function getR2Client(): S3Client {
-  if (_r2Client) return _r2Client;
-
-  const config = getR2Config();
-  
-  _r2Client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  });
-
-  return _r2Client;
+async function hmacSha256(key: ArrayBuffer | Uint8Array, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
 }
 
-/**
- * Reset client (useful for testing or credential rotation)
- */
-export function resetR2Client(): void {
-  _r2Client = null;
+async function sha256(message: string | Uint8Array): Promise<string> {
+  const data = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function getSignatureKey(
+  secretKey: string,
+  dateStamp: string,
+  region: string,
+  service: string
+): Promise<ArrayBuffer> {
+  const kDate = await hmacSha256(new TextEncoder().encode('AWS4' + secretKey), dateStamp);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  return hmacSha256(kService, 'aws4_request');
+}
+
+interface SignedRequest {
+  url: string;
+  headers: Record<string, string>;
+}
+
+async function signRequest(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body: string | Uint8Array | null,
+  config: R2Config
+): Promise<SignedRequest> {
+  const parsedUrl = new URL(url);
+  const region = 'auto';
+  const service = 's3';
+  
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.substring(0, 8);
+  
+  // Payload hash
+  let payloadHash: string;
+  if (body === null) {
+    payloadHash = await sha256('');
+  } else if (typeof body === 'string') {
+    payloadHash = await sha256(body);
+  } else {
+    payloadHash = await sha256(body);
+  }
+  
+  // Canonical headers
+  const signedHeaders: Record<string, string> = {
+    ...headers,
+    'host': parsedUrl.host,
+    'x-amz-content-sha256': payloadHash,
+    'x-amz-date': amzDate,
+  };
+  
+  const sortedHeaderKeys = Object.keys(signedHeaders).sort();
+  const canonicalHeaders = sortedHeaderKeys
+    .map(key => `${key.toLowerCase()}:${signedHeaders[key].trim()}`)
+    .join('\n') + '\n';
+  const signedHeadersStr = sortedHeaderKeys.map(k => k.toLowerCase()).join(';');
+  
+  // Canonical request
+  const canonicalUri = parsedUrl.pathname;
+  const canonicalQuerystring = parsedUrl.search.substring(1);
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuerystring,
+    canonicalHeaders,
+    signedHeadersStr,
+    payloadHash,
+  ].join('\n');
+  
+  // String to sign
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = [
+    algorithm,
+    amzDate,
+    credentialScope,
+    await sha256(canonicalRequest),
+  ].join('\n');
+  
+  // Signature
+  const signingKey = await getSignatureKey(config.secretAccessKey, dateStamp, region, service);
+  const signatureBuffer = await hmacSha256(signingKey, stringToSign);
+  const signature = Array.from(new Uint8Array(signatureBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  // Authorization header
+  const authorizationHeader = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+  
+  return {
+    url,
+    headers: {
+      ...signedHeaders,
+      'Authorization': authorizationHeader,
+    },
+  };
 }
 
 // =============================================
@@ -251,17 +337,13 @@ export function getCdnUrl(key: string, customBaseUrl?: string): string {
   return `${baseUrl}/${key}`;
 }
 
-/**
- * Generate signed URL for temporary access (not implemented - requires Worker)
- */
-export function getSignedUrl(_key: string, _expiresInSeconds: number = 3600): string {
-  // Note: R2 signed URLs require Cloudflare Workers, not S3 presigned URLs
-  throw new Error('Signed URLs require Cloudflare Worker implementation');
-}
+// =============================================
+// R2 OPERATIONS (Using native fetch)
+// =============================================
 
-// =============================================
-// UPLOAD HELPERS
-// =============================================
+function getR2Endpoint(config: R2Config): string {
+  return `https://${config.accountId}.r2.cloudflarestorage.com`;
+}
 
 export interface UploadOptions {
   key: string;
@@ -275,8 +357,9 @@ export interface UploadOptions {
  * Upload content to R2
  */
 export async function uploadToR2(options: UploadOptions): Promise<{ success: boolean; key: string; cdnUrl: string; size?: number }> {
-  const client = getR2Client();
   const config = getR2Config();
+  const endpoint = getR2Endpoint(config);
+  const url = `${endpoint}/${config.bucketName}/${options.key}`;
   
   const contentType = options.contentType || getMimeType(options.key);
   
@@ -287,26 +370,61 @@ export async function uploadToR2(options: UploadOptions): Promise<{ success: boo
       : 'public, max-age=3600, s-maxage=86400'
   );
 
-  const command = new PutObjectCommand({
-    Bucket: config.bucketName,
-    Key: options.key,
-    Body: options.body,
-    ContentType: contentType,
-    CacheControl: cacheControl,
-    Metadata: options.metadata,
+  // Convert body to Uint8Array for signing
+  let bodyBytes: Uint8Array;
+  if (typeof options.body === 'string') {
+    bodyBytes = new TextEncoder().encode(options.body);
+  } else if (options.body instanceof Uint8Array) {
+    bodyBytes = options.body;
+  } else {
+    // ReadableStream - read all chunks
+    const chunks: Uint8Array[] = [];
+    const reader = options.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    bodyBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bodyBytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+    'Cache-Control': cacheControl,
+    'Content-Length': bodyBytes.length.toString(),
+  };
+
+  // Add metadata headers
+  if (options.metadata) {
+    for (const [key, value] of Object.entries(options.metadata)) {
+      headers[`x-amz-meta-${key}`] = value;
+    }
+  }
+
+  const signed = await signRequest('PUT', url, headers, bodyBytes, config);
+  
+  const response = await fetch(signed.url, {
+    method: 'PUT',
+    headers: signed.headers,
+    body: bodyBytes,
   });
 
-  await client.send(command);
-  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`R2 upload failed: ${response.status} - ${errorText}`);
+  }
+
   return {
     success: true,
     key: options.key,
     cdnUrl: getCdnUrl(options.key),
-    size: typeof options.body === 'string' 
-      ? new TextEncoder().encode(options.body).length 
-      : options.body instanceof Uint8Array 
-        ? options.body.length 
-        : undefined,
+    size: bodyBytes.length,
   };
 }
 
@@ -314,15 +432,22 @@ export async function uploadToR2(options: UploadOptions): Promise<{ success: boo
  * Delete object from R2
  */
 export async function deleteFromR2(key: string): Promise<boolean> {
-  const client = getR2Client();
   const config = getR2Config();
+  const endpoint = getR2Endpoint(config);
+  const url = `${endpoint}/${config.bucketName}/${key}`;
 
-  const command = new DeleteObjectCommand({
-    Bucket: config.bucketName,
-    Key: key,
+  const signed = await signRequest('DELETE', url, {}, null, config);
+  
+  const response = await fetch(signed.url, {
+    method: 'DELETE',
+    headers: signed.headers,
   });
 
-  await client.send(command);
+  if (!response.ok && response.status !== 204) {
+    const errorText = await response.text();
+    throw new Error(`R2 delete failed: ${response.status} - ${errorText}`);
+  }
+
   return true;
 }
 
@@ -330,22 +455,49 @@ export async function deleteFromR2(key: string): Promise<boolean> {
  * Check if object exists in R2
  */
 export async function objectExists(key: string): Promise<boolean> {
-  const client = getR2Client();
   const config = getR2Config();
+  const endpoint = getR2Endpoint(config);
+  const url = `${endpoint}/${config.bucketName}/${key}`;
 
   try {
-    const command = new HeadObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
+    const signed = await signRequest('HEAD', url, {}, null, config);
+    
+    const response = await fetch(signed.url, {
+      method: 'HEAD',
+      headers: signed.headers,
     });
-    await client.send(command);
-    return true;
-  } catch (error) {
-    if ((error as any).name === 'NotFound' || (error as any).$metadata?.httpStatusCode === 404) {
-      return false;
-    }
-    throw error;
+
+    return response.ok;
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Get object from R2
+ */
+export async function getFromR2(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const config = getR2Config();
+  const endpoint = getR2Endpoint(config);
+  const url = `${endpoint}/${config.bucketName}/${key}`;
+
+  const signed = await signRequest('GET', url, {}, null, config);
+  
+  const response = await fetch(signed.url, {
+    method: 'GET',
+    headers: signed.headers,
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const errorText = await response.text();
+    throw new Error(`R2 get failed: ${response.status} - ${errorText}`);
+  }
+
+  const body = new Uint8Array(await response.arrayBuffer());
+  const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+
+  return { body, contentType };
 }
 
 /**
@@ -355,21 +507,34 @@ export async function listObjects(
   prefix: string, 
   maxKeys: number = 1000
 ): Promise<{ keys: string[]; truncated: boolean }> {
-  const client = getR2Client();
   const config = getR2Config();
+  const endpoint = getR2Endpoint(config);
+  const url = `${endpoint}/${config.bucketName}?list-type=2&prefix=${encodeURIComponent(prefix)}&max-keys=${maxKeys}`;
 
-  const command = new ListObjectsV2Command({
-    Bucket: config.bucketName,
-    Prefix: prefix,
-    MaxKeys: maxKeys,
+  const signed = await signRequest('GET', url, {}, null, config);
+  
+  const response = await fetch(signed.url, {
+    method: 'GET',
+    headers: signed.headers,
   });
 
-  const response = await client.send(command);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`R2 list failed: ${response.status} - ${errorText}`);
+  }
+
+  const xml = await response.text();
   
-  return {
-    keys: response.Contents?.map(obj => obj.Key || '').filter(Boolean) || [],
-    truncated: response.IsTruncated || false,
-  };
+  // Simple XML parsing for keys
+  const keys: string[] = [];
+  const keyMatches = xml.matchAll(/<Key>([^<]+)<\/Key>/g);
+  for (const match of keyMatches) {
+    keys.push(match[1]);
+  }
+  
+  const truncated = xml.includes('<IsTruncated>true</IsTruncated>');
+
+  return { keys, truncated };
 }
 
 // =============================================
@@ -398,15 +563,9 @@ export async function testR2Connection(): Promise<{
     const config = getR2Config();
     result.bucket = config.bucketName;
     
-    const client = getR2Client();
-    
-    // Test read permission
+    // Test read permission (list objects)
     try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: config.bucketName,
-        MaxKeys: 1,
-      });
-      await client.send(listCommand);
+      await listObjects('_health_', 1);
       result.canRead = true;
       result.connected = true;
     } catch (e) {
@@ -417,20 +576,13 @@ export async function testR2Connection(): Promise<{
     if (result.canRead) {
       try {
         const testKey = `_health_check_${Date.now()}.txt`;
-        const putCommand = new PutObjectCommand({
-          Bucket: config.bucketName,
-          Key: testKey,
-          Body: 'health_check',
-          ContentType: 'text/plain',
+        await uploadToR2({
+          key: testKey,
+          body: 'health_check',
+          contentType: 'text/plain',
         });
-        await client.send(putCommand);
         
-        const deleteCommand = new DeleteObjectCommand({
-          Bucket: config.bucketName,
-          Key: testKey,
-        });
-        await client.send(deleteCommand);
-        
+        await deleteFromR2(testKey);
         result.canWrite = true;
       } catch (e) {
         result.error = `Write failed: ${(e as Error).message}`;
@@ -443,16 +595,3 @@ export async function testR2Connection(): Promise<{
     return result;
   }
 }
-
-// =============================================
-// EXPORTS
-// =============================================
-
-export {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-};
