@@ -72,6 +72,15 @@ export const IptvPlayer = memo(function IptvPlayer({
     onEventRef.current?.(evt, data);
   }, []);
 
+  // Control visibility - declare early to maintain hook order
+  const showControlsTemporarily = useCallback(() => {
+    setShowControls(true);
+    clearTimeout(hideControlsTimer.current);
+    hideControlsTimer.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
+
   // Video.js hook with Smart TV config
   const {
     videoRef,
@@ -156,6 +165,14 @@ export const IptvPlayer = memo(function IptvPlayer({
     
     onEventRef.current?.('channelchange', { channel });
   }, [setSource]);
+
+  // Retry handler - declared after selectChannel since it depends on it
+  const handleRetry = useCallback(() => {
+    if (currentChannel) {
+      cdnFailover.reset();
+      selectChannel(currentChannel);
+    }
+  }, [currentChannel, selectChannel]);
 
   // Load playlist (original behavior)
   useEffect(() => {
@@ -288,23 +305,6 @@ export const IptvPlayer = memo(function IptvPlayer({
       setIsFullscreen(true);
     }
   }
-
-  // Control visibility
-  const showControlsTemporarily = useCallback(() => {
-    setShowControls(true);
-    clearTimeout(hideControlsTimer.current);
-    hideControlsTimer.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
-  }, [isPlaying]);
-
-  // Retry handler
-  const handleRetry = useCallback(() => {
-    if (currentChannel) {
-      cdnFailover.reset();
-      selectChannel(currentChannel);
-    }
-  }, [currentChannel, selectChannel]);
 
   return (
     <div 
