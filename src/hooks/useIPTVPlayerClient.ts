@@ -187,7 +187,22 @@ export function useIPTVPlayerClient() {
   const playlistKeyRef = useRef<string>('');
   const playlistUrlRef = useRef<string>('');
   const isBackgroundLoadingRef = useRef(false);
+  const isPlaybackActiveRef = useRef(false); // NEW: Pause background during playback
   const groupChannelsRef = useRef<(channels: any[]) => Category[]>(() => []);
+
+  // Pause/resume background loading during playback
+  const pauseBackgroundLoading = useCallback(() => {
+    console.log('[IPTV] Pausing background loading for playback');
+    isPlaybackActiveRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  const resumeBackgroundLoading = useCallback(() => {
+    console.log('[IPTV] Resuming background loading');
+    isPlaybackActiveRef.current = false;
+  }, []);
 
   // Group channels into categories - stores stream URLs in index, passes only metadata to UI
   groupChannelsRef.current = (channels: any[]): Category[] => {
@@ -328,6 +343,13 @@ export function useIPTVPlayerClient() {
     
     try {
       while (!controller.signal.aborted) {
+        // STOP: Playback active - pause background loading
+        if (isPlaybackActiveRef.current) {
+          console.log('[IPTV] Background paused - playback active');
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+
         // STOP CONDITIONS
         if (offset >= serverTotal) {
           console.log(`[IPTV] Complete: offset ${offset} >= total ${serverTotal}`);
@@ -587,6 +609,13 @@ export function useIPTVPlayerClient() {
     
     try {
       while (!controller.signal.aborted) {
+        // STOP: Playback active - pause background loading
+        if (isPlaybackActiveRef.current) {
+          console.log('[IPTV] Background paused - playback active');
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+
         // STOP CONDITION 1: Reached or exceeded server total
         if (currentOffset >= serverTotal) {
           console.log(`[IPTV] Complete: ${currentOffset} >= ${serverTotal}`);
@@ -954,5 +983,8 @@ export function useIPTVPlayerClient() {
     loadCategoryChannels,
     // Smart prefetch: get stream URL on demand
     getStreamUrl: getStoredStreamUrl,
+    // Playback control for background loading
+    pauseBackgroundLoading,
+    resumeBackgroundLoading,
   };
 }
