@@ -79,42 +79,66 @@ export class CdnFailoverService {
 
   /**
    * Build CDN list from channel URL
+   * 
+   * PRIORIDADE PARA HTTP:
+   * 1. Stream Proxy (obrigatório para Mixed Content)
+   * 2. Origin (fallback)
+   * 
+   * PRIORIDADE PARA HTTPS/VOD com R2:
+   * 1. R2 CDN
+   * 2. CF Stream
+   * 3. Origin
    */
-  buildEndpointsFromUrl(originalUrl: string, channelId?: string): CdnEndpoint[] {
+  buildEndpointsFromUrl(
+    originalUrl: string, 
+    channelId?: string,
+    options?: { hasR2?: boolean; hasCfStream?: boolean; r2Url?: string; cfStreamUrl?: string }
+  ): CdnEndpoint[] {
     const endpoints: CdnEndpoint[] = [];
+    const isHttpUrl = originalUrl.startsWith('http://');
+    const isSecurePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
     
-    // 1. R2 CDN (highest priority for VOD)
-    if (channelId) {
+    // CASO 1: HTTP URL em página HTTPS - PROXY É OBRIGATÓRIO
+    if (isHttpUrl && isSecurePage) {
+      // Proxy primeiro (única forma de funcionar)
       endpoints.push({
-        url: `${R2_CDN_URL}/channels/${channelId}/stream.m3u8`,
+        url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(originalUrl)}`,
+        priority: 1,
+        type: 'proxy',
+      });
+      
+      // Origin como fallback (para debug/dev)
+      endpoints.push({
+        url: originalUrl,
+        priority: 2,
+        type: 'origin',
+      });
+      
+      return endpoints;
+    }
+    
+    // CASO 2: Conteúdo com R2/CF-Stream disponível
+    if (options?.hasR2 && options.r2Url) {
+      endpoints.push({
+        url: options.r2Url,
         priority: 1,
         type: 'r2',
         region: 'global',
       });
     }
-
-    // 2. Cloudflare Stream (for live)
-    if (channelId) {
+    
+    if (options?.hasCfStream && options.cfStreamUrl) {
       endpoints.push({
-        url: `${SUPABASE_URL}/functions/v1/cf-stream-playback?channelId=${channelId}`,
-        priority: 2,
+        url: options.cfStreamUrl,
+        priority: options?.hasR2 ? 2 : 1,
         type: 'cf-stream',
       });
     }
-
-    // 3. Proxy (for HTTP content on HTTPS page)
-    if (originalUrl.startsWith('http://') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      endpoints.push({
-        url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(originalUrl)}`,
-        priority: 3,
-        type: 'proxy',
-      });
-    }
-
-    // 4. Origin (direct URL)
+    
+    // CASO 3: HTTPS direto ou fallback
     endpoints.push({
       url: originalUrl,
-      priority: 4,
+      priority: endpoints.length + 1,
       type: 'origin',
     });
 
