@@ -66,6 +66,12 @@ export const IptvPlayer = memo(function IptvPlayer({
   const [volume, setVolumeState] = useState(1);
   const [isMuted, setIsMuted] = useState(options.muted ?? true);
 
+  // Handle player events - memoized to prevent re-renders
+  const handlePlayerEvent = useCallback((evt: IptvPlayerEvent, data?: any) => {
+    console.log('[IptvPlayer] Event:', evt, data);
+    onEventRef.current?.(evt, data);
+  }, []);
+
   // Video.js hook with Smart TV config
   const {
     videoRef,
@@ -98,13 +104,19 @@ export const IptvPlayer = memo(function IptvPlayer({
     epgUrl,
   });
 
+  // Track previous streamUrl to detect actual changes
+  const prevStreamUrlRef = useRef<string | undefined>();
+
   // Direct stream URL mode - load immediately without playlist
   useEffect(() => {
-    // Prevent re-initialization on every render
+    // Skip if no streamUrl or if playlistUrl is provided
     if (!streamUrl || playlistUrl) return;
-    if (initializedRef.current) return;
+    
+    // Only initialize once per unique streamUrl
+    if (prevStreamUrlRef.current === streamUrl && initializedRef.current) return;
     
     console.log('[IptvPlayer] Direct stream mode:', streamUrl.substring(0, 80));
+    prevStreamUrlRef.current = streamUrl;
     initializedRef.current = true;
     
     // Create a virtual channel for display
@@ -128,11 +140,6 @@ export const IptvPlayer = memo(function IptvPlayer({
     setSource(finalUrl);
     onEventRef.current?.('ready', { channelCount: 1 });
   }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource]);
-  
-  // Reset initialization when stream URL changes
-  useEffect(() => {
-    initializedRef.current = false;
-  }, [streamUrl]);
 
   // Select channel - declared BEFORE useEffects that use it
   const selectChannel = useCallback((channel: IptvChannel) => {
@@ -204,22 +211,17 @@ export const IptvPlayer = memo(function IptvPlayer({
     }
   }, [currentChannel, options.cdnFallback]);
 
-  // Handle player events
-  function handlePlayerEvent(evt: IptvPlayerEvent, data?: any) {
-    console.log('[IptvPlayer] Event:', evt, data);
-    
-    if (evt === 'error' && currentChannel) {
-      // Attempt CDN failover
-      cdnFailover.handleError(new Error(data?.message || 'Playback error'))
+  // Handle CDN failover on error
+  useEffect(() => {
+    if (error && currentChannel) {
+      cdnFailover.handleError(new Error(error))
         .then(newUrl => {
           if (newUrl) {
             setSource(newUrl);
           }
         });
     }
-    
-    onEventRef.current?.(evt, data);
-  }
+  }, [error, currentChannel, setSource]);
 
   // Remote control handlers
   useRemoteControl({
