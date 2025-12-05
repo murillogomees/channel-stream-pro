@@ -1,12 +1,15 @@
 /**
  * Video.js + HLS.js React Hook
+ * Optimized for fastest startup and HTTP support via proxy
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import videojs from 'video.js';
 import type Player from 'video.js/dist/types/player';
 import Hls from 'hls.js';
+import mpegts from 'mpegts.js';
 import type { IptvPlayerEvent, IptvPlayerOptions, PlayerMetrics } from '../types';
+import { streamOptimizer } from '../services/streamOptimizer';
 
 import 'video.js/dist/video-js.css';
 
@@ -46,7 +49,8 @@ function isSmartTV(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent.toLowerCase();
   return ua.includes('tizen') || ua.includes('webos') || ua.includes('hbbtv') || 
-         ua.includes('smart-tv') || ua.includes('netcast') || ua.includes('viera');
+         ua.includes('smart-tv') || ua.includes('netcast') || ua.includes('viera') ||
+         ua.includes('firetv') || ua.includes('roku');
 }
 
 export function useVideoJs({
@@ -57,6 +61,7 @@ export function useVideoJs({
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Player | null>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const mpegtsRef = useRef<mpegts.Player | null>(null);
   
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -76,6 +81,10 @@ export function useVideoJs({
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    if (mpegtsRef.current) {
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
+    }
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -194,7 +203,7 @@ export function useVideoJs({
     };
   }, [options.autoplay, options.muted, options.poster, options.preferLowLatency, onEvent, cleanup]);
 
-  // Set source
+  // Set source with protocol detection and HTTP proxy support
   const setSource = useCallback((url: string) => {
     if (!playerRef.current) return;
     
@@ -202,50 +211,98 @@ export function useVideoJs({
     setIsBuffering(true);
     loadStartTime.current = Date.now();
 
-    const isHls = url.includes('.m3u8') || url.includes('.m3u');
+    // Optimize URL (handle HTTP→HTTPS proxy)
+    const optimized = streamOptimizer.optimize(url);
+    const finalUrl = optimized.url;
+    const protocol = optimized.protocol;
+    
+    console.log('[useVideoJs] Loading:', protocol, optimized.source, finalUrl.substring(0, 80));
 
-    // Use HLS.js for better control if available
-    if (isHls && Hls.isSupported() && !supportsNativeHls()) {
-      // Cleanup existing HLS instance
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-      }
+    const videoEl = playerRef.current.el()?.querySelector('video') as HTMLVideoElement;
+    if (!videoEl) return;
 
-      const videoEl = playerRef.current.el()?.querySelector('video');
-      if (!videoEl) return;
+    // Cleanup previous instances
+    if (mpegtsRef.current) {
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
-      const hls = new Hls({
-        enableWorker: !isSmartTV(),
-        lowLatencyMode: options.preferLowLatency ?? true,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 30 * 1000 * 1000,
-        startLevel: 0,
-        startFragPrefetch: true,
-        testBandwidth: false,
-        fragLoadingTimeOut: 10000,
-        manifestLoadingTimeOut: 8000,
-        fragLoadingMaxRetry: options.maxRetries ?? 3,
-        manifestLoadingMaxRetry: options.maxRetries ?? 3,
-        progressive: true,
-        backBufferLength: 10,
-      });
-
-      hlsRef.current = hls;
-      hls.loadSource(url);
-      hls.attachMedia(videoEl as HTMLMediaElement);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('[HLS.js] Manifest parsed');
+    // TS streams - use mpegts.js
+    if (protocol === 'ts' && mpegts.isSupported()) {
+      console.log('[useVideoJs] Using mpegts.js for TS stream');
+      
+      const player = mpegts.createPlayer({
+        type: 'mpegts',
+        url: finalUrl,
+        isLive: true,
+      }, streamOptimizer.getMpegtsConfig());
+      
+      mpegtsRef.current = player;
+      player.attachMediaElement(videoEl);
+      player.load();
+      
+      player.on(mpegts.Events.MEDIA_INFO, () => {
+        console.log('[mpegts] Media info received');
         setIsBuffering(false);
         setMetrics(prev => ({
           ...prev,
           loadTime: Date.now() - loadStartTime.current,
         }));
+        onEvent?.('ready');
         
         if (options.autoplay !== false) {
           videoEl.play().catch(() => {
-            (videoEl as HTMLVideoElement).muted = true;
+            videoEl.muted = true;
+            videoEl.play().catch(() => {});
+          });
+        }
+      });
+      
+      player.on(mpegts.Events.ERROR, (errType: string, errDetail: string) => {
+        console.error('[mpegts] Error:', errType, errDetail);
+        setError(`${errType}: ${errDetail}`);
+        setMetrics(prev => ({ ...prev, errors: prev.errors + 1 }));
+        onEvent?.('error', { type: errType, details: errDetail });
+      });
+      
+      return;
+    }
+
+    // HLS streams - use HLS.js with optimized config
+    if (protocol === 'hls' && Hls.isSupported() && !supportsNativeHls()) {
+      console.log('[useVideoJs] Using HLS.js');
+      
+      const hlsConfig = streamOptimizer.getHlsConfig(
+        options.preferLowLatency ?? true,
+        true // assume live
+      );
+      
+      const hls = new Hls({
+        ...hlsConfig,
+        fragLoadingMaxRetry: options.maxRetries ?? 3,
+        manifestLoadingMaxRetry: options.maxRetries ?? 3,
+      });
+
+      hlsRef.current = hls;
+      hls.loadSource(finalUrl);
+      hls.attachMedia(videoEl);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[HLS.js] Manifest parsed, TTFF:', Date.now() - loadStartTime.current, 'ms');
+        setIsBuffering(false);
+        setMetrics(prev => ({
+          ...prev,
+          loadTime: Date.now() - loadStartTime.current,
+        }));
+        onEvent?.('ready');
+        
+        if (options.autoplay !== false) {
+          videoEl.play().catch(() => {
+            videoEl.muted = true;
             videoEl.play().catch(() => {});
           });
         }
@@ -253,6 +310,13 @@ export function useVideoJs({
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         onEvent?.('qualitychange', { level: data.level });
+      });
+
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        // First fragment loaded - video should start soon
+        if (isBuffering) {
+          setIsBuffering(false);
+        }
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -264,20 +328,36 @@ export function useVideoJs({
 
           // Attempt recovery
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            console.log('[HLS.js] Network error, attempting recovery...');
             hls.startLoad();
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            console.log('[HLS.js] Media error, attempting recovery...');
             hls.recoverMediaError();
           }
         }
       });
-    } else {
-      // Use native playback
-      playerRef.current.src({
-        src: url,
-        type: isHls ? 'application/x-mpegURL' : undefined,
-      });
+      
+      return;
     }
-  }, [options.autoplay, options.maxRetries, options.preferLowLatency, onEvent]);
+
+    // Native playback (Safari, direct MP4, etc)
+    console.log('[useVideoJs] Using native playback');
+    playerRef.current.src({
+      src: finalUrl,
+      type: protocol === 'hls' ? 'application/x-mpegURL' : undefined,
+    });
+    
+    // For native, track ready state
+    videoEl.addEventListener('canplay', () => {
+      setIsBuffering(false);
+      setMetrics(prev => ({
+        ...prev,
+        loadTime: Date.now() - loadStartTime.current,
+      }));
+      onEvent?.('ready');
+    }, { once: true });
+    
+  }, [options.autoplay, options.maxRetries, options.preferLowLatency, onEvent, isBuffering]);
 
   // Update source when src changes
   useEffect(() => {
