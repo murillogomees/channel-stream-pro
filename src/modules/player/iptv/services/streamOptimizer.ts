@@ -61,12 +61,21 @@ class StreamOptimizerService {
 
   /**
    * Check if URL requires proxy (HTTP on HTTPS page)
+   * NOTE: MP4/VOD files should NOT be proxied - they play better directly
    */
   requiresProxy(url: string): boolean {
     if (typeof window === 'undefined') return false;
     
     const isHttpUrl = url.startsWith('http://');
     const isHttpsPage = window.location.protocol === 'https:';
+    
+    // MP4/VOD files should NOT go through proxy - they work better direct
+    // Proxy adds latency and breaks seeking for large files
+    const protocol = this.detectProtocol(url);
+    if (protocol === 'mp4') {
+      console.log('[StreamOptimizer] MP4 detected - skipping proxy for reliability');
+      return false;
+    }
     
     return isHttpUrl && isHttpsPage;
   }
