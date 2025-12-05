@@ -64,6 +64,7 @@ export function useVideoJs({
   const playerRef = useRef<Player | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const mpegtsRef = useRef<mpegts.Player | null>(null);
+  const pendingSourceRef = useRef<string | null>(null);
   
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -219,7 +220,12 @@ export function useVideoJs({
 
   // Set source with protocol detection and HTTP proxy support
   const setSource = useCallback((url: string) => {
-    if (!playerRef.current) return;
+    // If player not ready, store for later
+    if (!playerRef.current) {
+      console.log('[useVideoJs] Player not ready, queueing source:', url.substring(0, 60));
+      pendingSourceRef.current = url;
+      return;
+    }
     
     setError(null);
     setIsBuffering(true);
@@ -390,6 +396,16 @@ export function useVideoJs({
       setSource(src);
     }
   }, [src, setSource]);
+
+  // Apply pending source when player becomes ready
+  useEffect(() => {
+    if (isReady && pendingSourceRef.current && playerRef.current) {
+      console.log('[Video.js] Applying pending source:', pendingSourceRef.current.substring(0, 60));
+      const pendingUrl = pendingSourceRef.current;
+      pendingSourceRef.current = null;
+      setSource(pendingUrl);
+    }
+  }, [isReady, setSource]);
 
   // Control methods
   const play = useCallback(() => {
