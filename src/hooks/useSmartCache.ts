@@ -38,6 +38,7 @@ export interface UseSmartCacheOptions {
   enabled?: boolean;
   autoWarm?: boolean;
   lowBandwidthMode?: boolean;
+  paused?: boolean; // Pause stats polling during playback
 }
 
 export interface Channel {
@@ -56,6 +57,7 @@ export function useSmartCache({
   enabled = true,
   autoWarm = true,
   lowBandwidthMode = false,
+  paused = false,
 }: UseSmartCacheOptions = {}) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [stats, setStats] = useState<SmartCacheStats | null>(null);
@@ -98,9 +100,9 @@ export function useSmartCache({
     };
   }, [enabled, profileId, autoWarm, lowBandwidthMode]);
 
-  // Update stats periodically
+  // Update stats periodically - paused during playback
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || paused) return;
 
     const updateStats = () => {
       const warmingStats = cacheWarmingService.getStats();
@@ -123,7 +125,7 @@ export function useSmartCache({
     updateStats(); // Initial update
 
     return () => clearInterval(interval);
-  }, [isInitialized, predictions]);
+  }, [isInitialized, predictions, paused]);
 
   /**
    * Set channel list for predictions

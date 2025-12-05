@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef, startTransition, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Tv, ArrowLeft, Settings, RefreshCw, Database } from 'lucide-react';
+import { Tv, Database } from 'lucide-react';
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
@@ -11,24 +11,15 @@ import { useUltraFastSearch } from '@/hooks/useUltraFastSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { LoadingProgressBar } from '@/components/iptv/LoadingProgressBar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { TVNavRail } from '@/components/iptv/TVNavRail';
-import { TVHeroSection } from '@/components/iptv/TVHeroSection';
-import { TVContentRow } from '@/components/iptv/TVContentRow';
-import { TVContentCard } from '@/components/iptv/TVContentCard';
-import { TVCategoryFilter } from '@/components/iptv/TVCategoryFilter';
 import { TVContentGrid } from '@/components/iptv/TVContentGrid';
 import { ContentSkeleton } from '@/components/iptv/ContentSkeleton';
-import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
-import { useContinueWatching, useTrending, useRecommendations } from '@/features/player/hooks';
+import { useContinueWatching, useRecommendations } from '@/features/player/hooks';
 import { useSmartCache } from '@/hooks/useSmartCache';
-import { ContinueWatchingRow, Top10Row, LiveTVView, MoviesView, SeriesView, HomeView } from '@/features/player/components';
+import { MoviesView, SeriesView, HomeView } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
-import { favoritesService as playerFavoritesService, watchProgressService, analyticsService } from '@/features/player/services';
-import type { WatchProgress, TrendingItem, ContentType, RecommendationItem } from '@/features/player/types';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
 export default function AppPlayer() {
@@ -64,6 +55,9 @@ export default function AppPlayer() {
   const isCached = (player as any).isCached;
   const clearCacheAndReload = (player as any).clearCacheAndReload;
   const loadingPercent = (player as any).loadingPercent || 0;
+  const pauseBackgroundLoading = (player as any).pauseBackgroundLoading;
+  const resumeBackgroundLoading = (player as any).resumeBackgroundLoading;
+
   const {
     isFavorite,
     toggleFavorite,
@@ -93,12 +87,15 @@ export default function AppPlayer() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
-  const [optimizedStreamUrl, setOptimizedStreamUrl] = useState<string | null>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
   const [movieSortBy, setMovieSortBy] = useState<MovieSortOption>('name');
   const [seriesSortBy, setSeriesSortBy] = useState<SeriesSortOption>('name');
 
+  // Track if player is active to pause background operations
+  const isPlayerActive = showPlayerDialog && playerChannel;
+
   // Smart Cache integration for predictive preloading
+  // Paused during playback to reduce requests
   const {
     trackChannelView,
     setChannelList,
@@ -106,9 +103,9 @@ export default function AppPlayer() {
     resumeWarming
   } = useSmartCache({
     profileId: undefined,
-    // Will be set from auth context if available
-    enabled: !isAdmin,
-    autoWarm: true
+    enabled: !isAdmin && !isPlayerActive,
+    autoWarm: !isPlayerActive,
+    paused: !!isPlayerActive, // Stop stats polling during playback
   });
 
   // Smart features hooks
@@ -118,10 +115,6 @@ export default function AppPlayer() {
     removeItem: removeContinueWatchingItem,
     refresh: refreshContinueWatching
   } = useContinueWatching();
-  const {
-    items: trendingItems,
-    isLoading: loadingTrending
-  } = useTrending('weekly');
 
   // Handle search change - use backend search
   const handleSearchChange = useCallback((value: string) => {
@@ -194,14 +187,15 @@ export default function AppPlayer() {
     category_id: cat.id
   }))), [categories]);
 
-  // Update smart cache channel list
+  // Update smart cache channel list - skip during playback
   useEffect(() => {
-    if (allChannels.length > 0) {
+    if (allChannels.length > 0 && !isPlayerActive) {
       setChannelList(allChannels);
     }
-  }, [allChannels, setChannelList]);
+  }, [allChannels, setChannelList, isPlayerActive]);
 
   // Recommendations based on watch history (must be after allChannels)
+  // Disabled during playback to prevent requests
   const {
     recommendationGroups,
     seriesContinuations,
@@ -210,7 +204,7 @@ export default function AppPlayer() {
     refresh: refreshRecommendations
   } = useRecommendations({
     allChannels,
-    enabled: activeTab === 'home'
+    enabled: activeTab === 'home' && !isPlayerActive
   });
 
   // Featured items for hero
@@ -386,27 +380,8 @@ export default function AppPlayer() {
     // For clients, do nothing - they stay on the player page
   }, true);
 
-  // Use StreamService for proxy URLs (sync version for immediate use)
-  const getStreamUrl = useCallback((channel: any) => {
-    if (!channel?.stream_url) return '';
-    return streamService.getPlayableUrl(channel);
-  }, []);
-
-  // Fetch optimized URL when channel is selected
-  useEffect(() => {
-    if (playerChannel) {
-      setOptimizedStreamUrl(null); // Reset while loading
-      streamService.getOptimizedUrl(playerChannel).then(result => {
-        console.log('[AppPlayer] URL otimizada:', result.url);
-        setOptimizedStreamUrl(result.url);
-      }).catch(err => {
-        console.warn('[AppPlayer] URL optimization failed, using original:', err);
-        setOptimizedStreamUrl(playerChannel.stream_url);
-      });
-    } else {
-      setOptimizedStreamUrl(null);
-    }
-  }, [playerChannel]);
+  // REMOVED: Duplicate URL optimization - IptvPlayer/useVideoJs handles this internally
+  // This was causing double optimization calls. The player already optimizes URLs.
 
   // Helper to extract series name from episode name
   const extractSeriesName = useCallback((name: string): string => {
@@ -448,12 +423,13 @@ export default function AppPlayer() {
     trackChannelView(episode.id, episode.category_id);
   }, [trackChannelView]);
 
-  // Handle play
+  // Handle play - pause all background operations
   const handlePlay = (channel: any) => {
     setPlayerChannel(channel);
     setShowPlayerDialog(true);
     trackChannelView(channel.id, channel.category_id);
-    pauseWarming(); // Pause warming during playback
+    pauseWarming(); // Pause cache warming
+    pauseBackgroundLoading?.(); // Pause playlist sync
   };
 
   // Loading state - show skeleton to prevent CLS
@@ -586,7 +562,7 @@ export default function AppPlayer() {
 
       {/* Player Dialog - IptvPlayer Modular */}
       {showPlayerDialog && playerChannel && <div className="fixed inset-0 z-50 bg-black">
-          <IptvPlayer channelId={playerChannel.id} streamUrl={optimizedStreamUrl || playerChannel.stream_url} channelName={playerChannel.name} channelLogo={playerChannel.tvg_logo} options={{
+          <IptvPlayer channelId={playerChannel.id} streamUrl={playerChannel.stream_url} channelName={playerChannel.name} channelLogo={playerChannel.tvg_logo} options={{
         preferLowLatency: true,
         maxRetries: 3
       }} onEvent={(evt, data) => {
@@ -595,6 +571,7 @@ export default function AppPlayer() {
           setPlayerChannel(null);
           refreshContinueWatching();
           resumeWarming();
+          resumeBackgroundLoading?.(); // Resume playlist sync
         } else if (evt === 'error') {
           console.error('Player error:', data);
         }
