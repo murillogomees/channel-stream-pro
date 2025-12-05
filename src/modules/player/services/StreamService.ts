@@ -194,9 +194,9 @@ class StreamService {
       };
     }
 
-    // Para VOD/MP4: SEMPRE link direto (proxy quebra seeking em arquivos grandes)
-    if (this.isVodContent(channel)) {
-      console.log('[StreamService] 🎬 VOD - Link Direto (sem proxy):', channel.name);
+    // Para VOD HTTPS: link direto
+    if (this.isVodContent(channel) && streamUrl.startsWith('https://')) {
+      console.log('[StreamService] 🎬 VOD HTTPS - Link Direto:', channel.name);
       return {
         url: streamUrl,
         source: 'direct',
@@ -204,7 +204,7 @@ class StreamService {
       };
     }
 
-    // Para HTTPS: link direto
+    // Para HTTPS genérico: link direto
     if (streamUrl.startsWith('https://')) {
       console.log('[StreamService] 🔒 HTTPS - Link Direto:', channel.name);
       return {
@@ -214,7 +214,7 @@ class StreamService {
       };
     }
 
-    // Proxy apenas para HTTP não-VOD em página HTTPS (Mixed Content)
+    // PRIORIDADE 4: Proxy (HTTP em página HTTPS - Mixed Content)
     if (streamUrl.startsWith('http://')) {
       console.log('[StreamService] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
       return {

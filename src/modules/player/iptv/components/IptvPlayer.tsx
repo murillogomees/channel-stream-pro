@@ -138,15 +138,10 @@ export const IptvPlayer = memo(function IptvPlayer({
     
     setCurrentChannel(virtualChannel);
     
-    // Optimize URL - always handle HTTP→HTTPS proxy for Mixed Content
-    const optimized = streamOptimizer.optimize(streamUrl);
-    console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol, optimized.requiresProxy);
-    
-    // Use optimized URL (proxied if HTTP on HTTPS page)
-    const finalUrl = optimized.url;
-    console.log('[IptvPlayer] Final URL:', finalUrl.substring(0, 100));
-    
-    setSource(finalUrl);
+    // Pass ORIGINAL URL to setSource - useVideoJs handles proxy internally
+    // Don't double-optimize here or protocol detection will fail
+    console.log('[IptvPlayer] Setting source (original URL)');
+    setSource(streamUrl);
     onEventRef.current?.('ready', { channelCount: 1 });
   }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource]);
 
@@ -154,14 +149,14 @@ export const IptvPlayer = memo(function IptvPlayer({
   const selectChannel = useCallback((channel: IptvChannel) => {
     setCurrentChannel(channel);
     
-    // Use CDN failover to get optimal URL
+    // Initialize CDN failover for retry tracking
     const endpoints = cdnFailover.buildEndpointsFromUrl(channel.url, channel.id);
     cdnFailover.initialize(endpoints);
     
-    const url = cdnFailover.getCurrentUrl();
-    if (url) {
-      setSource(url);
-    }
+    // Pass ORIGINAL URL to setSource - useVideoJs handles proxy internally
+    // Don't pass pre-proxied URL or protocol detection will fail
+    console.log('[IptvPlayer] selectChannel:', channel.name);
+    setSource(channel.url);
     
     onEventRef.current?.('channelchange', { channel });
   }, [setSource]);
