@@ -23,6 +23,8 @@ import type { MovieSortOption, SeriesSortOption } from '@/features/player/compon
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
 import { useOptimizedPlaylist } from '@/hooks/useOptimizedPlaylist';
+import { streamService } from '@/modules/player/services/StreamService';
+
 export default function AppPlayer() {
   const navigate = useNavigate();
   const {
@@ -563,7 +565,7 @@ export default function AppPlayer() {
 
       {/* Player Dialog - IptvPlayer Modular */}
       {showPlayerDialog && playerChannel && <div className="fixed inset-0 z-50 bg-black">
-          <IptvPlayer channelId={playerChannel.id} streamUrl={playerChannel.stream_url} channelName={playerChannel.name} channelLogo={playerChannel.tvg_logo} options={{
+          <IptvPlayer channelId={playerChannel.id} streamUrl={streamService.getPlayableUrl(playerChannel)} channelName={playerChannel.name} channelLogo={playerChannel.tvg_logo} options={{
         preferLowLatency: true,
         maxRetries: 3
       }} onEvent={(evt, data) => {
