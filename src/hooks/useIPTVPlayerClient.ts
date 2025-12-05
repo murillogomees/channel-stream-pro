@@ -838,7 +838,7 @@ export function useIPTVPlayerClient() {
     }
   }, [loadPlaylistFromURL, loadFromPlaylistServe]);
 
-  // Initialize on mount
+  // Initialize on mount - FIXED: empty dependency array to run only once
   useEffect(() => {
     findAssignedPlaylist();
     
@@ -847,7 +847,8 @@ export function useIPTVPlayerClient() {
         abortControllerRef.current.abort();
       }
     };
-  }, [findAssignedPlaylist]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Channel navigation
   const changeChannel = useCallback((channel: Channel) => {
