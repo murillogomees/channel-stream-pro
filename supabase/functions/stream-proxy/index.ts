@@ -1,57 +1,201 @@
 /**
  * ============================================================================
- * IPTV Stream Proxy - Netflix-Grade Performance V4
+ * IPTV Stream Proxy - Netflix-Grade Performance V5 (SECURITY HARDENED)
  * ============================================================================
  * 
  * Proxy otimizado para streams HLS/IPTV com:
+ * - Domain whitelisting for security
+ * - Rate limiting per IP
+ * - Playback token integration
  * - Cache agressivo para segmentos (até 5 min)
  * - Connection pooling e keep-alive
  * - Compression automática
  * - Retry exponencial com jitter
  * - Headers otimizados para CDN
- * - Prefetch de segmentos adjacentes
  * 
- * @version 4.0.0
+ * @version 5.0.0
  */
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // =============================================================================
 // CORS HEADERS
 // =============================================================================
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept-encoding',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept-encoding, x-playback-token',
   'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, X-Cache-Status',
 } as const;
 
 // =============================================================================
+// SECURITY CONFIGURATION
+// =============================================================================
+const SECURITY = {
+  // Allowed upstream domains (whitelist)
+  ALLOWED_DOMAINS: [
+    // IPTV providers
+    '.m3u8',
+    '.ts',
+    'xtream',
+    'live.',
+    'vod.',
+    'series.',
+    'movie.',
+    // CDN domains
+    'cloudflare',
+    'akamai',
+    'fastly',
+    'cloudfront',
+    'cdn.',
+    // R2 storage
+    'r2.cloudflarestorage.com',
+    // Our own domains
+    'iptvlink.com.br',
+    'iptvlink.app',
+  ],
+  
+  // Blocked patterns (blacklist)
+  BLOCKED_PATTERNS: [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '10.',
+    '172.16.',
+    '172.17.',
+    '172.18.',
+    '172.19.',
+    '172.20.',
+    '172.21.',
+    '172.22.',
+    '172.23.',
+    '172.24.',
+    '172.25.',
+    '172.26.',
+    '172.27.',
+    '172.28.',
+    '172.29.',
+    '172.30.',
+    '172.31.',
+    '192.168.',
+    'metadata.google',
+    '169.254.',
+    'supabase.co',
+    'supabase.in',
+  ],
+  
+  // Rate limiting
+  RATE_LIMIT: {
+    WINDOW_MS: 60000, // 1 minute
+    MAX_REQUESTS: 300, // 300 requests per minute per IP
+  },
+} as const;
+
+// In-memory rate limit tracking
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+// =============================================================================
 // CONFIGURATION - NETFLIX-GRADE SETTINGS
 // =============================================================================
 const CONFIG = {
-  // Timeouts - OTIMIZADOS para startup rápido
-  FETCH_TIMEOUT_MS: 15000,        // Reduzido de 30s para 15s
-  MANIFEST_FETCH_TIMEOUT_MS: 8000, // Reduzido de 15s para 8s
-  LIVE_FETCH_TIMEOUT_MS: 10000,   // Timeout específico para live
+  // Timeouts
+  FETCH_TIMEOUT_MS: 15000,
+  MANIFEST_FETCH_TIMEOUT_MS: 8000,
+  LIVE_FETCH_TIMEOUT_MS: 10000,
   
-  // Retry settings - REDUZIDOS para falha rápida
-  MAX_RETRIES: 2,                  // Reduzido de 4 para 2
-  MANIFEST_MAX_RETRIES: 1,         // Manifests: apenas 1 retry
-  RETRY_DELAY_BASE_MS: 200,        // Reduzido de 300ms
-  RETRY_JITTER_MS: 50,             // Reduzido de 100ms
+  // Retry settings
+  MAX_RETRIES: 2,
+  MANIFEST_MAX_RETRIES: 1,
+  RETRY_DELAY_BASE_MS: 200,
+  RETRY_JITTER_MS: 50,
   
-  // Cache settings - agressivo para melhor performance
-  MANIFEST_CACHE_SECONDS: 5,       // Manifests: curto para updates
-  SEGMENT_CACHE_SECONDS: 300,      // Segmentos: 5 min (imutáveis)
-  VOD_SEGMENT_CACHE_SECONDS: 3600, // VOD: 1 hora
-  KEY_CACHE_SECONDS: 3600,         // Chaves DRM: 1 hora
+  // Cache settings
+  MANIFEST_CACHE_SECONDS: 5,
+  SEGMENT_CACHE_SECONDS: 300,
+  VOD_SEGMENT_CACHE_SECONDS: 3600,
+  KEY_CACHE_SECONDS: 3600,
   
   // Prefetch
   PREFETCH_ENABLED: true,
   PREFETCH_SEGMENTS: 2,
   
   // Quality
-  MAX_BANDWIDTH_HINT: 10000000, // 10 Mbps hint
+  MAX_BANDWIDTH_HINT: 10000000,
 } as const;
+
+// =============================================================================
+// SECURITY FUNCTIONS
+// =============================================================================
+
+function isDomainAllowed(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    // Check blocked patterns first (SSRF protection)
+    for (const blocked of SECURITY.BLOCKED_PATTERNS) {
+      if (hostname.includes(blocked) || url.includes(blocked)) {
+        console.log(`[Proxy] BLOCKED: ${hostname} matches blocked pattern: ${blocked}`);
+        return false;
+      }
+    }
+    
+    // For IPTV content, we allow most external domains but block internal
+    // The whitelist is more permissive for media content
+    const urlLower = url.toLowerCase();
+    
+    // Allow if URL contains allowed patterns (media files, CDNs)
+    for (const allowed of SECURITY.ALLOWED_DOMAINS) {
+      if (hostname.includes(allowed) || urlLower.includes(allowed)) {
+        return true;
+      }
+    }
+    
+    // Allow any HTTP/HTTPS URL that isn't blocked (for IPTV flexibility)
+    // The SSRF protection from blocked patterns is the main security layer
+    if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + SECURITY.RATE_LIMIT.WINDOW_MS });
+    return { allowed: true, remaining: SECURITY.RATE_LIMIT.MAX_REQUESTS - 1 };
+  }
+  
+  if (entry.count >= SECURITY.RATE_LIMIT.MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: SECURITY.RATE_LIMIT.MAX_REQUESTS - entry.count };
+}
+
+async function verifyPlaybackToken(token: string, supabase: any): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('validate_playback_token', {
+      p_token_hash: token,
+      p_ip_address: null
+    });
+    
+    if (error || !data) {
+      return false;
+    }
+    
+    return data.valid === true;
+  } catch {
+    return false;
+  }
+}
 
 // =============================================================================
 // IN-MEMORY CACHE (Edge Function instance)
@@ -69,7 +213,6 @@ function getCached(key: string): { data: string | ArrayBuffer; contentType: stri
 }
 
 function setCache(key: string, data: string | ArrayBuffer, contentType: string, ttlSeconds: number): void {
-  // LRU-like cleanup
   if (memoryCache.size >= MEMORY_CACHE_MAX_SIZE) {
     const oldest = memoryCache.keys().next().value;
     if (oldest) memoryCache.delete(oldest);
@@ -195,19 +338,16 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 }
 
 // =============================================================================
-// HTTP FETCHING - OPTIMIZED WITH CONNECTION REUSE
+// HTTP FETCHING
 // =============================================================================
 
 function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null): Headers {
   const headers = new Headers();
-  
-  // Optimized User-Agent that works with most CDNs
   headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   headers.set('Accept', '*/*');
   headers.set('Accept-Language', 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7');
   headers.set('Connection', 'keep-alive');
   
-  // Accept compression for manifests
   if (acceptEncoding) {
     headers.set('Accept-Encoding', acceptEncoding);
   }
@@ -264,7 +404,6 @@ async function fetchWithRetry(
       lastError = err as Error;
       const msg = lastError.message || '';
       
-      // Fallback HTTPS → HTTP on TLS errors
       if (attempt === 0 && urlToFetch.startsWith('https://')) {
         const tlsIndicators = ['tls', 'ssl', 'certificate', 'handshake', 'corrupt', 'CERT'];
         if (tlsIndicators.some(ind => msg.toLowerCase().includes(ind.toLowerCase()))) {
@@ -296,9 +435,33 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
+  // Get client IP for rate limiting
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                   req.headers.get('cf-connecting-ip') || 
+                   'unknown';
+
+  // Check rate limit
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    console.log(`[Proxy] RATE LIMITED: ${clientIp}`);
+    return new Response(
+      JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+      { 
+        status: 429, 
+        headers: { 
+          ...CORS_HEADERS, 
+          'Content-Type': 'application/json',
+          'Retry-After': '60',
+          'X-RateLimit-Remaining': '0'
+        } 
+      }
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const streamUrl = url.searchParams.get('url');
+    const playbackToken = url.searchParams.get('token') || req.headers.get('x-playback-token');
 
     if (!streamUrl) {
       return new Response(
@@ -308,24 +471,37 @@ Deno.serve(async (req) => {
     }
 
     const decodedUrl = decodeURIComponent(streamUrl);
+
+    // Security: Domain whitelist check
+    if (!isDomainAllowed(decodedUrl)) {
+      console.log(`[Proxy] DOMAIN BLOCKED: ${decodedUrl.substring(0, 100)}`);
+      return new Response(
+        JSON.stringify({ error: 'Domain not allowed' }),
+        { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Optional: Verify playback token for premium content
+    if (playbackToken) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      const isValid = await verifyPlaybackToken(playbackToken, supabase);
+      if (!isValid) {
+        console.log(`[Proxy] Invalid playback token`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired playback token' }),
+          { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     const origin = getOrigin(decodedUrl);
     const isVideoSegment = isSegment(decodedUrl);
     const isLiveStream = isDirectStream(decodedUrl);
     const isVod = isVodContent(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
-    
-    // VOD content: Stream through proxy (redirect causes Mixed Content block)
-    // Use range requests for better performance with large files
-    if (isVod && !isHlsContent(decodedUrl, null)) {
-      console.log(`[Proxy] VOD detected, streaming: ${decodedUrl.substring(0, 50)}...`);
-      // Fall through to normal streaming logic below
-    }
-    
-    // Direct live stream: Stream through proxy (redirect causes Mixed Content block)
-    if (isLiveStream) {
-      console.log(`[Proxy] Direct live stream, streaming: ${decodedUrl.substring(0, 50)}...`);
-      // Fall through to normal streaming logic below
-    }
     
     // Determine content type for logging
     const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : 'M3U';
@@ -335,10 +511,10 @@ Deno.serve(async (req) => {
     if (reqType === 'M3U' || reqType === 'KEY') {
       const cached = getCached(cacheKey);
       if (cached) {
-        console.log(`[Proxy] CACHE HIT ${reqType}: ${decodedUrl.substring(0, 50)}...`);
         const responseHeaders = new Headers(CORS_HEADERS);
         responseHeaders.set('Content-Type', cached.contentType);
         responseHeaders.set('X-Cache-Status', 'HIT');
+        responseHeaders.set('X-RateLimit-Remaining', String(rateLimit.remaining));
         responseHeaders.set('Cache-Control', `public, max-age=${reqType === 'KEY' ? CONFIG.KEY_CACHE_SECONDS : CONFIG.MANIFEST_CACHE_SECONDS}`);
         return new Response(cached.data, { status: 200, headers: responseHeaders });
       }
@@ -390,7 +566,6 @@ Deno.serve(async (req) => {
     const isHls = isHlsContent(decodedUrl, contentType);
     
     if (!contentType || contentType === 'application/octet-stream') {
-      // Detect correct content type based on URL
       const urlLower = decodedUrl.toLowerCase();
       if (isHls) {
         contentType = 'application/vnd.apple.mpegurl';
@@ -411,6 +586,7 @@ Deno.serve(async (req) => {
     const responseHeaders = new Headers(CORS_HEADERS);
     responseHeaders.set('Content-Type', contentType);
     responseHeaders.set('X-Cache-Status', 'MISS');
+    responseHeaders.set('X-RateLimit-Remaining', String(rateLimit.remaining));
     responseHeaders.set('Vary', 'Accept-Encoding');
     
     // Optimized cache control
@@ -432,7 +608,6 @@ Deno.serve(async (req) => {
       
       const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl);
       
-      // Cache manifest
       setCache(cacheKey, rewrittenManifest, 'application/vnd.apple.mpegurl', CONFIG.MANIFEST_CACHE_SECONDS);
       
       const duration = Date.now() - startTime;
@@ -494,17 +669,17 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[Proxy] Error: ${message}`);
     
-    // Timeout specific
-    if (message.includes('abort') || message.includes('timeout')) {
-      return new Response(
-        JSON.stringify({ error: 'Stream timeout - try again' }), 
-        { status: 504, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-      );
-    }
+    const isTimeout = message.includes('abort') || message.includes('timeout');
     
     return new Response(
-      JSON.stringify({ error: message }), 
-      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: isTimeout ? 'Upstream timeout' : 'Proxy error',
+        details: message
+      }),
+      { 
+        status: isTimeout ? 504 : 502, 
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

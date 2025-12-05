@@ -1,12 +1,14 @@
 /**
  * CDN Token Service
  * 
- * Generates signed JWT tokens for manifest access with:
+ * SECURITY HARDENED: Requires authentication for token generation
+ * 
+ * Features:
+ * - JWT authentication for generate action
+ * - Subscription status verification
  * - Configurable expiration
  * - IP and referrer restrictions
  * - Usage tracking
- * 
- * Token pattern: Manifests require JWT, segments use normalized cache-key
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -73,7 +75,6 @@ async function verifyJWT(token: string, secret: string): Promise<Record<string, 
       ['verify']
     );
     
-    // Decode signature
     const signatureStr = signatureB64.replace(/-/g, '+').replace(/_/g, '/');
     const signatureBytes = Uint8Array.from(atob(signatureStr), c => c.charCodeAt(0));
     
@@ -86,7 +87,6 @@ async function verifyJWT(token: string, secret: string): Promise<Record<string, 
     
     if (!valid) return null;
     
-    // Decode payload
     const payloadStr = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
     const payloadJson = atob(payloadStr);
     return JSON.parse(payloadJson);
@@ -104,6 +104,52 @@ async function hashToken(token: string): Promise<string> {
     .join('');
 }
 
+// Check subscription status
+async function checkSubscriptionStatus(supabase: any, userId: string): Promise<{ valid: boolean; reason?: string }> {
+  try {
+    // Check user subscription via RPC
+    const { data, error } = await supabase.rpc('get_subscription_status', {
+      p_user_id: userId
+    });
+    
+    if (error) {
+      console.log('[CDN-Token] Subscription check error:', error);
+      // If RPC doesn't exist, check profiles directly
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('cliente_ativo, data_vencimento')
+        .eq('id', userId)
+        .single();
+      
+      if (!profile) {
+        return { valid: false, reason: 'User not found' };
+      }
+      
+      if (!profile.cliente_ativo) {
+        return { valid: false, reason: 'Account inactive' };
+      }
+      
+      if (profile.data_vencimento) {
+        const expDate = new Date(profile.data_vencimento);
+        if (expDate < new Date()) {
+          return { valid: false, reason: 'Subscription expired' };
+        }
+      }
+      
+      return { valid: true };
+    }
+    
+    if (!data || data.status === 'expired' || data.status === 'canceled') {
+      return { valid: false, reason: `Subscription ${data?.status || 'invalid'}` };
+    }
+    
+    return { valid: true };
+  } catch (err) {
+    console.error('[CDN-Token] Subscription check failed:', err);
+    return { valid: false, reason: 'Subscription check failed' };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -111,6 +157,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const cdnSecret = Deno.env.get('STREAM_PROXY_SECRET') || 'cdn-signing-secret';
   
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -123,22 +170,63 @@ serve(async (req) => {
       method: req.method, 
       action,
       hasBody: req.body !== null,
-      contentType: req.headers.get('content-type')
     });
 
     if (action === 'generate') {
-      // Generate new signed token
+      // ========================================
+      // SECURITY: Require JWT Authentication
+      // ========================================
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication required', code: 'AUTH_REQUIRED' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const jwt = authHeader.replace('Bearer ', '');
+      
+      // Create client with user's JWT to verify identity
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${jwt}` } }
+      });
+      
+      // Get user from JWT
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ========================================
+      // SECURITY: Verify Subscription Status
+      // ========================================
+      const subscriptionCheck = await checkSubscriptionStatus(supabase, user.id);
+      
+      if (!subscriptionCheck.valid) {
+        console.log(`[CDN-Token] Subscription invalid for user ${user.id}: ${subscriptionCheck.reason}`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Active subscription required', 
+            code: 'SUBSCRIPTION_REQUIRED',
+            reason: subscriptionCheck.reason 
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Parse request body
       let body: any = {};
       try {
         const text = await req.text();
-        console.log('[CDN-Token] Raw body text:', text?.substring(0, 200));
-        
         if (text && text.trim() !== '') {
           body = JSON.parse(text);
-          console.log('[CDN-Token] Parsed body:', body);
         }
       } catch (parseError) {
-        console.error('[CDN-Token] Invalid JSON body for generate:', parseError);
+        console.error('[CDN-Token] Invalid JSON body:', parseError);
         return new Response(
           JSON.stringify({ error: 'Invalid JSON in request body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -148,15 +236,14 @@ serve(async (req) => {
       const {
         r2_key,
         channel_id,
-        user_profile_id,
-        expires_in_seconds = 7200, // 2 hours default
+        expires_in_seconds = 7200,
         ip_restriction,
         referrer_restriction,
         max_uses = 1,
         token_type = 'manifest'
       } = body;
       
-      console.log('[CDN-Token] Extracted fields:', { r2_key, channel_id, token_type });
+      console.log('[CDN-Token] Generating token for user:', user.id, { r2_key, channel_id, token_type });
 
       if (!r2_key) {
         return new Response(
@@ -170,10 +257,10 @@ serve(async (req) => {
 
       const payload = {
         sub: r2_key,
+        uid: user.id,
         iat: now,
         exp,
         cid: channel_id,
-        pid: user_profile_id,
         typ: token_type,
         ip: ip_restriction,
         ref: referrer_restriction,
@@ -191,7 +278,7 @@ serve(async (req) => {
           token_type,
           r2_key,
           channel_id,
-          user_profile_id,
+          user_profile_id: user.id,
           ip_restriction,
           referrer_restriction,
           max_uses,
@@ -206,7 +293,7 @@ serve(async (req) => {
       const r2Domain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.example.com';
       const cdnUrl = `https://${r2Domain}/${r2_key}?jwt=${token}`;
 
-      console.log('[CDN-Token] Generated token', { r2_key, token_type, expires_in_seconds });
+      console.log('[CDN-Token] Generated token for', user.email, { r2_key, token_type, expires_in_seconds });
 
       return new Response(
         JSON.stringify({
@@ -220,7 +307,7 @@ serve(async (req) => {
       );
 
     } else if (action === 'verify') {
-      // Verify existing token
+      // Verify existing token (no auth required - used by CDN worker)
       const token = url.searchParams.get('token');
       const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
       const referrer = req.headers.get('referer');
@@ -300,6 +387,7 @@ serve(async (req) => {
         JSON.stringify({
           valid: true,
           r2_key: payload.sub,
+          user_id: payload.uid,
           channel_id: payload.cid,
           token_type: payload.typ,
           expires_at: payload.exp
@@ -308,7 +396,41 @@ serve(async (req) => {
       );
 
     } else if (action === 'revoke') {
-      // Revoke token
+      // ========================================
+      // SECURITY: Require Admin Auth for Revoke
+      // ========================================
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const jwt = authHeader.replace('Bearer ', '');
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${jwt}` } }
+      });
+      
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check admin status
+      const { data: isAdmin } = await supabase.rpc('is_admin_or_master', { user_id: user.id });
+      
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Admin access required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       let body: any = {};
       try {
         const text = await req.text();
@@ -316,7 +438,6 @@ serve(async (req) => {
           body = JSON.parse(text);
         }
       } catch (parseError) {
-        console.error('[CDN-Token] Invalid JSON body for revoke:', parseError);
         return new Response(
           JSON.stringify({ error: 'Invalid JSON in request body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -332,13 +453,14 @@ serve(async (req) => {
           .update({ revoked_at: new Date().toISOString() })
           .eq('token_hash', tokenHash);
       } else if (channel_id) {
-        // Revoke all tokens for channel
         await supabase
           .from('cdn_signed_tokens')
           .update({ revoked_at: new Date().toISOString() })
           .eq('channel_id', channel_id)
           .is('revoked_at', null);
       }
+
+      console.log('[CDN-Token] Tokens revoked by admin:', user.email);
 
       return new Response(
         JSON.stringify({ success: true }),

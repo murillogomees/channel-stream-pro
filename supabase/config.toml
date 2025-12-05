@@ -255,9 +255,9 @@ verify_jwt = false
 # SECRET VERIFICATION
 # ==========================================
 
-# Check secrets configuration - public endpoint
+# Check secrets configuration - requires admin JWT
 [functions.check-secrets]
-verify_jwt = false
+verify_jwt = true
 
 # ==========================================
 # CDN BULK DOWNLOAD SYSTEM
