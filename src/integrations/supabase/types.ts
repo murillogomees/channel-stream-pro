@@ -7004,27 +7004,6 @@ export type Database = {
       }
     }
     Views: {
-      hypopg_hidden_indexes: {
-        Row: {
-          am_name: unknown
-          index_name: unknown
-          indexrelid: unknown
-          is_hypo: boolean | null
-          schema_name: unknown
-          table_name: unknown
-        }
-        Relationships: []
-      }
-      hypopg_list_indexes: {
-        Row: {
-          am_name: unknown
-          index_name: string | null
-          indexrelid: unknown
-          schema_name: unknown
-          table_name: unknown
-        }
-        Relationships: []
-      }
       profiles_safe: {
         Row: {
           cliente_ativo: boolean | null
@@ -7832,36 +7811,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      hypopg: { Args: never; Returns: Record<string, unknown>[] }
-      hypopg_create_index: {
-        Args: { sql_order: string }
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_drop_index: { Args: { indexid: unknown }; Returns: boolean }
-      hypopg_get_indexdef: { Args: { indexid: unknown }; Returns: string }
-      hypopg_hidden_indexes: {
-        Args: never
-        Returns: {
-          indexid: unknown
-        }[]
-      }
-      hypopg_hide_index: { Args: { indexid: unknown }; Returns: boolean }
-      hypopg_relation_size: { Args: { indexid: unknown }; Returns: number }
-      hypopg_reset: { Args: never; Returns: undefined }
-      hypopg_reset_index: { Args: never; Returns: undefined }
-      hypopg_unhide_all_indexes: { Args: never; Returns: undefined }
-      hypopg_unhide_index: { Args: { indexid: unknown }; Returns: boolean }
-      index_advisor: {
-        Args: { query: string }
-        Returns: {
-          errors: string[]
-          index_statements: string[]
-          startup_cost_after: Json
-          startup_cost_before: Json
-          total_cost_after: Json
-          total_cost_before: Json
-        }[]
       }
       insert_playlist: {
         Args: {
