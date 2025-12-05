@@ -113,7 +113,7 @@ export function CDNConfigPanel() {
           config_value: config,
           description: 'Configurações do CDN R2 e sistema de download',
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'config_key' });
 
       if (error) throw error;
 
