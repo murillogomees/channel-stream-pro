@@ -1,6 +1,7 @@
 /**
  * Smart TV Detection and Platform Configuration
  * Detects Samsung Tizen, LG WebOS, Android TV, Fire TV, Roku, etc.
+ * Uses platform-specific player configurations from system spec
  */
 
 export type SmartTvPlatform = 
@@ -8,28 +9,56 @@ export type SmartTvPlatform =
   | 'webos'      // LG Smart TV
   | 'android_tv' // Android TV / Google TV
   | 'fire_tv'    // Amazon Fire TV
-  | 'roku'       // Roku (limited web support)
+  | 'roku'       // Roku
   | 'chromecast' // Chromecast
   | 'playstation'// PlayStation browser
   | 'xbox'       // Xbox browser
   | 'desktop'    // Desktop browser
-  | 'mobile'     // Mobile browser
+  | 'ios'        // iOS
+  | 'android'    // Android mobile
+  | 'web'        // Web/PWA
   | 'unknown';
+
+export interface PlatformPlayerConfig {
+  webWorkers: boolean;
+  buffer: number;
+  lowLatency: boolean;
+  retries: number;
+  fragmentSize: number;
+}
 
 export interface SmartTvInfo {
   platform: SmartTvPlatform;
   isSmartTv: boolean;
-  isTv: boolean; // Includes desktop TVs
+  isTv: boolean;
   supportsWebWorkers: boolean;
-  supportsMSE: boolean; // Media Source Extensions
+  supportsMSE: boolean;
   supportsHls: boolean;
-  recommendedBufferSize: number; // seconds
+  recommendedBufferSize: number;
   maxResolution: '4k' | '1080p' | '720p' | '480p';
   hasHardwareDecoding: boolean;
   remoteFriendly: boolean;
+  playerConfig: PlatformPlayerConfig;
   model?: string;
   osVersion?: string;
 }
+
+// Platform-specific configurations from system spec
+const PLATFORM_CONFIGS: Record<SmartTvPlatform, PlatformPlayerConfig> = {
+  tizen: { webWorkers: false, buffer: 30, lowLatency: false, retries: 6, fragmentSize: 4 },
+  webos: { webWorkers: true, buffer: 30, lowLatency: false, retries: 5, fragmentSize: 4 },
+  roku: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  android_tv: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  fire_tv: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  android: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  ios: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  desktop: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  web: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  chromecast: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  playstation: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  xbox: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+  unknown: { webWorkers: true, buffer: 20, lowLatency: false, retries: 4, fragmentSize: 2 },
+};
 
 interface TizenWindow extends Window {
   tizen?: {
@@ -66,18 +95,20 @@ class SmartTvDetection {
 
     const ua = navigator.userAgent.toLowerCase();
     const platform = this.detectPlatform(ua);
+    const playerConfig = PLATFORM_CONFIGS[platform];
     
     this.cachedInfo = {
       platform,
       isSmartTv: this.isSmartTvPlatform(platform),
       isTv: this.isTvPlatform(platform),
-      supportsWebWorkers: this.checkWebWorkersSupport(platform),
+      supportsWebWorkers: playerConfig.webWorkers && typeof Worker !== 'undefined',
       supportsMSE: this.checkMseSupport(),
       supportsHls: this.checkHlsSupport(),
-      recommendedBufferSize: this.getRecommendedBuffer(platform),
+      recommendedBufferSize: playerConfig.buffer,
       maxResolution: this.getMaxResolution(platform),
       hasHardwareDecoding: this.hasHardwareDecoding(platform),
       remoteFriendly: this.isRemoteFriendly(platform),
+      playerConfig,
       ...this.getModelInfo(platform),
     };
 
@@ -98,7 +129,7 @@ class SmartTvDetection {
     
     // Fire TV
     if (ua.includes('aftm') || ua.includes('aftt') || ua.includes('afts') || ua.includes('silk')) {
-      if (ua.includes('mobile')) return 'mobile';
+      if (ua.includes('mobile')) return 'android';
       return 'fire_tv';
     }
     
@@ -122,14 +153,19 @@ class SmartTvDetection {
       return 'xbox';
     }
     
-    // Roku (limited)
+    // Roku
     if (ua.includes('roku')) {
       return 'roku';
     }
     
-    // Mobile
-    if (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
-      return 'mobile';
+    // iOS
+    if (/iphone|ipad|ipod/i.test(ua)) {
+      return 'ios';
+    }
+    
+    // Android mobile
+    if (/android/i.test(ua)) {
+      return 'android';
     }
     
     // Check for TV-like characteristics
@@ -171,20 +207,6 @@ class SmartTvDetection {
     return ['tizen', 'webos', 'android_tv', 'fire_tv', 'roku', 'chromecast', 'playstation', 'xbox'].includes(platform);
   }
 
-  private checkWebWorkersSupport(platform: SmartTvPlatform): boolean {
-    // Samsung Tizen has buggy Web Worker support
-    if (platform === 'tizen') return false;
-    
-    // Old WebOS versions have issues
-    if (platform === 'webos') {
-      const ua = navigator.userAgent;
-      const webosMatch = ua.match(/Web0S[^\d]*(\d+)/i);
-      if (webosMatch && parseInt(webosMatch[1]) < 5) return false;
-    }
-    
-    return typeof Worker !== 'undefined';
-  }
-
   private checkMseSupport(): boolean {
     return 'MediaSource' in window && 
            typeof MediaSource.isTypeSupported === 'function';
@@ -196,30 +218,12 @@ class SmartTvDetection {
            this.checkMseSupport();
   }
 
-  private getRecommendedBuffer(platform: SmartTvPlatform): number {
-    switch (platform) {
-      case 'tizen':
-      case 'webos':
-        return 30; // Larger buffer for stability
-      case 'fire_tv':
-      case 'android_tv':
-        return 20;
-      case 'chromecast':
-        return 15;
-      case 'roku':
-        return 30;
-      default:
-        return 10;
-    }
-  }
-
   private getMaxResolution(platform: SmartTvPlatform): '4k' | '1080p' | '720p' | '480p' {
     switch (platform) {
       case 'tizen':
       case 'webos':
       case 'android_tv':
       case 'fire_tv':
-        return '4k';
       case 'chromecast':
       case 'playstation':
       case 'xbox':
@@ -265,37 +269,44 @@ class SmartTvDetection {
   }
 
   /**
-   * Get optimized HLS.js config for current platform
+   * Get optimized HLS.js config using platform-specific settings
    */
   getHlsConfig(): Record<string, any> {
     const info = this.detect();
-    
+    const config = info.playerConfig;
+
     const baseConfig = {
-      enableWorker: info.supportsWebWorkers,
-      lowLatencyMode: !info.isSmartTv, // Disable low latency on TVs for stability
-      backBufferLength: 30,
-      maxBufferLength: info.recommendedBufferSize,
-      maxMaxBufferLength: info.recommendedBufferSize * 2,
-      maxBufferSize: 60 * 1000 * 1000, // 60MB
-      maxBufferHole: 0.5,
-      startLevel: -1, // Auto
+      enableWorker: config.webWorkers && info.supportsWebWorkers,
+      lowLatencyMode: config.lowLatency,
+      backBufferLength: info.isTv ? 30 : 60,
+      maxBufferLength: config.buffer,
+      maxMaxBufferLength: config.buffer * 2,
+      maxBufferSize: config.buffer * 2 * 1000 * 1000,
+      maxBufferHole: config.fragmentSize,
+      fragLoadingMaxRetry: config.retries,
+      manifestLoadingMaxRetry: config.retries,
+      levelLoadingMaxRetry: config.retries,
+      fragLoadingRetryDelay: 1000,
+      startLevel: -1,
       capLevelToPlayerSize: true,
+      startFragPrefetch: true,
+      testBandwidth: true,
     };
 
-    // Platform-specific tweaks
+    // Platform-specific optimizations
     if (info.platform === 'tizen') {
       return {
         ...baseConfig,
         enableWorker: false,
         fragLoadingTimeOut: 30000,
-        fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 2000,
         manifestLoadingTimeOut: 20000,
-        manifestLoadingMaxRetry: 4,
         levelLoadingTimeOut: 20000,
         liveSyncDuration: 3,
         liveMaxLatencyDuration: 10,
-        startFragPrefetch: false, // Disable prefetch on Tizen
+        startFragPrefetch: false,
+        abrEwmaDefaultEstimate: 1000000,
+        abrBandWidthFactor: 0.8,
       };
     }
 
@@ -303,18 +314,19 @@ class SmartTvDetection {
       return {
         ...baseConfig,
         fragLoadingTimeOut: 25000,
-        fragLoadingMaxRetry: 5,
         fragLoadingRetryDelay: 1500,
-        startFragPrefetch: true,
+        abrEwmaDefaultEstimate: 1000000,
+        abrBandWidthFactor: 0.8,
       };
     }
 
-    if (info.platform === 'fire_tv' || info.platform === 'android_tv') {
+    if (info.isTv) {
       return {
         ...baseConfig,
         fragLoadingTimeOut: 20000,
-        fragLoadingMaxRetry: 4,
-        startFragPrefetch: true,
+        abrEwmaDefaultEstimate: 1000000,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.5,
       };
     }
 
@@ -328,7 +340,6 @@ class SmartTvDetection {
     const info = this.detect();
     
     if (info.isTv) {
-      // TV viewers sit further away, need larger UI
       return 1.5;
     }
     
@@ -341,6 +352,13 @@ class SmartTvDetection {
   shouldShowFocusIndicators(): boolean {
     const info = this.detect();
     return info.isTv || info.remoteFriendly;
+  }
+
+  /**
+   * Get platform config
+   */
+  getPlatformConfig(): PlatformPlayerConfig {
+    return this.detect().playerConfig;
   }
 }
 
