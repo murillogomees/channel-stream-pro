@@ -57,6 +57,14 @@ export type { ChannelMetrics, AggregatedMetrics, MetricsTimeRange } from './useC
 export { useSmartCache } from './useSmartCache';
 export type { SmartCacheStats, UseSmartCacheOptions } from './useSmartCache';
 
+// Viewer Profiles & Content
+export { useViewerProfiles } from './useViewerProfiles';
+export type { ViewerProfile, CreateProfileInput, UpdateProfileInput } from './useViewerProfiles';
+export { useWatchHistory } from './useWatchHistory';
+export type { WatchHistoryItem } from './useWatchHistory';
+export { useFavorites } from './useFavorites';
+export type { FavoriteItem } from './useFavorites';
+
 // Re-export types
 export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
 export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';

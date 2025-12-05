@@ -2126,6 +2126,50 @@ export type Database = {
         }
         Relationships: []
       }
+      favorites: {
+        Row: {
+          content_category: string | null
+          content_id: string
+          content_logo: string | null
+          content_name: string
+          content_type: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          profile_id: string
+        }
+        Insert: {
+          content_category?: string | null
+          content_id: string
+          content_logo?: string | null
+          content_name: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+        }
+        Update: {
+          content_category?: string | null
+          content_id?: string
+          content_logo?: string | null
+          content_name?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "viewer_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_flag_config: {
         Row: {
           created_at: string
