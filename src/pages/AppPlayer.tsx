@@ -95,6 +95,7 @@ export default function AppPlayer() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [playerChannel, setPlayerChannel] = useState<any>(null);
+  const [optimizedStreamUrl, setOptimizedStreamUrl] = useState<string | null>(null);
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
   const [movieSortBy, setMovieSortBy] = useState<MovieSortOption>('name');
   const [seriesSortBy, setSeriesSortBy] = useState<SeriesSortOption>('name');
@@ -402,21 +403,21 @@ export default function AppPlayer() {
     return streamService.getPlayableUrl(channel);
   }, []);
 
-  // Prefetch optimized URL when channel is selected (async optimization)
+  // Fetch optimized URL when channel is selected
   useEffect(() => {
     if (playerChannel) {
+      setOptimizedStreamUrl(null); // Reset while loading
       streamService.getOptimizedUrl(playerChannel)
         .then(result => {
-          // Log com formato mais claro
-          console.log('[AppPlayer] URL pronta:', {
-            source: result.source,
-            url: result.url,
-            fallback: result.fallbackUrl,
-          });
+          console.log('[AppPlayer] URL otimizada:', result.url);
+          setOptimizedStreamUrl(result.url);
         })
         .catch(err => {
-          console.warn('[AppPlayer] URL optimization failed:', err);
+          console.warn('[AppPlayer] URL optimization failed, using original:', err);
+          setOptimizedStreamUrl(playerChannel.stream_url);
         });
+    } else {
+      setOptimizedStreamUrl(null);
     }
   }, [playerChannel]);
 
@@ -708,7 +709,7 @@ export default function AppPlayer() {
         <div className="fixed inset-0 z-50 bg-black">
           <IptvPlayer
             channelId={playerChannel.id}
-            streamUrl={playerChannel.stream_url}
+            streamUrl={optimizedStreamUrl || playerChannel.stream_url}
             channelName={playerChannel.name}
             channelLogo={playerChannel.tvg_logo}
             options={{
