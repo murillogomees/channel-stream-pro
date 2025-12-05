@@ -2,12 +2,12 @@
  * CDN Prewarm Service
  * 
  * Nightly job to prefetch first N segments of top predicted assets.
- * Uses shared R2 config helper for CDN URL generation.
+ * Fetches directly from R2 using S3 API to bypass CDN authentication.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { R2_CDN_BASE_URL } from "../_shared/r2-config.ts";
+import { getFromR2, checkR2Config } from "../_shared/r2-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,55 +49,46 @@ function parseHlsManifest(content: string, baseUrl: string): string[] {
   return segments;
 }
 
-// Prewarm a single asset
+// Prewarm a single asset by fetching directly from R2
 async function prewarmAsset(
-  cdnUrl: string,
+  r2Key: string,
   segmentsToFetch: number,
   timeoutMs: number
 ): Promise<{ success: boolean; segments: number; bytes: number; error?: string }> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    // Check R2 config first
+    const r2Status = checkR2Config();
+    if (!r2Status.configured) {
+      return { 
+        success: false, 
+        segments: 0, 
+        bytes: 0, 
+        error: `R2 not configured: ${r2Status.missing.join(', ')}` 
+      };
+    }
     
-    const isHlsManifest = cdnUrl.includes('.m3u8');
-    const isMp4 = cdnUrl.includes('.mp4') || cdnUrl.includes('/vod/');
+    const isHlsManifest = r2Key.includes('.m3u8');
+    const isMp4 = r2Key.includes('.mp4') || r2Key.includes('/vod/');
     
     if (isHlsManifest) {
-      const manifestResponse = await fetch(cdnUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'CDN-Prewarm-Bot/1.0',
-          'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
-        }
-      });
-      
-      if (!manifestResponse.ok) {
-        clearTimeout(timeout);
-        return { success: false, segments: 0, bytes: 0, error: `Manifest fetch failed: ${manifestResponse.status}` };
+      // Fetch manifest from R2
+      const manifestData = await getFromR2(r2Key);
+      if (!manifestData) {
+        return { success: false, segments: 0, bytes: 0, error: 'Manifest not found in R2' };
       }
       
-      const manifestContent = await manifestResponse.text();
-      const segments = parseHlsManifest(manifestContent, cdnUrl);
+      const manifestContent = new TextDecoder().decode(manifestData.body);
+      const segments = parseHlsManifest(manifestContent, r2Key);
       
-      let fetchedSegments = 0;
-      let totalBytes = 0;
+      let fetchedSegments = 1; // Count manifest itself
+      let totalBytes = manifestData.body.length;
       const segmentsToPrewarm = segments.slice(0, segmentsToFetch);
       
-      for (const segmentUrl of segmentsToPrewarm) {
+      for (const segmentKey of segmentsToPrewarm) {
         try {
-          const normalizedUrl = segmentUrl.split('?')[0];
-          
-          const segmentResponse = await fetch(normalizedUrl, {
-            signal: controller.signal,
-            headers: {
-              'User-Agent': 'CDN-Prewarm-Bot/1.0',
-              'Accept': 'video/mp2t, application/octet-stream, */*'
-            }
-          });
-          
-          if (segmentResponse.ok) {
-            const body = await segmentResponse.arrayBuffer();
-            totalBytes += body.byteLength;
+          const segmentData = await getFromR2(segmentKey);
+          if (segmentData) {
+            totalBytes += segmentData.body.length;
             fetchedSegments++;
           }
         } catch (segError) {
@@ -105,49 +96,26 @@ async function prewarmAsset(
         }
       }
       
-      clearTimeout(timeout);
       return { success: true, segments: fetchedSegments, bytes: totalBytes };
       
     } else if (isMp4) {
-      const rangeSize = 5 * 1024 * 1024;
-      
-      const response = await fetch(cdnUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'CDN-Prewarm-Bot/1.0',
-          'Accept': 'video/mp4, video/*, */*',
-          'Range': `bytes=0-${rangeSize - 1}`
-        }
-      });
-      
-      if (!response.ok && response.status !== 206) {
-        clearTimeout(timeout);
-        return { success: false, segments: 0, bytes: 0, error: `Video fetch failed: ${response.status}` };
+      // For MP4/VOD, fetch from R2 directly
+      const videoData = await getFromR2(r2Key);
+      if (!videoData) {
+        return { success: false, segments: 0, bytes: 0, error: 'Video not found in R2' };
       }
       
-      const body = await response.arrayBuffer();
-      clearTimeout(timeout);
-      
-      return { success: true, segments: 1, bytes: body.byteLength };
+      // We got the file, prewarm successful (R2 internally warms its cache)
+      return { success: true, segments: 1, bytes: videoData.body.length };
       
     } else {
-      const response = await fetch(cdnUrl, {
-        method: 'HEAD',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'CDN-Prewarm-Bot/1.0',
-          'Accept': '*/*'
-        }
-      });
-      
-      clearTimeout(timeout);
-      
-      if (!response.ok) {
-        return { success: false, segments: 0, bytes: 0, error: `HEAD request failed: ${response.status}` };
+      // For other content, just verify it exists
+      const data = await getFromR2(r2Key);
+      if (!data) {
+        return { success: false, segments: 0, bytes: 0, error: 'Object not found in R2' };
       }
       
-      const contentLength = parseInt(response.headers.get('content-length') || '0');
-      return { success: true, segments: 1, bytes: contentLength };
+      return { success: true, segments: 1, bytes: data.body.length };
     }
     
   } catch (error) {
@@ -162,7 +130,7 @@ async function prewarmAsset(
 
 // Process prewarm queue with concurrency control
 async function processPrewarmQueue(
-  assets: Array<{ r2_key: string; cdn_url: string; channel_id: string }>,
+  assets: Array<{ r2_key: string; channel_id: string }>,
   config: PrewarmConfig,
   updateProgress: (prewarmed: number, failed: number, bytes: number) => Promise<void>
 ): Promise<{ prewarmed: number; failed: number; totalBytes: number; errors: string[] }> {
@@ -175,7 +143,7 @@ async function processPrewarmQueue(
     const batch = assets.slice(i, i + config.concurrency);
     
     const results = await Promise.all(
-      batch.map(asset => prewarmAsset(asset.cdn_url, config.segmentsPerAsset, config.timeoutMs))
+      batch.map(asset => prewarmAsset(asset.r2_key, config.segmentsPerAsset, config.timeoutMs))
     );
     
     for (let j = 0; j < results.length; j++) {
@@ -287,36 +255,25 @@ serve(async (req) => {
       throw new Error(`Failed to fetch predictions: ${fetchError.message}`);
     }
 
-    let assetsWithUrls = [];
+    let assetsToWarm: Array<{ r2_key: string; channel_id: string }> = [];
     
     if (predictions && predictions.length > 0) {
-      const { data: r2Objects, error: r2Error } = await supabase
-        .from('r2_storage_objects')
-        .select('r2_key, cdn_url, source_channel_id')
-        .in('r2_key', predictions.map(p => p.r2_key).filter(Boolean))
-        .eq('status', 'ready');
+      // Use predictions that have r2_key
+      assetsToWarm = predictions
+        .filter(p => p.r2_key)
+        .map(p => ({
+          r2_key: p.r2_key!,
+          channel_id: p.channel_id
+        }));
       
-      if (r2Error) {
-        console.error('[CDN-Prewarm] Error fetching R2 objects:', r2Error);
-      }
-      
-      console.log('[CDN-Prewarm] Found R2 objects:', r2Objects?.length || 0);
-      
-      assetsWithUrls = predictions
-        .map(p => {
-          const r2Object = r2Objects?.find(r => r.r2_key === p.r2_key);
-          return r2Object ? {
-            ...p,
-            cdn_url: r2Object.cdn_url
-          } : null;
-        })
-        .filter(Boolean);
+      console.log('[CDN-Prewarm] Found predictions with R2 keys:', assetsToWarm.length);
     }
     
-    if (!assetsWithUrls || assetsWithUrls.length === 0) {
+    if (assetsToWarm.length === 0) {
+      // Fallback to r2_storage_objects
       const { data: fallbackAssets } = await supabase
         .from('r2_storage_objects')
-        .select('r2_key, source_channel_id, cdn_url')
+        .select('r2_key, source_channel_id')
         .eq('status', 'ready')
         .in('content_type', ['vod', 'manifest'])
         .order('access_count', { ascending: false })
@@ -334,19 +291,16 @@ serve(async (req) => {
         );
       }
       
-      assetsWithUrls = fallbackAssets.map(a => ({
-        channel_id: a.source_channel_id,
+      assetsToWarm = fallbackAssets.map(a => ({
         r2_key: a.r2_key,
-        cdn_url: a.cdn_url,
-        predicted_views: 0,
-        moving_avg_views: 0,
-        ml_score: null,
-        priority_rank: 0
+        channel_id: a.source_channel_id
       }));
+      
+      console.log('[CDN-Prewarm] Using fallback assets:', assetsToWarm.length);
     }
 
     // Create prewarm job record
-    const targetKeys = assetsWithUrls.map(p => p.r2_key).filter(Boolean);
+    const targetKeys = assetsToWarm.map(p => p.r2_key).filter(Boolean);
     const { data: job, error: jobError } = await supabase
       .from('cdn_prewarm_jobs')
       .insert({
@@ -354,7 +308,7 @@ serve(async (req) => {
         status: 'running',
         target_r2_keys: targetKeys,
         segments_per_asset: config.segmentsPerAsset,
-        total_assets: assetsWithUrls.length,
+        total_assets: assetsToWarm.length,
         started_at: new Date().toISOString()
       })
       .select()
@@ -364,29 +318,7 @@ serve(async (req) => {
       throw new Error(`Failed to create job: ${jobError.message}`);
     }
 
-    // Prepare assets for prewarming
-    const assets = assetsWithUrls
-      .filter(p => {
-        if (!p.cdn_url) {
-          console.warn('[CDN-Prewarm] No cdn_url for:', p.r2_key);
-          return false;
-        }
-        
-        if (p.cdn_url.includes('https://https//')) {
-          console.error('[CDN-Prewarm] Malformed URL detected:', p.cdn_url);
-          return false;
-        }
-        
-        return true;
-      })
-      .map(p => {
-        console.log('[CDN-Prewarm] Preparing asset:', { r2_key: p.r2_key, cdn_url: p.cdn_url });
-        return {
-          r2_key: p.r2_key!,
-          cdn_url: p.cdn_url!,
-          channel_id: p.channel_id
-        };
-      });
+    console.log('[CDN-Prewarm] Starting prewarm for', assetsToWarm.length, 'assets');
 
     // Progress update function
     const updateProgress = async (prewarmed: number, failed: number, bytes: number) => {
@@ -400,8 +332,8 @@ serve(async (req) => {
         .eq('id', job.id);
     };
 
-    // Run prewarm
-    const result = await processPrewarmQueue(assets, config, updateProgress);
+    // Run prewarm directly from R2
+    const result = await processPrewarmQueue(assetsToWarm, config, updateProgress);
 
     // Finalize job
     const avgTime = assets.length > 0 
