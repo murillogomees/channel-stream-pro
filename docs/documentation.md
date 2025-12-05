@@ -1,6 +1,6 @@
 # IPTVLINK - Documentação Técnica Consolidada
 
-> Versão: 1.0 | Última atualização: 2025-12-05
+> Versão: 1.1 | Última atualização: 2025-12-05
 
 ---
 
@@ -17,6 +17,13 @@
 9. [Webhooks e Integrações](#9-webhooks-e-integrações)
 10. [Rate Limiting](#10-rate-limiting)
 11. [Playbooks Operacionais](#11-playbooks-operacionais)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Variáveis de Ambiente](#13-variáveis-de-ambiente)
+14. [Deployment](#14-deployment)
+15. [Edge Functions Reference](#15-edge-functions-reference)
+16. [Backup e Disaster Recovery](#16-backup-e-disaster-recovery)
+17. [Changelog](#17-changelog)
+18. [API Reference](#18-api-reference)
 
 ---
 
@@ -441,14 +448,686 @@ UPDATE streaming_policies SET strategy = 'USE_ORIGIN' WHERE content_type = 'vod'
 
 ---
 
+## 12. Troubleshooting
+
+### Erros Comuns
+
+#### Player não carrega vídeo
+```
+Sintoma: Loading infinito, vídeo não inicia
+Causa: stream-proxy timeout (150s) ou CORS
+Solução:
+1. Verificar logs do stream-proxy
+2. VOD deve usar R2 direto (bypass proxy)
+3. Checar se URL do stream está acessível
+```
+
+#### JWT Expired / Sessão Inválida
+```
+Sintoma: Logout inesperado, erro 401
+Causa: Token expirado não renovado
+Solução:
+1. Limpar localStorage
+2. Fazer logout/login
+3. Verificar custom_access_token_hook
+```
+
+#### M3U Import Falha
+```
+Sintoma: Erro ao importar playlist
+Causa: Arquivo > 60MB ou timeout
+Solução:
+1. Usar paste direto (client-side) para arquivos grandes
+2. Dividir playlist em partes menores
+3. Verificar formato M3U válido
+```
+
+#### RLS Policy Error
+```
+Sintoma: "new row violates row-level security"
+Causa: Política RLS bloqueando operação
+Solução:
+1. Verificar role do usuário no JWT
+2. Executar SELECT * FROM user_roles WHERE user_id = 'xxx'
+3. Ajustar política ou adicionar role
+```
+
+### Diagnóstico de Permissões
+
+```sql
+-- Verificar role atual
+SELECT * FROM user_roles WHERE user_id = auth.uid();
+
+-- Verificar se é admin
+SELECT is_admin_or_master();
+
+-- Claims do JWT (via Edge Function)
+SELECT auth.jwt() -> 'user_metadata' -> 'role';
+```
+
+### Logs e Monitoramento
+
+| Serviço | Localização |
+|---------|-------------|
+| Edge Functions | Supabase Dashboard > Edge Functions > Logs |
+| Database | Supabase Dashboard > Database > Query Logs |
+| CDN Worker | Cloudflare Dashboard > Workers > Logs |
+| Auth | Supabase Dashboard > Authentication > Logs |
+
+### Comandos de Debug
+
+```bash
+# Testar Edge Function
+curl -X POST https://[project].supabase.co/functions/v1/[function] \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Verificar saúde do CDN
+curl https://[cdn-worker].workers.dev/health
+
+# Testar conectividade R2
+curl -I https://[r2-bucket].r2.cloudflarestorage.com/test.txt
+```
+
+---
+
+## 13. Variáveis de Ambiente
+
+### Supabase (Secrets)
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `SUPABASE_URL` | URL do projeto Supabase | ✅ |
+| `SUPABASE_ANON_KEY` | Chave pública anon | ✅ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave service role (admin) | ✅ |
+
+### WhatsApp (BotBot)
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `WHATSAPP_APPKEY` | App key da API BotBot | ✅ |
+| `WHATSAPP_AUTHKEY` | Auth key da API BotBot | ✅ |
+| `WHATSAPP_WEBHOOK_SECRET` | Secret para validar webhooks | ✅ |
+
+### Cloudflare
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare | ✅ |
+| `CLOUDFLARE_API_TOKEN` | Token de API com permissões R2/Workers | ✅ |
+| `R2_ACCESS_KEY_ID` | Access key do R2 | ✅ |
+| `R2_SECRET_ACCESS_KEY` | Secret key do R2 | ✅ |
+| `R2_BUCKET_NAME` | Nome do bucket (iptvlink-cdn) | ✅ |
+| `JWT_SECRET` | Secret para validação JWT no Worker | ✅ |
+
+### SmartOne IPTV
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `SMARTONE_API_URL` | URL base da API SmartOne | ⚠️ |
+| `SMARTONE_API_KEY` | Chave de API SmartOne | ⚠️ |
+| `SMARTONE_WEBHOOK_SECRET` | Secret para webhooks | ⚠️ |
+
+### MercadoPago
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `MERCADOPAGO_ACCESS_TOKEN` | Token de acesso MP | ⚠️ |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Secret para webhooks | ⚠️ |
+
+### Frontend (Vite)
+
+| Variável | Descrição |
+|----------|-----------|
+| `VITE_SUPABASE_URL` | URL do Supabase (público) |
+| `VITE_SUPABASE_ANON_KEY` | Anon key (público) |
+| `VITE_META_PIXEL_ID` | ID do Meta Pixel |
+
+### Configuração
+
+**Supabase Secrets (Edge Functions):**
+```bash
+# Via CLI
+supabase secrets set WHATSAPP_APPKEY=xxx WHATSAPP_AUTHKEY=xxx
+
+# Via Dashboard
+Project Settings > Edge Functions > Secrets
+```
+
+**Cloudflare Worker (wrangler.toml):**
+```toml
+[vars]
+SUPABASE_URL = "https://xxx.supabase.co"
+
+[[kv_namespaces]]
+binding = "CACHE"
+```
+
+---
+
+## 14. Deployment
+
+### Arquitetura de Deploy
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      GitHub Repository                       │
+└─────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│    Lovable      │  │  GitHub Actions │  │    Manual       │
+│  (Auto-deploy)  │  │  (CDN Worker)   │  │  (Supabase)     │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   Frontend      │  │ Cloudflare Edge │  │ Edge Functions  │
+│   (Lovable)     │  │    (Worker)     │  │   (Supabase)    │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+### Frontend (Lovable)
+
+1. Push para `main` → Deploy automático
+2. Preview em cada PR
+3. Rollback via History
+
+### Edge Functions (Supabase)
+
+```bash
+# Deploy individual
+supabase functions deploy stream-proxy
+
+# Deploy todas
+supabase functions deploy
+
+# Listar funções
+supabase functions list
+```
+
+### CDN Worker (Cloudflare)
+
+**Via GitHub Actions (.github/workflows/deploy-cdn-worker.yml):**
+- Trigger: Push em `workers/cdn-router/`
+- Secrets necessários: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+
+**Manual:**
+```bash
+cd workers/cdn-router
+npx wrangler deploy
+```
+
+### Database Migrations
+
+```bash
+# Criar migration
+supabase migration new nome_da_migration
+
+# Aplicar migrations
+supabase db push
+
+# Reset (CUIDADO: apaga dados)
+supabase db reset
+```
+
+### Checklist de Deploy
+
+- [ ] Variáveis de ambiente configuradas
+- [ ] Secrets do Supabase atualizados
+- [ ] Migrations aplicadas
+- [ ] Edge Functions deployadas
+- [ ] CDN Worker atualizado
+- [ ] Testes de smoke executados
+- [ ] Monitoramento ativo
+
+---
+
+## 15. Edge Functions Reference
+
+### stream-proxy
+
+**Descrição:** Proxy de streams com autenticação e cache
+
+```bash
+# GET - Stream direto
+curl "https://[project].supabase.co/functions/v1/stream-proxy?url=https://example.com/stream.m3u8&clientId=xxx&token=xxx"
+
+# Response: Stream proxiado com headers de cache
+```
+
+### fetch-m3u-url
+
+**Descrição:** Importa M3U de URL externa (bypass CORS)
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/fetch-m3u-url" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/playlist.m3u"}'
+
+# Response
+{
+  "success": true,
+  "content": "#EXTM3U\n...",
+  "size": 1234567,
+  "channelCount": 500
+}
+```
+
+### generate-m3u-file
+
+**Descrição:** Gera arquivo M3U e faz upload para R2
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/generate-m3u-file" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceId": "uuid",
+    "sourceKey": "source-key",
+    "sourceName": "Minha Lista"
+  }'
+
+# Response
+{
+  "success": true,
+  "cdnUrl": "https://cdn.example.com/playlists/xxx.m3u",
+  "channelCount": 1500,
+  "fileSize": 234567
+}
+```
+
+### generate-m3u-from-sync
+
+**Descrição:** Gera M3U a partir de m3u_sync_entries (server-side, para listas grandes)
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/generate-m3u-from-sync" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceId": "uuid",
+    "sourceKey": "source-key",
+    "sourceName": "Lista Grande"
+  }'
+
+# Response
+{
+  "success": true,
+  "cdnUrl": "https://cdn.example.com/...",
+  "totalEntries": 209568
+}
+```
+
+### send-whatsapp
+
+**Descrição:** Envia mensagem WhatsApp via BotBot API
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/send-whatsapp" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "5511999999999",
+    "message": "Olá, sua assinatura vence em 3 dias!",
+    "templateId": "expiration_reminder"
+  }'
+
+# Response
+{
+  "success": true,
+  "messageId": "msg_xxx",
+  "status": "sent"
+}
+```
+
+### create-admin-user
+
+**Descrição:** Cria usuário admin (requer role master)
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/create-admin-user" \
+  -H "Authorization: Bearer [JWT_MASTER]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "novo@admin.com",
+    "password": "senhaSegura123",
+    "name": "Novo Admin",
+    "role": "admin"
+  }'
+
+# Response
+{
+  "success": true,
+  "userId": "uuid",
+  "email": "novo@admin.com"
+}
+```
+
+### cdn-prewarm
+
+**Descrição:** Pré-aquece cache do CDN para conteúdo popular
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/cdn-prewarm" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "r2Keys": ["content/video1.mp4", "content/video2.mp4"],
+    "priority": "high"
+  }'
+
+# Response
+{
+  "success": true,
+  "jobId": "job_xxx",
+  "status": "queued"
+}
+```
+
+### cache-invalidate
+
+**Descrição:** Invalida cache do CDN
+
+```bash
+curl -X POST "https://[project].supabase.co/functions/v1/cache-invalidate" \
+  -H "Authorization: Bearer [JWT]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "pattern",
+    "pattern": "playlists/*",
+    "scope": "global"
+  }'
+
+# Response
+{
+  "success": true,
+  "invalidatedKeys": 45,
+  "duration": 234
+}
+```
+
+---
+
+## 16. Backup e Disaster Recovery
+
+### Estratégia de Backup
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    BACKUP STRATEGY                           │
+├─────────────────────────────────────────────────────────────┤
+│  Database (PostgreSQL)                                       │
+│  └─ Supabase: Point-in-time recovery (7 dias)               │
+│  └─ Daily: pg_dump automático                               │
+│                                                              │
+│  Storage (R2)                                                │
+│  └─ Versionamento habilitado                                │
+│  └─ Cross-region replication                                │
+│                                                              │
+│  Código                                                      │
+│  └─ GitHub: Branches protegidas                             │
+│  └─ Tags para releases                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### RPO/RTO
+
+| Componente | RPO | RTO |
+|------------|-----|-----|
+| Database | 5 min | 1 hora |
+| Storage (R2) | 0 (versioning) | 15 min |
+| Edge Functions | 0 (Git) | 5 min |
+| CDN Worker | 0 (Git) | 5 min |
+
+### Procedimentos de Recovery
+
+#### Database Restore (Supabase)
+
+```sql
+-- Via Dashboard: Project Settings > Database > Backups > Restore
+
+-- Manual: Restaurar de pg_dump
+psql -h [host] -U postgres -d postgres < backup.sql
+```
+
+#### R2 Object Recovery
+
+```bash
+# Listar versões de um objeto
+aws s3api list-object-versions \
+  --bucket iptvlink-cdn \
+  --prefix "playlists/xxx.m3u"
+
+# Restaurar versão específica
+aws s3api copy-object \
+  --bucket iptvlink-cdn \
+  --copy-source "iptvlink-cdn/playlists/xxx.m3u?versionId=xxx" \
+  --key "playlists/xxx.m3u"
+```
+
+#### Rollback de Edge Functions
+
+```bash
+# Listar deploys anteriores
+supabase functions list --project-ref xxx
+
+# Redeploy de versão anterior (via Git)
+git checkout [commit-hash] -- supabase/functions/[function-name]
+supabase functions deploy [function-name]
+```
+
+### Disaster Recovery Checklist
+
+**P0 - Database Down:**
+1. Verificar status no Dashboard Supabase
+2. Iniciar restore do último backup
+3. Notificar equipe via WhatsApp
+4. Ativar página de manutenção
+
+**P1 - CDN Down:**
+1. Verificar status Cloudflare
+2. Ativar fallback para origin direto
+3. Invalidar cache corrompido
+
+**P2 - Edge Functions Down:**
+1. Verificar logs de erro
+2. Rollback para versão anterior
+3. Escalar se necessário
+
+### Contatos de Emergência
+
+| Serviço | Suporte |
+|---------|---------|
+| Supabase | support@supabase.io |
+| Cloudflare | Enterprise Dashboard |
+| BotBot (WhatsApp) | suporte@botbot.com |
+
+---
+
+## 17. Changelog
+
+### v1.1.0 (2025-12-05)
+- ✅ Consolidação completa da documentação
+- ✅ Adição de seções: Troubleshooting, Environment Variables, Deployment
+- ✅ Adição de seções: Edge Functions Reference, Backup/DR, API Reference
+- ✅ Remoção de 35 arquivos .md duplicados/obsoletos
+
+### v1.0.0 (2025-12-01)
+- ✅ Sistema de três níveis de roles (client/admin/master)
+- ✅ Tabela `profiles` como single source of truth
+- ✅ Player otimizado para Smart TVs
+- ✅ Sistema de notificações WhatsApp
+- ✅ CDN híbrido (R2 + Cloudflare Stream)
+- ✅ Sistema de cache inteligente
+- ✅ Pipeline de transcode enterprise
+- ✅ MercadoPago integração
+
+### Roadmap
+
+| Feature | Status | ETA |
+|---------|--------|-----|
+| Multi-tenancy | 🔄 Planejado | Q1 2026 |
+| App Store Publication | 🔄 Planejado | Q1 2026 |
+| Analytics Avançado | 🔄 Planejado | Q2 2026 |
+| AI Recommendations | 🔄 Planejado | Q2 2026 |
+
+---
+
+## 18. API Reference
+
+### Autenticação
+
+Todas as APIs requerem autenticação via JWT (exceto webhooks públicos).
+
+**Header:**
+```
+Authorization: Bearer [JWT_TOKEN]
+```
+
+**Obter JWT:**
+```javascript
+const { data: { session } } = await supabase.auth.getSession()
+const jwt = session?.access_token
+```
+
+### Endpoints Base
+
+| Ambiente | URL |
+|----------|-----|
+| Edge Functions | `https://[project].supabase.co/functions/v1/` |
+| REST API | `https://[project].supabase.co/rest/v1/` |
+| Auth | `https://[project].supabase.co/auth/v1/` |
+| Storage | `https://[project].supabase.co/storage/v1/` |
+
+### REST API (Supabase PostgREST)
+
+#### Profiles
+
+```bash
+# Listar profiles (admin)
+GET /rest/v1/profiles?select=*&order=created_at.desc
+
+# Buscar profile por ID
+GET /rest/v1/profiles?id=eq.[uuid]
+
+# Atualizar profile
+PATCH /rest/v1/profiles?id=eq.[uuid]
+Content-Type: application/json
+{"nome": "Novo Nome", "plano": "anual"}
+
+# Buscar por telefone
+GET /rest/v1/profiles?contact_phone=eq.5511999999999
+```
+
+#### User Roles
+
+```bash
+# Listar roles de um usuário
+GET /rest/v1/user_roles?user_id=eq.[uuid]
+
+# Adicionar role
+POST /rest/v1/user_roles
+{"user_id": "uuid", "role": "admin"}
+
+# Remover role
+DELETE /rest/v1/user_roles?user_id=eq.[uuid]&role=eq.admin
+```
+
+#### M3U Sync
+
+```bash
+# Listar fontes de sync
+GET /rest/v1/m3u_sync_sources?select=*
+
+# Buscar entradas de uma fonte
+GET /rest/v1/m3u_sync_entries?source_id=eq.[uuid]&limit=1000
+
+# Contagem total
+GET /rest/v1/m3u_sync_entries?source_id=eq.[uuid]&select=count
+Prefer: count=exact
+```
+
+### Códigos de Resposta
+
+| Código | Significado |
+|--------|-------------|
+| 200 | Sucesso |
+| 201 | Criado |
+| 400 | Bad Request (validação) |
+| 401 | Não autenticado |
+| 403 | Não autorizado (RLS) |
+| 404 | Não encontrado |
+| 429 | Rate limit |
+| 500 | Erro interno |
+
+### Rate Limits
+
+Ver seção [10. Rate Limiting](#10-rate-limiting).
+
+### Webhooks
+
+#### WhatsApp Webhook
+
+```
+POST /functions/v1/whatsapp-webhook
+Content-Type: application/json
+x-webhook-signature: [HMAC-SHA256]
+
+{
+  "event": "message_read",
+  "messageId": "msg_xxx",
+  "timestamp": "2025-12-05T10:00:00Z"
+}
+```
+
+#### SmartOne Webhook
+
+```
+POST /functions/v1/smartone-webhook
+Content-Type: application/json
+x-webhook-signature: [HMAC-SHA256]
+
+{
+  "event": "playlist_updated",
+  "playlistId": "xxx",
+  "timestamp": "2025-12-05T10:00:00Z"
+}
+```
+
+### SDKs
+
+**JavaScript (Frontend):**
+```javascript
+import { supabase } from '@/integrations/supabase/client'
+
+// Query
+const { data, error } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('situacao', 'Ativo')
+
+// Edge Function
+const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+  body: { phone: '5511999999999', message: 'Olá!' }
+})
+```
+
+---
+
 ## Referências
 
 - [Supabase Docs](https://supabase.com/docs)
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/)
 - [Cloudflare Stream](https://developers.cloudflare.com/stream/)
+- [Cloudflare R2](https://developers.cloudflare.com/r2/)
 - [HLS.js](https://github.com/video-dev/hls.js)
 - [Capacitor](https://capacitorjs.com/docs)
+- [PostgREST](https://postgrest.org/en/stable/)
 
 ---
 
 *Documento consolidado de múltiplas fontes de documentação do projeto IPTVLINK.*
+*Versão 1.1 - Atualizado em 2025-12-05*
