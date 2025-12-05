@@ -1,7 +1,7 @@
 /**
- * UnifiedProfile - Página unificada de perfil do usuário
- * Mostra informações da conta, assinatura e histórico de pagamentos
- * Novos usuários podem completar perfil e escolher plano
+ * UnifiedProfile - Página de perfil do usuário estilo landing page
+ * Aba Informações: cards de dados pessoais, plano, senha e logout
+ * Aba Pagamentos: histórico de pagamentos
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,11 +13,9 @@ import {
   Calendar, 
   CreditCard,
   LogOut,
-  Shield,
   Lock,
   Download,
   Receipt,
-  Tv,
   Loader2,
   Save,
   FileText,
@@ -25,16 +23,16 @@ import {
   Clock,
   XCircle,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useToast } from '@/hooks/use-toast';
@@ -72,45 +70,35 @@ interface Payment {
   metadata: any;
 }
 
-interface Subscription {
-  id: string;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
-  plan: {
-    name: string;
-    price: number;
-    period: string;
-  } | null;
-}
-
 export default function UnifiedProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAdmin, signOut } = useAuth();
   const { toast: shadcnToast } = useToast();
   
-  // Check if we're on app route for fullscreen layout
   const isAppRoute = location.pathname.startsWith('/app');
   
   const [cliente, setCliente] = useState<ClienteData | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  // WhatsApp edit state
+  const [whatsapp, setWhatsapp] = useState("");
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
   
   // Password change state
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   
   // Plan selection state
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   
-  // Check if user needs to complete profile/select plan
-  const isNewUser = !cliente?.plano || cliente?.situacao === 'Testando';
-  const defaultTab = isNewUser ? 'plans' : 'subscription';
+  // Check if user is in trial
+  const isTrialUser = cliente?.situacao === 'Testando';
 
   useEffect(() => {
     loadData();
@@ -132,6 +120,7 @@ export default function UnifiedProfile() {
 
       if (clienteData) {
         setCliente(clienteData);
+        setWhatsapp(formatPhone(clienteData.telefone || ''));
       }
 
       // Load payments
@@ -144,37 +133,49 @@ export default function UnifiedProfile() {
       if (paymentsData) {
         setPayments(paymentsData as Payment[]);
       }
-
-      // Load subscription
-      const { data: subscriptionData } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          id,
-          status,
-          current_period_start,
-          current_period_end,
-          cancel_at_period_end,
-          plan_id,
-          subscription_plans (
-            name,
-            price,
-            period
-          )
-        `)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (subscriptionData) {
-        setSubscription({
-          ...subscriptionData,
-          plan: subscriptionData.subscription_plans as any
-        });
-      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setWhatsapp(formatted);
+  };
+
+  const handleSaveWhatsapp = async () => {
+    if (!cliente?.id) return;
+    
+    const phoneNumbers = whatsapp.replace(/\D/g, '');
+    if (phoneNumbers.length < 10) {
+      toast.error('Telefone inválido');
+      return;
+    }
+
+    setSavingWhatsapp(true);
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ telefone: phoneNumbers })
+        .eq('id', cliente.id);
+
+      if (error) throw error;
+      toast.success('WhatsApp atualizado com sucesso!');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar WhatsApp');
+      console.error(error);
+    } finally {
+      setSavingWhatsapp(false);
     }
   };
 
@@ -244,21 +245,17 @@ export default function UnifiedProfile() {
   const generatePaymentPDF = (payment: Payment) => {
     const doc = new jsPDF();
     
-    // Header
     doc.setFontSize(20);
     doc.setTextColor(40, 40, 40);
     doc.text('Comprovante de Pagamento', 105, 25, { align: 'center' });
     
-    // Logo placeholder
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
     doc.text('IPTV Link', 20, 20);
     
-    // Divider
     doc.setDrawColor(200, 200, 200);
     doc.line(20, 35, 190, 35);
     
-    // Payment details
     doc.setFontSize(11);
     doc.setTextColor(60, 60, 60);
     
@@ -288,7 +285,6 @@ export default function UnifiedProfile() {
       addLine('Email do Pagador:', payment.payer_email);
     }
     
-    // Footer
     doc.setDrawColor(200, 200, 200);
     doc.line(20, 250, 190, 250);
     
@@ -297,7 +293,6 @@ export default function UnifiedProfile() {
     doc.text('Este documento é um comprovante de pagamento gerado automaticamente.', 105, 260, { align: 'center' });
     doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 267, { align: 'center' });
     
-    // Download
     const fileName = `comprovante-${payment.mercado_pago_payment_id || payment.id}.pdf`;
     doc.save(fileName);
     
@@ -309,6 +304,9 @@ export default function UnifiedProfile() {
       case 'ativo':
       case 'active':
         return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'testando':
+      case 'trial':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
       case 'pendente':
       case 'pending':
         return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
@@ -376,6 +374,12 @@ export default function UnifiedProfile() {
     }).format(value);
   };
 
+  const getPlanLabel = (plano: string | null, situacao: string | null) => {
+    if (situacao === 'Testando') return 'Em teste';
+    if (!plano) return '-';
+    return plano;
+  };
+
   if (isLoading) {
     const loadingContent = (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -405,177 +409,238 @@ export default function UnifiedProfile() {
       </div>
 
       <div className="p-4 max-w-4xl mx-auto pb-24">
-        {/* Profile Header */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="w-8 h-8 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-semibold">{cliente?.nome || user?.nome || 'Usuário'}</h2>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  {cliente?.situacao && (
-                    <Badge variant="outline" className={getSituacaoColor(cliente.situacao)}>
-                      {cliente.situacao}
-                    </Badge>
-                  )}
-                  {cliente?.plano && (
-                    <Badge variant="secondary">{cliente.plano}</Badge>
-                  )}
-                  {isAdmin && (
-                    <Badge variant="default">Admin</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Tabs */}
-        <Tabs defaultValue={defaultTab} className="space-y-4">
-          <ScrollArea className="w-full whitespace-nowrap">
-            <TabsList className="inline-flex h-auto min-w-full p-1 bg-muted">
-              {isNewUser && (
-                <TabsTrigger value="plans" className="flex-shrink-0 px-3 py-2 text-sm">
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Escolher Plano
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="subscription" className="flex-shrink-0 px-3 py-2 text-sm">
-                <CreditCard className="w-4 h-4 mr-2" />
-                Assinatura
-              </TabsTrigger>
-              <TabsTrigger value="payments" className="flex-shrink-0 px-3 py-2 text-sm">
-                <Receipt className="w-4 h-4 mr-2" />
-                Pagamentos
-              </TabsTrigger>
-              <TabsTrigger value="account" className="flex-shrink-0 px-3 py-2 text-sm">
-                <User className="w-4 h-4 mr-2" />
-                Conta
-              </TabsTrigger>
-              <TabsTrigger value="security" className="flex-shrink-0 px-3 py-2 text-sm">
-                <Shield className="w-4 h-4 mr-2" />
-                Segurança
-              </TabsTrigger>
-            </TabsList>
-            <ScrollBar orientation="horizontal" className="invisible" />
-          </ScrollArea>
+        <Tabs defaultValue="info" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 h-12">
+            <TabsTrigger value="info" className="text-sm">
+              <User className="w-4 h-4 mr-2" />
+              Informações
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="text-sm">
+              <Receipt className="w-4 h-4 mr-2" />
+              Pagamentos
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Plans Tab - For new users */}
-          {isNewUser && (
-            <TabsContent value="plans" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    Escolha seu Plano
-                  </CardTitle>
-                  <CardDescription>
-                    Você está no período de teste gratuito. Escolha um plano para continuar aproveitando!
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Trial info banner */}
-                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Clock className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-foreground">Período de Teste</p>
-                        <p className="text-sm text-muted-foreground">
-                          Aproveite 3 dias grátis para testar todos os recursos. Após o período, escolha o plano ideal para você.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Plan Cards */}
-                  <PlanCards 
-                    selectedPlan={selectedPlan} 
-                    onSelectPlan={setSelectedPlan} 
-                  />
-
-                  {/* Proceed button */}
-                  {selectedPlan && (
-                    <Button 
-                      className="w-full h-12 text-base"
-                      onClick={() => navigate(`/checkout?plan=${selectedPlan}`)}
-                    >
-                      <CreditCard className="w-5 h-5 mr-2" />
-                      Assinar Plano {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {/* Subscription Tab */}
-          <TabsContent value="subscription" className="space-y-4">
+          {/* Tab Informações */}
+          <TabsContent value="info" className="space-y-4">
+            {/* Card 1: Informações Pessoais */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Tv className="w-5 h-5" />
-                  Detalhes da Assinatura
+                  <User className="w-5 h-5 text-primary" />
+                  Informações Pessoais
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Plano Atual</p>
-                    <p className="font-medium">
-                      {subscription?.plan?.name || cliente?.plano || 'Nenhum plano ativo'}
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Valor</p>
-                    <p className="font-medium">
-                      {subscription?.plan?.price 
-                        ? formatCurrency(subscription.plan.price)
-                        : cliente?.valor_pago 
-                          ? formatCurrency(cliente.valor_pago)
-                          : '-'
-                      }
-                    </p>
-                  </div>
+                {/* Email - Read only */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </Label>
+                  <p className="text-foreground font-medium bg-muted/50 p-3 rounded-lg">
+                    {user?.email || '-'}
+                  </p>
+                </div>
 
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Data de Contratação</p>
-                    <p className="font-medium">
-                      {formatDate(subscription?.current_period_start || cliente?.data_contratacao)}
-                    </p>
+                {/* WhatsApp - Editable */}
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp" className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    WhatsApp
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="whatsapp"
+                      type="tel"
+                      placeholder="(11) 99999-9999"
+                      value={whatsapp}
+                      onChange={handlePhoneChange}
+                      maxLength={15}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSaveWhatsapp}
+                      disabled={savingWhatsapp}
+                      size="icon"
+                      variant="outline"
+                    >
+                      {savingWhatsapp ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                    </Button>
                   </div>
-
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Próximo Vencimento</p>
-                    <p className="font-medium">
-                      {formatDate(subscription?.current_period_end || cliente?.data_vencimento)}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant="outline" className={getSituacaoColor(subscription?.status || cliente?.situacao)}>
-                      {subscription?.status || cliente?.situacao || 'Desconhecido'}
-                    </Badge>
-                  </div>
-
-                  {subscription?.cancel_at_period_end && (
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Cancelamento</p>
-                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500">
-                        Cancela no vencimento
-                      </Badge>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Card 2: Informações do Plano */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  Meu Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Data de Cadastro/Renovação */}
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Data de Cadastro
+                    </p>
+                    <p className="font-medium text-foreground">
+                      {formatDate(cliente?.data_contratacao)}
+                    </p>
+                  </div>
+
+                  {/* Data de Vencimento */}
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Vencimento
+                    </p>
+                    <p className="font-medium text-foreground">
+                      {formatDate(cliente?.data_vencimento)}
+                    </p>
+                  </div>
+
+                  {/* Modelo do Plano */}
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Plano
+                    </p>
+                    <Badge variant="outline" className={getSituacaoColor(cliente?.situacao)}>
+                      {getPlanLabel(cliente?.plano, cliente?.situacao)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Plan selection for trial users */}
+                {isTrialUser && (
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                      <h3 className="font-semibold text-foreground">Escolha seu plano</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Seu período de teste está ativo. Escolha um plano para continuar aproveitando após o término.
+                    </p>
+                    
+                    <PlanCards 
+                      selectedPlan={selectedPlan} 
+                      onSelectPlan={setSelectedPlan} 
+                    />
+
+                    {selectedPlan && (
+                      <Button 
+                        className="w-full h-12 text-base mt-4"
+                        onClick={() => navigate(`/checkout?plan=${selectedPlan}`)}
+                      >
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Assinar Plano {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Alterar Senha */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-primary" />
+                  Alterar Senha
+                </CardTitle>
+                <CardDescription>
+                  Atualize sua senha de acesso
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="novaSenha">Nova Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="novaSenha"
+                      type={showPassword ? "text" : "password"}
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      placeholder="Digite a nova senha"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmarSenha"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmarSenha}
+                      onChange={(e) => setConfirmarSenha(e.target.value)}
+                      placeholder="Confirme a nova senha"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleUpdatePassword}
+                  disabled={savingPassword || !novaSenha || !confirmarSenha}
+                  className="w-full"
+                >
+                  {savingPassword ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Atualizar Senha
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Logout Button */}
+            <Button
+              variant="destructive"
+              className="w-full h-12"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saindo...
+                </>
+              ) : (
+                <>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair da Conta
+                </>
+              )}
+            </Button>
           </TabsContent>
 
-          {/* Payments Tab */}
+          {/* Tab Pagamentos */}
           <TabsContent value="payments" className="space-y-4">
             <Card>
               <CardHeader>
@@ -649,141 +714,10 @@ export default function UnifiedProfile() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Account Tab */}
-          <TabsContent value="account" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Informações da Conta
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 py-2">
-                  <Mail className="w-5 h-5 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm">{user?.email || '-'}</p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex items-center gap-3 py-2">
-                  <Phone className="w-5 h-5 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Telefone</p>
-                    <p className="text-sm">{cliente?.telefone || user?.telefone || '-'}</p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex items-center gap-3 py-2">
-                  <Calendar className="w-5 h-5 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Cliente desde</p>
-                    <p className="text-sm">{formatDate(cliente?.data_contratacao || user?.created_at)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Security Tab */}
-          <TabsContent value="security" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="w-5 h-5" />
-                  Alterar Senha
-                </CardTitle>
-                <CardDescription>
-                  Atualize sua senha de acesso
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="novaSenha">Nova Senha</Label>
-                  <Input
-                    id="novaSenha"
-                    type="password"
-                    value={novaSenha}
-                    onChange={(e) => setNovaSenha(e.target.value)}
-                    placeholder="Digite a nova senha"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
-                  <Input
-                    id="confirmarSenha"
-                    type="password"
-                    value={confirmarSenha}
-                    onChange={(e) => setConfirmarSenha(e.target.value)}
-                    placeholder="Confirme a nova senha"
-                  />
-                </div>
-
-                <Button 
-                  onClick={handleUpdatePassword}
-                  disabled={savingPassword}
-                  className="w-full"
-                >
-                  {savingPassword ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
-                  Atualizar Senha
-                </Button>
-              </CardContent>
-            </Card>
-
-            {isAdmin && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Segurança Avançada</CardTitle>
-                  <CardDescription>
-                    Configurações adicionais de segurança
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button 
-                    onClick={() => navigate('/admin/seguranca')}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
-                    Configurar 2FA e Segurança
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
         </Tabs>
 
-        {/* Logout Button */}
-        <div className="mt-6">
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saindo...
-              </>
-            ) : (
-              <>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sair da Conta
-              </>
-            )}
-          </Button>
-        </div>
-
         {/* App Version */}
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        <p className="text-center text-xs text-muted-foreground mt-6">
           IPTV Link v1.0.0
         </p>
       </div>
