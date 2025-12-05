@@ -11,6 +11,8 @@ interface StatusCounts {
   processing: number;
   ready: number;
   failed: number;
+  error: number;
+  needs_r2_fallback: number;
   retry_scheduled: number;
 }
 
@@ -20,6 +22,10 @@ interface CFStreamStatusCardsProps {
 }
 
 export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsProps) {
+  // Combine error statuses for display
+  const totalFailed = (counts.failed || 0) + (counts.error || 0);
+  const totalR2Fallback = counts.needs_r2_fallback || 0;
+
   const cards = [
     {
       label: "Na Fila",
@@ -51,6 +57,13 @@ export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsPr
       bgColor: "bg-green-500/10",
     },
     {
+      label: "R2 Fallback",
+      value: totalR2Fallback,
+      icon: Cloud,
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+    },
+    {
       label: "Retry Agendado",
       value: counts.retry_scheduled,
       icon: RefreshCw,
@@ -59,17 +72,18 @@ export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsPr
     },
     {
       label: "Falhou",
-      value: counts.failed,
+      value: totalFailed,
       icon: AlertTriangle,
       color: "text-red-500",
       bgColor: "bg-red-500/10",
     },
   ];
 
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const total = counts.queued + counts.downloading + counts.processing + counts.ready + 
+    totalFailed + totalR2Fallback + counts.retry_scheduled;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
       {cards.map((card) => (
         <Card key={card.label} className="border-border/50">
           <CardContent className="p-4">
@@ -91,7 +105,7 @@ export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsPr
       ))}
       
       {/* Total Card */}
-      <Card className="border-border/50 col-span-2 sm:col-span-3 lg:col-span-6 bg-muted/30">
+      <Card className="border-border/50 col-span-2 sm:col-span-4 lg:col-span-7 bg-muted/30">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -115,6 +129,11 @@ export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsPr
                       title={`Prontos: ${counts.ready}`}
                     />
                     <div 
+                      className="h-full bg-purple-500 transition-all"
+                      style={{ width: `${(totalR2Fallback / total) * 100}%` }}
+                      title={`R2 Fallback: ${totalR2Fallback}`}
+                    />
+                    <div 
                       className="h-full bg-yellow-500 transition-all"
                       style={{ width: `${(counts.processing / total) * 100}%` }}
                       title={`Processando: ${counts.processing}`}
@@ -136,8 +155,8 @@ export function CFStreamStatusCards({ counts, isLoading }: CFStreamStatusCardsPr
                     />
                     <div 
                       className="h-full bg-red-500 transition-all"
-                      style={{ width: `${(counts.failed / total) * 100}%` }}
-                      title={`Falhou: ${counts.failed}`}
+                      style={{ width: `${(totalFailed / total) * 100}%` }}
+                      title={`Falhou: ${totalFailed}`}
                     />
                   </>
                 )}

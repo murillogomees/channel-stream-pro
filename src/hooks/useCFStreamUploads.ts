@@ -29,6 +29,8 @@ interface StatusCounts {
   processing: number;
   ready: number;
   failed: number;
+  error: number;
+  needs_r2_fallback: number;
   retry_scheduled: number;
 }
 
@@ -40,6 +42,8 @@ export function useCFStreamUploads() {
     processing: 0,
     ready: 0,
     failed: 0,
+    error: 0,
+    needs_r2_fallback: 0,
     retry_scheduled: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -92,6 +96,8 @@ export function useCFStreamUploads() {
         processing: 0,
         ready: 0,
         failed: 0,
+        error: 0,
+        needs_r2_fallback: 0,
         retry_scheduled: 0,
       };
 
