@@ -27,10 +27,24 @@ const AdminUserRoles = () => {
   const [loading, setLoading] = useState(true);
   const [emailFilter, setEmailFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [selectedRole, setSelectedRole] = useState<string>("admin");
+  // Estado individual por usuário para o select de role
+  const [userRoleSelections, setUserRoleSelections] = useState<Record<string, string>>({});
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [bulkRole, setBulkRole] = useState<string>("admin");
   const [bulkAction, setBulkAction] = useState<"add" | "remove">("add");
+
+  // Função para obter a role selecionada de um usuário específico
+  const getUserSelectedRole = (userId: string) => {
+    return userRoleSelections[userId] || "admin";
+  };
+
+  // Função para atualizar a role selecionada de um usuário específico
+  const setUserSelectedRole = (userId: string, role: string) => {
+    setUserRoleSelections(prev => ({
+      ...prev,
+      [userId]: role
+    }));
+  };
 
   const loadUsers = async () => {
     try {
@@ -421,13 +435,13 @@ const AdminUserRoles = () => {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Select
-                            value={selectedRole}
-                            onValueChange={setSelectedRole}
+                            value={getUserSelectedRole(user.id)}
+                            onValueChange={(role) => setUserSelectedRole(user.id, role)}
                           >
                             <SelectTrigger className="w-28 h-9">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-background border shadow-lg z-50">
                               {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="client">Cliente</SelectItem>
@@ -436,8 +450,8 @@ const AdminUserRoles = () => {
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => handleAddRole(user.id, selectedRole)}
-                            disabled={user.roles.includes(selectedRole)}
+                            onClick={() => handleAddRole(user.id, getUserSelectedRole(user.id))}
+                            disabled={user.roles.includes(getUserSelectedRole(user.id))}
                           >
                             <UserPlus className="h-4 w-4" />
                           </Button>
