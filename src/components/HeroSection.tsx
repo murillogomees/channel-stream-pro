@@ -3,10 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, Tv, ExternalLink } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { toast } from "sonner";
-// Logo otimizado para performance (transparente)
-// Logo moved to public/ for LCP optimization (preloadable with stable URL)
-// Using WebP format for better compression
-const logoWhite = "/logo.webp";
+// Logo com fundo transparente para melhor integração visual
+import logoWhite from "@/assets/logo-white.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
 import { supabase } from "@/integrations/supabase/client";
