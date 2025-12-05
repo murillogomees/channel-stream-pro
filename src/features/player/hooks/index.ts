@@ -7,6 +7,8 @@ export { useContinueWatching } from './useContinueWatching';
 export { useTrending } from './useTrending';
 export { useRecommendations } from './useRecommendations';
 export { useWatchProgress } from './useWatchProgress';
+export { useHomeContent } from './useHomeContent';
+export type { HomeContentSection, ContinueWatchingItem } from './useHomeContent';
 
 // Live TV hooks
 export { useEPG, useChannelEPG } from './useEPG';
