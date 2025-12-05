@@ -10,3 +10,5 @@ export { BuildConfigPanel } from './BuildConfigPanel';
 export { CiCdPipelinePanel } from './CiCdPipelinePanel';
 export { BuildMonitoringDashboard } from './BuildMonitoringDashboard';
 export { BuildHistoryTable } from './BuildHistoryTable';
+export { AndroidDeployInstructions } from './AndroidDeployInstructions';
+export { DeveloperAccountsModal } from './DeveloperAccountsModal';
