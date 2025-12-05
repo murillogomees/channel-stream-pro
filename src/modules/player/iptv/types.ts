@@ -4,7 +4,13 @@
 
 export interface IptvPlayerProps {
   playlistUrl?: string;
+  /** Direct stream URL - bypasses playlist loading */
+  streamUrl?: string;
   channelId?: string;
+  /** Channel name for display when using direct streamUrl */
+  channelName?: string;
+  /** Channel logo for display when using direct streamUrl */
+  channelLogo?: string;
   epgUrl?: string;
   authToken?: string;
   options?: IptvPlayerOptions;
