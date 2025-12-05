@@ -446,7 +446,7 @@ serve(async (req) => {
     // Verificar download existente
     const { data: existingDownload } = await supabaseService
       .from('vod_downloads')
-      .select('id, status, download_started_at')
+      .select('id, status, download_started_at, updated_at')
       .eq('channel_id', channelId)
       .in('status', ['queued', 'downloading', 'processing', 'paused'])
       .maybeSingle();
@@ -461,19 +461,29 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       
-      // Verificar se está travado há mais de 30 minutos ou se force=true
+      // Verificar se está travado - usa updated_at para detectar inatividade real (5 min sem atualização)
+      const lastUpdate = existingDownload.updated_at ? new Date(existingDownload.updated_at) : null;
       const startedAt = existingDownload.download_started_at ? new Date(existingDownload.download_started_at) : null;
-      const isStuck = startedAt && (Date.now() - startedAt.getTime()) > 30 * 60 * 1000;
+      const isStuckByUpdate = lastUpdate && (Date.now() - lastUpdate.getTime()) > 5 * 60 * 1000;
+      const isStuckByStart = startedAt && (Date.now() - startedAt.getTime()) > 10 * 60 * 1000;
+      const isStuck = isStuckByUpdate || isStuckByStart;
       
       if (forceRestart || isStuck) {
         console.log(`🔄 [VOD] Resetando download ${isStuck ? 'travado' : 'forçado'}: ${existingDownload.id}`);
         await supabaseService.from('vod_downloads').update({
           status: 'failed',
-          error_message: isStuck ? 'Timeout - resetado automaticamente' : 'Resetado manualmente (force=true)'
+          error_message: isStuck ? `Timeout - sem atividade por ${isStuckByUpdate ? '5' : '10'} min` : 'Resetado manualmente (force=true)'
         }).eq('id', existingDownload.id);
       } else {
-        return new Response(JSON.stringify({ error: 'Download em andamento', downloadId: existingDownload.id }), 
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        // Retornar info útil para que frontend possa exibir progresso ou forçar restart
+        return new Response(JSON.stringify({ 
+          error: 'Download em andamento', 
+          downloadId: existingDownload.id,
+          status: existingDownload.status,
+          startedAt: existingDownload.download_started_at,
+          lastUpdate: existingDownload.updated_at,
+          hint: 'Use force=true para reiniciar'
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
