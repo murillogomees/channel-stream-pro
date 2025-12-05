@@ -5141,6 +5141,134 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          description: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value?: Json
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      storage_monthly_stats: {
+        Row: {
+          cf_minutes_delivered: number | null
+          cf_minutes_stored: number | null
+          cf_objects_count: number | null
+          cf_total_bytes: number | null
+          created_at: string
+          estimated_cost_usd: number | null
+          id: string
+          month: string
+          r2_bandwidth_bytes: number | null
+          r2_objects_count: number | null
+          r2_total_bytes: number | null
+        }
+        Insert: {
+          cf_minutes_delivered?: number | null
+          cf_minutes_stored?: number | null
+          cf_objects_count?: number | null
+          cf_total_bytes?: number | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          month: string
+          r2_bandwidth_bytes?: number | null
+          r2_objects_count?: number | null
+          r2_total_bytes?: number | null
+        }
+        Update: {
+          cf_minutes_delivered?: number | null
+          cf_minutes_stored?: number | null
+          cf_objects_count?: number | null
+          cf_total_bytes?: number | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          month?: string
+          r2_bandwidth_bytes?: number | null
+          r2_objects_count?: number | null
+          r2_total_bytes?: number | null
+        }
+        Relationships: []
+      }
+      storage_sync_events: {
+        Row: {
+          channel_id: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          metadata: Json | null
+          source_type: string
+          source_url: string | null
+          started_at: string | null
+          status: string
+          sync_duration_ms: number | null
+          target_type: string
+          target_url: string | null
+        }
+        Insert: {
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          metadata?: Json | null
+          source_type?: string
+          source_url?: string | null
+          started_at?: string | null
+          status?: string
+          sync_duration_ms?: number | null
+          target_type?: string
+          target_url?: string | null
+        }
+        Update: {
+          channel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          metadata?: Json | null
+          source_type?: string
+          source_url?: string | null
+          started_at?: string | null
+          status?: string
+          sync_duration_ms?: number | null
+          target_type?: string
+          target_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_sync_events_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stream_analytics: {
         Row: {
           avg_bitrate_kbps: number | null
@@ -6291,6 +6419,20 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_storage_consolidated: {
+        Row: {
+          access_count: number | null
+          bandwidth_bytes: number | null
+          channel_id: string | null
+          content_type: string | null
+          created_at: string | null
+          key: string | null
+          size_bytes: number | null
+          source: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
       vw_stream_performance: {
         Row: {
           avg_bitrate_kbps: number | null
@@ -6327,6 +6469,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["quality_ladder_preset"]
       }
       calculate_prewarm_predictions: { Args: never; Returns: number }
+      calculate_storage_monthly_stats: { Args: never; Returns: undefined }
       check_and_block_ip: {
         Args: {
           _event_type: string
