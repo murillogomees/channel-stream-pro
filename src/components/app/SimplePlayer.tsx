@@ -3,25 +3,30 @@
  * 
  * Carrega conteúdo DIRETO sem proxy, CDN routing ou service workers.
  * Usa HLS.js básico para streams HLS e playback nativo para VOD.
+ * 
+ * VOD HTTP: Primeiro verifica R2, depois tenta proxy com detecção de timeout.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
-  ArrowLeft, RefreshCw, Loader2, AlertCircle, Wifi
+  ArrowLeft, RefreshCw, Loader2, AlertCircle, Wifi, Download, Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SimplePlayerProps {
   url: string;
   title?: string;
   logo?: string;
   category?: string;
+  channelId?: string; // Para verificar R2
   autoplay?: boolean;
   onBack?: () => void;
   onError?: (error: string) => void;
   onReady?: () => void;
+  onRequestDownload?: () => void; // Callback para solicitar download
   className?: string;
 }
 
@@ -55,6 +60,35 @@ function isSecurePage(): boolean {
 
 // Supabase URL para proxy
 const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
+
+// R2 CDN URL
+const R2_CDN_URL = 'https://pub-iptvlink.r2.dev';
+
+// Verifica se VOD está disponível no R2
+async function checkR2Availability(channelId: string): Promise<string | null> {
+  try {
+    // Busca na tabela r2_storage_objects pelo channel_id
+    const { data, error } = await (supabase as any)
+      .from('r2_storage_objects')
+      .select('r2_key, status')
+      .eq('channel_id', channelId)
+      .eq('status', 'completed')
+      .maybeSingle();
+    
+    if (error || !data) {
+      console.log('[SimplePlayer] VOD não encontrado no R2 para channel:', channelId);
+      return null;
+    }
+    
+    // Retorna URL do R2
+    const r2Url = `${R2_CDN_URL}/${data.r2_key}`;
+    console.log('[SimplePlayer] VOD encontrado no R2:', r2Url);
+    return r2Url;
+  } catch (e) {
+    console.warn('[SimplePlayer] Erro ao verificar R2:', e);
+    return null;
+  }
+}
 
 // Converte URL HTTP para usar proxy (bypass Mixed Content)
 function getProxiedUrl(url: string): string {
@@ -114,10 +148,12 @@ export default function SimplePlayer({
   title = 'Canal',
   logo,
   category,
+  channelId,
   autoplay = true,
   onBack,
   onError,
   onReady,
+  onRequestDownload,
   className,
 }: SimplePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -130,13 +166,17 @@ export default function SimplePlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<'network' | 'timeout' | 'format' | 'generic'>('generic');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('Conectando...');
   
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
   const retryCount = useRef(0);
-  const maxRetries = 2; // Reduzido para evitar loops infinitos
+  const maxRetries = 2;
   const hasNetworkError = useRef(false);
+  const loadStartTime = useRef<number>(0);
+  const isHttpVod = useRef(false);
 
   // Cleanup HLS
   const cleanupHls = useCallback(() => {
@@ -147,7 +187,7 @@ export default function SimplePlayer({
   }, []);
 
   // Initialize player
-  const initPlayer = useCallback(() => {
+  const initPlayer = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !url) {
       setError('URL não fornecida');
@@ -161,25 +201,50 @@ export default function SimplePlayer({
       return;
     }
 
-    // Obtém URL final (com proxy se necessário para evitar Mixed Content)
-    const finalUrl = getProxiedUrl(url);
-    console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
-    
     setIsLoading(true);
     setError(null);
+    setErrorType('generic');
     cleanupHls();
 
-    const contentType = getContentType(url); // Usa URL original para detectar tipo
+    const contentType = getContentType(url);
     console.log('[SimplePlayer] Tipo de conteúdo:', contentType);
+    
+    // Marca se é HTTP VOD para tratamento especial de timeout
+    isHttpVod.current = (contentType === 'vod' || contentType === 'direct') && isHttpUrl(url);
+    loadStartTime.current = Date.now();
+
+    let finalUrl = url;
+    
+    // Para VOD HTTP, primeiro verifica se já está no R2
+    if (isHttpVod.current && channelId) {
+      setLoadingMessage('Verificando cache CDN...');
+      const r2Url = await checkR2Availability(channelId);
+      
+      if (r2Url) {
+        console.log('[SimplePlayer] Usando VOD do R2 CDN');
+        finalUrl = r2Url;
+        isHttpVod.current = false; // R2 é HTTPS, não precisa proxy
+      } else {
+        console.log('[SimplePlayer] VOD não está no R2, usando proxy');
+        setLoadingMessage('Conectando via proxy...');
+        finalUrl = getProxiedUrl(url);
+      }
+    } else {
+      finalUrl = getProxiedUrl(url);
+    }
+    
+    console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
 
     // VOD ou conteúdo direto - usa playback nativo
     if (contentType === 'vod' || contentType === 'direct') {
       console.log('[SimplePlayer] Usando playback nativo');
+      setLoadingMessage('Carregando vídeo...');
       video.src = finalUrl;
       
       const handleLoaded = () => {
         console.log('[SimplePlayer] Carregado com sucesso');
         setIsLoading(false);
+        setLoadingMessage('Conectando...');
         retryCount.current = 0;
         hasNetworkError.current = false;
         onReady?.();
@@ -195,22 +260,43 @@ export default function SimplePlayer({
       
       const handleError = () => {
         const err = video.error;
-        console.error('[SimplePlayer] Erro:', err?.code, err?.message);
+        const loadTime = Date.now() - loadStartTime.current;
+        console.error('[SimplePlayer] Erro:', err?.code, err?.message, `após ${loadTime}ms`);
         
-        // MEDIA_ERR_NETWORK (2) ou MEDIA_ERR_SRC_NOT_SUPPORTED (4) - para de tentar
+        // Detecta timeout (se demorou mais de 2 minutos e é HTTP VOD via proxy)
+        const isTimeout = loadTime > 120000 && isHttpVod.current;
+        
+        if (isTimeout) {
+          hasNetworkError.current = true;
+          setErrorType('timeout');
+          setError('Arquivo muito grande para streaming direto');
+          setIsLoading(false);
+          onError?.('Timeout - arquivo grande');
+          return;
+        }
+        
+        // MEDIA_ERR_NETWORK (2) ou MEDIA_ERR_SRC_NOT_SUPPORTED (4)
         if (err?.code === 2 || err?.code === 4) {
           hasNetworkError.current = true;
-          const errorMsg = err.code === 2 
-            ? 'Servidor de stream indisponível ou bloqueado'
-            : 'Formato de vídeo não suportado pelo navegador';
-          setError(errorMsg);
+          
+          // Se é HTTP VOD, provavelmente é timeout do proxy
+          if (isHttpVod.current && loadTime > 30000) {
+            setErrorType('timeout');
+            setError('Servidor demorou muito para responder');
+          } else {
+            setErrorType(err.code === 2 ? 'network' : 'format');
+            setError(err.code === 2 
+              ? 'Servidor de stream indisponível'
+              : 'Formato não suportado');
+          }
           setIsLoading(false);
-          onError?.(errorMsg);
+          onError?.(err.code === 2 ? 'Network error' : 'Format error');
           return;
         }
         
         if (retryCount.current < maxRetries && !hasNetworkError.current) {
           retryCount.current++;
+          setLoadingMessage(`Tentativa ${retryCount.current + 1}...`);
           console.log(`[SimplePlayer] Tentativa ${retryCount.current}/${maxRetries}`);
           setTimeout(() => {
             video.src = '';
@@ -219,6 +305,7 @@ export default function SimplePlayer({
           }, 2000 * retryCount.current);
         } else {
           hasNetworkError.current = true;
+          setErrorType('network');
           setError('Não foi possível carregar o conteúdo');
           setIsLoading(false);
           onError?.('Playback error');
@@ -298,7 +385,7 @@ export default function SimplePlayer({
       setError('Navegador não suporta este formato');
       setIsLoading(false);
     }
-  }, [url, autoplay, onError, onReady, cleanupHls]);
+  }, [url, channelId, autoplay, onError, onReady, cleanupHls]);
 
   // Inicializa player
   useEffect(() => {
@@ -423,7 +510,7 @@ export default function SimplePlayer({
           )}
           <div className="flex items-center gap-3 text-white">
             <Loader2 className="w-8 h-8 animate-spin" />
-            <span>Conectando...</span>
+            <span>{loadingMessage}</span>
           </div>
           <Wifi className="w-6 h-6 text-white/50 mt-4 animate-pulse" />
         </div>
@@ -431,16 +518,43 @@ export default function SimplePlayer({
 
       {/* Error Overlay */}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white">
-          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-          <p className="text-lg mb-4">{error}</p>
-          <button
-            onClick={handleRetry}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Tentar novamente
-          </button>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white px-6">
+          {errorType === 'timeout' ? (
+            <Clock className="w-16 h-16 text-yellow-500 mb-4" />
+          ) : (
+            <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+          )}
+          
+          <p className="text-lg mb-2 text-center">{error}</p>
+          
+          {/* Mensagem adicional para timeout de VOD HTTP */}
+          {errorType === 'timeout' && (
+            <p className="text-sm text-white/70 mb-4 text-center max-w-xs">
+              Este arquivo é muito grande para streaming via proxy.
+              Solicite o download para assistir em qualidade total.
+            </p>
+          )}
+          
+          <div className="flex flex-col sm:flex-row gap-3 mt-2">
+            <button
+              onClick={handleRetry}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Tentar novamente
+            </button>
+            
+            {/* Botão de solicitar download para erros de timeout */}
+            {errorType === 'timeout' && onRequestDownload && (
+              <button
+                onClick={onRequestDownload}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
+              >
+                <Download className="w-5 h-5" />
+                Solicitar Download
+              </button>
+            )}
+          </div>
         </div>
       )}
 
