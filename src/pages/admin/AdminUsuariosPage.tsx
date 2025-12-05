@@ -8,8 +8,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
 import { Users, Shield, History, FlaskConical, Activity, CreditCard, Play } from "lucide-react";
 import AdminUserList from "../AdminUserList";
 import AdminUserRoles from "../AdminUserRoles";
@@ -52,7 +51,6 @@ export default function AdminUsuariosPage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    // Update URL without full page reload
     if (value !== "list") {
       setSearchParams({ tab: value });
     } else {
@@ -60,74 +58,59 @@ export default function AdminUsuariosPage() {
     }
   };
 
+  const tabs = [
+    {
+      value: "list",
+      label: "Usuários",
+      icon: <Users className="h-4 w-4" />,
+      content: <AdminUserList />
+    },
+    {
+      value: "payments",
+      label: "Pagamentos",
+      icon: <CreditCard className="h-4 w-4" />,
+      content: <AdminUserPayments />
+    },
+    {
+      value: "streaming",
+      label: "Streaming",
+      icon: <Play className="h-4 w-4" />,
+      content: <AdminUserStreaming />
+    },
+    {
+      value: "activity",
+      label: "Atividades",
+      icon: <Activity className="h-4 w-4" />,
+      content: <AdminActivityLogs />
+    },
+    {
+      value: "roles",
+      label: "Roles",
+      icon: <Shield className="h-4 w-4" />,
+      content: <AdminUserRoles />
+    },
+    {
+      value: "audit",
+      label: "Auditoria",
+      icon: <History className="h-4 w-4" />,
+      content: <AdminRoleAudit />
+    },
+    {
+      value: "test",
+      label: "Teste",
+      icon: <FlaskConical className="h-4 w-4" />,
+      content: <AdminPermissionTest />
+    }
+  ];
+
   return (
-    <AdminShell 
-      title="Usuários & Permissões"
-      description="Gestão completa de usuários, roles, auditoria e controle de acesso"
-    >
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <ScrollArea className="w-full whitespace-nowrap pb-2">
-          <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
-            <TabsTrigger value="list" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <Users className="h-3.5 w-3.5" />
-              Usuários
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <CreditCard className="h-3.5 w-3.5" />
-              Pagamentos
-            </TabsTrigger>
-            <TabsTrigger value="streaming" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <Play className="h-3.5 w-3.5" />
-              Streaming
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <Activity className="h-3.5 w-3.5" />
-              Atividades
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <Shield className="h-3.5 w-3.5" />
-              Roles
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <History className="h-3.5 w-3.5" />
-              Auditoria
-            </TabsTrigger>
-            <TabsTrigger value="test" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm gap-1.5">
-              <FlaskConical className="h-3.5 w-3.5" />
-              Teste
-            </TabsTrigger>
-          </TabsList>
-          <ScrollBar orientation="horizontal" className="invisible" />
-        </ScrollArea>
-
-        <TabsContent value="list" className="space-y-4 mt-4">
-          <AdminUserList />
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-4 mt-4">
-          <AdminUserPayments />
-        </TabsContent>
-
-        <TabsContent value="streaming" className="space-y-4 mt-4">
-          <AdminUserStreaming />
-        </TabsContent>
-
-        <TabsContent value="activity" className="space-y-4 mt-4">
-          <AdminActivityLogs />
-        </TabsContent>
-
-        <TabsContent value="roles" className="space-y-4 mt-4">
-          <AdminUserRoles />
-        </TabsContent>
-
-        <TabsContent value="audit" className="space-y-4 mt-4">
-          <AdminRoleAudit />
-        </TabsContent>
-
-        <TabsContent value="test" className="space-y-4 mt-4">
-          <AdminPermissionTest />
-        </TabsContent>
-      </Tabs>
+    <AdminShell>
+      <ResponsiveTabs
+        defaultValue="list"
+        value={activeTab}
+        onValueChange={handleTabChange}
+        tabs={tabs}
+      />
     </AdminShell>
   );
 }
