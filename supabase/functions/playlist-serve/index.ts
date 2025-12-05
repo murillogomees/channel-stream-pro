@@ -21,9 +21,10 @@ const CORS_HEADERS = {
 };
 
 const CONFIG = {
-  DEFAULT_LIMIT: 10000,  // Increased from 5000 for fewer requests
-  MAX_LIMIT: 50000,      // Allow very large batches for full loading
+  DEFAULT_LIMIT: 1000,   // Smaller batches for reliability
+  MAX_LIMIT: 5000,       // Prevent timeouts with large offsets
   CACHE_MAX_AGE: 300,    // 5 minutes
+  QUERY_TIMEOUT_MS: 25000, // 25 second timeout per query
 };
 
 Deno.serve(async (req) => {
@@ -145,13 +146,12 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Build query
+      // Build query - select only essential columns to reduce payload
       let query = supabase
         .from('playlist_entries')
-        .select('entry_hash, title, stream_url, group_title, tvg_id, tvg_name, tvg_logo, sequence')
+        .select('entry_hash, title, stream_url, group_title, tvg_logo')
         .eq('playlist_key', key)
         .eq('is_valid', true)
-        .order('group_title')
         .order('sequence')
         .range(offset, offset + limit - 1);
       
@@ -163,14 +163,12 @@ Deno.serve(async (req) => {
       
       if (entriesError) throw entriesError;
       
-      // Transform to client format
+      // Transform to client format (minimal payload)
       const channels = (entries || []).map((e, idx) => ({
         id: e.entry_hash,
         name: e.title,
         stream_url: e.stream_url,
         category_name: e.group_title || 'Outros',
-        tvg_id: e.tvg_id,
-        tvg_name: e.tvg_name,
         tvg_logo: e.tvg_logo,
         sequence: offset + idx,
       }));
