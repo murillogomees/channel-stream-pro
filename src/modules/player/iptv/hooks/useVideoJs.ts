@@ -381,17 +381,23 @@ export function useVideoJs({
     // Native playback (Safari, MP4, unknown formats, etc)
     console.log('[useVideoJs] Using native playback for protocol:', protocol, 'URL:', finalUrl.substring(0, 80));
     
-    // Determine correct MIME type - default to video/mp4 for unknown
-    const mimeType = protocol === 'hls' 
-      ? 'application/x-mpegURL' 
-      : protocol === 'dash'
-        ? 'application/dash+xml'
-        : 'video/mp4'; // MP4 for mp4, unknown, and other formats
+    // Determine correct MIME type - let browser detect for unknown
+    let mimeType: string | undefined;
+    if (protocol === 'hls') {
+      mimeType = 'application/x-mpegURL';
+    } else if (protocol === 'dash') {
+      mimeType = 'application/dash+xml';
+    } else if (protocol === 'mp4') {
+      mimeType = 'video/mp4';
+    }
+    // For 'unknown', don't specify MIME type - let browser auto-detect
     
-    playerRef.current.src({
-      src: finalUrl,
-      type: mimeType,
-    });
+    const sourceConfig: any = { src: finalUrl };
+    if (mimeType) {
+      sourceConfig.type = mimeType;
+    }
+    
+    playerRef.current.src(sourceConfig);
     
     // For native, track ready state
     videoEl.addEventListener('canplay', () => {
