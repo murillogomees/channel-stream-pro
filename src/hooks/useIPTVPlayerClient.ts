@@ -183,8 +183,8 @@ export function useIPTVPlayerClient() {
   const playlistUrlRef = useRef<string>('');
   const isBackgroundLoadingRef = useRef(false);
 
-  // Group channels into categories
-  const groupChannelsIntoCategories = useCallback((channels: any[]): Category[] => {
+  // Group channels into categories - pure function, no deps
+  const groupChannelsIntoCategories = (channels: any[]): Category[] => {
     const categoriesMap = new Map<string, Category>();
 
     for (const channel of channels) {
@@ -214,16 +214,20 @@ export function useIPTVPlayerClient() {
     }
 
     return Array.from(categoriesMap.values());
-  }, []);
+  };
+  
+  // Store grouping function in ref to prevent dependency cycles
+  const groupChannelsRef = useRef(groupChannelsIntoCategories);
+  groupChannelsRef.current = groupChannelsIntoCategories;
 
-  // Update UI without blocking
+  // Update UI without blocking - no dependencies to prevent loops
   const updateUIInBackground = useCallback((channels: any[], total: number, progress?: string) => {
     startTransition(() => {
       setLoadedChannels(channels.length);
       if (progress) setLoadingProgress(progress);
-      setCategories(groupChannelsIntoCategories(channels));
+      setCategories(groupChannelsRef.current(channels));
     });
-  }, [groupChannelsIntoCategories]);
+  }, []);
 
   // Fetch batch with improved retry
   const fetchBatch = async (
@@ -371,7 +375,7 @@ export function useIPTVPlayerClient() {
         });
         
         startTransition(() => {
-          setCategories(groupChannelsIntoCategories(allChannelsRef.current));
+          setCategories(groupChannelsRef.current(allChannelsRef.current));
           setTotalChannels(finalTotal);
           setLoadedChannels(finalTotal);
           setIsLoadingMore(false);
@@ -389,7 +393,7 @@ export function useIPTVPlayerClient() {
       setIsLoadingMore(false);
       setLoadingProgress('');
     }
-  }, [groupChannelsIntoCategories, updateUIInBackground]);
+  }, [updateUIInBackground]);
 
   // Load playlist from M3U URL
   const loadPlaylistFromURL = useCallback(async (url: string, playlistId: string, playlistName: string) => {
@@ -409,7 +413,7 @@ export function useIPTVPlayerClient() {
         setLoadedChannels(cached.channels.length);
         setIsCached(true);
         
-        const cats = groupChannelsIntoCategories(cached.channels);
+        const cats = groupChannelsRef.current(cached.channels);
         setCategories(cats);
         
         if (cats.length > 0 && cats[0].channels.length > 0) {
@@ -451,7 +455,7 @@ export function useIPTVPlayerClient() {
       setLoadedChannels(channels.length);
       allChannelsRef.current = channels;
       
-      const cats = groupChannelsIntoCategories(channels);
+      const cats = groupChannelsRef.current(channels);
       setCategories(cats);
       
       if (cats.length > 0 && cats[0].channels.length > 0) {
@@ -487,7 +491,7 @@ export function useIPTVPlayerClient() {
       console.error('[IPTV] Error loading from URL:', err);
       return false;
     }
-  }, [groupChannelsIntoCategories, loadAllChannelsBackground]);
+  }, [loadAllChannelsBackground]);
 
   // Load from playlist-serve (PRIMARY method)
   const loadFromPlaylistServe = useCallback(async (playlistKey: string) => {
@@ -520,7 +524,7 @@ export function useIPTVPlayerClient() {
       setLoadedChannels(data.channels.length);
       allChannelsRef.current = data.channels;
       
-      const cats = groupChannelsIntoCategories(data.channels);
+      const cats = groupChannelsRef.current(data.channels);
       setCategories(cats);
       
       if (cats.length > 0 && cats[0].channels.length > 0) {
@@ -547,7 +551,7 @@ export function useIPTVPlayerClient() {
       console.error('[IPTV] playlist-serve error:', err);
       return false;
     }
-  }, [groupChannelsIntoCategories]);
+  }, []);
 
   // Background loader - FIXED: proper stop conditions
   const loadPlaylistServeBackground = useCallback(async (
@@ -695,7 +699,7 @@ export function useIPTVPlayerClient() {
       });
       
       startTransition(() => {
-        setCategories(groupChannelsIntoCategories(allChannelsRef.current));
+        setCategories(groupChannelsRef.current(allChannelsRef.current));
         setTotalChannels(finalCount);
         setLoadedChannels(finalCount);
         setIsLoadingMore(false);
@@ -713,7 +717,7 @@ export function useIPTVPlayerClient() {
       setIsLoadingMore(false);
       setLoadingProgress('');
     }
-  }, [groupChannelsIntoCategories, updateUIInBackground]);
+  }, [updateUIInBackground]);
 
   // Find assigned playlist for client
   const findAssignedPlaylist = useCallback(async (): Promise<boolean> => {
