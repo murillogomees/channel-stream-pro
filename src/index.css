@@ -621,3 +621,92 @@ body.app-mode html {
   z-index: 9999 !important;
   background: black !important;
 }
+
+/* ============================================================================
+ * TV MODE STYLES
+ * Optimized for 10-foot viewing distance on Smart TVs (Tizen, WebOS, etc)
+ * ============================================================================ */
+
+/* TV Mode Variables */
+.tv-mode {
+  --tv-scale: 1.5;
+  --tv-focus-ring: hsl(var(--primary));
+  --tv-focus-glow: 0 0 20px hsl(var(--primary) / 0.5);
+  --tv-button-size: calc(48px * var(--tv-scale, 1));
+  --tv-font-scale: calc(1rem * var(--tv-scale, 1));
+}
+
+/* TV Mode - Larger UI elements */
+.tv-mode body {
+  font-size: var(--tv-font-scale);
+  cursor: none; /* Hide cursor on TVs */
+}
+
+/* TV Focus States - High visibility for D-pad navigation */
+.tv-mode [data-focus-id]:focus,
+.tv-mode [data-focus-id].tv-focused {
+  outline: none;
+  box-shadow: 
+    0 0 0 4px hsl(var(--primary)),
+    var(--tv-focus-glow);
+  transform: scale(1.05);
+  transition: all 0.15s ease-out;
+}
+
+/* TV Buttons - Larger touch targets */
+.tv-mode button,
+.tv-mode [role="button"] {
+  min-height: var(--tv-button-size);
+  min-width: var(--tv-button-size);
+  padding: calc(12px * var(--tv-scale, 1));
+  font-size: calc(1rem * var(--tv-scale, 1));
+}
+
+/* TV Icons - Scale up */
+.tv-mode svg {
+  width: calc(24px * var(--tv-scale, 1));
+  height: calc(24px * var(--tv-scale, 1));
+}
+
+/* TV Text - Larger for readability */
+.tv-mode h1 { font-size: calc(2.5rem * var(--tv-scale, 1)); }
+.tv-mode h2 { font-size: calc(2rem * var(--tv-scale, 1)); }
+.tv-mode h3 { font-size: calc(1.5rem * var(--tv-scale, 1)); }
+.tv-mode p,
+.tv-mode span { font-size: calc(1.125rem * var(--tv-scale, 1)); }
+
+/* TV Player Controls - Extra padding for visibility */
+.tv-mode .player-controls {
+  padding: calc(24px * var(--tv-scale, 1));
+  gap: calc(16px * var(--tv-scale, 1));
+}
+
+/* TV Focus Animation */
+@keyframes tv-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 4px hsl(var(--primary)), 
+                0 0 20px hsl(var(--primary) / 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 0 6px hsl(var(--primary)), 
+                0 0 30px hsl(var(--primary) / 0.5);
+  }
+}
+
+.tv-mode [data-focus-id]:focus {
+  animation: tv-pulse 2s ease-in-out infinite;
+}
+
+/* TV Safe Area - Keep content within TV overscan zone */
+.tv-mode .tv-safe-area {
+  padding: 5% 3%;
+}
+
+/* Hide scrollbars on TV */
+.tv-mode ::-webkit-scrollbar {
+  display: none;
+}
+
+.tv-mode * {
+  scrollbar-width: none;
+}
