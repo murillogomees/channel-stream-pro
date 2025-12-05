@@ -7,7 +7,7 @@ import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import { IptvPlayer } from '@/modules/player/iptv';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
-import { useBackendSearch } from '@/hooks/useBackendSearch';
+import { useDirectDatabaseSearch } from '@/hooks/useDirectDatabaseSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { LoadingProgressBar } from '@/components/iptv/LoadingProgressBar';
@@ -63,18 +63,18 @@ export default function AppPlayer() {
     isLoading: favoritesLoading
   } = useFavoriteChannels();
 
-  // Backend search hook
+  // Direct database search - fast background queries
   const {
     query: backendQuery,
     results: backendResults,
     isSearching,
-    totalResults: backendTotalResults,
+    totalCount: backendTotalResults,
     updateQuery: updateBackendSearch,
     clearSearch,
-    isActive: isBackendSearchActive
-  } = useBackendSearch({
-    playlistKey: 'lista-vip',
-    debounceMs: 400
+    hasResults: isBackendSearchActive
+  } = useDirectDatabaseSearch({
+    debounceMs: 200,
+    limit: 100
   });
   const [activeTab, setActiveTab] = useState<'home' | 'live' | 'movies' | 'series' | 'favorites'>('home');
 
@@ -247,12 +247,12 @@ export default function AppPlayer() {
     if (isBackendSearchActive && backendResults.length > 0) {
       return backendResults.map(r => ({
         id: r.id,
-        name: r.name,
+        name: r.title,
         stream_url: r.stream_url,
         tvg_logo: r.tvg_logo,
         tvg_id: r.tvg_id,
         category_id: 'search',
-        category_name: r.category_name,
+        category_name: r.group_title,
         order_position: 0
       }));
     }
@@ -268,12 +268,12 @@ export default function AppPlayer() {
       if (isBackendSearchActive) {
         return backendResults.map(r => ({
           id: r.id,
-          name: r.name,
+          name: r.title,
           stream_url: r.stream_url,
           tvg_logo: r.tvg_logo,
           tvg_id: r.tvg_id,
           category_id: 'search',
-          category_name: r.category_name,
+          category_name: r.group_title,
           order_position: 0
         }));
       }
