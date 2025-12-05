@@ -14,7 +14,7 @@ import AdminCFStreamDashboard from "./AdminCFStreamDashboard";
 
 export default function AdminM3UManagement() {
   return (
-    <AdminLayout maxWidth="7xl">
+    <AdminLayout maxWidth="full">
       <PageHeader
         title="Gestão M3U & Playlists"
         description="Gerencie listas M3U, sincronização, edição e armazenamento VOD"
