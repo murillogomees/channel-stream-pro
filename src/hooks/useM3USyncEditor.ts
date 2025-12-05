@@ -809,7 +809,7 @@ export function useM3USyncEditor() {
       const entriesCount = hasFilters ? filteredEntries.length : entries.length;
       toast({
         title: 'Gerando M3U CDN...',
-        description: `Processando ${entriesCount.toLocaleString()} entradas${hasFilters ? ' (filtradas)' : ''}...`,
+        description: `Processando ${entriesCount.toLocaleString()} entradas${hasFilters ? ' (filtradas)' : ''}. Aguarde...`,
       });
 
       // Call edge function with filters
@@ -831,12 +831,78 @@ export function useM3USyncEditor() {
 
       if (error) throw error;
 
-      toast({
-        title: 'M3U CDN gerada com sucesso',
-        description: `${data?.entriesCount?.toLocaleString() || '?'} entradas • ${((data?.fileSize || 0) / 1024 / 1024).toFixed(2)} MB`,
-      });
+      // Background generation started - poll for completion
+      if (data?.status === 'processing') {
+        toast({
+          title: 'Geração em andamento...',
+          description: 'Processamento iniciado. Aguardando conclusão...',
+        });
 
-      return { success: true, cdnUrl: data?.cdnUrl };
+        // Poll for completion (max 60 seconds, check every 3 seconds)
+        const maxAttempts = 20;
+        let attempt = 0;
+        let cdnUrl: string | null = null;
+
+        while (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, 3000)); // Wait 3 seconds
+          attempt++;
+
+          const { data: sourceData } = await supabase
+            .from('m3u_sync_sources')
+            .select('metadata')
+            .eq('id', selectedSourceId)
+            .single();
+
+          const metadata = sourceData?.metadata as Record<string, any> | null;
+          const status = metadata?.generation_status;
+
+          if (status === 'completed' && metadata?.cdn_url) {
+            cdnUrl = metadata.cdn_url;
+            toast({
+              title: 'M3U CDN gerada com sucesso!',
+              description: `${metadata?.cdn_entries_count?.toLocaleString() || '?'} entradas • ${((metadata?.cdn_file_size || 0) / 1024 / 1024).toFixed(2)} MB`,
+            });
+            return { success: true, cdnUrl };
+          }
+
+          if (status === 'failed') {
+            const errorMsg = metadata?.generation_error || 'Falha na geração';
+            toast({
+              title: 'Erro na geração',
+              description: errorMsg,
+              variant: 'destructive',
+            });
+            return { success: false, error: errorMsg };
+          }
+
+          // Still processing...
+          if (attempt % 5 === 0) {
+            toast({
+              title: 'Processando...',
+              description: `Ainda gerando... (${attempt * 3}s)`,
+            });
+          }
+        }
+
+        // Timeout - but may still be generating
+        toast({
+          title: 'Tempo limite atingido',
+          description: 'A geração continua em background. Recarregue a página para ver o resultado.',
+          variant: 'default',
+        });
+        return { success: false, error: 'Timeout - verifique o status depois' };
+      }
+
+      // Direct response with URL (shouldn't happen with current implementation)
+      if (data?.cdnUrl) {
+        toast({
+          title: 'M3U CDN gerada com sucesso',
+          description: `${data?.entriesCount?.toLocaleString() || '?'} entradas`,
+        });
+        return { success: true, cdnUrl: data.cdnUrl };
+      }
+
+      return { success: false, error: 'Resposta inesperada do servidor' };
     } catch (error: any) {
       console.error('[M3USyncEditor] Error generating M3U CDN:', error);
       toast({
