@@ -588,6 +588,18 @@ export default function AdminNotificacoes() {
             )}
 
             {config.testPhoneNumber && !phoneValidation.isValid && (
+              <div className="bg-stat-danger/10 border border-stat-danger/20 text-stat-danger p-3 rounded-lg">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Número de teste inválido
+                </p>
+                <p className="text-xs mt-1 opacity-80">
+                  Corrija o formato do número para enviar mensagens de teste
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Variáveis de Template */}
         <Card>
