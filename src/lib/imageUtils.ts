@@ -9,6 +9,11 @@ const INVALID_URL_PATTERNS = [
   'None', 'undefined', 'null',           // String representations of null values
 ];
 
+// Domains known to have SSL/connection issues
+const BLOCKED_DOMAINS = [
+  'brtv.club',      // SSL protocol errors
+];
+
 /**
  * Validates if a URL is a valid image URL
  * Rejects malformed URLs that would cause network errors
@@ -19,8 +24,12 @@ export function isValidImageUrl(url: string | undefined | null): url is string {
   // Check for invalid patterns
   if (INVALID_URL_PATTERNS.some(p => url.includes(p))) return false;
   
+  // Check for blocked domains
+  if (BLOCKED_DOMAINS.some(domain => url.includes(domain))) return false;
+  
   try {
-    const pathname = new URL(url, 'http://localhost').pathname;
+    const parsed = new URL(url, 'http://localhost');
+    const pathname = parsed.pathname;
     const filename = pathname.split('/').pop() || '';
     
     // Reject URLs with filenames starting with underscore or dot (invalid)
