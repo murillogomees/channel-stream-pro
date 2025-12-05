@@ -7812,6 +7812,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      index_advisor: {
+        Args: { query: string }
+        Returns: {
+          errors: string[]
+          index_statements: string[]
+          startup_cost_after: Json
+          startup_cost_before: Json
+          total_cost_after: Json
+          total_cost_before: Json
+        }[]
+      }
       insert_playlist: {
         Args: {
           p_channel_count: number

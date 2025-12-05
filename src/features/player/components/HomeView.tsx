@@ -434,9 +434,9 @@ export function HomeView({
             icon={Clock}
             isEmpty={false}
           >
-            {group.items.map((item) => (
+            {group.items.map((item, idx) => (
               <RecommendationCard
-                key={item.id}
+                key={`${group.type}-${item.id}-${idx}`}
                 item={item}
                 onPlay={() => onPlayRecommendation(item)}
               />
@@ -453,9 +453,9 @@ export function HomeView({
           icon={Film}
           isEmpty={false}
         >
-          {shuffledForYouMix.map((item) => (
+          {shuffledForYouMix.map((item, idx) => (
             <RecommendationCard
-              key={item.id}
+              key={`foryou-${item.id}-${idx}`}
               item={item}
               onPlay={() => onPlayRecommendation(item)}
             />
