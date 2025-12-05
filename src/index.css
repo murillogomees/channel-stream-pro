@@ -710,3 +710,38 @@ body.app-mode html {
 .tv-mode * {
   scrollbar-width: none;
 }
+
+/* ============================================================================
+ * WEB VITALS OPTIMIZATIONS
+ * ============================================================================ */
+
+/* Content visibility optimization for below-fold content */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Reduce CLS by setting explicit dimensions on images */
+img[loading="lazy"] {
+  background-color: hsl(var(--muted));
+}
+
+/* Optimize paint for scrolling content */
+.will-change-scroll {
+  will-change: transform;
+}
+
+/* Safe area insets for modern mobile devices */
+.safe-area-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+
+/* Improve FID by reducing layout thrashing */
+.transform-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}

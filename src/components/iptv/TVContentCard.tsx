@@ -68,13 +68,16 @@ export const TVContentCard = memo(function TVContentCard({
           aspectRatio
         )}
       >
-        {/* Image/Logo */}
+        {/* Image/Logo - Optimized with reserved space */}
         {logo && !imageError ? (
           <img
             src={logo}
             alt={name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            width={280}
+            height={158}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             loading="lazy"
+            decoding="async"
             onError={() => setImageError(true)}
           />
         ) : (
