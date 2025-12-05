@@ -407,8 +407,12 @@ export default function AppPlayer() {
     if (playerChannel) {
       streamService.getOptimizedUrl(playerChannel)
         .then(result => {
-          console.log('[AppPlayer] Optimized URL ready:', result.source, result.url?.substring(0, 80) + '...');
-          // URL is cached internally for future use
+          // Log com formato mais claro
+          console.log('[AppPlayer] URL pronta:', {
+            source: result.source,
+            url: result.url,
+            fallback: result.fallbackUrl,
+          });
         })
         .catch(err => {
           console.warn('[AppPlayer] URL optimization failed:', err);
