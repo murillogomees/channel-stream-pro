@@ -5,7 +5,8 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { toast } from "sonner";
 // Logo otimizado para performance (transparente)
 // Logo moved to public/ for LCP optimization (preloadable with stable URL)
-const logoWhite = "/images/logo-white-hero.png";
+// Using WebP format for better compression
+const logoWhite = "/logo.webp";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
 import { supabase } from "@/integrations/supabase/client";
