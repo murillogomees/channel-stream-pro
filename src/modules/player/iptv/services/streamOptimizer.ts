@@ -40,23 +40,41 @@ class StreamOptimizerService {
    */
   detectProtocol(url: string): StreamProtocol {
     const lowerUrl = url.toLowerCase();
-    const pathname = new URL(url, 'http://dummy').pathname.toLowerCase();
+    let pathname = '';
+    try {
+      pathname = new URL(url, 'http://dummy').pathname.toLowerCase();
+    } catch {
+      pathname = lowerUrl;
+    }
     
+    // Check for HLS first
     if (lowerUrl.includes('.m3u8') || lowerUrl.includes('.m3u') || pathname.endsWith('.m3u8')) {
       return 'hls';
     }
-    if (pathname.endsWith('.ts') || lowerUrl.includes('/live/') || lowerUrl.includes('stream.php')) {
-      return 'ts';
+    
+    // Check for VOD/Movie content (MP4) - BEFORE checking for live/ts
+    // Xtream format: /movie/user/pass/id.mp4 OR /movie/user/pass/id (no extension)
+    if (lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) {
+      return 'mp4';
     }
+    
+    // Check for explicit MP4 files
     if (pathname.endsWith('.mp4') || pathname.endsWith('.mkv') || pathname.endsWith('.webm')) {
       return 'mp4';
     }
+    
+    // Check for DASH
     if (lowerUrl.includes('.mpd')) {
       return 'dash';
     }
     
-    // Default to HLS for unknown IPTV streams
-    return 'hls';
+    // Check for TS/Live streams
+    if (pathname.endsWith('.ts') || lowerUrl.includes('/live/') || lowerUrl.includes('stream.php')) {
+      return 'ts';
+    }
+    
+    // Default to TS for unknown IPTV streams (most live streams are TS)
+    return 'ts';
   }
 
   /**
