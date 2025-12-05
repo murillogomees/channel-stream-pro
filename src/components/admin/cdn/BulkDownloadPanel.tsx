@@ -167,12 +167,15 @@ export function BulkDownloadPanel() {
     try {
       const { error } = await supabase
         .from('content_routing_config')
-        .upsert({
-          config_key: 'cdn_download_schedule',
-          config_value: schedule,
-          description: 'Agendamento de download automático para R2',
-          updated_at: new Date().toISOString(),
-        });
+        .upsert(
+          {
+            config_key: 'cdn_download_schedule',
+            config_value: schedule,
+            description: 'Agendamento de download automático para R2',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'config_key' }
+        );
 
       if (error) throw error;
 
