@@ -4,7 +4,8 @@ import { Download, CheckCircle, Tv, ExternalLink } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { toast } from "sonner";
 // Logo otimizado para performance (transparente)
-import logoWhite from "@/assets/logo-white.png";
+// Logo moved to public/ for LCP optimization (preloadable with stable URL)
+const logoWhite = "/images/logo-white-hero.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
 import { supabase } from "@/integrations/supabase/client";
