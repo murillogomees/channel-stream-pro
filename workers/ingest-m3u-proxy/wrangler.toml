@@ -1,0 +1,34 @@
+# Cloudflare Worker: M3U Ingest Proxy
+# 
+# Streams M3U content from origin directly to R2 without buffering.
+# Deploy with: wrangler deploy
+
+name = "ingest-m3u-proxy"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Production environment
+[env.production]
+name = "ingest-m3u-proxy"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "iptvlink-cdn"
+
+# Environment variables (set via wrangler secret)
+# Required secrets:
+# - SERVICE_BASE: Supabase URL (e.g., https://xxx.supabase.co)
+# - SERVICE_TOKEN: Supabase service role key for signed URL requests
+
+[vars]
+ENVIRONMENT = "production"
+
+# Routes (configure in Cloudflare dashboard or here)
+# routes = [
+#   { pattern = "ingest.iptvlink.app/*", zone_name = "iptvlink.app" }
+# ]
+
+# Limits
+[limits]
+cpu_ms = 100000  # 100s max CPU time
