@@ -1729,6 +1729,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clientes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       code_snippets: {
@@ -4042,6 +4049,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       permission_diagnostics: {
@@ -4156,6 +4170,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playback_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -6552,7 +6573,35 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_safe"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      user_totp_secrets: {
+        Row: {
+          created_at: string | null
+          totp_secret: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          totp_secret: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          totp_secret?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
       }
       user_watchlist: {
         Row: {
@@ -6966,6 +7015,87 @@ export type Database = {
           indexrelid: unknown
           schema_name: unknown
           table_name: unknown
+        }
+        Relationships: []
+      }
+      profiles_safe: {
+        Row: {
+          cliente_ativo: boolean | null
+          contact_phone: string | null
+          created_at: string | null
+          data_contratacao: string | null
+          data_ultimo_pagamento: string | null
+          data_vencimento: string | null
+          dispositivo_contratado:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
+          email: string | null
+          has_2fa: boolean | null
+          id: string | null
+          is_recorrente: boolean | null
+          mac_smart_one: string | null
+          nome: string | null
+          origem_cadastro: string | null
+          plano: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone: string | null
+          telefone_whatsapp: string | null
+          theme: string | null
+          totp_enabled: boolean | null
+          totp_verified_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cliente_ativo?: boolean | null
+          contact_phone?: string | null
+          created_at?: string | null
+          data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
+          email?: string | null
+          has_2fa?: never
+          id?: string | null
+          is_recorrente?: boolean | null
+          mac_smart_one?: string | null
+          nome?: string | null
+          origem_cadastro?: string | null
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone?: string | null
+          telefone_whatsapp?: string | null
+          theme?: string | null
+          totp_enabled?: boolean | null
+          totp_verified_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cliente_ativo?: boolean | null
+          contact_phone?: string | null
+          created_at?: string | null
+          data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
+          data_vencimento?: string | null
+          dispositivo_contratado?:
+            | Database["public"]["Enums"]["dispositivo_tipo"]
+            | null
+          email?: string | null
+          has_2fa?: never
+          id?: string | null
+          is_recorrente?: boolean | null
+          mac_smart_one?: string | null
+          nome?: string | null
+          origem_cadastro?: string | null
+          plano?: Database["public"]["Enums"]["plano_cliente"] | null
+          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
+          telefone?: string | null
+          telefone_whatsapp?: string | null
+          theme?: string | null
+          totp_enabled?: boolean | null
+          totp_verified_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -7646,6 +7776,13 @@ export type Database = {
         }[]
       }
       get_transcode_queue_stats: { Args: never; Returns: Json }
+      get_user_m3u_credentials: {
+        Args: { p_user_id: string }
+        Returns: {
+          senha: string
+          usuario: string
+        }[]
+      }
       get_user_subscription_status: {
         Args: { p_user_id: string }
         Returns: {
@@ -7928,6 +8065,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: number
       }
+      user_has_totp_enabled: { Args: { p_user_id: string }; Returns: boolean }
       user_has_valid_access: { Args: { _user_id: string }; Returns: boolean }
       validate_playback_token: {
         Args: { p_ip_address?: string; p_token_hash: string }
@@ -7939,6 +8077,10 @@ export type Database = {
         }[]
       }
       validate_sql_syntax: { Args: { sql: string }; Returns: boolean }
+      verify_user_totp: {
+        Args: { p_token: string; p_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "client" | "admin" | "super_admin" | "master"
