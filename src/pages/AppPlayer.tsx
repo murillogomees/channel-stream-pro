@@ -24,6 +24,7 @@ import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
 import { useOptimizedPlaylist } from '@/hooks/useOptimizedPlaylist';
 import { streamService } from '@/modules/player/services/StreamService';
+import { VirtualChannelList } from '@/components/app/VirtualChannelList';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -543,8 +544,14 @@ export default function AppPlayer() {
           }} onPlayChannel={handlePlay} allChannels={allChannels} />}
             </div>}
 
-          {activeTab === 'live' && <div className="px-4 lg:px-6 py-4">
-              <TVContentGrid channels={filteredChannels} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+          {activeTab === 'live' && <div className="px-4 lg:px-6 py-4 h-[calc(100vh-120px)]">
+              <VirtualChannelList 
+                channels={filteredChannels} 
+                currentChannelId={playerChannel?.id}
+                onChannelSelect={handlePlay}
+                isFavorite={isFavorite}
+                onFavoriteToggle={toggleFavorite}
+              />
             </div>}
 
           {activeTab === 'movies' && <MoviesView categories={categorizedContent.movies} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} sortBy={movieSortBy} />}
