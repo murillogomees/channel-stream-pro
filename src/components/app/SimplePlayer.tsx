@@ -2,14 +2,17 @@
  * SimplePlayer - Player Otimizado de Streaming
  * 
  * FAST STARTUP: Inicia reprodução imediatamente, verifica R2 em background.
- * Usa HLS.js agressivo para streams HLS e playback nativo para VOD.
+ * Suporta: HLS (hls.js), MPEG-TS (mpegts.js), MP4/WebM (nativo)
+ * Fallback inteligente entre formatos quando um falha.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import mpegts from 'mpegts.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
-  ArrowLeft, RefreshCw, Loader2, AlertCircle, Clock, Wifi, Download
+  ArrowLeft, RefreshCw, Loader2, AlertCircle, Clock, Wifi, Download, 
+  FileWarning, Flag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,16 +29,28 @@ interface SimplePlayerProps {
   onError?: (error: string) => void;
   onReady?: () => void;
   onRequestDownload?: () => void;
+  onReportIssue?: (channelId: string, issue: string) => void;
   className?: string;
 }
 
-// Detecta tipo de conteúdo
-function getContentType(url: string): 'hls' | 'vod' | 'direct' {
+// Detecta tipo de conteúdo com melhor precisão
+function getContentType(url: string): 'hls' | 'ts' | 'vod' | 'live' | 'direct' {
   const lower = url.toLowerCase();
+  
+  // HLS manifests
   if (lower.includes('.m3u8') || lower.includes('.m3u')) return 'hls';
+  
+  // MPEG-TS streams (live IPTV comum)
+  if (lower.includes('.ts') && !lower.includes('/series/') && !lower.includes('/movie/')) return 'ts';
+  
+  // Xtream Codes live pattern: /live/user/pass/123
+  if (/\/live\/[^\/]+\/[^\/]+\/\d+/.test(lower)) return 'live';
+  
+  // VOD files
   if (lower.includes('.mp4') || lower.includes('.mkv') || 
       lower.includes('.avi') || lower.includes('.webm') ||
       lower.includes('/movie/') || lower.includes('/series/')) return 'vod';
+  
   return 'direct';
 }
 
@@ -158,11 +173,13 @@ export default function SimplePlayer({
   onError,
   onReady,
   onRequestDownload,
+  onReportIssue,
   className,
 }: SimplePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const mpegtsRef = useRef<mpegts.Player | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -174,6 +191,7 @@ export default function SimplePlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('Conectando...');
+  const [triedFallback, setTriedFallback] = useState(false);
   
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
   const retryCount = useRef(0);
@@ -181,14 +199,121 @@ export default function SimplePlayer({
   const hasNetworkError = useRef(false);
   const loadStartTime = useRef<number>(0);
   const isHttpVod = useRef(false);
+  const currentMethod = useRef<'native' | 'hls' | 'mpegts'>('native');
 
-  // Cleanup HLS
-  const cleanupHls = useCallback(() => {
+  // Cleanup all players
+  const cleanupPlayers = useCallback(() => {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    if (mpegtsRef.current) {
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
+    }
   }, []);
+
+  // Try with mpegts.js for TS/FLV streams
+  const tryMpegts = useCallback((videoEl: HTMLVideoElement, streamUrl: string) => {
+    if (!mpegts.isSupported()) {
+      console.log('[SimplePlayer] mpegts.js não suportado');
+      return false;
+    }
+    
+    try {
+      console.log('[SimplePlayer] Tentando mpegts.js...');
+      setLoadingMessage('Conectando via MPEG-TS...');
+      currentMethod.current = 'mpegts';
+      
+      const player = mpegts.createPlayer({
+        type: 'mpegts',
+        isLive: true,
+        url: streamUrl,
+      }, {
+        enableWorker: !isSmartTV(),
+        lazyLoad: false,
+        autoCleanupSourceBuffer: true,
+        stashInitialSize: 128,
+      });
+      
+      mpegtsRef.current = player;
+      player.attachMediaElement(videoEl);
+      player.load();
+      
+      player.on(mpegts.Events.MEDIA_INFO, () => {
+        console.log('[SimplePlayer] mpegts MEDIA_INFO received');
+        setIsLoading(false);
+        onReady?.();
+        if (autoplay) {
+          videoEl.play().catch(() => {
+            videoEl.muted = true;
+            setIsMuted(true);
+            videoEl.play().catch(() => {});
+          });
+        }
+      });
+      
+      player.on(mpegts.Events.ERROR, (errType: any, errDetail: any) => {
+        console.error('[SimplePlayer] mpegts error:', errType, errDetail);
+        // Se mpegts falhou, não marcar como erro fatal - pode tentar outro método
+      });
+      
+      return true;
+    } catch (e) {
+      console.error('[SimplePlayer] mpegts init error:', e);
+      return false;
+    }
+  }, [autoplay, onReady]);
+
+  // Try with HLS.js as fallback for unknown streams
+  const tryHlsFallback = useCallback((videoEl: HTMLVideoElement, streamUrl: string) => {
+    if (!Hls.isSupported()) return false;
+    
+    try {
+      console.log('[SimplePlayer] Tentando HLS.js como fallback...');
+      setLoadingMessage('Tentando formato alternativo...');
+      currentMethod.current = 'hls';
+      
+      const hls = new Hls({
+        ...getHlsConfig(),
+        // Mais tolerante para streams desconhecidos
+        maxBufferHole: 2,
+        fragLoadingMaxRetry: 3,
+      });
+      
+      hlsRef.current = hls;
+      hls.loadSource(streamUrl);
+      hls.attachMedia(videoEl);
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[SimplePlayer] HLS fallback - manifest parsed');
+        setIsLoading(false);
+        onReady?.();
+        if (autoplay) {
+          videoEl.play().catch(() => {
+            videoEl.muted = true;
+            setIsMuted(true);
+            videoEl.play().catch(() => {});
+          });
+        }
+      });
+      
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          console.error('[SimplePlayer] HLS fallback fatal error:', data.type);
+          // Fallback final falhou
+          if (!triedFallback) {
+            setTriedFallback(true);
+          }
+        }
+      });
+      
+      return true;
+    } catch (e) {
+      console.error('[SimplePlayer] HLS fallback init error:', e);
+      return false;
+    }
+  }, [autoplay, onReady, triedFallback]);
 
   // Initialize player - R2 PRIORITY para VOD
   const initPlayer = useCallback(async () => {
@@ -204,7 +329,7 @@ export default function SimplePlayer({
     setIsLoading(true);
     setError(null);
     setErrorType('generic');
-    cleanupHls();
+    cleanupPlayers();
 
     const contentType = getContentType(url);
     const isHttpContent = isHttpUrl(url);
@@ -246,11 +371,33 @@ export default function SimplePlayer({
       setLoadingMessage('Conectando...');
     }
     
-    console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
+    console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80), 'Tipo:', contentType);
+
+    // TS streams ou Live IPTV - usar mpegts.js
+    if (contentType === 'ts' || contentType === 'live') {
+      console.log('[SimplePlayer] Detectado stream TS/Live, usando mpegts.js');
+      currentMethod.current = 'mpegts';
+      
+      if (tryMpegts(video, finalUrl)) {
+        return; // mpegts iniciou com sucesso
+      }
+      
+      // Fallback para HLS se mpegts falhou
+      console.log('[SimplePlayer] mpegts falhou, tentando HLS.js');
+      if (Hls.isSupported()) {
+        // Continua para a lógica HLS abaixo
+      } else {
+        // Tenta playback nativo como última opção
+        video.src = finalUrl;
+        video.load();
+        return;
+      }
+    }
 
     // VOD ou conteúdo direto - usa playback nativo
     if (contentType === 'vod' || contentType === 'direct') {
       console.log('[SimplePlayer] Usando playback nativo');
+      currentMethod.current = 'native';
       setLoadingMessage('Carregando vídeo...');
       video.src = finalUrl;
       
@@ -288,6 +435,22 @@ export default function SimplePlayer({
           return;
         }
         
+        // MEDIA_ERR_SRC_NOT_SUPPORTED (4) - Tentar fallbacks antes de desistir
+        if (err?.code === 4 && !triedFallback) {
+          console.log('[SimplePlayer] Formato não suportado nativamente, tentando fallbacks...');
+          setTriedFallback(true);
+          
+          // Tentar mpegts.js primeiro (bom para TS/FLV)
+          if (tryMpegts(video, finalUrl)) {
+            return;
+          }
+          
+          // Tentar HLS.js como último recurso
+          if (tryHlsFallback(video, finalUrl)) {
+            return;
+          }
+        }
+        
         // MEDIA_ERR_NETWORK (2) ou MEDIA_ERR_SRC_NOT_SUPPORTED (4)
         if (err?.code === 2 || err?.code === 4) {
           hasNetworkError.current = true;
@@ -300,7 +463,7 @@ export default function SimplePlayer({
             setErrorType(err.code === 2 ? 'network' : 'format');
             setError(err.code === 2 
               ? 'Servidor de stream indisponível'
-              : 'Formato não suportado');
+              : 'Formato não suportado pelo navegador');
           }
           setIsLoading(false);
           onError?.(err.code === 2 ? 'Network error' : 'Format error');
@@ -398,13 +561,13 @@ export default function SimplePlayer({
       setError('Navegador não suporta este formato');
       setIsLoading(false);
     }
-  }, [url, channelId, autoplay, onError, onReady, cleanupHls]);
+  }, [url, channelId, autoplay, onError, onReady, cleanupPlayers, tryMpegts, tryHlsFallback]);
 
   // Inicializa player
   useEffect(() => {
     initPlayer();
-    return () => cleanupHls();
-  }, [initPlayer, cleanupHls]);
+    return () => cleanupPlayers();
+  }, [initPlayer, cleanupPlayers]);
 
   // Event listeners do video
   useEffect(() => {
@@ -489,7 +652,9 @@ export default function SimplePlayer({
 
   const handleRetry = () => {
     retryCount.current = 0;
-    hasNetworkError.current = false; // Reseta flag de erro
+    hasNetworkError.current = false;
+    setTriedFallback(false); // Reseta para tentar fallbacks novamente
+    cleanupPlayers();
     initPlayer();
   };
 
@@ -547,6 +712,8 @@ export default function SimplePlayer({
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white px-6">
           {errorType === 'timeout' ? (
             <Clock className="w-16 h-16 text-yellow-500 mb-4" />
+          ) : errorType === 'format' ? (
+            <FileWarning className="w-16 h-16 text-orange-500 mb-4" />
           ) : (
             <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
           )}
@@ -558,6 +725,14 @@ export default function SimplePlayer({
             <p className="text-sm text-white/70 mb-4 text-center max-w-xs">
               Este arquivo é muito grande para streaming via proxy.
               Solicite o download para assistir em qualidade total.
+            </p>
+          )}
+          
+          {/* Mensagem adicional para formato não suportado */}
+          {errorType === 'format' && (
+            <p className="text-sm text-white/70 mb-4 text-center max-w-xs">
+              Este conteúdo usa um formato que não é compatível com seu navegador.
+              Tente outro dispositivo ou reporte o problema.
             </p>
           )}
           
@@ -578,6 +753,17 @@ export default function SimplePlayer({
               >
                 <Download className="w-5 h-5" />
                 Solicitar Download
+              </button>
+            )}
+            
+            {/* Botão de reportar problema para erros de formato */}
+            {errorType === 'format' && channelId && onReportIssue && (
+              <button
+                onClick={() => onReportIssue(channelId, 'format_not_supported')}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition"
+              >
+                <Flag className="w-5 h-5" />
+                Reportar Problema
               </button>
             )}
           </div>
