@@ -1,13 +1,13 @@
 /**
  * AdminM3UPage - Hub de gestão M3U
  * Rota: /admin/m3u
- * Abas: Listas, Sync, Editor, Import History, Stats, VOD Storage, CF Stream
+ * Abas: Listas, Sync, Editor, Import History, Stats, VOD Storage, CF Stream, Storage Report
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { List, RefreshCw, Pencil, Palette, History, BarChart3, TrendingUp, Film, Cloud, HardDrive } from "lucide-react";
+import { List, RefreshCw, Pencil, Palette, History, BarChart3, TrendingUp, Film, Cloud, HardDrive, PieChart } from "lucide-react";
 import AdminM3ULists from "../AdminM3ULists";
 import AdminM3USyncContent from "../AdminM3USyncContent";
 import AdminM3UContentEditor from "../AdminM3UContentEditor";
@@ -18,6 +18,7 @@ import AdminVODStorage from "../AdminVODStorage";
 import AdminCFStreamDashboard from "../AdminCFStreamDashboard";
 import AdminM3UCustomDashboard from "../AdminM3UCustomDashboard";
 import { PlaylistStorageManager } from "@/components/admin/m3u/PlaylistStorageManager";
+import { StorageConsolidatedReport } from "@/components/admin/storage";
 
 export default function AdminM3UPage() {
   const [activeTab, setActiveTab] = useState("listas");
@@ -82,6 +83,12 @@ export default function AdminM3UPage() {
       label: "Storage",
       icon: <HardDrive className="h-4 w-4" />,
       content: <PlaylistStorageManager />
+    },
+    {
+      value: "storage-report",
+      label: "Relatório",
+      icon: <PieChart className="h-4 w-4" />,
+      content: <StorageConsolidatedReport />
     }
   ];
 

@@ -299,3 +299,15 @@ verify_jwt = false
 # M3U Clean Advanced - analyze, preview and clean with configurable rules
 [functions.m3u-clean-advanced]
 verify_jwt = false
+
+# ==========================================
+# STORAGE INTEGRATION (R2 ↔ CF Stream)
+# ==========================================
+
+# R2 to CF Stream auto-sync trigger
+[functions.r2-to-cfstream-trigger]
+verify_jwt = false
+
+# Consolidated storage report
+[functions.get-storage-report]
+verify_jwt = false
