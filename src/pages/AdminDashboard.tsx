@@ -10,7 +10,7 @@ import {
   UserCog, ArrowLeft, Tv, Play, Download,
   History, MessageSquare, Send, Cog,
   ListVideo, Hammer, Sparkles, LayoutDashboard, 
-  CreditCard, PanelTop, RefreshCw
+  CreditCard, PanelTop, RefreshCw, Database, UserPlus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -263,6 +263,12 @@ const AdminDashboard = () => {
               path="/admin/m3u"
               badge="Consolidado"
             />
+            <NavCard
+              title="Afiliados"
+              description="Gerencie afiliados, cupons e comissões"
+              icon={<UserPlus className="h-5 w-5" />}
+              path="/admin/afiliados"
+            />
           </div>
         </section>
 
@@ -326,6 +332,12 @@ const AdminDashboard = () => {
               icon={<Cog className="h-5 w-5" />}
               path="/admin/system"
               badge="Consolidado"
+            />
+            <NavCard
+              title="Migrações"
+              description="Schema, drift detection e histórico"
+              icon={<Database className="h-5 w-5" />}
+              path="/admin/migrations"
             />
           </div>
         </section>
