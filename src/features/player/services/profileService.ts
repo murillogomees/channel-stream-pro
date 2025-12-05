@@ -3,6 +3,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 import type { UserProfile, ProfilePreferences, ProfileType } from '../types';
 
 // Helper to convert DB profile to typed profile
@@ -29,13 +30,18 @@ class ProfileService {
    * Get all profiles for current user
    */
   async getProfiles(): Promise<UserProfile[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    // Usar cache primeiro, fallback para API apenas se necessário
+    let userId = authCache.getUserId();
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+    if (!userId) return [];
 
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('is_default', { ascending: false });
 
     if (error) {
@@ -154,13 +160,18 @@ class ProfileService {
     profileType: ProfileType = 'adult',
     avatarUrl?: string
   ): Promise<UserProfile | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    // Usar cache primeiro
+    let userId = authCache.getUserId();
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from('user_profiles')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         name,
         profile_type: profileType,
         avatar_url: avatarUrl,
@@ -250,14 +261,19 @@ class ProfileService {
    * Set profile as default
    */
   async setDefaultProfile(profileId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+    // Usar cache primeiro
+    let userId = authCache.getUserId();
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+    if (!userId) return false;
 
     // Remove default from all profiles
     await supabase
       .from('user_profiles')
       .update({ is_default: false })
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     // Set new default
     const { error } = await supabase

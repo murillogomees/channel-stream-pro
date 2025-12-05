@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 import { toast } from 'sonner';
 
 interface Channel {
@@ -32,9 +33,13 @@ export function useIPTVPlayer() {
     try {
       setIsLoading(true);
       
-      // Get current user's client ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get current user's client ID - usar cache primeiro
+      let userId = authCache.getUserId();
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id || null;
+      }
+      if (!userId) {
         toast.error('Usuário não autenticado');
         return;
       }
@@ -43,7 +48,7 @@ export function useIPTVPlayer() {
       const { data: cliente } = await supabase
         .from('clientes')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (!cliente) {
