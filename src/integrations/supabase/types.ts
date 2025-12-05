@@ -4267,6 +4267,13 @@ export type Database = {
             referencedRelation: "playlists"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "playlist_access_logs_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "vw_playlist_metrics"
+            referencedColumns: ["id"]
+          },
         ]
       }
       playlist_archives: {
@@ -7218,44 +7225,54 @@ export type Database = {
       }
       vw_playlist_metrics: {
         Row: {
-          active_playlists: number | null
-          archived_playlists: number | null
-          avg_channels_per_playlist: number | null
-          total_channels: number | null
-          total_playlists: number | null
-          total_size_bytes: number | null
-          unique_users: number | null
+          archived: boolean | null
+          channel_count: number | null
+          created_at: string | null
+          expires_at: string | null
+          filename: string | null
+          id: string | null
+          quarantined_count: number | null
+          size_bytes: number | null
+          status: string | null
+          unique_count: number | null
+          user_id: string | null
+        }
+        Insert: {
+          archived?: boolean | null
+          channel_count?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          filename?: string | null
+          id?: string | null
+          quarantined_count?: number | null
+          size_bytes?: number | null
+          status?: never
+          unique_count?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          archived?: boolean | null
+          channel_count?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          filename?: string | null
+          id?: string | null
+          quarantined_count?: number | null
+          size_bytes?: number | null
+          status?: never
+          unique_count?: number | null
+          user_id?: string | null
         }
         Relationships: []
       }
       vw_storage_consolidated: {
         Row: {
-          access_count: number | null
-          bandwidth_bytes: number | null
-          channel_id: string | null
-          content_type: string | null
-          created_at: string | null
-          key: string | null
-          size_bytes: number | null
-          source: string | null
-          status: string | null
-        }
-        Relationships: []
-      }
-      vw_stream_performance: {
-        Row: {
-          avg_bitrate_kbps: number | null
-          avg_response_time_ms: number | null
-          avg_startup_time_ms: number | null
-          cache_status: string | null
-          device_type: string | null
-          error_count: number | null
-          hour: string | null
-          p95_response_time_ms: number | null
-          route_type: string | null
-          total_buffer_events: number | null
-          total_bytes_served: number | null
-          total_requests: number | null
+          object_count: number | null
+          pending_count: number | null
+          ready_count: number | null
+          storage_type: string | null
+          total_bytes: number | null
+          total_gb: number | null
         }
         Relationships: []
       }
