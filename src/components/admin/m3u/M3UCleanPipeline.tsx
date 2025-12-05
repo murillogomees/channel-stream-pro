@@ -1211,7 +1211,7 @@ export function M3UCleanPipeline({
                 <StatCard label="Total" value={stats.totalEntries} />
                 <StatCard label="Válidas" value={stats.validEntries} variant="success" />
                 <StatCard label="Duplicadas" value={stats.duplicatesRemoved} variant="warning" />
-                <StatCard label="Removidas" value={stats.invalidUrlsRemoved + stats.emptyTitlesRemoved + stats.protocolFiltered + stats.groupFiltered} variant="danger" />
+                <StatCard label="Removidas" value={(stats.invalidUrlsRemoved ?? 0) + (stats.emptyTitlesRemoved ?? 0) + (stats.protocolFiltered ?? 0) + (stats.groupFiltered ?? 0)} variant="danger" />
               </div>
             )}
 
@@ -1219,27 +1219,27 @@ export function M3UCleanPipeline({
             {stats && (
               <div className="grid grid-cols-3 md:grid-cols-6 gap-1 text-xs">
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{stats.invalidUrlsRemoved.toLocaleString()}</div>
+                  <div className="font-medium">{(stats.invalidUrlsRemoved ?? 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">URLs inválidas</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{stats.emptyTitlesRemoved.toLocaleString()}</div>
+                  <div className="font-medium">{(stats.emptyTitlesRemoved ?? 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Títulos vazios</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{stats.protocolFiltered.toLocaleString()}</div>
+                  <div className="font-medium">{(stats.protocolFiltered ?? 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Protocolos</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{stats.groupFiltered.toLocaleString()}</div>
+                  <div className="font-medium">{(stats.groupFiltered ?? 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Por grupo</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{stats.healthCheckFailed.toLocaleString()}</div>
+                  <div className="font-medium">{(stats.healthCheckFailed ?? 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Health check</div>
                 </div>
                 <div className="p-2 bg-muted/30 rounded text-center">
-                  <div className="font-medium">{(stats.processingTimeMs / 1000).toFixed(1)}s</div>
+                  <div className="font-medium">{((stats.processingTimeMs ?? 0) / 1000).toFixed(1)}s</div>
                   <div className="text-muted-foreground">Tempo</div>
                 </div>
               </div>
@@ -1473,7 +1473,7 @@ function StatCard({
 
   return (
     <div className={`p-2 rounded-lg text-center ${variants[variant]}`}>
-      <div className="text-lg font-bold">{value.toLocaleString()}</div>
+      <div className="text-lg font-bold">{(value ?? 0).toLocaleString()}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
