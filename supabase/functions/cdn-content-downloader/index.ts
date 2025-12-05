@@ -150,13 +150,13 @@ async function downloadLiveManifest(job: DownloadJob, supabase: any) {
         .upsert({
           r2_key: r2Key,
           r2_bucket: R2_BUCKET_NAME,
-          channel_id: job.channelId,
+          source_channel_id: job.channelId,
           content_type: 'live',
           size_bytes: new Blob([manifestContent]).size,
           cdn_url: uploadResult.cdnUrl,
           status: 'ready',
           last_accessed_at: new Date().toISOString(),
-        });
+        }, { onConflict: 'r2_key' });
 
       console.log(`[Live] Success: ${r2Key}`);
       return { r2Key, cdnUrl: uploadResult.cdnUrl, size: manifestContent.length, attempts: attempt };
@@ -241,13 +241,12 @@ async function downloadVODContent(job: DownloadJob, supabase: any) {
     .upsert({
       r2_key: manifestKey,
       r2_bucket: R2_BUCKET_NAME,
-      channel_id: job.channelId,
+      source_channel_id: job.channelId,
       content_type: 'vod',
       cdn_url: manifestUpload.cdnUrl,
       size_bytes: new Blob([updatedManifest]).size,
       status: 'ready',
-      metadata: { totalSegments: segments.length, downloadedSegments: downloadedCount },
-    });
+    }, { onConflict: 'r2_key' });
 
   return { 
     manifestKey, 
