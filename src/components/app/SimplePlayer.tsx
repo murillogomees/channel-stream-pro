@@ -66,23 +66,48 @@ function getProxiedUrl(url: string): string {
   return url;
 }
 
+// Detecta se é Samsung TV (Tizen)
+function isSamsungTV(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('tizen') || ua.includes('samsung') || ua.includes('smart-tv');
+}
+
+// Detecta se é TV em geral
+function isSmartTV(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('tizen') || ua.includes('webos') || ua.includes('hbbtv') || 
+         ua.includes('smart-tv') || ua.includes('netcast') || ua.includes('viera');
+}
+
 // Configuração HLS básica e otimizada
-const HLS_CONFIG: Partial<Hls['config']> = {
-  enableWorker: true,
-  lowLatencyMode: false,
-  backBufferLength: 30,
-  maxBufferLength: 30,
-  maxMaxBufferLength: 60,
-  maxBufferSize: 60 * 1000 * 1000,
-  maxBufferHole: 0.5,
-  startFragPrefetch: true,
-  testBandwidth: true,
-  progressive: true,
-  fragLoadingTimeOut: 20000,
-  fragLoadingMaxRetry: 4,
-  manifestLoadingTimeOut: 15000,
-  manifestLoadingMaxRetry: 3,
-};
+function getHlsConfig(): Partial<Hls['config']> {
+  const isTv = isSmartTV();
+  const isSamsung = isSamsungTV();
+  
+  // Samsung TVs têm problemas com Web Workers
+  const enableWorker = !isSamsung && !isTv;
+  
+  console.log(`[SimplePlayer] Config: Samsung=${isSamsung}, TV=${isTv}, Worker=${enableWorker}`);
+  
+  return {
+    enableWorker,
+    lowLatencyMode: false,
+    backBufferLength: isTv ? 15 : 30,
+    maxBufferLength: isTv ? 20 : 30,
+    maxMaxBufferLength: isTv ? 30 : 60,
+    maxBufferSize: isTv ? 30 * 1000 * 1000 : 60 * 1000 * 1000,
+    maxBufferHole: 0.5,
+    startFragPrefetch: !isTv, // Desabilita prefetch em TVs para economia de memória
+    testBandwidth: true,
+    progressive: true,
+    fragLoadingTimeOut: isTv ? 30000 : 20000, // Mais tempo para TVs
+    fragLoadingMaxRetry: isTv ? 6 : 4, // Mais retries para TVs
+    manifestLoadingTimeOut: isTv ? 20000 : 15000,
+    manifestLoadingMaxRetry: isTv ? 5 : 3,
+  };
+}
 
 export default function SimplePlayer({
   url,
@@ -210,7 +235,7 @@ export default function SimplePlayer({
     // HLS - usa HLS.js se suportado
     if (Hls.isSupported()) {
       console.log('[SimplePlayer] Usando HLS.js');
-      const hls = new Hls(HLS_CONFIG);
+      const hls = new Hls(getHlsConfig());
       hlsRef.current = hls;
 
       hls.loadSource(finalUrl);
