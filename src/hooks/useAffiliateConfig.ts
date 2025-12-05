@@ -60,13 +60,19 @@ export function useAffiliateConfig() {
             parsed.max_withdrawals_per_month = value?.value || 4;
             break;
           case 'auto_confirm_referrals':
-            parsed.auto_confirm_referrals = value || { enabled: false, delay_hours: 24 };
+            parsed.auto_confirm_referrals = {
+              enabled: value?.enabled ?? false,
+              delay_hours: value?.delay_hours ?? 24
+            };
             break;
           case 'fraud_detection_enabled':
             parsed.fraud_detection_enabled = value?.enabled ?? true;
             break;
           case 'recurring_commission_enabled':
-            parsed.recurring_commission_enabled = value || { enabled: true, percentage: 5 };
+            parsed.recurring_commission_enabled = {
+              enabled: value?.enabled ?? true,
+              percentage: value?.percentage ?? 5
+            };
             break;
           case 'cookie_duration_days':
             parsed.cookie_duration_days = value?.value || 30;
