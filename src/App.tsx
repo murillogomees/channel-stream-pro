@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { webVitalsService } from "@/services/webVitalsService";
+import { useGlobalOrientationLock } from "@/hooks/useGlobalOrientationLock";
 
 // Core pages
 const Index = lazy(() => import("./pages/Index"));
@@ -67,18 +68,18 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const App = () => (
-  <AuthProvider>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <Suspense fallback={
-          <div className="min-h-screen bg-background flex items-center justify-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        }>
+// Inner component to use hooks
+function AppContent() {
+  // Global portrait lock - app always stays vertical
+  useGlobalOrientationLock();
+  
+  return (
+    <BrowserRouter>
+      <Suspense fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      }>
           <Routes>
             {/* ========================================
                 PUBLIC ROUTES
@@ -131,8 +132,18 @@ const App = () => (
             <Route path="/403" element={<Forbidden />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Suspense>
-        </BrowserRouter>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+
+const App = () => (
+  <AuthProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
       </TooltipProvider>
     </ThemeProvider>
   </AuthProvider>
