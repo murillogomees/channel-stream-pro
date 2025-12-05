@@ -108,12 +108,15 @@ export function CDNConfigPanel() {
     try {
       const { error } = await supabase
         .from('content_routing_config')
-        .upsert({
-          config_key: 'cdn_settings',
-          config_value: config,
-          description: 'Configurações do CDN R2 e sistema de download',
-          updated_at: new Date().toISOString()
-        });
+        .upsert(
+          {
+            config_key: 'cdn_settings',
+            config_value: config,
+            description: 'Configurações do CDN R2 e sistema de download',
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'config_key' }
+        );
 
       if (error) throw error;
 
@@ -375,8 +378,8 @@ export function CDNConfigPanel() {
                   <Label>Downloads Simultâneos</Label>
                   <Input
                     type="number"
-                    value={config.maxConcurrentDownloads}
-                    onChange={(e) => setConfig({ ...config, maxConcurrentDownloads: parseInt(e.target.value) })}
+                    value={config.maxConcurrentDownloads || ''}
+                    onChange={(e) => setConfig({ ...config, maxConcurrentDownloads: parseInt(e.target.value) || 10 })}
                     min="1"
                     max="50"
                   />
@@ -386,8 +389,8 @@ export function CDNConfigPanel() {
                   <Label>Tentativas de Retry</Label>
                   <Input
                     type="number"
-                    value={config.retryAttempts}
-                    onChange={(e) => setConfig({ ...config, retryAttempts: parseInt(e.target.value) })}
+                    value={config.retryAttempts || ''}
+                    onChange={(e) => setConfig({ ...config, retryAttempts: parseInt(e.target.value) || 5 })}
                     min="1"
                     max="10"
                   />
@@ -397,8 +400,8 @@ export function CDNConfigPanel() {
                   <Label>Timeout (ms)</Label>
                   <Input
                     type="number"
-                    value={config.downloadTimeout}
-                    onChange={(e) => setConfig({ ...config, downloadTimeout: parseInt(e.target.value) })}
+                    value={config.downloadTimeout || ''}
+                    onChange={(e) => setConfig({ ...config, downloadTimeout: parseInt(e.target.value) || 60000 })}
                     min="10000"
                     step="10000"
                   />
