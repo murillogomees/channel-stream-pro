@@ -63,6 +63,3 @@ export { useSmartBuffer } from '@/hooks/useSmartBuffer';
 export { useMemoryManager } from '@/hooks/useMemoryManager';
 export { useFrameDropPrevention } from '@/hooks/useFrameDropPrevention';
 export { usePlayerPerformanceV2 } from '@/hooks/usePlayerPerformanceV2';
-
-// Optimized channel list component
-export { VirtualizedChannelList, MemoizedVirtualizedChannelList } from './VirtualizedChannelList';

@@ -888,66 +888,6 @@ export function useIPTVPlayerClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Realtime sync - update channels without full refresh
-  useEffect(() => {
-    if (!assignedPlaylist?.id) return;
-
-    console.log('[IPTV] Setting up realtime sync for playlist:', assignedPlaylist.id);
-    
-    // Subscribe to channel updates
-    const channel = supabase
-      .channel(`playlist-realtime-${assignedPlaylist.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'm3u_sync_entries',
-        },
-        (payload) => {
-          const eventType = payload.eventType;
-          const record = payload.new as any;
-          const oldRecord = payload.old as any;
-          
-          console.log(`[IPTV Realtime] ${eventType} event received`);
-          
-          startTransition(() => {
-            if (eventType === 'UPDATE' && record) {
-              // Update existing channel
-              setCategories(prev => prev.map(cat => ({
-                ...cat,
-                channels: cat.channels.map(ch => 
-                  ch.id === record.id ? { ...ch, name: record.title, stream_url: record.stream_url, tvg_logo: record.tvg_logo } : ch
-                )
-              })));
-              
-              // Update in allChannelsRef
-              allChannelsRef.current = allChannelsRef.current.map(ch =>
-                ch.id === record.id ? { ...ch, name: record.title, stream_url: record.stream_url, tvg_logo: record.tvg_logo } : ch
-              );
-            } else if (eventType === 'DELETE' && oldRecord) {
-              // Remove channel
-              setCategories(prev => prev.map(cat => ({
-                ...cat,
-                channels: cat.channels.filter(ch => ch.id !== oldRecord.id)
-              })));
-              
-              allChannelsRef.current = allChannelsRef.current.filter(ch => ch.id !== oldRecord.id);
-              setLoadedChannels(allChannelsRef.current.length);
-            }
-          });
-        }
-      )
-      .subscribe((status) => {
-        console.log('[IPTV Realtime] Subscription status:', status);
-      });
-
-    return () => {
-      console.log('[IPTV] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [assignedPlaylist?.id]);
-
   // Channel navigation
   const changeChannel = useCallback((channel: Channel) => {
     setCurrentChannel(channel);

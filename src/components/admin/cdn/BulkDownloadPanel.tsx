@@ -172,7 +172,7 @@ export function BulkDownloadPanel() {
           config_value: schedule,
           description: 'Agendamento de download automático para R2',
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'config_key' });
+        });
 
       if (error) throw error;
 
