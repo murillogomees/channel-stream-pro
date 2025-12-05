@@ -5,11 +5,29 @@ export default {
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
+  	// Custom responsive breakpoints
+  	screens: {
+  		'xs': '0px',       // Mobile small
+  		'sm': '481px',     // Mobile large
+  		'md': '769px',     // Tablet portrait
+  		'lg': '1025px',    // Tablet landscape / Small desktop
+  		'xl': '1281px',    // Desktop
+  		'2xl': '1441px',   // Large desktop / TV
+  		'3xl': '1921px',   // 4K TV / Ultra-wide
+  	},
   	container: {
   		center: true,
-  		padding: '2rem',
+  		padding: {
+  			DEFAULT: '1rem',
+  			sm: '1.5rem',
+  			md: '2rem',
+  			lg: '2rem',
+  			xl: '2rem',
+  			'2xl': '3rem',
+  		},
   		screens: {
-  			'2xl': '1400px'
+  			'2xl': '1600px',
+  			'3xl': '1920px',
   		}
   	},
   	extend: {
