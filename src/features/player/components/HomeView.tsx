@@ -318,7 +318,9 @@ export function HomeView({
     const series: Channel[] = [];
     const live: Channel[] = [];
     
+    // Only include channels with cover images on home page
     for (const ch of allChannels) {
+      if (!ch.tvg_logo) continue; // Skip channels without cover image
       const type = detectContentType(ch);
       if (type === 'movie') movies.push(ch);
       else if (type === 'episode') series.push(ch);
@@ -377,25 +379,25 @@ export function HomeView({
 
   return (
     <div className="pb-8 space-y-2">
-      {/* Continue Watching */}
-      {continueWatchingItems.length > 0 && (
+      {/* Continue Watching - only items with cover images */}
+      {continueWatchingItems.filter(item => item.content_logo).length > 0 && (
         <ContinueWatchingRow
-          items={continueWatchingItems}
+          items={continueWatchingItems.filter(item => item.content_logo)}
           onPlay={onPlayContinue}
           onRemove={onRemoveContinue}
           isLoading={loadingContinueWatching}
         />
       )}
 
-      {/* Series Continuations - Next Episodes */}
-      {seriesContinuations.length > 0 && (
+      {/* Series Continuations - Next Episodes - only with cover images */}
+      {seriesContinuations.filter(item => item.logo || item.nextEpisode.tvg_logo).length > 0 && (
         <ContentRow
           title="Continuar Séries"
           subtitle="Próximos episódios das suas séries"
           icon={PlaySquare}
-          isEmpty={seriesContinuations.length === 0}
+          isEmpty={false}
         >
-          {seriesContinuations.map((item) => (
+          {seriesContinuations.filter(item => item.logo || item.nextEpisode.tvg_logo).map((item) => (
             <SeriesContinuationCard
               key={item.seriesName}
               item={item}
@@ -405,33 +407,37 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Recommendation Groups - "Because you watched X" */}
-      {recommendationGroups.map((group) => (
-        <ContentRow
-          key={group.type + (group.source_content || '')}
-          title={group.title}
-          icon={Clock}
-          isEmpty={group.items.length === 0}
-        >
-          {group.items.map((item) => (
-            <RecommendationCard
-              key={item.id}
-              item={item}
-              onPlay={() => onPlayRecommendation(item)}
-            />
-          ))}
-        </ContentRow>
-      ))}
+      {/* Recommendation Groups - "Because you watched X" - only items with cover images */}
+      {recommendationGroups.map((group) => {
+        const itemsWithLogo = group.items.filter(item => item.content_logo);
+        if (itemsWithLogo.length === 0) return null;
+        return (
+          <ContentRow
+            key={group.type + (group.source_content || '')}
+            title={group.title}
+            icon={Clock}
+            isEmpty={false}
+          >
+            {itemsWithLogo.map((item) => (
+              <RecommendationCard
+                key={item.id}
+                item={item}
+                onPlay={() => onPlayRecommendation(item)}
+              />
+            ))}
+          </ContentRow>
+        );
+      })}
 
-      {/* For You Mix */}
-      {forYouMix.length > 0 && (
+      {/* For You Mix - only items with cover images */}
+      {forYouMix.filter(item => item.content_logo).length > 0 && (
         <ContentRow
           title="Para Você"
           subtitle="Seleção personalizada"
           icon={Film}
-          isEmpty={forYouMix.length === 0}
+          isEmpty={false}
         >
-          {forYouMix.slice(0, 20).map((item) => (
+          {forYouMix.filter(item => item.content_logo).slice(0, 20).map((item) => (
             <RecommendationCard
               key={item.id}
               item={item}
