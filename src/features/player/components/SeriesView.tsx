@@ -13,6 +13,7 @@ import { useLazyLoadContent } from '@/hooks/useLazyLoadContent';
 import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
 import { SeriesCard } from './SeriesCard';
 import { SeriesDetailSheet } from './SeriesDetailSheet';
+import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
 import type { SeriesMetadata } from '../types/series';
 
 interface Category {
@@ -96,6 +97,9 @@ export function SeriesView({
   const [seriesMetadata, setSeriesMetadata] = useState<SeriesMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // Session key for randomization - changes on each component mount
+  const [sessionKey] = useState(() => createSessionKey());
   
   // Metadata cache - persists across renders
   const metadataCacheRef = useRef<Map<string, SeriesMetadata>>(new Map());
@@ -206,7 +210,7 @@ export function SeriesView({
     }
   }, [seriesGroups.length, isInitializing]);
 
-  // Filter series - uses deferred values to keep UI responsive
+  // Filter series - RANDOMIZED on each visit
   const filteredSeries = useMemo(() => {
     let series = [...seriesGroups];
 
@@ -233,13 +237,21 @@ export function SeriesView({
         case 'year':
           return (metaB?.year || 0) - (metaA?.year || 0);
         case 'name':
-        default:
           return a.seriesName.localeCompare(b.seriesName);
+        case 'recent':
+        default:
+          // Random order for default
+          return 0;
       }
     });
 
+    // Apply randomization for default/recent sort
+    if (deferredSortBy === 'recent' || !deferredSortBy) {
+      series = shuffleArray(series);
+    }
+
     return series;
-  }, [seriesGroups, selectedCategory, deferredSearch, deferredSortBy, metadataCacheVersion]);
+  }, [seriesGroups, selectedCategory, deferredSearch, deferredSortBy, metadataCacheVersion, sessionKey]);
 
   // Use lazy loading with smaller initial batch for faster first paint
   const {

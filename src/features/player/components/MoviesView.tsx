@@ -12,6 +12,7 @@ import { useLazyLoadContent } from '@/hooks/useLazyLoadContent';
 import { useMovieMetadata } from '../hooks/useMovieMetadata';
 import { MovieCard } from './MovieCard';
 import { MovieDetailSheet } from './MovieDetailSheet';
+import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
 import type { ContentMetadata } from '../types';
 
 interface Category {
@@ -58,6 +59,9 @@ export function MoviesView({
   const [movieMetadata, setMovieMetadata] = useState<ContentMetadata | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   
+  // Session key for randomization - changes on each component mount
+  const [sessionKey] = useState(() => createSessionKey());
+  
   // Metadata cache - persists across renders
   const metadataCacheRef = useRef<Map<string, ContentMetadata>>(new Map());
   const [metadataCacheVersion, setMetadataCacheVersion] = useState(0);
@@ -77,7 +81,7 @@ export function MoviesView({
     );
   }, [categories]);
 
-  // Filter and sort movies - memoized
+  // Filter and sort movies - RANDOMIZED on each visit
   const filteredMovies = useMemo(() => {
     let movies = allMovies;
 
@@ -107,13 +111,21 @@ export function MoviesView({
         case 'year':
           return (metaB?.year || 0) - (metaA?.year || 0);
         case 'name':
-        default:
           return a.name.localeCompare(b.name);
+        case 'recent':
+        default:
+          // Random order for default - shuffled each session
+          return 0;
       }
     });
 
+    // Apply randomization for default/recent sort
+    if (sortBy === 'recent' || !sortBy) {
+      movies = shuffleArray(movies);
+    }
+
     return movies;
-  }, [allMovies, selectedCategory, externalSearch, sortBy, metadataCacheVersion]);
+  }, [allMovies, selectedCategory, externalSearch, sortBy, metadataCacheVersion, sessionKey]);
 
   // Use lazy loading for visible items
   const {

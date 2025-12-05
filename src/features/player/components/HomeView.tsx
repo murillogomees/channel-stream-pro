@@ -2,13 +2,14 @@
  * HomeView - Dynamic home tab with personalized content
  */
 
-import { memo, useRef, useMemo } from 'react';
+import { memo, useRef, useMemo, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ContinueWatchingRow } from './ContinueWatchingRow';
+import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
 interface SeriesContinuation {
@@ -273,6 +274,9 @@ export function HomeView({
   onPlayChannel,
   allChannels,
 }: HomeViewProps) {
+  // Session key for randomization - changes on each mount/remount
+  const [sessionKey] = useState(() => createSessionKey());
+  
   // Check if we have any personalized content
   const hasPersonalizedContent = 
     continueWatchingItems.length > 0 || 
@@ -309,16 +313,15 @@ export function HomeView({
     return 'live';
   };
 
-  // Default content sections for new users - PROPERLY SEPARATED BY TYPE
+  // Default content sections for new users - RANDOMIZED on each visit
   const defaultSections = useMemo(() => {
     if (hasPersonalizedContent || allChannels.length === 0) return [];
 
-    // Separate channels by content type
+    // Separate channels by content type - only with cover images
     const movies: Channel[] = [];
     const series: Channel[] = [];
     const live: Channel[] = [];
     
-    // Only include channels with cover images on home page
     for (const ch of allChannels) {
       if (!ch.tvg_logo) continue; // Skip channels without cover image
       const type = detectContentType(ch);
@@ -329,12 +332,12 @@ export function HomeView({
 
     const sections: { title: string; icon: React.ElementType; channels: Channel[]; type: string }[] = [];
     
-    // Add sections in order: Live TV, Movies, Series
+    // RANDOMIZE and take different content each time
     if (live.length > 0) {
       sections.push({
         title: '📺 TV ao Vivo',
         icon: Tv,
-        channels: live.slice(0, 20),
+        channels: shuffleArray(live).slice(0, 20),
         type: 'live',
       });
     }
@@ -343,7 +346,7 @@ export function HomeView({
       sections.push({
         title: '🎬 Filmes',
         icon: Film,
-        channels: movies.slice(0, 20),
+        channels: shuffleArray(movies).slice(0, 20),
         type: 'movie',
       });
     }
@@ -365,13 +368,13 @@ export function HomeView({
       sections.push({
         title: '📺 Séries',
         icon: PlaySquare,
-        channels: Array.from(seriesMap.values()).slice(0, 20),
+        channels: shuffleArray(Array.from(seriesMap.values())).slice(0, 20),
         type: 'episode',
       });
     }
 
     return sections;
-  }, [allChannels, hasPersonalizedContent]);
+  }, [allChannels, hasPersonalizedContent, sessionKey]); // sessionKey forces new random on each mount
 
   if (loadingContinueWatching && loadingRecommendations) {
     return <LoadingSkeleton />;
@@ -407,9 +410,9 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Recommendation Groups - "Because you watched X" - only items with cover images */}
+      {/* Recommendation Groups - RANDOMIZED, only items with cover images */}
       {recommendationGroups.map((group) => {
-        const itemsWithLogo = group.items.filter(item => item.content_logo);
+        const itemsWithLogo = shuffleArray(group.items.filter(item => item.content_logo));
         if (itemsWithLogo.length === 0) return null;
         return (
           <ContentRow
@@ -429,7 +432,7 @@ export function HomeView({
         );
       })}
 
-      {/* For You Mix - only items with cover images */}
+      {/* For You Mix - RANDOMIZED, only items with cover images */}
       {forYouMix.filter(item => item.content_logo).length > 0 && (
         <ContentRow
           title="Para Você"
@@ -437,7 +440,7 @@ export function HomeView({
           icon={Film}
           isEmpty={false}
         >
-          {forYouMix.filter(item => item.content_logo).slice(0, 20).map((item) => (
+          {shuffleArray(forYouMix.filter(item => item.content_logo)).slice(0, 20).map((item) => (
             <RecommendationCard
               key={item.id}
               item={item}
