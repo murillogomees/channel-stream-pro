@@ -180,12 +180,145 @@ interface ParsedEntry {
   rawExtInf: string;
 }
 
+// Check if content is HLS master playlist
+function isHlsMasterPlaylist(content: string): boolean {
+  return content.includes('#EXT-X-STREAM-INF') || 
+         content.includes('#EXT-X-VERSION') ||
+         content.includes('#EXT-X-MEDIA');
+}
+
+// Parse HLS master playlist and convert variants to entries
+function parseHlsPlaylist(content: string, sourceUrl: string): ParsedEntry[] {
+  const lines = content.split(/\r?\n/);
+  const entries: ParsedEntry[] = [];
+  const baseUrl = sourceUrl.substring(0, sourceUrl.lastIndexOf('/') + 1);
+  
+  let currentStreamInf: string | null = null;
+  let streamIndex = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (!line) continue;
+    
+    // Parse EXT-X-STREAM-INF for video variants
+    if (line.startsWith('#EXT-X-STREAM-INF:')) {
+      currentStreamInf = line;
+      continue;
+    }
+    
+    // Parse EXT-X-MEDIA for audio/subtitle tracks
+    if (line.startsWith('#EXT-X-MEDIA:')) {
+      const attrs = parseHlsAttributes(line.substring('#EXT-X-MEDIA:'.length));
+      if (attrs.uri) {
+        const fullUrl = attrs.uri.startsWith('http') ? attrs.uri : baseUrl + attrs.uri;
+        entries.push({
+          title: attrs.name || attrs['group-id'] || `Audio Track ${streamIndex + 1}`,
+          streamUrl: fullUrl,
+          groupTitle: attrs.type || 'Audio',
+          tvgName: attrs.name,
+          tvgLanguage: attrs.language,
+          duration: -1,
+          rawExtInf: line.substring(0, 500),
+        });
+        streamIndex++;
+      }
+      continue;
+    }
+    
+    // URL line after STREAM-INF
+    if (currentStreamInf && !line.startsWith('#')) {
+      const attrs = parseHlsAttributes(currentStreamInf.substring('#EXT-X-STREAM-INF:'.length));
+      const fullUrl = line.startsWith('http') ? line : baseUrl + line;
+      
+      // Extract quality info
+      const resolution = attrs.resolution || 'Unknown';
+      const bandwidth = attrs.bandwidth ? `${Math.round(parseInt(attrs.bandwidth) / 1000)}kbps` : '';
+      const qualityName = getQualityName(resolution);
+      
+      entries.push({
+        title: `${qualityName}${bandwidth ? ` (${bandwidth})` : ''}`,
+        streamUrl: fullUrl,
+        groupTitle: 'Video Quality',
+        tvgId: `stream_${streamIndex}`,
+        tvgName: qualityName,
+        duration: -1,
+        rawExtInf: currentStreamInf.substring(0, 500),
+      });
+      
+      streamIndex++;
+      currentStreamInf = null;
+    }
+  }
+  
+  // If no entries found but it's an HLS URL, add the source URL as single entry
+  if (entries.length === 0) {
+    entries.push({
+      title: 'Stream Principal',
+      streamUrl: sourceUrl,
+      groupTitle: 'Live',
+      duration: -1,
+      rawExtInf: '',
+    });
+  }
+  
+  console.log(`[M3U-Sync] Parsed HLS playlist: ${entries.length} entries`);
+  return entries;
+}
+
+// Parse HLS attributes from a line
+function parseHlsAttributes(attrString: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const regex = /([\w-]+)=(?:"([^"]*)"|([^,]*))/g;
+  let match;
+  
+  while ((match = regex.exec(attrString)) !== null) {
+    const key = match[1].toLowerCase();
+    const value = match[2] || match[3];
+    attrs[key] = value;
+  }
+  
+  return attrs;
+}
+
+// Get quality name from resolution
+function getQualityName(resolution: string): string {
+  if (!resolution) return 'Auto';
+  
+  const height = resolution.split('x')[1];
+  if (!height) return resolution;
+  
+  const h = parseInt(height);
+  if (h >= 2160) return '4K UHD';
+  if (h >= 1440) return '1440p QHD';
+  if (h >= 1080) return '1080p Full HD';
+  if (h >= 720) return '720p HD';
+  if (h >= 480) return '480p SD';
+  if (h >= 360) return '360p';
+  if (h >= 240) return '240p';
+  return `${height}p`;
+}
+
 // Optimized M3U Parser with offset support for chunked processing
 function parseM3UChunked(
   content: string, 
   offset = 0, 
-  chunkSize = CHUNK_SIZE
+  chunkSize = CHUNK_SIZE,
+  sourceUrl = ''
 ): { entries: ParsedEntry[]; invalidCount: number; totalEntries: number; hasMore: boolean } {
+  
+  // Check if it's an HLS playlist
+  if (isHlsMasterPlaylist(content)) {
+    console.log('[M3U-Sync] Detected HLS master playlist, using HLS parser');
+    const hlsEntries = parseHlsPlaylist(content, sourceUrl);
+    return {
+      entries: hlsEntries,
+      invalidCount: 0,
+      totalEntries: hlsEntries.length,
+      hasMore: false,
+    };
+  }
+  
   const lines = content.split(/\r?\n/);
   const entries: ParsedEntry[] = [];
   let invalidCount = 0;
@@ -350,7 +483,7 @@ async function processSyncInBackground(
     console.log(`[M3U-Sync-BG] Downloaded ${fileSize} bytes for ${source.key}`);
     
     // Parse chunk
-    const { entries, invalidCount, totalEntries, hasMore } = parseM3UChunked(content, offset, CHUNK_SIZE);
+    const { entries, invalidCount, totalEntries, hasMore } = parseM3UChunked(content, offset, CHUNK_SIZE, source.source_url);
     console.log(`[M3U-Sync-BG] Parsed chunk: ${entries.length} entries (offset: ${offset}, total: ${totalEntries}, hasMore: ${hasMore})`);
     
     // Deduplicate
