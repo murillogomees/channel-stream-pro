@@ -24,12 +24,18 @@ import {
 import { 
   DollarSign, Users, TrendingUp, Copy, Check, 
   Wallet, ArrowDownToLine, CreditCard, Loader2,
-  Clock, CheckCircle, XCircle, AlertCircle, Share2
+  Clock, CheckCircle, XCircle, AlertCircle, Share2,
+  Link2, QrCode, Image
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Affiliate portal components
+import { AffiliateLinkBuilder } from "@/components/affiliate/AffiliateLinkBuilder";
+import { AffiliateQRGenerator } from "@/components/affiliate/AffiliateQRGenerator";
+import { AffiliateMarketingHub } from "@/components/affiliate/AffiliateMarketingHub";
 
 export default function AffiliateDashboard() {
   const { affiliate, referrals, withdrawals, loading, updatePixInfo, requestWithdrawal, refresh } = useMyAffiliate();
@@ -296,11 +302,29 @@ export default function AffiliateDashboard() {
           </Button>
         </div>
 
-        {/* Tabs for Referrals and Withdrawals */}
+        {/* Tabs for Referrals, Withdrawals, and Tools */}
         <Tabs defaultValue="referrals" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="referrals">Indicações ({referrals.length})</TabsTrigger>
-            <TabsTrigger value="withdrawals">Saques ({withdrawals.length})</TabsTrigger>
+          <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="referrals">
+              <Users className="h-4 w-4 mr-1" />
+              Indicações ({referrals.length})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals">
+              <Wallet className="h-4 w-4 mr-1" />
+              Saques ({withdrawals.length})
+            </TabsTrigger>
+            <TabsTrigger value="links">
+              <Link2 className="h-4 w-4 mr-1" />
+              Links
+            </TabsTrigger>
+            <TabsTrigger value="qrcode">
+              <QrCode className="h-4 w-4 mr-1" />
+              QR Code
+            </TabsTrigger>
+            <TabsTrigger value="marketing">
+              <Image className="h-4 w-4 mr-1" />
+              Marketing
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="referrals">
@@ -377,6 +401,18 @@ export default function AffiliateDashboard() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="links">
+            <AffiliateLinkBuilder affiliateId={affiliate.id} customSlug={affiliate.custom_slug} />
+          </TabsContent>
+
+          <TabsContent value="qrcode">
+            <AffiliateQRGenerator affiliateId={affiliate.id} customSlug={affiliate.custom_slug} />
+          </TabsContent>
+
+          <TabsContent value="marketing">
+            <AffiliateMarketingHub />
           </TabsContent>
         </Tabs>
 
