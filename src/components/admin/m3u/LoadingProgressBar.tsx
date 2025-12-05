@@ -33,7 +33,7 @@ export const LoadingProgressBar = React.memo(function LoadingProgressBar({
           </span>
         </div>
         <span className="text-muted-foreground">
-          {progress.loaded.toLocaleString()} / {progress.total.toLocaleString()}
+          {(progress.loaded ?? 0).toLocaleString()} / {(progress.total ?? 0).toLocaleString()}
         </span>
       </div>
       <Progress 
@@ -42,10 +42,10 @@ export const LoadingProgressBar = React.memo(function LoadingProgressBar({
         indicatorClassName="transition-all duration-300"
       />
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{progress.percent}% concluído</span>
-        {progress.phase === 'fetching' && progress.total > 0 && !progress.fromCache && (
+        <span>{progress.percent ?? 0}% concluído</span>
+        {progress.phase === 'fetching' && (progress.total ?? 0) > 0 && !progress.fromCache && (
           <span>
-            ~{Math.ceil((progress.total - progress.loaded) / 5000)} páginas restantes
+            ~{Math.ceil(((progress.total ?? 0) - (progress.loaded ?? 0)) / 5000)} páginas restantes
           </span>
         )}
       </div>
