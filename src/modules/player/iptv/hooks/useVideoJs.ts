@@ -230,7 +230,13 @@ export function useVideoJs({
     const finalUrl = optimized.url;
     const protocol = optimized.protocol;
     
-    console.log('[useVideoJs] Loading:', protocol, optimized.source, finalUrl.substring(0, 80));
+    console.log('[useVideoJs] Loading stream:', {
+      protocol,
+      source: optimized.source,
+      requiresProxy: optimized.requiresProxy,
+      originalUrl: url,
+      finalUrl,
+    });
 
     const videoEl = playerRef.current.el()?.querySelector('video') as HTMLVideoElement;
     if (!videoEl) return;
