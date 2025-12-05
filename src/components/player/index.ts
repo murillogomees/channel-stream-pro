@@ -66,8 +66,3 @@ export { usePlayerPerformanceV2 } from '@/hooks/usePlayerPerformanceV2';
 
 // Optimized channel list component
 export { VirtualizedChannelList, MemoizedVirtualizedChannelList } from './VirtualizedChannelList';
-export { InfiniteChannelList } from './InfiniteChannelList';
-export type { InfiniteChannelListProps, InfiniteChannelListRef, Channel } from './InfiniteChannelList';
-export { ChannelListContainer } from './ChannelListContainer';
-export { ChannelListItem, ChannelItemSkeleton } from './ChannelListItem';
-export { useChannelBatchFetch } from '@/hooks/useChannelBatchFetch';
