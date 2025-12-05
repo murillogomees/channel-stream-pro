@@ -43,6 +43,22 @@
     --destructive-foreground: 0 85% 97%;
     --success: 142 80% 26%;
     --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
+    /* Surface tokens - for layered backgrounds */
+    --surface-0: 0 0% 100%;
+    --surface-1: 220 14% 96%;
+    --surface-2: 220 13% 91%;
+    --surface-3: 220 12% 85%;
+    /* Semantic stat colors */
+    --stat-primary: 161 93% 30%;
+    --stat-success: 142 76% 36%;
+    --stat-warning: 38 92% 50%;
+    --stat-danger: 0 72% 50%;
+    --stat-info: 210 100% 50%;
+    --stat-purple: 262 83% 58%;
     --chart-1: 158 64% 51%;
     --chart-2: 141 69% 58%;
     --chart-3: 172 66% 50%;
@@ -65,6 +81,11 @@
     --gradient-accent: linear-gradient(135deg, hsl(210 100% 50%), hsl(220 100% 60%));
     --gradient-hero: linear-gradient(135deg, hsl(220 10% 96%) 0%, hsl(220 10% 98%) 50%, hsl(220 10% 96%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 10% 98%));
+    /* Elevation shadows */
+    --elevation-1: 0 1px 3px 0 hsl(0 0% 0% / 0.06), 0 1px 2px -1px hsl(0 0% 0% / 0.06);
+    --elevation-2: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 2px 4px -2px hsl(0 0% 0% / 0.08);
+    --elevation-3: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --elevation-4: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-sm: -7px 1px 17.25px -4px hsl(0, 0%, 0%);
@@ -107,6 +128,22 @@
     --destructive-foreground: 0 85% 97%;
     --success: 142 80% 26%;
     --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 100% 60%;
+    --info-foreground: 0 0% 100%;
+    /* Surface tokens - for layered backgrounds (dark mode) */
+    --surface-0: 220 13% 10%;
+    --surface-1: 220 13% 14%;
+    --surface-2: 220 13% 18%;
+    --surface-3: 220 13% 22%;
+    /* Semantic stat colors (dark mode) */
+    --stat-primary: 158 64% 51%;
+    --stat-success: 142 76% 45%;
+    --stat-warning: 45 93% 47%;
+    --stat-danger: 0 84% 60%;
+    --stat-info: 210 100% 60%;
+    --stat-purple: 262 83% 68%;
     --chart-1: 156 71% 66%;
     --chart-2: 141 76% 73%;
     --chart-3: 170 76% 64%;
@@ -125,6 +162,11 @@
     --gradient-accent: linear-gradient(135deg, hsl(210 100% 60%), hsl(220 100% 70%));
     --gradient-hero: linear-gradient(135deg, hsl(220 13% 5%) 0%, hsl(220 13% 10%) 50%, hsl(220 13% 5%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(220 13% 18%), hsl(220 13% 22%));
+    /* Elevation shadows (dark mode) */
+    --elevation-1: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --elevation-2: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --elevation-3: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.4);
+    --elevation-4: 0 20px 25px -5px hsl(0 0% 0% / 0.5), 0 8px 10px -6px hsl(0 0% 0% / 0.5);
     --shadow-glow: 0 0 40px hsl(142 76% 28% / 0.4);
     --shadow-accent-glow: 0 0 30px hsl(210 100% 60% / 0.3);
     --shadow-card: 0 4px 20px -5px hsl(220 13% 0% / 0.6), 0 0 0 1px hsl(220 13% 28% / 0.5);
