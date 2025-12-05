@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
@@ -144,44 +144,60 @@ export default function AdminNotificationQueue() {
 
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total</p>
-              <h3 className="text-2xl font-bold">{stats.total}</h3>
+        <Card variant="stat">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total</p>
+                <h3 className="text-2xl font-bold text-foreground">{stats.total}</h3>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-stat-primary/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-stat-primary" />
+              </div>
             </div>
-            <AlertCircle className="h-8 w-8 text-muted-foreground" />
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
-              <h3 className="text-2xl font-bold">{stats.pending}</h3>
+        <Card variant="stat-warning">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
+                <h3 className="text-2xl font-bold text-foreground">{stats.pending}</h3>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-stat-warning/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-stat-warning" />
+              </div>
             </div>
-            <Clock className="h-8 w-8 text-yellow-500" />
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Enviados</p>
-              <h3 className="text-2xl font-bold">{stats.sent}</h3>
+        <Card variant="stat-success">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Enviados</p>
+                <h3 className="text-2xl font-bold text-foreground">{stats.sent}</h3>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-stat-success/10 flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-stat-success" />
+              </div>
             </div>
-            <CheckCircle className="h-8 w-8 text-green-500" />
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Falharam</p>
-              <h3 className="text-2xl font-bold">{stats.failed}</h3>
+        <Card variant="stat-danger">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Falharam</p>
+                <h3 className="text-2xl font-bold text-foreground">{stats.failed}</h3>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-stat-danger/10 flex items-center justify-center">
+                <XCircle className="h-5 w-5 text-stat-danger" />
+              </div>
             </div>
-            <XCircle className="h-8 w-8 text-destructive" />
-          </div>
+          </CardContent>
         </Card>
       </div>
 

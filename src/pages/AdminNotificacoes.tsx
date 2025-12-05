@@ -32,7 +32,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Send, MessageSquare, Download, Trash2, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle, Plus, User, Variable, Save, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Send, MessageSquare, Download, Trash2, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle, Plus, User, Variable, Save, Copy, Check, Settings } from 'lucide-react';
 import { LOCAL_TEMPLATES, getDaysUntilDue, sendNotification } from '@/services/notificationScheduler';
 import { Cliente } from '@/types/cliente';
 import { formatPhoneForDisplay } from '@/utils/phoneFormatter';
@@ -392,14 +392,6 @@ export default function AdminNotificacoes() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate('/admin/dashboard')}
-              className="flex-shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">
                 Notificações WhatsApp
@@ -558,7 +550,7 @@ export default function AdminNotificacoes() {
                     placeholder="5561999999999"
                     value={config.testPhoneNumber || ''}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, ''); // Remove não-dígitos
+                      const value = e.target.value.replace(/\D/g, '');
                       saveConfig({ testPhoneNumber: value });
                     }}
                     disabled={!isConfigured}
@@ -596,43 +588,6 @@ export default function AdminNotificacoes() {
             )}
 
             {config.testPhoneNumber && !phoneValidation.isValid && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Número de teste inválido
-                </p>
-                <p className="text-xs mt-1 opacity-80">
-                  Corrija o formato do número antes de enviar testes
-                </p>
-              </div>
-            )}
-
-            {!isConfigured && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-3 rounded-lg">
-                <p className="text-sm font-medium">
-                  ⚠️ Configure as credenciais BotBot.chat no Dashboard primeiro
-                </p>
-              </div>
-            )}
-
-            {isConfigured && (
-              <div className="flex flex-col gap-2">
-                <Button
-                  onClick={handleTestCredentials}
-                  disabled={testingCredentials}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {testingCredentials ? 'Testando...' : 'Testar Credenciais BotBot'}
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Verifica se suas credenciais estão válidas e ativas
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Variáveis de Template */}
         <Card>
