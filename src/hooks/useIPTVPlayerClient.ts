@@ -48,19 +48,20 @@ interface CachedPlaylist {
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-  INITIAL_BATCH_SIZE: 50000,    // Maximum supported by server - single request
-  BACKGROUND_BATCH_SIZE: 50000, // Maximum batch for background loading
-  PARALLEL_BATCHES: 3,
+  INITIAL_BATCH_SIZE: 20000,    // Balanced for speed without timeouts
+  BACKGROUND_BATCH_SIZE: 20000, // Same for background
+  PARALLEL_BATCHES: 4,          // More parallel requests
   MAX_RETRIES: 3,
   MAX_RETRY_CYCLES: 5,
   MAX_CONSECUTIVE_EMPTY: 3,
-  CACHE_TTL_MS: 24 * 60 * 60 * 1000,  // 24 hours - aggressive caching
-  DB_NAME: 'iptv_playlist_v9',         // New version for 50k batch
+  CACHE_TTL_MS: 24 * 60 * 60 * 1000,
+  DB_NAME: 'iptv_playlist_v10',  // New version
   DB_VERSION: 1,
   STORE_NAME: 'playlists',
   CATEGORIES_STORE: 'categories',
-  BATCH_DELAY_MS: 50,           // Faster batch processing
+  BATCH_DELAY_MS: 25,           // Fast processing
   RETRY_DELAY_MS: 2000,
+  FETCH_TIMEOUT_MS: 60000,      // 60s timeout to prevent aborts
   PLAYLIST_SERVE_URL: 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve',
 };
 
@@ -653,20 +654,32 @@ export function useIPTVPlayerClient() {
             limit: String(batchLimit) 
           });
           
-          batchPromises.push(
-            fetch(`${endpoint}?${params}`, { signal: controller.signal })
-              .then(r => r.json())
-              .then(data => ({ 
+          // Use individual timeout per request to prevent global abort issues
+          const fetchWithTimeout = async () => {
+            const timeoutId = setTimeout(() => {}, CONFIG.FETCH_TIMEOUT_MS);
+            try {
+              const response = await fetch(`${endpoint}?${params}`, { 
+                signal: controller.signal 
+              });
+              clearTimeout(timeoutId);
+              const data = await response.json();
+              return { 
                 channels: data.channels || [], 
                 offset: batchOffset,
                 hasMore: data.hasMore !== false,
                 success: true
-              }))
-              .catch(err => {
+              };
+            } catch (err: any) {
+              clearTimeout(timeoutId);
+              if (err.name === 'AbortError') {
+                console.log(`[IPTV] Batch ${batchOffset} aborted (component unmounted)`);
+              } else {
                 console.warn(`[IPTV] Batch error at ${batchOffset}:`, err.message);
-                return { channels: [], offset: batchOffset, hasMore: true, success: false };
-              })
-          );
+              }
+              return { channels: [], offset: batchOffset, hasMore: true, success: false };
+            }
+          };
+          batchPromises.push(fetchWithTimeout());
         }
 
         if (batchPromises.length === 0) {
