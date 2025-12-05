@@ -1,7 +1,7 @@
 /**
  * AdminUsuariosPage - Hub de usuários e permissões
  * Rota: /admin/usuarios
- * Gerenciamento completo de usuários, roles, auditoria, logs e atividades
+ * Gerenciamento completo de usuários, roles, auditoria, logs, atividades e afiliados
  * Suporta URL param ?tab=roles para navegação direta
  */
 
@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Users, Shield, History, FlaskConical, Activity, CreditCard, Play } from "lucide-react";
+import { Users, Shield, History, FlaskConical, Activity, CreditCard, Play, UserCheck } from "lucide-react";
 import AdminUserList from "../AdminUserList";
 import AdminUserRoles from "../AdminUserRoles";
 import AdminRoleAudit from "../AdminRoleAudit";
@@ -17,6 +17,7 @@ import AdminPermissionTest from "../AdminPermissionTest";
 import AdminActivityLogs from "../AdminActivityLogs";
 import AdminUserPayments from "./AdminUserPayments";
 import AdminUserStreaming from "./AdminUserStreaming";
+import AdminAffiliatesTab from "./AdminAffiliatesTab";
 
 const TAB_MAP: Record<string, string> = {
   list: "list",
@@ -26,6 +27,8 @@ const TAB_MAP: Record<string, string> = {
   streaming: "streaming",
   activity: "activity",
   atividades: "activity",
+  affiliates: "affiliates",
+  afiliados: "affiliates",
   roles: "roles",
   audit: "audit",
   auditoria: "audit",
@@ -82,6 +85,12 @@ export default function AdminUsuariosPage() {
       label: "Atividades",
       icon: <Activity className="h-4 w-4" />,
       content: <AdminActivityLogs />
+    },
+    {
+      value: "affiliates",
+      label: "Afiliados",
+      icon: <UserCheck className="h-4 w-4" />,
+      content: <AdminAffiliatesTab />
     },
     {
       value: "roles",
