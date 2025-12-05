@@ -51,7 +51,7 @@ export function AdminHeader({
               variant="outline" 
               size="sm" 
               onClick={() => navigate('/admin/perfil')} 
-              className="flex-shrink-0 2xl:h-11 2xl:px-5 2xl:text-base 3xl:h-13 3xl:px-6 3xl:text-lg focus:ring-2 2xl:focus:ring-4"
+              className="flex-shrink-0 h-9 sm:h-9 2xl:h-11 3xl:h-13 px-3 2xl:px-5 3xl:px-6 2xl:text-base 3xl:text-lg focus:ring-2 2xl:focus:ring-4"
             >
               <User className="h-4 w-4 2xl:h-5 2xl:w-5 sm:mr-2" />
               <span className="hidden sm:inline">Perfil</span>
@@ -60,7 +60,7 @@ export function AdminHeader({
               variant="ghost" 
               size="sm" 
               onClick={handleLogout} 
-              className="flex-shrink-0 2xl:h-11 2xl:px-5 2xl:text-base 3xl:h-13 3xl:px-6 3xl:text-lg focus:ring-2 2xl:focus:ring-4"
+              className="flex-shrink-0 h-9 sm:h-9 2xl:h-11 3xl:h-13 px-3 2xl:px-5 3xl:px-6 2xl:text-base 3xl:text-lg focus:ring-2 2xl:focus:ring-4"
             >
               <LogOut className="h-4 w-4 2xl:h-5 2xl:w-5 sm:mr-2" />
               <span className="hidden sm:inline">Sair</span>
