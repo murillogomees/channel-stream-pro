@@ -4,55 +4,56 @@
  * Abas: Streaming, Analytics, Conversão, Cupons
  */
 
+import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
+import { Video, BarChart3, Target, Ticket } from "lucide-react";
 import { StreamingDashboard } from "@/components/admin/streaming";
 import AdminAnalytics from "../AdminAnalytics";
 import AdminConversionDashboard from "../AdminConversionDashboard";
 import AdminCoupons from "../AdminCoupons";
 
 export default function AdminAnalyticsPage() {
+  const [activeTab, setActiveTab] = useState("streaming");
+
+  const tabs = [
+    {
+      value: "streaming",
+      label: "Streaming",
+      icon: <Video className="h-4 w-4" />,
+      content: <StreamingDashboard />
+    },
+    {
+      value: "analytics",
+      label: "Analytics",
+      icon: <BarChart3 className="h-4 w-4" />,
+      content: <AdminAnalytics />
+    },
+    {
+      value: "conversion",
+      label: "Conversão",
+      icon: <Target className="h-4 w-4" />,
+      content: <AdminConversionDashboard />
+    },
+    {
+      value: "coupons",
+      label: "Cupons",
+      icon: <Ticket className="h-4 w-4" />,
+      content: <AdminCoupons />
+    }
+  ];
+
   return (
     <AdminShell 
       title="Analytics & Performance"
       description="Métricas, streaming, conversão e cupons"
     >
-      <Tabs defaultValue="streaming" className="space-y-4">
-        <ScrollArea className="w-full whitespace-nowrap pb-2">
-          <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
-            <TabsTrigger value="streaming" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🎬 Streaming
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              📊 Analytics
-            </TabsTrigger>
-            <TabsTrigger value="conversion" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🎯 Conversão
-            </TabsTrigger>
-            <TabsTrigger value="coupons" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🎟️ Cupons
-            </TabsTrigger>
-          </TabsList>
-          <ScrollBar orientation="horizontal" className="invisible" />
-        </ScrollArea>
-
-        <TabsContent value="streaming" className="space-y-4 mt-4">
-          <StreamingDashboard />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4 mt-4">
-          <AdminAnalytics />
-        </TabsContent>
-
-        <TabsContent value="conversion" className="space-y-4 mt-4">
-          <AdminConversionDashboard />
-        </TabsContent>
-
-        <TabsContent value="coupons" className="space-y-4 mt-4">
-          <AdminCoupons />
-        </TabsContent>
-      </Tabs>
+      <ResponsiveTabs
+        defaultValue="streaming"
+        value={activeTab}
+        onValueChange={setActiveTab}
+        tabs={tabs}
+      />
     </AdminShell>
   );
 }
