@@ -260,9 +260,9 @@ export function useVideoJs({
       hlsRef.current = null;
     }
 
-    // TS streams - use mpegts.js
+    // TS streams ONLY - use mpegts.js (NOT for mp4, unknown, or other formats)
     if (protocol === 'ts' && mpegts.isSupported()) {
-      console.log('[useVideoJs] Using mpegts.js for TS stream');
+      console.log('[useVideoJs] Using mpegts.js for TS stream, URL:', finalUrl.substring(0, 80));
       
       const player = mpegts.createPlayer({
         type: 'mpegts',
@@ -374,17 +374,15 @@ export function useVideoJs({
       return;
     }
 
-    // Native playback (Safari, direct MP4, etc)
-    console.log('[useVideoJs] Using native playback for protocol:', protocol);
+    // Native playback (Safari, MP4, unknown formats, etc)
+    console.log('[useVideoJs] Using native playback for protocol:', protocol, 'URL:', finalUrl.substring(0, 80));
     
-    // Determine correct MIME type
+    // Determine correct MIME type - default to video/mp4 for unknown
     const mimeType = protocol === 'hls' 
       ? 'application/x-mpegURL' 
-      : protocol === 'mp4' 
-        ? 'video/mp4' 
-        : protocol === 'dash'
-          ? 'application/dash+xml'
-          : 'video/mp2t'; // Default for TS streams
+      : protocol === 'dash'
+        ? 'application/dash+xml'
+        : 'video/mp4'; // MP4 for mp4, unknown, and other formats
     
     playerRef.current.src({
       src: finalUrl,

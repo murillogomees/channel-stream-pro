@@ -49,19 +49,20 @@ class StreamOptimizerService {
       pathname = lowerUrl;
     }
     
-    // Check for HLS first
+    // Check for HLS first (highest priority)
     if (lowerUrl.includes('.m3u8') || lowerUrl.includes('.m3u') || pathname.endsWith('.m3u8')) {
       return 'hls';
     }
     
-    // Check for VOD/Movie content (MP4) - BEFORE checking for live/ts
-    // Xtream format: /movie/user/pass/id.mp4 OR /movie/user/pass/id (no extension)
-    if (lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) {
+    // Check for explicit MP4/video files (before VOD path check)
+    if (pathname.endsWith('.mp4') || pathname.endsWith('.mkv') || pathname.endsWith('.webm') || 
+        pathname.endsWith('.avi') || pathname.endsWith('.mov')) {
       return 'mp4';
     }
     
-    // Check for explicit MP4 files
-    if (pathname.endsWith('.mp4') || pathname.endsWith('.mkv') || pathname.endsWith('.webm')) {
+    // Check for VOD/Movie content (MP4) - Xtream format
+    // /movie/user/pass/id.mp4 OR /movie/user/pass/id (no extension)
+    if (lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) {
       return 'mp4';
     }
     
@@ -70,13 +71,19 @@ class StreamOptimizerService {
       return 'dash';
     }
     
-    // Check for TS/Live streams
-    if (pathname.endsWith('.ts') || lowerUrl.includes('/live/') || lowerUrl.includes('stream.php')) {
+    // Check for explicit TS streams only
+    if (pathname.endsWith('.ts')) {
       return 'ts';
     }
     
-    // Default to TS for unknown IPTV streams (most live streams are TS)
-    return 'ts';
+    // Live streams - use TS (mpegts.js)
+    if (lowerUrl.includes('/live/') || lowerUrl.includes('stream.php')) {
+      return 'ts';
+    }
+    
+    // Default to 'unknown' - will use native HTML5 video
+    // This prevents mpegts.js from being used for non-TS content
+    return 'unknown';
   }
 
   /**
