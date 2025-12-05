@@ -19,6 +19,7 @@ import { TVContentRow } from '@/components/iptv/TVContentRow';
 import { TVContentCard } from '@/components/iptv/TVContentCard';
 import { TVCategoryFilter } from '@/components/iptv/TVCategoryFilter';
 import { TVContentGrid } from '@/components/iptv/TVContentGrid';
+import { ContentSkeleton } from '@/components/iptv/ContentSkeleton';
 import { streamService } from '@/modules/player/services/StreamService';
 import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useFocusManager';
 // Smart features imports
@@ -449,10 +450,40 @@ export default function AppPlayer() {
     pauseWarming(); // Pause warming during playback
   };
 
-  // Loading state - only show if no content at all
+  // Loading state - show skeleton to prevent CLS
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
-    return <AppLayout className="flex items-center justify-center">
-        <LoadingProgressBar isLoading={true} isLoadingMore={false} loadedChannels={loadedChannels} totalChannels={totalChannels} loadingPercent={loadingPercent} loadingProgress={loadingProgress} isCached={isCached} />
+    return <AppLayout allowScroll>
+        {/* NavRail skeleton space */}
+        <div className="hidden md:block md:w-[72px] lg:w-[88px] fixed left-0 top-0 bottom-0 bg-card border-r border-border" />
+        
+        <main className="md:ml-[72px] lg:ml-[88px]">
+          {/* Header skeleton */}
+          <header className="fixed top-0 right-0 left-0 md:left-[72px] lg:left-[88px] h-14 sm:h-16 bg-background/95 backdrop-blur-xl border-b border-border z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
+            <div className="h-7 w-32 bg-muted rounded animate-pulse" />
+            <div className="h-9 w-48 bg-muted rounded-lg animate-pulse" />
+          </header>
+          
+          <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
+            {/* Hero skeleton */}
+            <ContentSkeleton variant="hero" />
+            
+            {/* Content rows skeleton */}
+            <div className="py-6">
+              <ContentSkeleton variant="row" count={3} />
+            </div>
+            
+            {/* Progress indicator */}
+            <LoadingProgressBar 
+              isLoading={true} 
+              isLoadingMore={false} 
+              loadedChannels={loadedChannels} 
+              totalChannels={totalChannels} 
+              loadingPercent={loadingPercent} 
+              loadingProgress={loadingProgress} 
+              isCached={isCached} 
+            />
+          </div>
+        </main>
       </AppLayout>;
   }
 

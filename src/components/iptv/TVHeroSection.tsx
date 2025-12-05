@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Play, Info, Heart, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { OptimizedImage } from './OptimizedImage';
 
 interface FeaturedItem {
   id: string;
@@ -18,7 +19,7 @@ interface TVHeroSectionProps {
   isFavorite: (id: string) => boolean;
 }
 
-export function TVHeroSection({ items, onPlay, onToggleFavorite, isFavorite }: TVHeroSectionProps) {
+export const TVHeroSection = memo(function TVHeroSection({ items, onPlay, onToggleFavorite, isFavorite }: TVHeroSectionProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const featuredItems = items.slice(0, 5);
   const currentItem = featuredItems[activeIndex];
@@ -34,17 +35,31 @@ export function TVHeroSection({ items, onPlay, onToggleFavorite, isFavorite }: T
     return () => clearInterval(interval);
   }, [featuredItems.length]);
 
-  if (!currentItem) return null;
+  // Reserve space even when no content (prevents CLS)
+  if (!currentItem) {
+    return (
+      <section 
+        className="relative overflow-hidden bg-muted"
+        style={{ height: 'clamp(400px, 50vh, 60vh)' }}
+      />
+    );
+  }
 
   return (
-    <section className="relative h-[50vh] lg:h-[60vh] min-h-[400px] overflow-hidden">
-      {/* Background Image */}
+    <section 
+      className="relative overflow-hidden"
+      style={{ height: 'clamp(400px, 50vh, 60vh)' }}
+    >
+      {/* Background Image - Optimized for LCP */}
       <div className="absolute inset-0">
         {currentItem.logo ? (
-          <img
+          <OptimizedImage
             src={currentItem.logo}
             alt={currentItem.name}
-            className="w-full h-full object-cover transition-opacity duration-700"
+            aspectRatio="21/9"
+            priority={activeIndex === 0} // Priority for first image (LCP)
+            containerClassName="w-full h-full"
+            className="transition-opacity duration-700"
           />
         ) : (
           <div className="w-full h-full bg-gradient-card" />
@@ -133,4 +148,6 @@ export function TVHeroSection({ items, onPlay, onToggleFavorite, isFavorite }: T
       </div>
     </section>
   );
-}
+});
+
+export default TVHeroSection;
