@@ -7967,6 +7967,20 @@ export type Database = {
           scan_id: string
         }[]
       }
+      search_channels_fast: {
+        Args: { result_limit?: number; search_term: string }
+        Returns: {
+          content_type: string
+          group_title: string
+          id: string
+          is_vod: boolean
+          stream_url: string
+          title: string
+          tvg_id: string
+          tvg_logo: string
+          tvg_name: string
+        }[]
+      }
       search_m3u_entries: {
         Args: {
           limit_count?: number
