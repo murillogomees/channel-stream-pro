@@ -7,7 +7,7 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 
 export type StreamProtocol = 'hls' | 'ts' | 'mp4' | 'dash' | 'unknown';
-export type StreamSource = 'direct' | 'proxy' | 'r2' | 'cf-stream';
+export type StreamSource = 'direct' | 'proxy' | 'r2' | 'cf-stream' | 'https-upgrade';
 
 export interface OptimizedStream {
   url: string;
@@ -15,6 +15,8 @@ export interface OptimizedStream {
   source: StreamSource;
   requiresProxy: boolean;
   headers?: Record<string, string>;
+  /** Fallback URL if primary fails (e.g., HTTPS upgrade fails, use proxy) */
+  fallbackUrl?: string;
 }
 
 export interface StreamConfig {
@@ -90,11 +92,23 @@ class StreamOptimizerService {
   }
 
   /**
+   * Check if content is VOD (large file that may timeout proxy)
+   */
+  isVodContent(url: string): boolean {
+    const lowerUrl = url.toLowerCase();
+    return lowerUrl.includes('/movie/') || 
+           lowerUrl.includes('/series/') || 
+           lowerUrl.includes('/vod/') ||
+           (lowerUrl.endsWith('.mp4') && !lowerUrl.includes('/live/'));
+  }
+
+  /**
    * Optimize stream URL for best performance
    */
   optimize(originalUrl: string, config: StreamConfig = {}): OptimizedStream {
     const protocol = this.detectProtocol(originalUrl);
     const needsProxy = config.forceProxy || this.requiresProxy(originalUrl);
+    const isVod = this.isVodContent(originalUrl);
     
     // Direct HTTPS - no proxy needed
     if (!needsProxy && originalUrl.startsWith('https://')) {
@@ -106,7 +120,21 @@ class StreamOptimizerService {
       };
     }
 
-    // HTTP content - use proxy
+    // HTTP VOD content - try HTTPS directly first (many IPTV servers support both)
+    // This avoids proxy timeout issues with large files
+    if (needsProxy && isVod && originalUrl.startsWith('http://')) {
+      const httpsUrl = originalUrl.replace('http://', 'https://');
+      console.log('[StreamOptimizer] VOD content: trying HTTPS directly to avoid proxy timeout');
+      return {
+        url: httpsUrl,
+        protocol,
+        source: 'https-upgrade',
+        requiresProxy: false,
+        fallbackUrl: `${this.proxyUrl}?url=${encodeURIComponent(originalUrl)}`,
+      };
+    }
+
+    // HTTP HLS/TS content - use proxy (smaller requests, less timeout risk)
     if (needsProxy) {
       const proxyParams = new URLSearchParams({
         url: originalUrl,

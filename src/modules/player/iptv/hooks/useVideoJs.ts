@@ -219,7 +219,7 @@ export function useVideoJs({
   }, [options.autoplay, options.muted, options.poster, options.preferLowLatency, onEvent, cleanup]);
 
   // Set source with protocol detection and HTTP proxy support
-  const setSource = useCallback((url: string) => {
+  const setSource = useCallback((url: string, fallbackUrl?: string) => {
     // If player not ready, store for later
     if (!playerRef.current) {
       console.log('[useVideoJs] Player not ready, queueing source:', url.substring(0, 60));
@@ -235,6 +235,8 @@ export function useVideoJs({
     const optimized = streamOptimizer.optimize(url);
     const finalUrl = optimized.url;
     const protocol = optimized.protocol;
+    // Store fallback for error recovery
+    const actualFallback = fallbackUrl || optimized.fallbackUrl;
     
     console.log('[useVideoJs] Loading stream:', {
       protocol,
@@ -242,6 +244,7 @@ export function useVideoJs({
       requiresProxy: optimized.requiresProxy,
       originalUrl: url,
       finalUrl,
+      hasFallback: !!actualFallback,
     });
 
     const videoEl = playerRef.current.el()?.querySelector('video') as HTMLVideoElement;
@@ -372,10 +375,20 @@ export function useVideoJs({
     }
 
     // Native playback (Safari, direct MP4, etc)
-    console.log('[useVideoJs] Using native playback');
+    console.log('[useVideoJs] Using native playback for protocol:', protocol);
+    
+    // Determine correct MIME type
+    const mimeType = protocol === 'hls' 
+      ? 'application/x-mpegURL' 
+      : protocol === 'mp4' 
+        ? 'video/mp4' 
+        : protocol === 'dash'
+          ? 'application/dash+xml'
+          : 'video/mp2t'; // Default for TS streams
+    
     playerRef.current.src({
       src: finalUrl,
-      type: protocol === 'hls' ? 'application/x-mpegURL' : undefined,
+      type: mimeType,
     });
     
     // For native, track ready state
@@ -387,6 +400,21 @@ export function useVideoJs({
       }));
       onEvent?.('ready');
     }, { once: true });
+    
+    // Handle errors with fallback for HTTPS upgrade failures
+    if (actualFallback) {
+      const errorHandler = () => {
+        console.log('[useVideoJs] Primary URL failed, trying fallback:', actualFallback.substring(0, 60));
+        videoEl.removeEventListener('error', errorHandler);
+        
+        // Try fallback URL (proxy for VOD)
+        playerRef.current?.src({
+          src: actualFallback,
+          type: mimeType,
+        });
+      };
+      videoEl.addEventListener('error', errorHandler, { once: true });
+    }
     
   }, [options.autoplay, options.maxRetries, options.preferLowLatency, customHlsConfig, onEvent, isBuffering]);
 
