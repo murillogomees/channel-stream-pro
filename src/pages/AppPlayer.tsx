@@ -37,6 +37,7 @@ import {
   analyticsService 
 } from '@/features/player/services';
 import type { WatchProgress, TrendingItem, ContentType, RecommendationItem } from '@/features/player/types';
+import { AppLayout } from '@/components/layouts/AppLayout';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -481,7 +482,7 @@ export default function AppPlayer() {
   // Loading state - only show if no content at all
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <AppLayout className="flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-16 h-16 animate-spin mx-auto mb-6 text-primary" />
           <p className="text-xl font-medium text-foreground mb-2">
@@ -491,14 +492,14 @@ export default function AppPlayer() {
             {loadingProgress || 'Preparando sua experiência...'}
           </p>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   // No playlist state
   if (hasPlaylist === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <AppLayout className="flex items-center justify-center p-4">
         <Card className="p-8 max-w-md text-center">
           <Tv className="w-20 h-20 mx-auto mb-6 text-muted-foreground" />
           <h2 className="text-2xl font-bold mb-3">Nenhuma playlist disponível</h2>
@@ -511,7 +512,7 @@ export default function AppPlayer() {
             </Button>
           )}
         </Card>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -524,7 +525,7 @@ export default function AppPlayer() {
   }[activeTab];
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppLayout allowScroll>
       {/* Left Navigation Rail */}
       <TVNavRail
         activeTab={activeTab}
@@ -721,6 +722,6 @@ export default function AppPlayer() {
           />
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }

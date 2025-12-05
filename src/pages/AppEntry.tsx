@@ -4,6 +4,7 @@ import { AnimatedSplash } from '@/components/app/AnimatedSplash';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { AppLayout } from '@/components/layouts/AppLayout';
 
 export default function AppEntry() {
   const navigate = useNavigate();
@@ -49,15 +50,19 @@ export default function AppEntry() {
 
   // Show splash screen
   if (showSplash) {
-    return <AnimatedSplash onComplete={handleSplashComplete} minDuration={2000} />;
+    return (
+      <AppLayout>
+        <AnimatedSplash onComplete={handleSplashComplete} minDuration={2000} />
+      </AppLayout>
+    );
   }
 
   // Show loading while checking auth
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <AppLayout className="flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      </AppLayout>
     );
   }
 

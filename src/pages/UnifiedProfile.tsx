@@ -3,7 +3,7 @@
  * Mostra informações da conta, assinatura e histórico de pagamentos
  */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   User, 
@@ -40,6 +40,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
+import { AppLayout } from '@/components/layouts/AppLayout';
 
 interface ClienteData {
   id: string;
@@ -83,8 +84,12 @@ interface Subscription {
 
 export default function UnifiedProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAdmin, signOut } = useAuth();
   const { toast: shadcnToast } = useToast();
+  
+  // Check if we're on app route for fullscreen layout
+  const isAppRoute = location.pathname.startsWith('/app');
   
   const [cliente, setCliente] = useState<ClienteData | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -362,16 +367,17 @@ export default function UnifiedProfile() {
   };
 
   if (isLoading) {
-    return (
+    const loadingContent = (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+    return isAppRoute ? <AppLayout>{loadingContent}</AppLayout> : loadingContent;
   }
 
   const backPath = isAdmin ? '/admin/dashboard' : '/app/player';
 
-  return (
+  const content = (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border">
@@ -719,4 +725,6 @@ export default function UnifiedProfile() {
       </div>
     </div>
   );
+
+  return isAppRoute ? <AppLayout allowScroll>{content}</AppLayout> : content;
 }
