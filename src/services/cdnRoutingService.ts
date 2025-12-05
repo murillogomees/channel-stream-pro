@@ -303,10 +303,9 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // ===== PRIORIDADE 4: VOD/MP4 - SEMPRE LINK DIRETO (HTTP ou HTTPS) =====
-  // VOD/MP4 via proxy quebra seeking e causa buffering - jogar direto!
-  if (isVodContent(channel)) {
-    console.log('[CDN Routing] 🎬 VOD - Link Direto (sem proxy):', channel.name);
+  // ===== PRIORIDADE 4: VOD HTTPS - LINK DIRETO =====
+  if (isVodContent(channel) && !isHttpUrl(channel.stream_url)) {
+    console.log('[CDN Routing] 🎬 VOD HTTPS - Link Direto:', channel.name);
     metrics.direct_requests++;
     return {
       url: channel.stream_url,
@@ -315,7 +314,7 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // ===== PRIORIDADE 5: PROXY (apenas HTTP não-VOD) =====
+  // ===== PRIORIDADE 5: PROXY (HTTP → HTTPS - Mixed Content) =====
   if (isHttpUrl(channel.stream_url)) {
     const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
     
