@@ -1,5 +1,8 @@
 project_id = "sdvyxdghxqmntyoweqbd"
 
+[functions.get-r2-config]
+verify_jwt = false
+
 # CDN Router - Intelligent content routing for optimal performance
 [functions.cdn-router]
 verify_jwt = false
