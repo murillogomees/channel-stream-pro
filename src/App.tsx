@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ViewerProfileProvider } from "@/contexts/ViewerProfileContext";
 import { webVitalsService } from "@/services/webVitalsService";
 import { useGlobalOrientationLock } from "@/hooks/useGlobalOrientationLock";
 
@@ -143,9 +144,11 @@ const App = () => (
   <AuthProvider>
     <ThemeProvider>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppContent />
+        <ViewerProfileProvider>
+          <Toaster />
+          <Sonner />
+          <AppContent />
+        </ViewerProfileProvider>
       </TooltipProvider>
     </ThemeProvider>
   </AuthProvider>
