@@ -19,10 +19,59 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    // Authentication check
+    const authHeader = req.headers.get('authorization');
+    const cronSecret = req.headers.get('x-supabase-cron-secret');
+    const internalSecret = req.headers.get('x-internal-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+
+    const isCronRequest = cronSecret && expectedCronSecret && cronSecret === expectedCronSecret;
+    const isInternalRequest = internalSecret && expectedCronSecret && internalSecret === expectedCronSecret;
+
+    if (!isCronRequest && !isInternalRequest) {
+      if (!authHeader) {
+        console.log('[Bulk Download] No authorization header provided');
+        return new Response(
+          JSON.stringify({ error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify user authentication
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        console.log('[Bulk Download] Invalid token:', authError?.message);
+        return new Response(
+          JSON.stringify({ error: 'Invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check admin role
+      const { data: isAdmin } = await supabaseAuth.rpc('is_admin', { uid: user.id });
+      if (!isAdmin) {
+        console.log('[Bulk Download] Access denied for user:', user.id);
+        return new Response(
+          JSON.stringify({ error: 'Access denied. Admin role required.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('[Bulk Download] Authenticated admin user:', user.id);
+    } else {
+      console.log('[Bulk Download] Cron/internal request authenticated');
+    }
+
+    // Use service role for actual operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const options: DownloadOptions = await req.json();
     const { 
