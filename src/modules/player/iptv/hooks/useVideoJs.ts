@@ -203,14 +203,16 @@ export function useVideoJs({
       }
     }, 2000);
 
-    return () => {
-      clearInterval(metricsInterval);
-      cleanup();
-    };
+    // Store interval ref for cleanup
+    (window as any).__videoMetricsInterval = metricsInterval;
     }, 0); // Close setTimeout - deferred initialization
 
     return () => {
       clearTimeout(initTimeout);
+      if ((window as any).__videoMetricsInterval) {
+        clearInterval((window as any).__videoMetricsInterval);
+        delete (window as any).__videoMetricsInterval;
+      }
       cleanup();
     };
   }, [options.autoplay, options.muted, options.poster, options.preferLowLatency, onEvent, cleanup]);
