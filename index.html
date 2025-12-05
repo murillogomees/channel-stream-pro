@@ -215,7 +215,7 @@
           document.head.appendChild(link);
         }
 
-        // Load Meta Pixel after idle (lowest priority)
+        // Load Meta Pixel after page is fully interactive (lowest priority)
         function loadMetaPixel() {
           !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
           n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
@@ -229,12 +229,14 @@
         if ('requestIdleCallback' in window) {
           // Fonts: load during first idle period (high priority)
           requestIdleCallback(loadFonts, { timeout: 1000 });
-          // Meta Pixel: load during idle with low priority
-          requestIdleCallback(loadMetaPixel, { timeout: 5000 });
+          // Meta Pixel: defer until after TTI (8 second delay to not block interactivity)
+          setTimeout(function() {
+            requestIdleCallback(loadMetaPixel, { timeout: 10000 });
+          }, 8000);
         } else {
           // Fallback for Safari and older browsers
           setTimeout(loadFonts, 50);
-          setTimeout(loadMetaPixel, 3000);
+          setTimeout(loadMetaPixel, 8000);
         }
         
         if (window.performance && performance.mark) {
