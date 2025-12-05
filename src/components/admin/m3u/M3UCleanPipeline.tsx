@@ -81,10 +81,12 @@ interface CleanJob {
 
 interface Suggestion {
   id: string;
-  type: 'dedupe' | 'protocol' | 'emoji' | 'group' | 'empty';
+  type: 'dedupe' | 'protocol' | 'emoji' | 'group' | 'empty' | 'format' | 'quality' | 'language' | 'region' | 'category' | 'invalid' | 'regex' | 'health';
   message: string;
   action: () => void;
   impact: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  category: string;
 }
 
 interface PreviewEntry {
@@ -92,7 +94,433 @@ interface PreviewEntry {
   cleaned: { title: string; url: string; group?: string } | null;
   action: 'keep' | 'remove' | 'modify';
   reason?: string;
+  ruleApplied?: string;
 }
+
+// Sample data generator for demo/testing
+const generateSampleSuggestions = (setConfig: (fn: (c: CleanConfig) => CleanConfig) => void): Suggestion[] => [
+  {
+    id: 'dedupe-url',
+    type: 'dedupe',
+    message: '12.847 URLs duplicadas detectadas',
+    action: () => setConfig(c => ({ ...c, dedupe_by: 'url' })),
+    impact: 12847,
+    severity: 'critical',
+    category: 'Duplicação',
+  },
+  {
+    id: 'dedupe-title',
+    type: 'dedupe',
+    message: '3.291 títulos idênticos com URLs diferentes',
+    action: () => setConfig(c => ({ ...c, dedupe_by: 'both' })),
+    impact: 3291,
+    severity: 'high',
+    category: 'Duplicação',
+  },
+  {
+    id: 'empty-titles',
+    type: 'empty',
+    message: '1.523 entradas sem título (título vazio)',
+    action: () => setConfig(c => ({ ...c, remove_empty_lines: true })),
+    impact: 1523,
+    severity: 'high',
+    category: 'Dados Vazios',
+  },
+  {
+    id: 'empty-urls',
+    type: 'invalid',
+    message: '847 entradas com URL vazia ou inválida',
+    action: () => setConfig(c => ({ ...c, remove_empty_lines: true })),
+    impact: 847,
+    severity: 'critical',
+    category: 'URLs Inválidas',
+  },
+  {
+    id: 'strip-emojis',
+    type: 'emoji',
+    message: '28% dos títulos contêm emojis (🔥📺🎬)',
+    action: () => setConfig(c => ({ ...c, strip_emojis: true })),
+    impact: 58432,
+    severity: 'low',
+    category: 'Formatação',
+  },
+  {
+    id: 'remove-brackets',
+    type: 'format',
+    message: '15.234 títulos com [HD], [FHD], [4K] redundantes',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '\\[(HD|FHD|4K|SD|UHD)\\]', replace: '' }]
+    })),
+    impact: 15234,
+    severity: 'medium',
+    category: 'Formatação',
+  },
+  {
+    id: 'remove-quality-tags',
+    type: 'quality',
+    message: '9.876 tags de qualidade no título (1080p, 720p)',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '(1080p|720p|480p|2160p)', replace: '' }]
+    })),
+    impact: 9876,
+    severity: 'low',
+    category: 'Formatação',
+  },
+  {
+    id: 'protocol-rtmp',
+    type: 'protocol',
+    message: '2.341 streams usando protocolo RTMP (incompatível)',
+    action: () => setConfig(c => ({ ...c, keep_protocols: ['http', 'https'] })),
+    impact: 2341,
+    severity: 'high',
+    category: 'Protocolos',
+  },
+  {
+    id: 'protocol-rtsp',
+    type: 'protocol',
+    message: '567 streams usando protocolo RTSP',
+    action: () => setConfig(c => ({ ...c, keep_protocols: ['http', 'https'] })),
+    impact: 567,
+    severity: 'medium',
+    category: 'Protocolos',
+  },
+  {
+    id: 'protocol-mms',
+    type: 'protocol',
+    message: '123 streams usando protocolo MMS (obsoleto)',
+    action: () => setConfig(c => ({ ...c, keep_protocols: ['http', 'https'] })),
+    impact: 123,
+    severity: 'high',
+    category: 'Protocolos',
+  },
+  {
+    id: 'group-adult',
+    type: 'group',
+    message: '4.521 canais no grupo "Adulto" / "XXX"',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      group_actions: [...c.group_actions, { group: 'Adulto', action: 'remove' }, { group: 'XXX', action: 'remove' }]
+    })),
+    impact: 4521,
+    severity: 'medium',
+    category: 'Grupos',
+  },
+  {
+    id: 'group-test',
+    type: 'group',
+    message: '892 canais de teste/placeholder',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      group_actions: [...c.group_actions, { group: 'TEST', action: 'remove' }, { group: 'Teste', action: 'remove' }]
+    })),
+    impact: 892,
+    severity: 'high',
+    category: 'Grupos',
+  },
+  {
+    id: 'group-empty',
+    type: 'group',
+    message: '1.234 canais sem grupo definido',
+    action: () => setConfig(c => ({ ...c, remove_empty_lines: true })),
+    impact: 1234,
+    severity: 'low',
+    category: 'Grupos',
+  },
+  {
+    id: 'language-foreign',
+    type: 'language',
+    message: '6.789 canais em idiomas não-PT/EN',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '\\[(AR|RU|CN|JP|KR)\\]', replace: '' }]
+    })),
+    impact: 6789,
+    severity: 'low',
+    category: 'Idioma',
+  },
+  {
+    id: 'region-blocked',
+    type: 'region',
+    message: '3.456 canais com restrição regional detectada',
+    action: () => setConfig(c => ({ ...c, healthcheck: { ...c.healthcheck, enabled: true } })),
+    impact: 3456,
+    severity: 'medium',
+    category: 'Região',
+  },
+  {
+    id: 'special-chars',
+    type: 'format',
+    message: '7.891 títulos com caracteres especiais excessivos',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '[\\|\\*\\#\\@\\^]+', replace: ' ' }]
+    })),
+    impact: 7891,
+    severity: 'medium',
+    category: 'Formatação',
+  },
+  {
+    id: 'trailing-spaces',
+    type: 'format',
+    message: '23.456 títulos com espaços extras',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '\\s+', replace: ' ' }]
+    })),
+    impact: 23456,
+    severity: 'low',
+    category: 'Formatação',
+  },
+  {
+    id: 'invalid-m3u8',
+    type: 'health',
+    message: '1.876 links .m3u8 com formato inválido',
+    action: () => setConfig(c => ({ ...c, healthcheck: { ...c.healthcheck, enabled: true } })),
+    impact: 1876,
+    severity: 'high',
+    category: 'Health Check',
+  },
+  {
+    id: 'timeout-hosts',
+    type: 'health',
+    message: '5.432 URLs de hosts com timeout frequente',
+    action: () => setConfig(c => ({ ...c, healthcheck: { ...c.healthcheck, enabled: true, timeout: 3000 } })),
+    impact: 5432,
+    severity: 'critical',
+    category: 'Health Check',
+  },
+  {
+    id: 'dead-links',
+    type: 'health',
+    message: '8.765 links mortos (HTTP 404/500)',
+    action: () => setConfig(c => ({ ...c, healthcheck: { ...c.healthcheck, enabled: true } })),
+    impact: 8765,
+    severity: 'critical',
+    category: 'Health Check',
+  },
+  {
+    id: 'category-news',
+    type: 'category',
+    message: '2.345 canais de notícias duplicados',
+    action: () => setConfig(c => ({ ...c, dedupe_by: 'url' })),
+    impact: 2345,
+    severity: 'medium',
+    category: 'Categorias',
+  },
+  {
+    id: 'category-sports',
+    type: 'category',
+    message: '1.567 canais esportivos sem evento ativo',
+    action: () => setConfig(c => ({ ...c, healthcheck: { ...c.healthcheck, enabled: true } })),
+    impact: 1567,
+    severity: 'low',
+    category: 'Categorias',
+  },
+  {
+    id: 'regex-brackets-content',
+    type: 'regex',
+    message: 'Remover conteúdo entre parênteses: (BACKUP), (OLD)',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '\\(BACKUP\\)|\\(OLD\\)|\\(ALTERNATIVO\\)', replace: '' }]
+    })),
+    impact: 4321,
+    severity: 'medium',
+    category: 'Regex',
+  },
+  {
+    id: 'url-params-tracking',
+    type: 'format',
+    message: '11.234 URLs com parâmetros de tracking desnecessários',
+    action: () => setConfig(c => ({ 
+      ...c, 
+      title_cleanup: [...c.title_cleanup, { type: 'regex', pattern: '[\\?&](utm_|ref=|source=)[^&]*', replace: '' }]
+    })),
+    impact: 11234,
+    severity: 'low',
+    category: 'URLs',
+  },
+];
+
+const generateSamplePreview = (): PreviewEntry[] => [
+  {
+    original: { title: '🔥 HBO MAX HD 🎬', url: 'http://server1.com/hbo', group: 'Filmes' },
+    cleaned: { title: 'HBO MAX HD', url: 'http://server1.com/hbo', group: 'Filmes' },
+    action: 'modify',
+    reason: 'Emojis removidos do título',
+    ruleApplied: 'strip_emojis',
+  },
+  {
+    original: { title: 'ESPN Brasil [HD] [1080p]', url: 'http://server2.com/espn', group: 'Esportes' },
+    cleaned: { title: 'ESPN Brasil', url: 'http://server2.com/espn', group: 'Esportes' },
+    action: 'modify',
+    reason: 'Tags de qualidade removidas',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'Globo SP', url: 'http://server1.com/globo', group: 'Abertos' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'URL duplicada (mantida entrada anterior)',
+    ruleApplied: 'dedupe_url',
+  },
+  {
+    original: { title: '', url: 'http://server3.com/empty', group: 'Sem Grupo' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Título vazio',
+    ruleApplied: 'remove_empty',
+  },
+  {
+    original: { title: 'Canal XXX Premium', url: 'http://adult.com/xxx', group: 'Adulto' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Grupo "Adulto" marcado para remoção',
+    ruleApplied: 'group_filter',
+  },
+  {
+    original: { title: 'Test Channel 1', url: 'rtmp://stream.test.com/live', group: 'TEST' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Protocolo RTMP não permitido',
+    ruleApplied: 'protocol_filter',
+  },
+  {
+    original: { title: 'Discovery Channel', url: 'https://cdn.valid.com/discovery', group: 'Documentários' },
+    cleaned: { title: 'Discovery Channel', url: 'https://cdn.valid.com/discovery', group: 'Documentários' },
+    action: 'keep',
+    reason: 'Entrada válida',
+    ruleApplied: 'none',
+  },
+  {
+    original: { title: 'CNN   International   HD', url: 'http://news.com/cnn', group: 'Notícias' },
+    cleaned: { title: 'CNN International HD', url: 'http://news.com/cnn', group: 'Notícias' },
+    action: 'modify',
+    reason: 'Espaços extras removidos',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'SporTV (BACKUP)', url: 'http://backup.com/sportv', group: 'Esportes' },
+    cleaned: { title: 'SporTV', url: 'http://backup.com/sportv', group: 'Esportes' },
+    action: 'modify',
+    reason: 'Tag (BACKUP) removida',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'Band News', url: '', group: 'Notícias' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'URL vazia',
+    ruleApplied: 'remove_empty',
+  },
+  {
+    original: { title: 'Telecine Premium || HD || 4K', url: 'http://movies.com/telecine', group: 'Filmes' },
+    cleaned: { title: 'Telecine Premium HD 4K', url: 'http://movies.com/telecine', group: 'Filmes' },
+    action: 'modify',
+    reason: 'Caracteres especiais (||) substituídos',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'Fox Sports 1', url: 'http://dead.server.com/fox?utm_source=app&ref=123', group: 'Esportes' },
+    cleaned: { title: 'Fox Sports 1', url: 'http://dead.server.com/fox', group: 'Esportes' },
+    action: 'modify',
+    reason: 'Parâmetros de tracking removidos da URL',
+    ruleApplied: 'url_cleanup',
+  },
+  {
+    original: { title: 'Nacional [AR]', url: 'http://ar.server.com/nacional', group: 'Internacionais' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Canal em idioma não permitido [AR]',
+    ruleApplied: 'language_filter',
+  },
+  {
+    original: { title: 'History Channel 2 FHD', url: 'http://history.com/hc2', group: 'Documentários' },
+    cleaned: { title: 'History Channel 2', url: 'http://history.com/hc2', group: 'Documentários' },
+    action: 'modify',
+    reason: 'Tag FHD removida',
+    ruleApplied: 'quality_cleanup',
+  },
+  {
+    original: { title: 'MTV Live', url: 'mms://old.protocol.com/mtv', group: 'Música' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Protocolo MMS obsoleto',
+    ruleApplied: 'protocol_filter',
+  },
+  {
+    original: { title: '★★★ Canal VIP ★★★', url: 'http://vip.com/canal', group: 'Premium' },
+    cleaned: { title: 'Canal VIP', url: 'http://vip.com/canal', group: 'Premium' },
+    action: 'modify',
+    reason: 'Caracteres decorativos removidos',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'Cartoon Network', url: 'http://cdn.cartoon.com/stream.m3u8', group: 'Infantil' },
+    cleaned: { title: 'Cartoon Network', url: 'http://cdn.cartoon.com/stream.m3u8', group: 'Infantil' },
+    action: 'keep',
+    reason: 'Entrada válida',
+    ruleApplied: 'none',
+  },
+  {
+    original: { title: 'Animal Planet', url: 'http://offline.server.com/animal', group: 'Documentários' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'Health check falhou (timeout)',
+    ruleApplied: 'healthcheck',
+  },
+  {
+    original: { title: 'TNT Series', url: 'http://server1.com/tnt', group: 'Séries' },
+    cleaned: null,
+    action: 'remove',
+    reason: 'URL duplicada de entrada #47',
+    ruleApplied: 'dedupe_url',
+  },
+  {
+    original: { title: 'Warner Channel (OLD)', url: 'http://old.warner.com/wc', group: 'Séries' },
+    cleaned: { title: 'Warner Channel', url: 'http://old.warner.com/wc', group: 'Séries' },
+    action: 'modify',
+    reason: 'Tag (OLD) removida',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'AXN HD 1080p', url: 'http://valid.axn.com/stream', group: 'Séries' },
+    cleaned: { title: 'AXN HD', url: 'http://valid.axn.com/stream', group: 'Séries' },
+    action: 'modify',
+    reason: 'Tag 1080p removida (redundante)',
+    ruleApplied: 'quality_cleanup',
+  },
+  {
+    original: { title: 'Sony Channel', url: 'http://cdn.sony.com/live', group: 'Filmes' },
+    cleaned: { title: 'Sony Channel', url: 'http://cdn.sony.com/live', group: 'Filmes' },
+    action: 'keep',
+    reason: 'Entrada válida',
+    ruleApplied: 'none',
+  },
+  {
+    original: { title: 'Mega TV @#$%', url: 'http://mega.tv/stream', group: 'Variedades' },
+    cleaned: { title: 'Mega TV', url: 'http://mega.tv/stream', group: 'Variedades' },
+    action: 'modify',
+    reason: 'Caracteres especiais removidos',
+    ruleApplied: 'regex_cleanup',
+  },
+  {
+    original: { title: 'SBT Rio', url: 'http://sbt.com/rio?source=iptv&utm_campaign=2024', group: 'Abertos' },
+    cleaned: { title: 'SBT Rio', url: 'http://sbt.com/rio', group: 'Abertos' },
+    action: 'modify',
+    reason: 'Parâmetros de tracking removidos',
+    ruleApplied: 'url_cleanup',
+  },
+  {
+    original: { title: 'Record News 24h', url: 'http://record.com/news', group: 'Notícias' },
+    cleaned: { title: 'Record News 24h', url: 'http://record.com/news', group: 'Notícias' },
+    action: 'keep',
+    reason: 'Entrada válida',
+    ruleApplied: 'none',
+  },
+];
 
 interface M3UCleanPipelineProps {
   open: boolean;
@@ -181,6 +609,23 @@ export function M3UCleanPipeline({
     }
   };
 
+  const loadDemoData = () => {
+    setSuggestions(generateSampleSuggestions(setConfig));
+    setPreview(generateSamplePreview());
+    setGroups(['Filmes', 'Séries', 'Esportes', 'Notícias', 'Documentários', 'Infantil', 'Música', 'Adulto', 'TEST', 'Premium']);
+    setStats({
+      totalEntries: 209568,
+      validEntries: 165234,
+      duplicatesRemoved: 16138,
+      invalidUrlsRemoved: 12847,
+      emptyTitlesRemoved: 2370,
+      protocolFiltered: 3031,
+      groupFiltered: 5413,
+      healthCheckFailed: 4535,
+      processingTimeMs: 45230,
+    });
+  };
+
   const analyzeSource = async () => {
     setIsAnalyzing(true);
     setError(null);
@@ -207,6 +652,20 @@ export function M3UCleanPipeline({
           message: `${data.analysis.duplicateUrls.toLocaleString()} URLs duplicadas detectadas`,
           action: () => setConfig(c => ({ ...c, dedupe_by: 'url' })),
           impact: data.analysis.duplicateUrls,
+          severity: data.analysis.duplicateUrls > 5000 ? 'critical' : 'high',
+          category: 'Duplicação',
+        });
+      }
+
+      if (data.analysis.duplicateTitles > 0) {
+        newSuggestions.push({
+          id: 'dedupe-title',
+          type: 'dedupe',
+          message: `${data.analysis.duplicateTitles.toLocaleString()} títulos duplicados`,
+          action: () => setConfig(c => ({ ...c, dedupe_by: 'both' })),
+          impact: data.analysis.duplicateTitles,
+          severity: 'high',
+          category: 'Duplicação',
         });
       }
 
@@ -217,6 +676,20 @@ export function M3UCleanPipeline({
           message: `${data.analysis.emptyTitles.toLocaleString()} títulos vazios`,
           action: () => setConfig(c => ({ ...c, remove_empty_lines: true })),
           impact: data.analysis.emptyTitles,
+          severity: 'high',
+          category: 'Dados Vazios',
+        });
+      }
+
+      if (data.analysis.invalidUrls > 0) {
+        newSuggestions.push({
+          id: 'invalid-urls',
+          type: 'invalid',
+          message: `${data.analysis.invalidUrls.toLocaleString()} URLs inválidas`,
+          action: () => setConfig(c => ({ ...c, remove_empty_lines: true })),
+          impact: data.analysis.invalidUrls,
+          severity: 'critical',
+          category: 'URLs Inválidas',
         });
       }
 
@@ -227,11 +700,72 @@ export function M3UCleanPipeline({
           message: `${Math.round((data.analysis.emojiCount / data.analysis.sampleSize) * 100)}% dos títulos contêm emojis`,
           action: () => setConfig(c => ({ ...c, strip_emojis: true })),
           impact: data.analysis.emojiCount,
+          severity: 'low',
+          category: 'Formatação',
         });
       }
 
+      // Add protocol suggestions
+      if (data.analysis.protocols) {
+        const nonHttpProtocols = Object.entries(data.analysis.protocols)
+          .filter(([proto]) => !['http', 'https'].includes(proto.toLowerCase()));
+        
+        for (const [proto, count] of nonHttpProtocols) {
+          if ((count as number) > 0) {
+            newSuggestions.push({
+              id: `protocol-${proto}`,
+              type: 'protocol',
+              message: `${(count as number).toLocaleString()} streams usando ${proto.toUpperCase()}`,
+              action: () => setConfig(c => ({ ...c, keep_protocols: ['http', 'https'] })),
+              impact: count as number,
+              severity: proto.toLowerCase() === 'rtmp' ? 'high' : 'medium',
+              category: 'Protocolos',
+            });
+          }
+        }
+      }
+
+      // Add group-based suggestions
       if (data.analysis.groups) {
         setGroups(Object.keys(data.analysis.groups));
+        
+        const adultGroups = Object.entries(data.analysis.groups)
+          .filter(([group]) => /adulto|xxx|adult|porn/i.test(group));
+        
+        if (adultGroups.length > 0) {
+          const totalAdult = adultGroups.reduce((acc, [, count]) => acc + (count as number), 0);
+          newSuggestions.push({
+            id: 'group-adult',
+            type: 'group',
+            message: `${totalAdult.toLocaleString()} canais adultos detectados`,
+            action: () => setConfig(c => ({ 
+              ...c, 
+              group_actions: [...c.group_actions, ...adultGroups.map(([g]) => ({ group: g, action: 'remove' as const }))]
+            })),
+            impact: totalAdult,
+            severity: 'medium',
+            category: 'Grupos',
+          });
+        }
+
+        const testGroups = Object.entries(data.analysis.groups)
+          .filter(([group]) => /test|teste|placeholder/i.test(group));
+        
+        if (testGroups.length > 0) {
+          const totalTest = testGroups.reduce((acc, [, count]) => acc + (count as number), 0);
+          newSuggestions.push({
+            id: 'group-test',
+            type: 'group',
+            message: `${totalTest.toLocaleString()} canais de teste/placeholder`,
+            action: () => setConfig(c => ({ 
+              ...c, 
+              group_actions: [...c.group_actions, ...testGroups.map(([g]) => ({ group: g, action: 'remove' as const }))]
+            })),
+            impact: totalTest,
+            severity: 'high',
+            category: 'Grupos',
+          });
+        }
       }
 
       setSuggestions(newSuggestions);
@@ -242,6 +776,9 @@ export function M3UCleanPipeline({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro na análise';
       setError(message);
+      // Load demo data on error for testing
+      loadDemoData();
+      toast.info('Dados de demonstração carregados');
     } finally {
       setIsAnalyzing(false);
     }
@@ -554,43 +1091,115 @@ export function M3UCleanPipeline({
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
                 <p>Nenhuma sugestão de otimização</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={loadDemoData}
+                >
+                  Carregar dados de demonstração
+                </Button>
               </div>
             ) : (
               <>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <div className="text-sm text-muted-foreground">Impacto estimado</div>
-                  <div className="text-2xl font-bold">{totalImpact.toLocaleString()} entradas</div>
-                </div>
-                <div className="space-y-2">
-                  {suggestions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Lightbulb className="w-4 h-4 text-yellow-500" />
-                        <div>
-                          <div className="text-sm font-medium">{s.message}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {s.impact.toLocaleString()} itens afetados
-                          </div>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={s.action}>
-                        Aplicar
-                      </Button>
+                {/* Impact Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <div className="text-xs text-muted-foreground">Total de sugestões</div>
+                    <div className="text-xl font-bold">{suggestions.length}</div>
+                  </div>
+                  <div className="p-3 bg-red-500/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">Críticas</div>
+                    <div className="text-xl font-bold text-red-600">
+                      {suggestions.filter(s => s.severity === 'critical').length}
                     </div>
-                  ))}
+                  </div>
+                  <div className="p-3 bg-orange-500/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">Altas</div>
+                    <div className="text-xl font-bold text-orange-600">
+                      {suggestions.filter(s => s.severity === 'high').length}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">Impacto total</div>
+                    <div className="text-xl font-bold">{totalImpact.toLocaleString()}</div>
+                  </div>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    suggestions.forEach(s => s.action());
-                    toast.success('Todas as sugestões aplicadas');
-                  }}
-                >
-                  Aplicar Todas
-                </Button>
+
+                {/* Group by category */}
+                <ScrollArea className="h-[280px]">
+                  <div className="space-y-4">
+                    {Array.from(new Set(suggestions.map(s => s.category))).map(category => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur py-1">
+                          <h4 className="text-sm font-semibold">{category}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {suggestions.filter(s => s.category === category).length}
+                          </Badge>
+                        </div>
+                        {suggestions.filter(s => s.category === category).map((s) => (
+                          <div
+                            key={s.id}
+                            className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors ${
+                              s.severity === 'critical' ? 'border-red-500/50 bg-red-500/5' :
+                              s.severity === 'high' ? 'border-orange-500/50 bg-orange-500/5' :
+                              s.severity === 'medium' ? 'border-yellow-500/50' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                s.severity === 'critical' ? 'bg-red-500' :
+                                s.severity === 'high' ? 'bg-orange-500' :
+                                s.severity === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                              }`} />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium truncate">{s.message}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant={
+                                    s.severity === 'critical' ? 'destructive' :
+                                    s.severity === 'high' ? 'default' : 'secondary'
+                                  } className="text-[10px] h-4">
+                                    {s.severity === 'critical' ? 'Crítico' :
+                                     s.severity === 'high' ? 'Alto' :
+                                     s.severity === 'medium' ? 'Médio' : 'Baixo'}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {s.impact.toLocaleString()} itens
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <Button size="sm" variant="outline" onClick={s.action} className="shrink-0 ml-2">
+                              Aplicar
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => {
+                      suggestions.filter(s => s.severity === 'critical').forEach(s => s.action());
+                      toast.success('Sugestões críticas aplicadas');
+                    }}
+                  >
+                    Aplicar Críticas ({suggestions.filter(s => s.severity === 'critical').length})
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      suggestions.forEach(s => s.action());
+                      toast.success('Todas as sugestões aplicadas');
+                    }}
+                  >
+                    Aplicar Todas ({suggestions.length})
+                  </Button>
+                </div>
               </>
             )}
           </TabsContent>
@@ -598,47 +1207,145 @@ export function M3UCleanPipeline({
           {/* Preview Tab */}
           <TabsContent value="preview" className="flex-1 overflow-auto space-y-4 mt-4">
             {stats && (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <StatCard label="Total" value={stats.totalEntries} />
                 <StatCard label="Válidas" value={stats.validEntries} variant="success" />
                 <StatCard label="Duplicadas" value={stats.duplicatesRemoved} variant="warning" />
-                <StatCard label="Removidas" value={stats.invalidUrlsRemoved + stats.emptyTitlesRemoved} variant="danger" />
+                <StatCard label="Removidas" value={stats.invalidUrlsRemoved + stats.emptyTitlesRemoved + stats.protocolFiltered + stats.groupFiltered} variant="danger" />
+              </div>
+            )}
+
+            {/* Stats breakdown */}
+            {stats && (
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-1 text-xs">
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{stats.invalidUrlsRemoved.toLocaleString()}</div>
+                  <div className="text-muted-foreground">URLs inválidas</div>
+                </div>
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{stats.emptyTitlesRemoved.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Títulos vazios</div>
+                </div>
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{stats.protocolFiltered.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Protocolos</div>
+                </div>
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{stats.groupFiltered.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Por grupo</div>
+                </div>
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{stats.healthCheckFailed.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Health check</div>
+                </div>
+                <div className="p-2 bg-muted/30 rounded text-center">
+                  <div className="font-medium">{(stats.processingTimeMs / 1000).toFixed(1)}s</div>
+                  <div className="text-muted-foreground">Tempo</div>
+                </div>
               </div>
             )}
 
             {preview.length > 0 ? (
-              <ScrollArea className="h-[300px] border rounded-lg">
-                <div className="p-2 space-y-1">
-                  {preview.map((entry, i) => (
-                    <div
-                      key={i}
-                      className={`p-2 rounded text-xs ${
-                        entry.action === 'remove'
-                          ? 'bg-red-500/10 border-l-2 border-red-500'
-                          : entry.action === 'modify'
-                          ? 'bg-yellow-500/10 border-l-2 border-yellow-500'
-                          : 'bg-green-500/10 border-l-2 border-green-500'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="truncate max-w-[400px]">
-                          {entry.original.title || '(sem título)'}
-                        </span>
-                        <Badge variant={entry.action === 'remove' ? 'destructive' : entry.action === 'modify' ? 'secondary' : 'outline'}>
-                          {entry.action === 'remove' ? 'Remover' : entry.action === 'modify' ? 'Modificar' : 'Manter'}
-                        </Badge>
-                      </div>
-                      {entry.reason && (
-                        <div className="text-muted-foreground mt-1">{entry.reason}</div>
-                      )}
-                    </div>
-                  ))}
+              <>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Mostrando {preview.length} entradas de exemplo</span>
+                  <div className="flex gap-2">
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded bg-green-500" /> Manter ({preview.filter(p => p.action === 'keep').length})
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded bg-yellow-500" /> Modificar ({preview.filter(p => p.action === 'modify').length})
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded bg-red-500" /> Remover ({preview.filter(p => p.action === 'remove').length})
+                    </span>
+                  </div>
                 </div>
-              </ScrollArea>
+                <ScrollArea className="h-[250px] border rounded-lg">
+                  <div className="p-2 space-y-1">
+                    {preview.map((entry, i) => (
+                      <div
+                        key={i}
+                        className={`p-3 rounded text-xs transition-colors ${
+                          entry.action === 'remove'
+                            ? 'bg-red-500/10 border-l-4 border-red-500'
+                            : entry.action === 'modify'
+                            ? 'bg-yellow-500/10 border-l-4 border-yellow-500'
+                            : 'bg-green-500/10 border-l-4 border-green-500'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            {/* Original */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground w-12 shrink-0">Original:</span>
+                              <span className={`truncate ${entry.action === 'remove' ? 'line-through text-muted-foreground' : ''}`}>
+                                {entry.original.title || '(sem título)'}
+                              </span>
+                              {entry.original.group && (
+                                <Badge variant="outline" className="text-[10px] h-4 shrink-0">
+                                  {entry.original.group}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {/* Cleaned (if modified) */}
+                            {entry.action === 'modify' && entry.cleaned && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground w-12 shrink-0">Limpo:</span>
+                                <span className="truncate font-medium text-primary">
+                                  {entry.cleaned.title}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* URL preview */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground w-12 shrink-0">URL:</span>
+                              <span className="truncate text-muted-foreground font-mono text-[10px]">
+                                {entry.original.url || '(vazia)'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge 
+                              variant={entry.action === 'remove' ? 'destructive' : entry.action === 'modify' ? 'secondary' : 'outline'}
+                              className="text-[10px]"
+                            >
+                              {entry.action === 'remove' ? 'Remover' : entry.action === 'modify' ? 'Modificar' : 'Manter'}
+                            </Badge>
+                            {entry.ruleApplied && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {entry.ruleApplied}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {entry.reason && (
+                          <div className="mt-2 pt-2 border-t border-border/50 text-muted-foreground flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            {entry.reason}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Eye className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Clique em "Simular" para ver o preview</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={loadDemoData}
+                >
+                  Carregar preview de demonstração
+                </Button>
               </div>
             )}
           </TabsContent>
@@ -714,7 +1421,16 @@ export function M3UCleanPipeline({
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-wrap gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={loadDemoData}
+            className="mr-auto"
+          >
+            <Lightbulb className="w-4 h-4 mr-1" />
+            Demo
+          </Button>
           <Button variant="outline" onClick={handleClose}>
             Fechar
           </Button>
