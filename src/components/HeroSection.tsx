@@ -149,6 +149,8 @@ const HeroSection = () => {
               height={175}
               loading="eager"
               decoding="async"
+              // @ts-ignore - fetchpriority is valid HTML but not in React types yet
+              fetchpriority="high"
               role="img"
               aria-label="IPTV LINK - Streaming Premium"
             />
