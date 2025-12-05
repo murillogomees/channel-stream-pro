@@ -172,8 +172,10 @@ export function useRemoteControl(options: UseRemoteControlOptions = {}) {
     cleanupRef.current.push(unsub);
 
     return () => {
-      cleanupRef.current.forEach(unsub => unsub());
-      cleanupRef.current = [];
+      if (Array.isArray(cleanupRef.current)) {
+        cleanupRef.current.forEach(unsub => unsub());
+        cleanupRef.current = [];
+      }
       remoteControl.destroy();
     };
   }, [enabled, handleAction]); // handleAction is stable now
