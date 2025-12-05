@@ -77,17 +77,10 @@ class StreamOptimizerService {
       return 'ts';
     }
     
-    // Xtream API live endpoints typically serve HLS
-    // Pattern: /live/username/password/channelId.ts or without extension
-    // Also: stream.php, player_api.php with action=get_live_streams
-    if (lowerUrl.includes('/live/') || lowerUrl.includes('stream.php') || 
-        lowerUrl.includes('player_api.php') || lowerUrl.includes('/streaming/')) {
-      return 'hls'; // Most IPTV providers serve HLS for live content
-    }
-    
-    // Default to HLS for unknown - it's the most common IPTV format
-    // HLS.js will gracefully fail and we can fallback to native
-    return 'hls';
+    // For Xtream API and unknown live streams, use 'unknown' protocol
+    // This lets the player try native HTML5 video first, which handles more formats
+    // Don't assume HLS - many IPTV streams are raw TS or other formats
+    return 'unknown';
   }
 
   /**

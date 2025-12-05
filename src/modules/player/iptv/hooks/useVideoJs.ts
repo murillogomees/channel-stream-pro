@@ -305,9 +305,10 @@ export function useVideoJs({
       return;
     }
 
-    // HLS streams - use HLS.js with optimized config
+    // HLS streams - use HLS.js with optimized config (ONLY for explicit HLS URLs)
+    // Don't use HLS.js for 'unknown' protocol - let native video handle it
     if (protocol === 'hls' && Hls.isSupported() && !supportsNativeHls()) {
-      console.log('[useVideoJs] Using HLS.js', customHlsConfig ? '(TV config)' : '');
+      console.log('[useVideoJs] Using HLS.js for explicit HLS URL', customHlsConfig ? '(TV config)' : '');
       
       // Base config from optimizer
       const baseConfig = streamOptimizer.getHlsConfig(
