@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type FC, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
 export type Theme = 'dark' | 'light' | 'sepia' | 'high-contrast';
 
@@ -13,7 +12,20 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Get user from Supabase directly to avoid circular dependency with AuthContext
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id || null);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id || null);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('app-theme') as Theme;
     return stored || 'dark';
@@ -22,17 +34,17 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   // Load theme from database when user logs in
   useEffect(() => {
-    if (user?.id) {
-      loadThemeFromDatabase();
+    if (userId) {
+      loadThemeFromDatabase(userId);
     }
-  }, [user?.id]);
+  }, [userId]);
 
-  const loadThemeFromDatabase = async () => {
+  const loadThemeFromDatabase = async (uid: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('theme')
-        .eq('id', user?.id)
+        .eq('id', uid)
         .single();
 
       if (error) throw error;
@@ -47,14 +59,14 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
   };
 
   const saveThemeToDatabase = async (newTheme: Theme) => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     try {
       setIsSyncing(true);
       const { error } = await supabase
         .from('profiles')
         .update({ theme: newTheme })
-        .eq('id', user.id);
+        .eq('id', userId);
 
       if (error) throw error;
     } catch (error) {

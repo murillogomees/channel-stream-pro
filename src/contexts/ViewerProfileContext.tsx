@@ -79,5 +79,3 @@ export function useViewerProfile(): ViewerProfileContextType {
   }
   return context;
 }
-
-export default ViewerProfileContext;
