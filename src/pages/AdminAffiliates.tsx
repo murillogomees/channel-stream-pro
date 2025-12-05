@@ -34,11 +34,17 @@ import {
 import { 
   Users, Plus, Edit, Trash2, DollarSign, TrendingUp,
   Wallet, CheckCircle, XCircle, Clock, Loader2, Search,
-  Copy, ArrowDownToLine, AlertTriangle
+  Copy, ArrowDownToLine, AlertTriangle, BarChart3, Settings, Shield, Award
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// New affiliate components
+import { AffiliateAnalyticsDashboard } from "@/components/admin/affiliates/AffiliateAnalyticsDashboard";
+import { AffiliateTierManager } from "@/components/admin/affiliates/AffiliateTierManager";
+import { AffiliateConfigPanel } from "@/components/admin/affiliates/AffiliateConfigPanel";
+import { AffiliateFraudDetection } from "@/components/admin/affiliates/AffiliateFraudDetection";
 
 export default function AdminAffiliates() {
   const { affiliates, loading: affiliatesLoading, createAffiliate, updateAffiliate, deleteAffiliate } = useAffiliates();
@@ -262,8 +268,11 @@ export default function AdminAffiliates() {
 
       {/* Tabs */}
       <Tabs defaultValue="affiliates" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="affiliates">Afiliados</TabsTrigger>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="affiliates">
+            <Users className="h-4 w-4 mr-1" />
+            Afiliados
+          </TabsTrigger>
           <TabsTrigger value="referrals">Indicações</TabsTrigger>
           <TabsTrigger value="withdrawals">
             Saques
@@ -272,6 +281,22 @@ export default function AdminAffiliates() {
                 {pendingWithdrawals}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            Analytics
+          </TabsTrigger>
+          <TabsTrigger value="tiers">
+            <Award className="h-4 w-4 mr-1" />
+            Tiers
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Settings className="h-4 w-4 mr-1" />
+            Configurações
+          </TabsTrigger>
+          <TabsTrigger value="fraud">
+            <Shield className="h-4 w-4 mr-1" />
+            Segurança
           </TabsTrigger>
         </TabsList>
 
@@ -543,6 +568,26 @@ export default function AdminAffiliates() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics">
+          <AffiliateAnalyticsDashboard />
+        </TabsContent>
+
+        {/* Tiers Tab */}
+        <TabsContent value="tiers">
+          <AffiliateTierManager />
+        </TabsContent>
+
+        {/* Config Tab */}
+        <TabsContent value="config">
+          <AffiliateConfigPanel />
+        </TabsContent>
+
+        {/* Fraud Detection Tab */}
+        <TabsContent value="fraud">
+          <AffiliateFraudDetection />
         </TabsContent>
       </Tabs>
 

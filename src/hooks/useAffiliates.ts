@@ -21,6 +21,14 @@ export interface Affiliate {
   created_at: string;
   updated_at: string;
   created_by?: string;
+  // New fields from affiliate system expansion
+  custom_slug?: string;
+  tier_id?: string;
+  is_recurring_enabled?: boolean;
+  fraud_score?: number;
+  last_click_at?: string;
+  total_clicks?: number;
+  conversion_rate?: number;
 }
 
 export interface AffiliateReferral {
