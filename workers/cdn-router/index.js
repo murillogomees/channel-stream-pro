@@ -59,6 +59,9 @@ const CONFIG = {
   // Performance
   ENABLE_BROTLI: true,
   ENABLE_GZIP: true,
+  
+  // Prewarm bot bypass - allows internal prewarm requests without JWT
+  PREWARM_BOT_USER_AGENT: 'CDN-Prewarm-Bot/1.0',
 };
 
 // ============================================
@@ -305,11 +308,33 @@ export default {
 
     const contentCategory = getContentCategory(url);
     const jwtToken = url.searchParams.get('jwt');
+    const userAgent = request.headers.get('User-Agent') || '';
+    
+    // Check if this is a prewarm bot request (internal service)
+    const isPrewarmBot = userAgent.includes(CONFIG.PREWARM_BOT_USER_AGENT);
 
     // ========================================
-    // MANIFEST HANDLING (JWT REQUIRED)
+    // MANIFEST HANDLING (JWT REQUIRED - except for prewarm bot)
     // ========================================
     if (contentCategory === 'manifest') {
+      // Prewarm bot bypass - allow without JWT for cache warming
+      if (isPrewarmBot) {
+        console.log('[CDN] Prewarm bot access for manifest:', url.pathname);
+        const r2Key = url.pathname.replace(/^[/]/, '');
+        const object = await env.R2_BUCKET.get(r2Key);
+        
+        if (!object) {
+          return new Response('Not found', { status: 404 });
+        }
+        
+        const headers = getSecurityHeaders(request, allowedReferrers);
+        headers.set('Content-Type', getMimeType(r2Key));
+        headers.set('Cache-Control', `public, max-age=${CONFIG.MANIFEST_MAX_AGE}, s-maxage=${CONFIG.MANIFEST_CDN_MAX_AGE}`);
+        headers.set('X-Prewarm', 'true');
+        
+        return new Response(object.body, { headers });
+      }
+      
       if (!jwtToken) {
         return new Response('Unauthorized: JWT required for manifests', { status: 401 });
       }
