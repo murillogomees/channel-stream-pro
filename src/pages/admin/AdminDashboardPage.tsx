@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Users, Bell, Shield, BarChart3, Clock, AlertTriangle,
   UserCog, Tv, Play, Download, Settings2, ListVideo,
-  LayoutDashboard, GitBranch, Zap, TrendingUp
+  LayoutDashboard, GitBranch, Zap, TrendingUp, Rocket
 } from "lucide-react";
 import { useProfiles } from "@/hooks/useProfiles";
 
@@ -182,6 +182,15 @@ export default function AdminDashboardPage() {
             icon={<Settings2 className="h-5 w-5" />}
             path="/admin/sistema"
             badge="Hub"
+          />
+          <NavCard
+            title="Builds & Deploys"
+            description="Deploy multi-plataforma"
+            icon={<Rocket className="h-5 w-5" />}
+            path="/admin/builds"
+            badge="Novo"
+            isNew
+            variant="accent"
           />
         </div>
       </section>
