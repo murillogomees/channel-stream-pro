@@ -106,11 +106,15 @@ export const IptvPlayer = memo(function IptvPlayer({
       
       setCurrentChannel(virtualChannel);
       
-      // Optimize URL (handle HTTP→HTTPS proxy)
+      // Optimize URL - always handle HTTP→HTTPS proxy for Mixed Content
       const optimized = streamOptimizer.optimize(streamUrl);
-      console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol);
+      console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol, optimized.requiresProxy);
       
-      setSource(optimized.url);
+      // Use optimized URL (proxied if HTTP on HTTPS page)
+      const finalUrl = optimized.url;
+      console.log('[IptvPlayer] Final URL:', finalUrl.substring(0, 100));
+      
+      setSource(finalUrl);
       onEvent?.('ready', { channelCount: 1 });
     }
   }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource, onEvent]);
