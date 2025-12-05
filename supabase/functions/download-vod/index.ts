@@ -275,7 +275,7 @@ serve(async (req) => {
         }).eq('id', channel.id);
         
         // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
-        const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+        const r2Bucket = Deno.env.get('R2_BUCKET_NAME') || 'iptvlink-cdn';
         const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.iptvlink.com.br';
         const publicCdnUrl = `https://${r2PublicDomain}/${r2Key}`;
         const downloadInfo = await supabaseService.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
@@ -605,7 +605,7 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
     }).eq('id', downloadId);
 
     // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
-    const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
+    const r2Bucket = Deno.env.get('R2_BUCKET_NAME') || 'iptvlink-cdn';
     const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.iptvlink.com.br';
     const r2Key = isHLS 
       ? `vod/${channel.id}/playlist.m3u8` 
