@@ -6,6 +6,7 @@
 import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Tv, Star, Clock, X, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isValidImageUrl } from '@/lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -269,7 +270,7 @@ const ChannelItem = memo(function ChannelItem({
     >
       {/* Logo */}
       <div className="w-10 h-10 flex-shrink-0 rounded bg-muted overflow-hidden relative">
-        {channel.tvg_logo ? (
+        {isValidImageUrl(channel.tvg_logo) ? (
           <img
             src={channel.tvg_logo}
             alt=""

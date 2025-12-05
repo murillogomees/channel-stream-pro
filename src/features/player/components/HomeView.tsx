@@ -8,22 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { isValidImageUrl } from '@/lib/imageUtils';
 import { ContinueWatchingRow } from './ContinueWatchingRow';
 import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
-
-// Helper para validar URLs de logo
-const isValidLogoUrl = (url: string | undefined | null): url is string => {
-  if (!url || typeof url !== 'string') return false;
-  const invalidPatterns = ['/_small.', '/_medium.', '/_large.', '/images/_', 'None', 'undefined', 'null'];
-  if (invalidPatterns.some(p => url.includes(p))) return false;
-  try {
-    const pathname = new URL(url, 'http://localhost').pathname;
-    const filename = pathname.split('/').pop() || '';
-    if (filename.startsWith('_') || filename.startsWith('.') || pathname.length < 5) return false;
-    return true;
-  } catch { return false; }
-};
 
 interface SeriesContinuation {
   seriesName: string;
@@ -145,9 +133,9 @@ const SeriesContinuationCard = memo(function SeriesContinuationCard({
       onClick={onPlay}
     >
       <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-        {isValidLogoUrl(item.logo) || isValidLogoUrl(item.nextEpisode.tvg_logo) ? (
+        {isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo) ? (
           <img
-            src={isValidLogoUrl(item.logo) ? item.logo : item.nextEpisode.tvg_logo}
+            src={isValidImageUrl(item.logo) ? item.logo : item.nextEpisode.tvg_logo}
             alt={item.seriesName}
             className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
             loading="lazy"
@@ -349,7 +337,7 @@ export function HomeView({
     const live: Channel[] = [];
     
     for (const ch of allChannels) {
-      if (!isValidLogoUrl(ch.tvg_logo)) continue; // Skip channels without valid cover image
+      if (!isValidImageUrl(ch.tvg_logo)) continue; // Skip channels without valid cover image
       const type = detectContentType(ch);
       if (type === 'movie') movies.push(ch);
       else if (type === 'episode') series.push(ch);
@@ -419,14 +407,14 @@ export function HomeView({
       )}
 
       {/* Series Continuations - Next Episodes - only with cover images */}
-      {seriesContinuations.filter(item => isValidLogoUrl(item.logo) || isValidLogoUrl(item.nextEpisode.tvg_logo)).length > 0 && (
+      {seriesContinuations.filter(item => isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo)).length > 0 && (
         <ContentRow
           title="Continuar Séries"
           subtitle="Próximos episódios das suas séries"
           icon={PlaySquare}
           isEmpty={false}
         >
-          {seriesContinuations.filter(item => isValidLogoUrl(item.logo) || isValidLogoUrl(item.nextEpisode.tvg_logo)).map((item) => (
+          {seriesContinuations.filter(item => isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo)).map((item) => (
             <SeriesContinuationCard
               key={item.seriesName}
               item={item}
@@ -490,7 +478,7 @@ export function HomeView({
               onClick={() => onPlayChannel(channel)}
             >
               <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
-                {isValidLogoUrl(channel.tvg_logo) ? (
+                {isValidImageUrl(channel.tvg_logo) ? (
                   <img
                     src={channel.tvg_logo}
                     alt={channel.name}

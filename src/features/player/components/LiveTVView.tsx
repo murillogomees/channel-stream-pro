@@ -5,6 +5,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Tv, List, PictureInPicture2, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isValidImageUrl } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { useChannelEPG } from '../hooks/useEPG';
 import { useChannelZapping } from '../hooks/useChannelZapping';
@@ -109,7 +110,7 @@ export function LiveTVView({
             <div className="aspect-video relative">
               {/* Channel Logo/Preview */}
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-background via-transparent to-transparent">
-                {currentChannel.tvg_logo ? (
+                {isValidImageUrl(currentChannel.tvg_logo) ? (
                   <img
                     src={currentChannel.tvg_logo}
                     alt={currentChannel.name}
@@ -405,7 +406,7 @@ function ChannelChip({
           : 'border-border bg-background'
       )}
     >
-      {channel.tvg_logo && (
+      {isValidImageUrl(channel.tvg_logo) && (
         <img
           src={channel.tvg_logo}
           alt=""
