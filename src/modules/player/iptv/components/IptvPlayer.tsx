@@ -17,6 +17,7 @@ import { useSmartTv } from '../hooks/useSmartTv';
 import { useEpg } from '../hooks/useEpg';
 import { cdnFailover } from '../services/cdnFailover';
 import { playlistParser } from '../services/playlistParser';
+import { streamOptimizer } from '../services/streamOptimizer';
 import type { IptvPlayerProps, IptvChannel, IptvPlaylist, IptvPlayerEvent } from '../types';
 import { EpgDisplay } from './EpgDisplay';
 import { TvFocusableButton } from './TvFocusableButton';
@@ -25,7 +26,10 @@ import 'video.js/dist/video-js.css';
 
 export const IptvPlayer = memo(function IptvPlayer({
   playlistUrl,
+  streamUrl,
   channelId,
+  channelName,
+  channelLogo,
   epgUrl,
   authToken,
   options = {},
@@ -74,10 +78,10 @@ export const IptvPlayer = memo(function IptvPlayer({
     options: {
       autoplay: options.autoplay ?? true,
       muted: options.muted ?? true,
-      preferLowLatency: !isTv && (options.preferLowLatency ?? true), // Disable low latency on TVs
-      maxRetries: options.maxRetries ?? (isTv ? 5 : 3), // More retries on TVs
+      preferLowLatency: !isTv && (options.preferLowLatency ?? true),
+      maxRetries: options.maxRetries ?? (isTv ? 5 : 3),
     },
-    hlsConfig: isTv ? hlsConfig : undefined, // Use TV-optimized HLS config
+    hlsConfig: isTv ? hlsConfig : undefined,
     onEvent: handlePlayerEvent,
   });
 
@@ -87,9 +91,34 @@ export const IptvPlayer = memo(function IptvPlayer({
     epgUrl,
   });
 
-  // Load playlist
+  // Direct stream URL mode - load immediately without playlist
+  useEffect(() => {
+    if (streamUrl && !playlistUrl) {
+      console.log('[IptvPlayer] Direct stream mode:', streamUrl.substring(0, 80));
+      
+      // Create a virtual channel for display
+      const virtualChannel: IptvChannel = {
+        id: channelId || 'direct-stream',
+        name: channelName || 'Stream',
+        url: streamUrl,
+        logo: channelLogo,
+      };
+      
+      setCurrentChannel(virtualChannel);
+      
+      // Optimize URL (handle HTTP→HTTPS proxy)
+      const optimized = streamOptimizer.optimize(streamUrl);
+      console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol);
+      
+      setSource(optimized.url);
+      onEvent?.('ready', { channelCount: 1 });
+    }
+  }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource, onEvent]);
+
+  // Load playlist (original behavior)
   useEffect(() => {
     if (!playlistUrl) return;
+    if (streamUrl) return; // Skip if direct stream mode
 
     const loadPlaylist = async () => {
       try {
@@ -114,7 +143,7 @@ export const IptvPlayer = memo(function IptvPlayer({
     };
 
     loadPlaylist();
-  }, [playlistUrl, channelId, authToken]);
+  }, [playlistUrl, channelId, authToken, streamUrl]);
 
   // Initialize CDN failover
   useEffect(() => {

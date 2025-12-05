@@ -168,6 +168,10 @@ export default function TVPlayer() {
       {/* Player - IptvPlayer Modular */}
       <IptvPlayer
         channelId={channelId}
+        streamUrl={playableUrl}
+        channelName={channelName}
+        channelLogo={channelLogo}
+        playlistUrl={m3uUrl || undefined}
         options={{
           preferLowLatency: true,
           maxRetries: 3,

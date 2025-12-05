@@ -708,6 +708,9 @@ export default function AppPlayer() {
         <div className="fixed inset-0 z-50 bg-black">
           <IptvPlayer
             channelId={playerChannel.id}
+            streamUrl={playerChannel.stream_url}
+            channelName={playerChannel.name}
+            channelLogo={playerChannel.tvg_logo}
             options={{
               preferLowLatency: true,
               maxRetries: 3,
