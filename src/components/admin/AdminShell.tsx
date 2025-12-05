@@ -10,7 +10,9 @@ import { AdminHeader } from "./AdminHeader";
 
 interface AdminShellProps {
   children: ReactNode;
-  title: string;
+  /** @deprecated Título removido do header */
+  title?: string;
+  /** @deprecated Descrição removida do header */
   description?: string;
   backTo?: string;
   className?: string;
@@ -31,8 +33,6 @@ const maxWidthClasses = {
 
 export function AdminShell({ 
   children, 
-  title,
-  description,
   backTo = "/admin/dashboard",
   className,
   maxWidth = "2xl",
@@ -40,11 +40,7 @@ export function AdminShell({
 }: AdminShellProps) {
   return (
     <div className="min-h-screen bg-background">
-      <AdminHeader 
-        title={title}
-        description={description}
-        backTo={backTo}
-      />
+      <AdminHeader backTo={backTo} />
       
       <main className={cn(
         "mx-auto w-full",
