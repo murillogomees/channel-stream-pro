@@ -182,9 +182,10 @@ export function useIPTVPlayerClient() {
   const playlistKeyRef = useRef<string>('');
   const playlistUrlRef = useRef<string>('');
   const isBackgroundLoadingRef = useRef(false);
+  const groupChannelsRef = useRef<(channels: any[]) => Category[]>(() => []);
 
-  // Group channels into categories - pure function, no deps
-  const groupChannelsIntoCategories = (channels: any[]): Category[] => {
+  // Group channels into categories - pure function stored in ref
+  groupChannelsRef.current = (channels: any[]): Category[] => {
     const categoriesMap = new Map<string, Category>();
 
     for (const channel of channels) {
@@ -215,10 +216,6 @@ export function useIPTVPlayerClient() {
 
     return Array.from(categoriesMap.values());
   };
-  
-  // Store grouping function in ref to prevent dependency cycles
-  const groupChannelsRef = useRef(groupChannelsIntoCategories);
-  groupChannelsRef.current = groupChannelsIntoCategories;
 
   // Update UI without blocking - no dependencies to prevent loops
   const updateUIInBackground = useCallback((channels: any[], total: number, progress?: string) => {
