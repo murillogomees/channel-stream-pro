@@ -1,12 +1,14 @@
 /**
  * useCdnPlayer - Hook for CDN-aware video playback
  * 
- * Handles intelligent routing through CDN Worker with automatic fallback
+ * ARQUITETURA DE ENTREGA:
+ * - TV AO VIVO: Link direto (sem proxy, sem CDN)
+ * - VOD: R2 Cloudflare CDN
+ * - Cloudflare Stream: Para conteúdo transcodificado
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { cdnRoutingService, PlaybackResult } from '@/services/cdnRoutingService';
-import { streamService, Channel } from '@/modules/player/services/StreamService';
+import { streamService, Channel, PlaybackSource } from '@/modules/player/services/StreamService';
 
 interface UseCdnPlayerOptions {
   channel: Channel | null;
@@ -15,11 +17,12 @@ interface UseCdnPlayerOptions {
 
 interface UseCdnPlayerReturn {
   playbackUrl: string | null;
-  source: PlaybackResult['source'] | null;
+  source: PlaybackSource['source'] | null;
   isLoading: boolean;
   error: string | null;
   fallbackUrl: string | null;
-  requiresToken: boolean;
+  isLive: boolean;
+  isVod: boolean;
   retry: () => void;
 }
 
@@ -27,19 +30,19 @@ export function useCdnPlayer({
   channel, 
   enabled = true 
 }: UseCdnPlayerOptions): UseCdnPlayerReturn {
-  const [playbackResult, setPlaybackResult] = useState<PlaybackResult | null>(null);
+  const [playbackSource, setPlaybackSource] = useState<PlaybackSource | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null);
   const retryAttempts = useRef(0);
   const maxRetries = 2;
 
   /**
-   * Fetch optimized playback URL
+   * Resolve playback URL based on content type
    */
-  const fetchPlaybackUrl = useCallback(async () => {
+  const resolvePlaybackUrl = useCallback(() => {
     if (!channel || !enabled) {
-      setPlaybackResult(null);
+      setPlaybackSource(null);
+      setError(null);
       return;
     }
 
@@ -47,45 +50,39 @@ export function useCdnPlayer({
     setError(null);
 
     try {
-      const result = await cdnRoutingService.getPlaybackUrl(channel);
+      // Use StreamService to get optimized playback source
+      const source = streamService.getPlaybackSource(channel);
       
-      setPlaybackResult(result);
+      if (!source.url) {
+        throw new Error('No playback URL available');
+      }
+
+      setPlaybackSource(source);
       retryAttempts.current = 0;
 
-      console.log('[CDN Player] Playback URL resolved:', {
-        source: result.source,
+      console.log('[CDN Player] Playback resolved:', {
         channel: channel.name,
-        requiresToken: result.requiresToken,
+        source: source.source,
+        isLive: streamService.isLiveContent(channel),
+        isVod: streamService.isVodContent(channel),
+        url: source.url.substring(0, 60) + '...',
       });
 
-      // Setup token refresh if needed (refresh at 1h50min for 2h tokens)
-      if (result.requiresToken && result.expiresAt) {
-        const refreshTime = result.expiresAt - Date.now() - (10 * 60 * 1000); // 10 min before expiry
-        
-        if (refreshTime > 0) {
-          tokenRefreshTimer.current = setTimeout(async () => {
-            console.log('[CDN Player] Refreshing token...');
-            await fetchPlaybackUrl();
-          }, refreshTime);
-        }
-      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to get playback URL';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to resolve playback URL';
       console.error('[CDN Player] Error:', errorMsg);
       setError(errorMsg);
 
-      // Fallback to standard stream service on error
-      if (retryAttempts.current < maxRetries) {
+      // Retry with fallback
+      if (retryAttempts.current < maxRetries && channel.stream_url) {
         retryAttempts.current++;
-        console.log(`[CDN Player] Retrying... (${retryAttempts.current}/${maxRetries})`);
-        setTimeout(fetchPlaybackUrl, 1000 * retryAttempts.current);
-      } else {
-        // Use basic fallback
-        const fallbackUrl = streamService.getPlayableUrl(channel);
-        setPlaybackResult({
-          url: fallbackUrl,
-          source: 'stream_proxy',
-          requiresToken: false,
+        console.log(`[CDN Player] Retrying with direct URL... (${retryAttempts.current}/${maxRetries})`);
+        
+        // Fallback to direct URL
+        setPlaybackSource({
+          url: channel.stream_url,
+          source: 'direct',
+          requiresAuth: false,
         });
       }
     } finally {
@@ -98,27 +95,22 @@ export function useCdnPlayer({
    */
   const retry = useCallback(() => {
     retryAttempts.current = 0;
-    fetchPlaybackUrl();
-  }, [fetchPlaybackUrl]);
+    resolvePlaybackUrl();
+  }, [resolvePlaybackUrl]);
 
-  // Fetch URL when channel changes
+  // Resolve URL when channel changes
   useEffect(() => {
-    fetchPlaybackUrl();
-
-    return () => {
-      if (tokenRefreshTimer.current) {
-        clearTimeout(tokenRefreshTimer.current);
-      }
-    };
-  }, [fetchPlaybackUrl]);
+    resolvePlaybackUrl();
+  }, [resolvePlaybackUrl]);
 
   return {
-    playbackUrl: playbackResult?.url || null,
-    source: playbackResult?.source || null,
+    playbackUrl: playbackSource?.url || null,
+    source: playbackSource?.source || null,
     isLoading,
     error,
-    fallbackUrl: playbackResult?.fallbackUrl || null,
-    requiresToken: playbackResult?.requiresToken || false,
+    fallbackUrl: playbackSource?.fallbackUrl || channel?.stream_url || null,
+    isLive: channel ? streamService.isLiveContent(channel) : false,
+    isVod: channel ? streamService.isVodContent(channel) : false,
     retry,
   };
 }
