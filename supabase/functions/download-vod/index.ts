@@ -446,10 +446,12 @@ serve(async (req) => {
     // Verificar download existente
     const { data: existingDownload } = await supabaseService
       .from('vod_downloads')
-      .select('id, status')
+      .select('id, status, download_started_at')
       .eq('channel_id', channelId)
       .in('status', ['queued', 'downloading', 'processing', 'paused'])
       .maybeSingle();
+
+    const forceRestart = body?.force === true;
 
     if (existingDownload) {
       // Se está pausado, retomar
@@ -458,8 +460,21 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true, resumed: true, downloadId: existingDownload.id }), 
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify({ error: 'Download em andamento', downloadId: existingDownload.id }), 
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      
+      // Verificar se está travado há mais de 30 minutos ou se force=true
+      const startedAt = existingDownload.download_started_at ? new Date(existingDownload.download_started_at) : null;
+      const isStuck = startedAt && (Date.now() - startedAt.getTime()) > 30 * 60 * 1000;
+      
+      if (forceRestart || isStuck) {
+        console.log(`🔄 [VOD] Resetando download ${isStuck ? 'travado' : 'forçado'}: ${existingDownload.id}`);
+        await supabaseService.from('vod_downloads').update({
+          status: 'failed',
+          error_message: isStuck ? 'Timeout - resetado automaticamente' : 'Resetado manualmente (force=true)'
+        }).eq('id', existingDownload.id);
+      } else {
+        return new Response(JSON.stringify({ error: 'Download em andamento', downloadId: existingDownload.id }), 
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Criar registro de download
