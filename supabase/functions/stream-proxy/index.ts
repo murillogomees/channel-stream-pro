@@ -28,14 +28,16 @@ const CORS_HEADERS = {
 // CONFIGURATION - NETFLIX-GRADE SETTINGS
 // =============================================================================
 const CONFIG = {
-  // Timeouts
-  FETCH_TIMEOUT_MS: 30000,
-  MANIFEST_FETCH_TIMEOUT_MS: 15000,
+  // Timeouts - OTIMIZADOS para startup rápido
+  FETCH_TIMEOUT_MS: 15000,        // Reduzido de 30s para 15s
+  MANIFEST_FETCH_TIMEOUT_MS: 8000, // Reduzido de 15s para 8s
+  LIVE_FETCH_TIMEOUT_MS: 10000,   // Timeout específico para live
   
-  // Retry settings with exponential backoff
-  MAX_RETRIES: 4,
-  RETRY_DELAY_BASE_MS: 300,
-  RETRY_JITTER_MS: 100,
+  // Retry settings - REDUZIDOS para falha rápida
+  MAX_RETRIES: 2,                  // Reduzido de 4 para 2
+  MANIFEST_MAX_RETRIES: 1,         // Manifests: apenas 1 retry
+  RETRY_DELAY_BASE_MS: 200,        // Reduzido de 300ms
+  RETRY_JITTER_MS: 50,             // Reduzido de 100ms
   
   // Cache settings - agressivo para melhor performance
   MANIFEST_CACHE_SECONDS: 5,       // Manifests: curto para updates
@@ -229,12 +231,13 @@ function getJitter(): number {
 async function fetchWithRetry(
   url: string, 
   headers: Headers, 
-  timeoutMs: number = CONFIG.FETCH_TIMEOUT_MS
+  timeoutMs: number = CONFIG.FETCH_TIMEOUT_MS,
+  maxRetries: number = CONFIG.MAX_RETRIES
 ): Promise<{ response: Response; usedUrl: string }> {
   let lastError: Error | null = null;
   let urlToFetch = url;
   
-  for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -348,9 +351,22 @@ Deno.serve(async (req) => {
     const acceptEncoding = req.headers.get('Accept-Encoding');
     const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding);
 
-    // Fetch upstream with appropriate timeout
-    const timeout = reqType === 'M3U' ? CONFIG.MANIFEST_FETCH_TIMEOUT_MS : CONFIG.FETCH_TIMEOUT_MS;
-    const { response: streamResponse, usedUrl } = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout);
+    // Fetch upstream with appropriate timeout and retries
+    let timeout: number;
+    let maxRetries: number;
+    
+    if (reqType === 'M3U') {
+      timeout = CONFIG.MANIFEST_FETCH_TIMEOUT_MS;
+      maxRetries = CONFIG.MANIFEST_MAX_RETRIES;
+    } else if (isLiveStream) {
+      timeout = CONFIG.LIVE_FETCH_TIMEOUT_MS;
+      maxRetries = CONFIG.MAX_RETRIES;
+    } else {
+      timeout = CONFIG.FETCH_TIMEOUT_MS;
+      maxRetries = CONFIG.MAX_RETRIES;
+    }
+    
+    const { response: streamResponse, usedUrl } = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout, maxRetries);
 
     // Handle errors
     if (!streamResponse.ok && streamResponse.status !== 206) {

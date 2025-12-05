@@ -50,18 +50,44 @@ function isSecurePage(): boolean {
 const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 const R2_CDN_URL = 'https://pub-iptvlink.r2.dev';
 
-// Verifica R2 em background (não bloqueia startup)
+// Verifica R2 - PRIORITÁRIO para VOD (timeout curto)
 async function checkR2Availability(channelId: string): Promise<string | null> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+    
     const { data } = await (supabase as any)
       .from('r2_storage_objects')
       .select('r2_key, status')
       .eq('channel_id', channelId)
       .eq('status', 'completed')
+      .abortSignal(controller.signal)
       .maybeSingle();
     
+    clearTimeout(timeoutId);
     if (!data) return null;
     return `${R2_CDN_URL}/${data.r2_key}`;
+  } catch {
+    return null;
+  }
+}
+
+// Verifica m3u_channels para r2_url (fallback)
+async function checkChannelR2Url(channelId: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    
+    const { data } = await (supabase as any)
+      .from('m3u_channels')
+      .select('r2_url, r2_uploaded')
+      .eq('id', channelId)
+      .eq('r2_uploaded', true)
+      .abortSignal(controller.signal)
+      .maybeSingle();
+    
+    clearTimeout(timeoutId);
+    return data?.r2_url || null;
   } catch {
     return null;
   }
@@ -164,8 +190,8 @@ export default function SimplePlayer({
     }
   }, []);
 
-  // Initialize player - FAST STARTUP
-  const initPlayer = useCallback(() => {
+  // Initialize player - R2 PRIORITY para VOD
+  const initPlayer = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !url) {
       setError('URL não fornecida');
@@ -181,24 +207,43 @@ export default function SimplePlayer({
     cleanupHls();
 
     const contentType = getContentType(url);
-    isHttpVod.current = (contentType === 'vod' || contentType === 'direct') && isHttpUrl(url);
+    const isHttpContent = isHttpUrl(url);
+    isHttpVod.current = (contentType === 'vod' || contentType === 'direct') && isHttpContent;
     loadStartTime.current = Date.now();
 
-    // FAST: Usa proxy direto, verifica R2 em background
-    let finalUrl = getProxiedUrl(url);
+    let finalUrl = url;
     
-    // Background check para R2 (não bloqueia)
+    // PRIORIDADE R2: Para VOD HTTP, verifica R2 PRIMEIRO (bloqueante, mas com timeout curto)
     if (isHttpVod.current && channelId) {
-      checkR2Availability(channelId).then(r2Url => {
-        if (r2Url && videoRef.current) {
-          console.log('[SimplePlayer] R2 disponível, switching...');
-          // Se ainda está carregando ou deu erro, troca para R2
-          if (isLoading || error) {
-            videoRef.current.src = r2Url;
-            videoRef.current.load();
-          }
-        }
-      });
+      setLoadingMessage('Verificando CDN...');
+      console.log('[SimplePlayer] Verificando R2 para VOD...');
+      
+      // Verifica R2 em paralelo (r2_storage_objects + m3u_channels)
+      const [r2StorageUrl, channelR2Url] = await Promise.all([
+        checkR2Availability(channelId),
+        checkChannelR2Url(channelId)
+      ]);
+      
+      const r2Url = r2StorageUrl || channelR2Url;
+      
+      if (r2Url) {
+        console.log('[SimplePlayer] R2 disponível! Usando CDN direto');
+        finalUrl = r2Url;
+        isHttpVod.current = false; // Não é mais HTTP problemático
+        setLoadingMessage('Conectando ao CDN...');
+      } else {
+        console.log('[SimplePlayer] R2 não disponível, usando proxy');
+        finalUrl = getProxiedUrl(url);
+        setLoadingMessage('Streaming via proxy (pode demorar)...');
+      }
+    } else if (isHttpContent && contentType === 'hls') {
+      // HLS HTTP: usa proxy
+      finalUrl = getProxiedUrl(url);
+      setLoadingMessage('Conectando ao stream...');
+    } else {
+      // HTTPS ou Live: usa direto
+      finalUrl = url;
+      setLoadingMessage('Conectando...');
     }
     
     console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
