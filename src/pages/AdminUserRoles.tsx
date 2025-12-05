@@ -33,9 +33,23 @@ const AdminUserRoles = () => {
   const [bulkRole, setBulkRole] = useState<string>("admin");
   const [bulkAction, setBulkAction] = useState<"add" | "remove">("add");
 
+  // Função para obter a role principal de um usuário (prioridade: master > admin > client)
+  const getPrimaryRole = (roles: string[]): string => {
+    if (roles.includes('master')) return 'master';
+    if (roles.includes('admin')) return 'admin';
+    if (roles.includes('client')) return 'client';
+    return 'client';
+  };
+
   // Função para obter a role selecionada de um usuário específico
   const getUserSelectedRole = (userId: string) => {
-    return userRoleSelections[userId] || "admin";
+    // Se já tem seleção manual, usa ela
+    if (userRoleSelections[userId]) {
+      return userRoleSelections[userId];
+    }
+    // Senão, retorna a role principal do usuário
+    const user = users.find(u => u.id === userId);
+    return user ? getPrimaryRole(user.roles) : 'client';
   };
 
   // Função para atualizar a role selecionada de um usuário específico
@@ -44,6 +58,16 @@ const AdminUserRoles = () => {
       ...prev,
       [userId]: role
     }));
+  };
+
+  // Verifica se é o próprio usuário master tentando editar a si mesmo
+  const isSelfMaster = (userId: string) => {
+    return currentUser?.id === userId && currentUser?.isMaster;
+  };
+
+  // Verifica se o usuário tem role master (não pode ser editado exceto por master)
+  const userHasMasterRole = (user: UserWithRole) => {
+    return user.roles.includes('master');
   };
 
   const loadUsers = async () => {
@@ -434,27 +458,37 @@ const AdminUserRoles = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Select
-                            value={getUserSelectedRole(user.id)}
-                            onValueChange={(role) => setUserSelectedRole(user.id, role)}
-                          >
-                            <SelectTrigger className="w-28 h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50">
-                              {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="client">Cliente</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleAddRole(user.id, getUserSelectedRole(user.id))}
-                            disabled={user.roles.includes(getUserSelectedRole(user.id))}
-                          >
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
+                          {isSelfMaster(user.id) ? (
+                            <Badge className="bg-stat-purple/20 text-stat-purple border-stat-purple/30">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Sempre Master
+                            </Badge>
+                          ) : (
+                            <>
+                              <Select
+                                value={getUserSelectedRole(user.id)}
+                                onValueChange={(role) => setUserSelectedRole(user.id, role)}
+                                disabled={userHasMasterRole(user) && !currentUser?.isMaster}
+                              >
+                                <SelectTrigger className="w-28 h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-background border shadow-lg z-50">
+                                  {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="client">Cliente</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleAddRole(user.id, getUserSelectedRole(user.id))}
+                                disabled={user.roles.includes(getUserSelectedRole(user.id)) || (userHasMasterRole(user) && !currentUser?.isMaster)}
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
