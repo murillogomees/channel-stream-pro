@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { extractMetadata, getStoredStreamUrl, clearStreamUrlIndex } from '@/services/smartPrefetch';
 
 interface Channel {
   id: string;
@@ -188,7 +189,7 @@ export function useIPTVPlayerClient() {
   const isBackgroundLoadingRef = useRef(false);
   const groupChannelsRef = useRef<(channels: any[]) => Category[]>(() => []);
 
-  // Group channels into categories - pure function stored in ref
+  // Group channels into categories - stores stream URLs in index, passes only metadata to UI
   groupChannelsRef.current = (channels: any[]): Category[] => {
     const categoriesMap = new Map<string, Category>();
 
@@ -206,15 +207,19 @@ export function useIPTVPlayerClient() {
       }
       
       const category = categoriesMap.get(categoryName)!;
+      
+      // Extract metadata and store stream URL in index (smart prefetch)
+      const metadata = extractMetadata(channel, category.id);
+      
       category.channels.push({
-        id: channel.id || channel.entry_hash || `ch-${category.channels.length}`,
-        name: channel.name || channel.title,
-        stream_url: channel.stream_url,
-        tvg_logo: channel.tvg_logo,
-        tvg_id: channel.tvg_id || null,
+        id: metadata.id,
+        name: metadata.name,
+        stream_url: channel.stream_url, // Keep for backwards compatibility
+        tvg_logo: metadata.tvg_logo,
+        tvg_id: metadata.tvg_id,
         category_id: category.id,
         category_name: categoryName,
-        order_position: channel.sequence || category.channels.length
+        order_position: metadata.order_position
       });
     }
 
@@ -949,5 +954,7 @@ export function useIPTVPlayerClient() {
     clearCacheAndReload,
     searchChannels,
     loadCategoryChannels,
+    // Smart prefetch: get stream URL on demand
+    getStreamUrl: getStoredStreamUrl,
   };
 }
