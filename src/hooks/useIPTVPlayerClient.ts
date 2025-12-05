@@ -287,7 +287,7 @@ export function useIPTVPlayerClient() {
     return { channels: [], total: 0, hasMore: false, version: 0 };
   };
 
-  // Background loading - FIXED: proper stop conditions
+  // Background loading - STABLE: NO UI updates during sync, only at END
   const loadAllChannelsBackground = useCallback(async (
     url: string,
     serverTotal: number,
@@ -323,6 +323,9 @@ export function useIPTVPlayerClient() {
     
     console.log(`[IPTV] Background loading ${offset}/${serverTotal}...`);
     
+    // Show simple progress without UI updates
+    setLoadingProgress(`Sincronizando em segundo plano...`);
+    
     try {
       while (!controller.signal.aborted) {
         // STOP CONDITIONS
@@ -352,24 +355,18 @@ export function useIPTVPlayerClient() {
           continue;
         }
         
-        // Add channels and advance
+        // Add channels and advance - NO UI UPDATE during sync
         consecutiveEmptyBatches = 0;
         allChannelsRef.current = [...allChannelsRef.current, ...result.channels];
         offset = allChannelsRef.current.length;
         
-        // Update UI periodically
-        if (allChannelsRef.current.length % 10000 < CONFIG.BACKGROUND_BATCH_SIZE) {
-          updateUIInBackground(
-            allChannelsRef.current, 
-            serverTotal,
-            `Sincronizando: ${allChannelsRef.current.length.toLocaleString()} canais`
-          );
-        }
+        // Update loaded count only (no category rebuild)
+        setLoadedChannels(offset);
         
         await new Promise(r => setTimeout(r, 50));
       }
 
-      // Final update
+      // Final update - ONLY at the very END
       if (!controller.signal.aborted && allChannelsRef.current.length > 0) {
         const finalTotal = allChannelsRef.current.length;
         
@@ -382,6 +379,7 @@ export function useIPTVPlayerClient() {
           complete: true,
         });
         
+        // Single UI update at the end
         startTransition(() => {
           setCategories(groupChannelsRef.current(allChannelsRef.current));
           setTotalChannels(finalTotal);
@@ -401,7 +399,7 @@ export function useIPTVPlayerClient() {
       setIsLoadingMore(false);
       setLoadingProgress('');
     }
-  }, [updateUIInBackground]);
+  }, []);
 
   // Load playlist from M3U URL
   const loadPlaylistFromURL = useCallback(async (url: string, playlistId: string, playlistName: string) => {
