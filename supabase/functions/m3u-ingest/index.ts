@@ -2,20 +2,13 @@
  * M3U Ingest Orchestrator
  * 
  * Stream-safe M3U ingest with automatic fallback to signed URLs.
- * Zero buffer in RAM - all downloads are streamed.
+ * Uses native AWS4 signing (no npm dependencies).
  * 
- * Features:
- * - Streaming proxy origin → R2 (no memory buffering)
- * - Automatic fallback to signed URL when timeout risk detected
- * - Retry with exponential backoff
- * - Comprehensive observability (metrics, traces, structured logs)
- * 
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3@3.478.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,63 +20,130 @@ const corsHeaders = {
 // =============================================
 
 const CONFIG = {
-  // Timeouts
-  WORKER_MAX_TIME_MS: 80000,       // 80s - leave 20s buffer before 100s limit
-  FETCH_TIMEOUT_MS: 30000,         // 30s fetch timeout
-  SLOW_READ_THRESHOLD_MS: 10000,   // 10s without data = slow read
-  
-  // Retry policy
+  WORKER_MAX_TIME_MS: 80000,
+  FETCH_TIMEOUT_MS: 30000,
+  SLOW_READ_THRESHOLD_MS: 10000,
   MAX_RETRIES: 3,
   INITIAL_BACKOFF_MS: 1000,
   MAX_BACKOFF_MS: 10000,
-  
-  // Chunk sizes
-  MIN_CHUNK_SIZE: 1024,            // 1KB
-  PROGRESS_LOG_INTERVAL: 1000000,  // Log every 1MB
-  
-  // R2 bucket
+  PROGRESS_LOG_INTERVAL: 1000000,
   DEFAULT_BUCKET: 'iptvlink-cdn',
   DEFAULT_CDN_URL: 'https://cdn.iptvlink.app',
 };
 
 // =============================================
-// TYPES
+// AWS4 SIGNING (Native implementation)
 // =============================================
 
-interface IngestRequest {
-  originUrl: string;
-  objectKey?: string;
-  userId?: string;
-  sourceId?: string;
-  metadata?: Record<string, string>;
-  forceSignedUrl?: boolean;
+async function hmacSha256(key: ArrayBuffer | Uint8Array, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
 }
 
-interface IngestResult {
-  success: boolean;
-  objectKey: string;
-  cdnUrl: string;
-  bytes: number;
-  durationMs: number;
-  method: 'stream' | 'signed_url' | 'fallback';
-  retryCount: number;
-  traceId: string;
+async function sha256(message: string | Uint8Array): Promise<string> {
+  const data = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-interface IngestMetrics {
-  traceId: string;
-  originUrl: string;
-  objectKey: string;
-  bytes: number;
-  durationMs: number;
-  method: string;
-  retryCount: number;
-  status: 'success' | 'failed';
-  errorMessage?: string;
+async function getSignatureKey(
+  secretKey: string,
+  dateStamp: string,
+  region: string,
+  service: string
+): Promise<ArrayBuffer> {
+  const kDate = await hmacSha256(new TextEncoder().encode('AWS4' + secretKey), dateStamp);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  return hmacSha256(kService, 'aws4_request');
+}
+
+async function signAndUploadToR2(
+  accountId: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  bucketName: string,
+  objectKey: string,
+  body: Uint8Array,
+  contentType: string
+): Promise<void> {
+  const region = 'auto';
+  const service = 's3';
+  const host = `${accountId}.r2.cloudflarestorage.com`;
+  const url = `https://${host}/${bucketName}/${objectKey}`;
+  
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.substring(0, 8);
+  
+  const payloadHash = await sha256(body);
+  
+  const headers: Record<string, string> = {
+    'host': host,
+    'content-type': contentType,
+    'x-amz-content-sha256': payloadHash,
+    'x-amz-date': amzDate,
+    'cache-control': 'public, max-age=3600, s-maxage=86400',
+  };
+  
+  const sortedHeaderKeys = Object.keys(headers).sort();
+  const canonicalHeaders = sortedHeaderKeys
+    .map(key => `${key}:${headers[key]}`)
+    .join('\n') + '\n';
+  const signedHeadersStr = sortedHeaderKeys.join(';');
+  
+  const canonicalUri = `/${bucketName}/${objectKey}`;
+  const canonicalRequest = [
+    'PUT',
+    canonicalUri,
+    '',
+    canonicalHeaders,
+    signedHeadersStr,
+    payloadHash,
+  ].join('\n');
+  
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = [
+    algorithm,
+    amzDate,
+    credentialScope,
+    await sha256(canonicalRequest),
+  ].join('\n');
+  
+  const signingKey = await getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signatureBuffer = await hmacSha256(signingKey, stringToSign);
+  const signature = Array.from(new Uint8Array(signatureBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  const authorizationHeader = `${algorithm} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+  
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      ...headers,
+      'Authorization': authorizationHeader,
+    },
+    body: body,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`R2 upload failed: ${response.status} - ${errorText}`);
+  }
 }
 
 // =============================================
-// LOGGING & METRICS
+// LOGGING
 // =============================================
 
 function createLogger(traceId: string) {
@@ -118,48 +178,6 @@ function createLogger(traceId: string) {
   };
 }
 
-async function recordMetrics(supabase: any, metrics: IngestMetrics) {
-  try {
-    await supabase.from('m3u_ingest_metrics').insert({
-      trace_id: metrics.traceId,
-      origin_url: metrics.originUrl.substring(0, 500),
-      object_key: metrics.objectKey,
-      bytes_transferred: metrics.bytes,
-      duration_ms: metrics.durationMs,
-      ingest_method: metrics.method,
-      retry_count: metrics.retryCount,
-      status: metrics.status,
-      error_message: metrics.errorMessage?.substring(0, 1000),
-      created_at: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error('[Metrics] Failed to record:', err);
-  }
-}
-
-// =============================================
-// R2 CLIENT
-// =============================================
-
-function getR2Client(): S3Client {
-  const accountId = Deno.env.get('R2_ACCOUNT_ID') || Deno.env.get('CLOUDFLARE_ACCOUNT_ID');
-  const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
-  const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
-
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error('R2 configuration missing');
-  }
-
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-  });
-}
-
 // =============================================
 // STREAMING INGEST
 // =============================================
@@ -176,7 +194,7 @@ async function streamToR2(
   const response = await fetch(originUrl, {
     signal: abortController.signal,
     headers: {
-      'User-Agent': 'M3U-Ingest/1.0 (compatible; streaming)',
+      'User-Agent': 'M3U-Ingest/2.0 (compatible; streaming)',
       'Connection': 'keep-alive',
       'Accept': '*/*',
     },
@@ -198,7 +216,6 @@ async function streamToR2(
 
   try {
     while (true) {
-      // Check time limits
       const elapsed = Date.now() - startTime;
       if (elapsed > CONFIG.WORKER_MAX_TIME_MS) {
         log.warn('Time limit approaching, stopping stream', { 
@@ -209,7 +226,6 @@ async function streamToR2(
         return { bytes: totalBytes, complete: false, slowRead: false };
       }
 
-      // Check for slow read
       const timeSinceData = Date.now() - lastDataTime;
       if (timeSinceData > CONFIG.SLOW_READ_THRESHOLD_MS) {
         log.warn('Slow read detected', { 
@@ -221,16 +237,13 @@ async function streamToR2(
 
       const { done, value } = await reader.read();
       
-      if (done) {
-        break;
-      }
+      if (done) break;
 
       if (value && value.length > 0) {
         chunks.push(value);
         totalBytes += value.length;
         lastDataTime = Date.now();
 
-        // Progress logging
         if (totalBytes - lastProgressLog >= CONFIG.PROGRESS_LOG_INTERVAL) {
           log.info('Stream progress', { 
             bytes: totalBytes, 
@@ -241,7 +254,6 @@ async function streamToR2(
       }
     }
 
-    // Upload to R2
     log.info('Stream complete, uploading to R2', { totalBytes });
     
     const combinedBuffer = new Uint8Array(totalBytes);
@@ -251,23 +263,21 @@ async function streamToR2(
       offset += chunk.length;
     }
 
-    const r2Client = getR2Client();
+    const accountId = Deno.env.get('R2_ACCOUNT_ID') || Deno.env.get('CLOUDFLARE_ACCOUNT_ID')!;
+    const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!;
+    const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!;
     const bucketName = Deno.env.get('R2_BUCKET_NAME') || CONFIG.DEFAULT_BUCKET;
 
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: objectKey,
-      Body: combinedBuffer,
-      ContentType: 'application/vnd.apple.mpegurl',
-      CacheControl: 'public, max-age=3600, s-maxage=86400',
-      Metadata: {
-        'ingest-method': 'stream',
-        'ingest-time': new Date().toISOString(),
-        'source-url-hash': await hashString(originUrl),
-      },
-    });
+    await signAndUploadToR2(
+      accountId,
+      accessKeyId,
+      secretAccessKey,
+      bucketName,
+      objectKey,
+      combinedBuffer,
+      'application/vnd.apple.mpegurl'
+    );
 
-    await r2Client.send(command);
     log.info('Upload to R2 complete', { objectKey, bytes: totalBytes });
 
     return { bytes: totalBytes, complete: true, slowRead: false };
@@ -300,7 +310,7 @@ async function getSignedUploadUrl(
     body: JSON.stringify({
       key: objectKey,
       contentType,
-      ttlSeconds: 900, // 15 minutes
+      ttlSeconds: 900,
     }),
   });
 
@@ -319,10 +329,9 @@ async function uploadViaSignedUrl(
 ): Promise<number> {
   log.info('Fetching from origin for signed URL upload', { originUrl });
 
-  // Fetch from origin
   const originResponse = await fetch(originUrl, {
     headers: {
-      'User-Agent': 'M3U-Ingest/1.0 (compatible; fallback)',
+      'User-Agent': 'M3U-Ingest/2.0 (compatible; fallback)',
       'Connection': 'keep-alive',
     },
   });
@@ -336,7 +345,6 @@ async function uploadViaSignedUrl(
 
   log.info('Uploading via signed URL', { bytes });
 
-  // Upload to R2 via signed URL
   const uploadResponse = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -392,14 +400,6 @@ async function withRetry<T>(
 // HELPERS
 // =============================================
 
-async function hashString(str: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 function generateObjectKey(originUrl: string, sourceId?: string): string {
   const timestamp = Date.now();
   const hash = originUrl.split('/').pop()?.split('?')[0] || 'playlist';
@@ -416,7 +416,6 @@ serve(async (req) => {
   const log = createLogger(traceId);
   const startTime = Date.now();
 
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -424,9 +423,8 @@ serve(async (req) => {
   log.info('Ingest request received', { method: req.method });
 
   try {
-    // Parse request
-    const body: IngestRequest = await req.json();
-    const { originUrl, objectKey, userId, sourceId, metadata, forceSignedUrl } = body;
+    const body = await req.json();
+    const { originUrl, objectKey, sourceId, forceSignedUrl } = body;
 
     if (!originUrl || typeof originUrl !== 'string') {
       return new Response(
@@ -435,7 +433,6 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -449,12 +446,10 @@ serve(async (req) => {
       forceSignedUrl,
     });
 
-    let result: IngestResult;
     let method: 'stream' | 'signed_url' | 'fallback' = 'stream';
     let bytes = 0;
     let retryCount = 0;
 
-    // Option 1: Force signed URL (for known large files)
     if (forceSignedUrl) {
       method = 'signed_url';
       log.info('Forced signed URL mode');
@@ -472,20 +467,18 @@ serve(async (req) => {
       retryCount = retries;
 
     } else {
-      // Option 2: Try streaming first
       const abortController = new AbortController();
 
       try {
         const { result: streamResult, retryCount: retries } = await withRetry(async () => {
           return await streamToR2(originUrl, finalObjectKey, log, startTime, abortController);
-        }, log, 1); // Only 1 retry for streaming
+        }, log, 1);
 
         retryCount = retries;
 
         if (streamResult.complete) {
           bytes = streamResult.bytes;
         } else {
-          // Fallback to signed URL
           log.info('Stream incomplete, falling back to signed URL', {
             bytes: streamResult.bytes,
             slowRead: streamResult.slowRead,
@@ -501,68 +494,52 @@ serve(async (req) => {
           );
           bytes = await uploadViaSignedUrl(originUrl, uploadUrl, log);
         }
-
-      } catch (streamError) {
-        // Complete failure in streaming, try signed URL
-        log.warn('Stream failed, trying signed URL fallback', {
-          error: String(streamError),
-        });
-
+      } catch (error) {
+        log.warn('Stream failed, trying signed URL', { error: String(error) });
         method = 'fallback';
         
-        const { result: fallbackBytes, retryCount: fallbackRetries } = await withRetry(async () => {
-          const { uploadUrl } = await getSignedUploadUrl(
-            finalObjectKey,
-            'application/vnd.apple.mpegurl',
-            log
-          );
-          return await uploadViaSignedUrl(originUrl, uploadUrl, log);
-        }, log);
-
-        bytes = fallbackBytes;
-        retryCount += fallbackRetries;
+        const { uploadUrl } = await getSignedUploadUrl(
+          finalObjectKey,
+          'application/vnd.apple.mpegurl',
+          log
+        );
+        bytes = await uploadViaSignedUrl(originUrl, uploadUrl, log);
       }
     }
 
     const durationMs = Date.now() - startTime;
 
-    // Update database record
-    await supabase.from('m3u_ingest_jobs').upsert({
+    // Record metrics (non-blocking)
+    supabase.from('m3u_ingest_metrics').insert({
+      trace_id: traceId,
+      origin_url: originUrl.substring(0, 500),
       object_key: finalObjectKey,
-      origin_url: originUrl.substring(0, 1000),
-      source_id: sourceId,
-      user_id: userId,
-      status: 'finished',
-      ingest_method: method,
       bytes_transferred: bytes,
       duration_ms: durationMs,
+      ingest_method: method,
       retry_count: retryCount,
-      metadata: metadata || {},
-      finished_at: new Date().toISOString(),
-    }, { onConflict: 'object_key' });
-
-    // Record metrics
-    await recordMetrics(supabase, {
-      traceId,
-      originUrl,
-      objectKey: finalObjectKey,
-      bytes,
-      durationMs,
-      method,
-      retryCount,
       status: 'success',
+      created_at: new Date().toISOString(),
+    }).catch(err => {
+      log.warn('Failed to record metrics', { error: String(err) });
     });
 
-    result = {
-      success: true,
-      objectKey: finalObjectKey,
-      cdnUrl: `${cdnBaseUrl}/${finalObjectKey}`,
-      bytes,
-      durationMs,
-      method,
-      retryCount,
-      traceId,
-    };
+    // Update job status (non-blocking)
+    supabase.from('m3u_ingest_jobs').insert({
+      trace_id: traceId,
+      origin_url: originUrl,
+      object_key: finalObjectKey,
+      status: 'completed',
+      bytes_transferred: bytes,
+      ingest_method: method,
+      retry_count: retryCount,
+      duration_ms: durationMs,
+      cdn_url: `${cdnBaseUrl}/${finalObjectKey}`,
+      created_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    }).catch(err => {
+      log.warn('Failed to update job status', { error: String(err) });
+    });
 
     log.info('Ingest completed successfully', {
       objectKey: finalObjectKey,
@@ -573,7 +550,16 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        success: true,
+        objectKey: finalObjectKey,
+        cdnUrl: `${cdnBaseUrl}/${finalObjectKey}`,
+        bytes,
+        durationMs,
+        method,
+        retryCount,
+        traceId,
+      }),
       { 
         status: 200, 
         headers: { 
@@ -586,36 +572,16 @@ serve(async (req) => {
 
   } catch (error) {
     const durationMs = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
     log.error('Ingest failed', {
-      error: errorMessage,
+      error: String(error),
       durationMs,
     });
 
-    // Record failure metrics
-    try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      
-      await recordMetrics(supabase, {
-        traceId,
-        originUrl: 'unknown',
-        objectKey: 'unknown',
-        bytes: 0,
-        durationMs,
-        method: 'unknown',
-        retryCount: 0,
-        status: 'failed',
-        errorMessage,
-      });
-    } catch {}
-
     return new Response(
-      JSON.stringify({
+      JSON.stringify({ 
         success: false,
-        error: errorMessage,
+        error: 'Ingest failed',
+        details: String(error),
         traceId,
         durationMs,
       }),
