@@ -338,7 +338,7 @@ export default function SimplePlayer({
 
     let finalUrl = url;
     
-    // PRIORIDADE R2: Para VOD HTTP, verifica R2 PRIMEIRO (bloqueante, mas com timeout curto)
+    // PRIORIDADE R2: Para VOD HTTP com channelId, verifica R2 PRIMEIRO
     if (isHttpVod.current && channelId) {
       setLoadingMessage('Verificando CDN...');
       console.log('[SimplePlayer] Verificando R2 para VOD...');
@@ -361,12 +361,14 @@ export default function SimplePlayer({
         finalUrl = getProxiedUrl(url);
         setLoadingMessage('Streaming via proxy (pode demorar)...');
       }
-    } else if (isHttpContent && contentType === 'hls') {
-      // HLS HTTP: usa proxy
+    } else if (isHttpContent) {
+      // QUALQUER conteúdo HTTP em página HTTPS: DEVE usar proxy
+      // Isso inclui VOD sem channelId, HLS, live, etc
+      console.log('[SimplePlayer] Conteúdo HTTP detectado, usando proxy');
       finalUrl = getProxiedUrl(url);
-      setLoadingMessage('Conectando ao stream...');
+      setLoadingMessage('Conectando via proxy...');
     } else {
-      // HTTPS ou Live: usa direto
+      // HTTPS: usa direto
       finalUrl = url;
       setLoadingMessage('Conectando...');
     }
