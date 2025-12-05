@@ -101,6 +101,20 @@ export default {
 				info: 'hsl(var(--stat-info))',
 				purple: 'hsl(var(--stat-purple))'
 			},
+			integration: {
+				payment: 'hsl(var(--integration-payment))',
+				'payment-bg': 'hsl(var(--integration-payment-bg))',
+				messaging: 'hsl(var(--integration-messaging))',
+				'messaging-bg': 'hsl(var(--integration-messaging-bg))',
+				cdn: 'hsl(var(--integration-cdn))',
+				'cdn-bg': 'hsl(var(--integration-cdn-bg))',
+				transcode: 'hsl(var(--integration-transcode))',
+				'transcode-bg': 'hsl(var(--integration-transcode-bg))',
+				cache: 'hsl(var(--integration-cache))',
+				'cache-bg': 'hsl(var(--integration-cache-bg))',
+				qa: 'hsl(var(--integration-qa))',
+				'qa-bg': 'hsl(var(--integration-qa-bg))'
+			},
 			chart: {
 				'1': 'hsl(var(--chart-1))',
 				'2': 'hsl(var(--chart-2))',
