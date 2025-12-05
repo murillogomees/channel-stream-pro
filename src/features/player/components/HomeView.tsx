@@ -274,7 +274,7 @@ export function HomeView({
   onPlayChannel,
   allChannels,
 }: HomeViewProps) {
-  // Session key for randomization - changes on each mount/remount
+  // Session key for randomization - changes ONLY on mount (not on re-renders)
   const [sessionKey] = useState(() => createSessionKey());
   
   // Check if we have any personalized content
@@ -313,7 +313,20 @@ export function HomeView({
     return 'live';
   };
 
-  // Default content sections for new users - RANDOMIZED on each visit
+  // MEMOIZE shuffled recommendation groups - stable until data changes
+  const shuffledRecommendationGroups = useMemo(() => {
+    return recommendationGroups.map(group => ({
+      ...group,
+      items: shuffleArray(group.items.filter(item => item.content_logo)),
+    }));
+  }, [recommendationGroups, sessionKey]);
+
+  // MEMOIZE shuffled forYouMix - stable until data changes
+  const shuffledForYouMix = useMemo(() => {
+    return shuffleArray(forYouMix.filter(item => item.content_logo)).slice(0, 20);
+  }, [forYouMix, sessionKey]);
+
+  // Default content sections for new users - RANDOMIZED once per session
   const defaultSections = useMemo(() => {
     if (hasPersonalizedContent || allChannels.length === 0) return [];
 
@@ -410,10 +423,9 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Recommendation Groups - RANDOMIZED, only items with cover images */}
-      {recommendationGroups.map((group) => {
-        const itemsWithLogo = shuffleArray(group.items.filter(item => item.content_logo));
-        if (itemsWithLogo.length === 0) return null;
+      {/* Recommendation Groups - STABLE MEMOIZED (no re-shuffle on re-render) */}
+      {shuffledRecommendationGroups.map((group) => {
+        if (group.items.length === 0) return null;
         return (
           <ContentRow
             key={group.type + (group.source_content || '')}
@@ -421,7 +433,7 @@ export function HomeView({
             icon={Clock}
             isEmpty={false}
           >
-            {itemsWithLogo.map((item) => (
+            {group.items.map((item) => (
               <RecommendationCard
                 key={item.id}
                 item={item}
@@ -432,15 +444,15 @@ export function HomeView({
         );
       })}
 
-      {/* For You Mix - RANDOMIZED, only items with cover images */}
-      {forYouMix.filter(item => item.content_logo).length > 0 && (
+      {/* For You Mix - STABLE MEMOIZED (no re-shuffle on re-render) */}
+      {shuffledForYouMix.length > 0 && (
         <ContentRow
           title="Para Você"
           subtitle="Seleção personalizada"
           icon={Film}
           isEmpty={false}
         >
-          {shuffleArray(forYouMix.filter(item => item.content_logo)).slice(0, 20).map((item) => (
+          {shuffledForYouMix.map((item) => (
             <RecommendationCard
               key={item.id}
               item={item}
