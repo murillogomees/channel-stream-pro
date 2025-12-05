@@ -10,6 +10,7 @@ import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useBackendSearch } from '@/hooks/useBackendSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
+import { LoadingProgressBar } from '@/components/iptv/LoadingProgressBar';
 import {
   Select,
   SelectContent,
@@ -64,6 +65,7 @@ export default function AppPlayer() {
   const isLoadingMore = (player as any).isLoadingMore;
   const isCached = (player as any).isCached;
   const clearCacheAndReload = (player as any).clearCacheAndReload;
+  const loadingPercent = (player as any).loadingPercent || 0;
 
   const {
     isFavorite,
@@ -483,15 +485,15 @@ export default function AppPlayer() {
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
     return (
       <AppLayout className="flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 animate-spin mx-auto mb-6 text-primary" />
-          <p className="text-xl font-medium text-foreground mb-2">
-            Sincronizando conteúdo
-          </p>
-          <p className="text-muted-foreground">
-            {loadingProgress || 'Preparando sua experiência...'}
-          </p>
-        </div>
+        <LoadingProgressBar
+          isLoading={true}
+          isLoadingMore={false}
+          loadedChannels={loadedChannels}
+          totalChannels={totalChannels}
+          loadingPercent={loadingPercent}
+          loadingProgress={loadingProgress}
+          isCached={isCached}
+        />
       </AppLayout>
     );
   }
@@ -592,13 +594,7 @@ export default function AppPlayer() {
               </Button>
             )}
             
-            {/* Loading more indicator */}
-            {isLoadingMore && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="hidden sm:inline">{loadedChannels.toLocaleString()}/{totalChannels.toLocaleString()}</span>
-              </div>
-            )}
+            {/* Loading more indicator - now handled by floating progress bar */}
             
             <TVTopSearchBar
               value={searchQuery}
@@ -729,6 +725,17 @@ export default function AppPlayer() {
           />
         </div>
       )}
+
+      {/* Floating background loading progress */}
+      <LoadingProgressBar
+        isLoading={false}
+        isLoadingMore={isLoadingMore}
+        loadedChannels={loadedChannels}
+        totalChannels={totalChannels}
+        loadingPercent={loadingPercent}
+        loadingProgress={loadingProgress}
+        isCached={isCached}
+      />
     </AppLayout>
   );
 }

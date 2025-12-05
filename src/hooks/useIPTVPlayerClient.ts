@@ -49,14 +49,15 @@ interface CachedPlaylist {
 const CONFIG = {
   INITIAL_BATCH_SIZE: 5000,
   BACKGROUND_BATCH_SIZE: 10000,
-  PARALLEL_BATCHES: 3,            // Reduced for stability
-  MAX_RETRIES: 3,                 // Per-batch retries
-  MAX_RETRY_CYCLES: 5,            // Total retry cycles before giving up
-  MAX_CONSECUTIVE_EMPTY: 3,       // Stop after 3 empty batches
-  CACHE_TTL_MS: 2 * 60 * 60 * 1000,
-  DB_NAME: 'iptv_playlist_v6',    // New version
+  PARALLEL_BATCHES: 3,
+  MAX_RETRIES: 3,
+  MAX_RETRY_CYCLES: 5,
+  MAX_CONSECUTIVE_EMPTY: 3,
+  CACHE_TTL_MS: 24 * 60 * 60 * 1000,  // 24 hours - aggressive caching
+  DB_NAME: 'iptv_playlist_v7',         // New version for cache update
   DB_VERSION: 1,
   STORE_NAME: 'playlists',
+  CATEGORIES_STORE: 'categories',      // Lazy loading: store categories separately
   BATCH_DELAY_MS: 100,
   RETRY_DELAY_MS: 2000,
   PLAYLIST_SERVE_URL: 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve',
@@ -176,6 +177,9 @@ export function useIPTVPlayerClient() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasPlaylist, setHasPlaylist] = useState<boolean | null>(null);
   const [isCached, setIsCached] = useState(false);
+  const [loadingPercent, setLoadingPercent] = useState(0);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [isCategoryLoading, setIsCategoryLoading] = useState(false);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const allChannelsRef = useRef<any[]>([]);
@@ -217,10 +221,12 @@ export function useIPTVPlayerClient() {
     return Array.from(categoriesMap.values());
   };
 
-  // Update UI without blocking - no dependencies to prevent loops
+  // Update UI without blocking - with progress percentage
   const updateUIInBackground = useCallback((channels: any[], total: number, progress?: string) => {
+    const percent = total > 0 ? Math.round((channels.length / total) * 100) : 0;
     startTransition(() => {
       setLoadedChannels(channels.length);
+      setLoadingPercent(percent);
       if (progress) setLoadingProgress(progress);
       setCategories(groupChannelsRef.current(channels));
     });
@@ -917,21 +923,31 @@ export function useIPTVPlayerClient() {
       }));
   }, []);
 
+  // Lazy load channels for a specific category
+  const loadCategoryChannels = useCallback(async (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    // Channels are already loaded, just filter display
+  }, []);
+
   return {
     categories,
     currentChannel,
     isLoading,
     assignedPlaylist,
     loadingProgress,
+    loadingPercent,
     totalChannels,
     loadedChannels,
     isLoadingMore,
     hasPlaylist,
     isCached,
+    selectedCategoryId,
+    isCategoryLoading,
     changeChannel,
     nextChannel,
     previousChannel,
     clearCacheAndReload,
     searchChannels,
+    loadCategoryChannels,
   };
 }
