@@ -108,7 +108,6 @@ class StreamOptimizerService {
   optimize(originalUrl: string, config: StreamConfig = {}): OptimizedStream {
     const protocol = this.detectProtocol(originalUrl);
     const needsProxy = config.forceProxy || this.requiresProxy(originalUrl);
-    const isVod = this.isVodContent(originalUrl);
     
     // Direct HTTPS - no proxy needed
     if (!needsProxy && originalUrl.startsWith('https://')) {
@@ -120,27 +119,15 @@ class StreamOptimizerService {
       };
     }
 
-    // HTTP VOD content - try HTTPS directly first (many IPTV servers support both)
-    // This avoids proxy timeout issues with large files
-    if (needsProxy && isVod && originalUrl.startsWith('http://')) {
-      const httpsUrl = originalUrl.replace('http://', 'https://');
-      console.log('[StreamOptimizer] VOD content: trying HTTPS directly to avoid proxy timeout');
-      return {
-        url: httpsUrl,
-        protocol,
-        source: 'https-upgrade',
-        requiresProxy: false,
-        fallbackUrl: `${this.proxyUrl}?url=${encodeURIComponent(originalUrl)}`,
-      };
-    }
-
-    // HTTP HLS/TS content - use proxy (smaller requests, less timeout risk)
+    // HTTP content on HTTPS page - ALWAYS use proxy
+    // IPTV servers typically don't support HTTPS, so https-upgrade fails with SSL errors
     if (needsProxy) {
       const proxyParams = new URLSearchParams({
         url: originalUrl,
         ...(config.authToken && { token: config.authToken }),
       });
       
+      console.log('[StreamOptimizer] HTTP → Proxy:', protocol);
       return {
         url: `${this.proxyUrl}?${proxyParams}`,
         protocol,
@@ -149,7 +136,7 @@ class StreamOptimizerService {
       };
     }
 
-    // Default: direct URL
+    // Default: direct URL (for HTTP page or other cases)
     return {
       url: originalUrl,
       protocol,
