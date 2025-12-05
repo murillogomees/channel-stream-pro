@@ -1437,6 +1437,36 @@ export type Database = {
           },
         ]
       }
+      channel_health: {
+        Row: {
+          channel_id: string
+          consecutive_failures: number | null
+          error_message: string | null
+          id: string
+          last_check_at: string | null
+          status: string | null
+          uptime_percentage: number | null
+        }
+        Insert: {
+          channel_id: string
+          consecutive_failures?: number | null
+          error_message?: string | null
+          id?: string
+          last_check_at?: string | null
+          status?: string | null
+          uptime_percentage?: number | null
+        }
+        Update: {
+          channel_id?: string
+          consecutive_failures?: number | null
+          error_message?: string | null
+          id?: string
+          last_check_at?: string | null
+          status?: string | null
+          uptime_percentage?: number | null
+        }
+        Relationships: []
+      }
       channel_routing_overrides: {
         Row: {
           channel_id: string
@@ -4579,6 +4609,36 @@ export type Database = {
         }
         Relationships: []
       }
+      qos_metrics: {
+        Row: {
+          bitrate_kbps: number | null
+          channel_id: string | null
+          id: string
+          latency_ms: number | null
+          rebuffer_count: number | null
+          timestamp: string | null
+          viewer_count: number | null
+        }
+        Insert: {
+          bitrate_kbps?: number | null
+          channel_id?: string | null
+          id?: string
+          latency_ms?: number | null
+          rebuffer_count?: number | null
+          timestamp?: string | null
+          viewer_count?: number | null
+        }
+        Update: {
+          bitrate_kbps?: number | null
+          channel_id?: string | null
+          id?: string
+          latency_ms?: number | null
+          rebuffer_count?: number | null
+          timestamp?: string | null
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
       r2_download_jobs: {
         Row: {
           channel_id: string | null
@@ -5685,6 +5745,30 @@ export type Database = {
           },
         ]
       }
+      stream_limits: {
+        Row: {
+          created_at: string | null
+          id: string
+          max_concurrent_streams: number | null
+          max_profiles: number | null
+          plan_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          max_concurrent_streams?: number | null
+          max_profiles?: number | null
+          plan_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          max_concurrent_streams?: number | null
+          max_profiles?: number | null
+          plan_type?: string
+        }
+        Relationships: []
+      }
       stream_signing_keys: {
         Row: {
           created_at: string | null
@@ -6323,6 +6407,51 @@ export type Database = {
           },
         ]
       }
+      viewer_profiles: {
+        Row: {
+          avatar_color: string | null
+          avatar_url: string | null
+          created_at: string | null
+          id: string
+          is_kids: boolean | null
+          language: string | null
+          last_used_at: string | null
+          maturity_rating: string | null
+          name: string
+          pin_code: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_color?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_kids?: boolean | null
+          language?: string | null
+          last_used_at?: string | null
+          maturity_rating?: string | null
+          name: string
+          pin_code?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_color?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_kids?: boolean | null
+          language?: string | null
+          last_used_at?: string | null
+          maturity_rating?: string | null
+          name?: string
+          pin_code?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       vod_downloads: {
         Row: {
           channel_id: string | null
@@ -6446,6 +6575,7 @@ export type Database = {
           created_at: string | null
           duration_seconds: number | null
           id: string
+          last_watched_at: string | null
           metadata: Json | null
           profile_id: string
           watched_at: string | null
@@ -6459,6 +6589,7 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           id?: string
+          last_watched_at?: string | null
           metadata?: Json | null
           profile_id: string
           watched_at?: string | null
@@ -6472,6 +6603,7 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           id?: string
+          last_watched_at?: string | null
           metadata?: Json | null
           profile_id?: string
           watched_at?: string | null
@@ -6833,6 +6965,7 @@ export type Database = {
           is_blocked: boolean
         }[]
       }
+      check_stream_limit: { Args: { p_user_id: string }; Returns: Json }
       check_suspicious_login: {
         Args: { _email?: string; _ip_address: string }
         Returns: Json
