@@ -94,7 +94,7 @@ export default function SignUp() {
         email: validatedData.email,
         password: validatedData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/app/player`,
+          emailRedirectTo: `${window.location.origin}/app/profile`,
           data: {
             nome: validatedData.nome,
             telefone: validatedData.telefone.replace(/\D/g, ''),
