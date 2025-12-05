@@ -38,6 +38,13 @@ export const IptvPlayer = memo(function IptvPlayer({
 }: IptvPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
+  const initializedRef = useRef(false);
+  const onEventRef = useRef(onEvent);
+  
+  // Keep callback ref updated
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
   
   // Smart TV detection
   const { 
@@ -93,31 +100,55 @@ export const IptvPlayer = memo(function IptvPlayer({
 
   // Direct stream URL mode - load immediately without playlist
   useEffect(() => {
-    if (streamUrl && !playlistUrl) {
-      console.log('[IptvPlayer] Direct stream mode:', streamUrl.substring(0, 80));
-      
-      // Create a virtual channel for display
-      const virtualChannel: IptvChannel = {
-        id: channelId || 'direct-stream',
-        name: channelName || 'Stream',
-        url: streamUrl,
-        logo: channelLogo,
-      };
-      
-      setCurrentChannel(virtualChannel);
-      
-      // Optimize URL - always handle HTTP→HTTPS proxy for Mixed Content
-      const optimized = streamOptimizer.optimize(streamUrl);
-      console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol, optimized.requiresProxy);
-      
-      // Use optimized URL (proxied if HTTP on HTTPS page)
-      const finalUrl = optimized.url;
-      console.log('[IptvPlayer] Final URL:', finalUrl.substring(0, 100));
-      
-      setSource(finalUrl);
-      onEvent?.('ready', { channelCount: 1 });
+    // Prevent re-initialization on every render
+    if (!streamUrl || playlistUrl) return;
+    if (initializedRef.current) return;
+    
+    console.log('[IptvPlayer] Direct stream mode:', streamUrl.substring(0, 80));
+    initializedRef.current = true;
+    
+    // Create a virtual channel for display
+    const virtualChannel: IptvChannel = {
+      id: channelId || 'direct-stream',
+      name: channelName || 'Stream',
+      url: streamUrl,
+      logo: channelLogo,
+    };
+    
+    setCurrentChannel(virtualChannel);
+    
+    // Optimize URL - always handle HTTP→HTTPS proxy for Mixed Content
+    const optimized = streamOptimizer.optimize(streamUrl);
+    console.log('[IptvPlayer] Optimized URL:', optimized.source, optimized.protocol, optimized.requiresProxy);
+    
+    // Use optimized URL (proxied if HTTP on HTTPS page)
+    const finalUrl = optimized.url;
+    console.log('[IptvPlayer] Final URL:', finalUrl.substring(0, 100));
+    
+    setSource(finalUrl);
+    onEventRef.current?.('ready', { channelCount: 1 });
+  }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource]);
+  
+  // Reset initialization when stream URL changes
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [streamUrl]);
+
+  // Select channel - declared BEFORE useEffects that use it
+  const selectChannel = useCallback((channel: IptvChannel) => {
+    setCurrentChannel(channel);
+    
+    // Use CDN failover to get optimal URL
+    const endpoints = cdnFailover.buildEndpointsFromUrl(channel.url, channel.id);
+    cdnFailover.initialize(endpoints);
+    
+    const url = cdnFailover.getCurrentUrl();
+    if (url) {
+      setSource(url);
     }
-  }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource, onEvent]);
+    
+    onEventRef.current?.('channelchange', { channel });
+  }, [setSource]);
 
   // Load playlist (original behavior)
   useEffect(() => {
@@ -139,15 +170,15 @@ export const IptvPlayer = memo(function IptvPlayer({
           }
         }
         
-        onEvent?.('ready', { channelCount: data.channels.length });
+        onEventRef.current?.('ready', { channelCount: data.channels.length });
       } catch (err) {
         console.error('[IptvPlayer] Playlist load error:', err);
-        onEvent?.('error', { type: 'playlist', error: err });
+        onEventRef.current?.('error', { type: 'playlist', error: err });
       }
     };
 
     loadPlaylist();
-  }, [playlistUrl, channelId, authToken, streamUrl]);
+  }, [playlistUrl, channelId, authToken, streamUrl, selectChannel]);
 
   // Initialize CDN failover
   useEffect(() => {
@@ -169,25 +200,9 @@ export const IptvPlayer = memo(function IptvPlayer({
       }
       
       cdnFailover.initialize(endpoints);
-      cdnFailover.setEventCallback(onEvent || (() => {}));
+      cdnFailover.setEventCallback(onEventRef.current || (() => {}));
     }
-  }, [currentChannel, options.cdnFallback, onEvent]);
-
-  // Select channel
-  const selectChannel = useCallback((channel: IptvChannel) => {
-    setCurrentChannel(channel);
-    
-    // Use CDN failover to get optimal URL
-    const endpoints = cdnFailover.buildEndpointsFromUrl(channel.url, channel.id);
-    cdnFailover.initialize(endpoints);
-    
-    const url = cdnFailover.getCurrentUrl();
-    if (url) {
-      setSource(url);
-    }
-    
-    onEvent?.('channelchange', { channel });
-  }, [setSource, onEvent]);
+  }, [currentChannel, options.cdnFallback]);
 
   // Handle player events
   function handlePlayerEvent(evt: IptvPlayerEvent, data?: any) {
@@ -203,7 +218,7 @@ export const IptvPlayer = memo(function IptvPlayer({
         });
     }
     
-    onEvent?.(evt, data);
+    onEventRef.current?.(evt, data);
   }
 
   // Remote control handlers
@@ -238,7 +253,7 @@ export const IptvPlayer = memo(function IptvPlayer({
     onChannelDown: () => navigateChannel(-1),
     onChannelDirect: handleDirectChannel,
     onInfo: () => setShowEpg(!showEpg),
-    onBack: () => onEvent?.('back'),
+    onBack: () => onEventRef.current?.('back'),
   });
 
   // Channel navigation
