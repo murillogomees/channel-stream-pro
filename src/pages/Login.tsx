@@ -61,22 +61,18 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
-      const isAdminRole = isAdmin || user.roles?.includes("admin");
-      const isClientRole = user.roles?.includes("client");
+      const isAdminOrMaster = isAdmin || user.roles?.includes("admin") || user.roles?.includes("master");
       let redirectTo: string;
-      if (isAdminRole) {
-        redirectTo = "/dashboard";
+      
+      if (isAdminOrMaster) {
+        redirectTo = "/admin/dashboard";
       } else {
-        const stateFrom = (location.state as any)?.from?.pathname;
-        if (isClientRole) {
-          redirectTo = stateFrom || "/app/player";
-        } else {
-          redirectTo = stateFrom || "/";
-        }
+        redirectTo = "/app/player";
       }
+      
       navigate(redirectTo, { replace: true });
     }
-  }, [isAuthenticated, isAdmin, authLoading, navigate, location, user]);
+  }, [isAuthenticated, isAdmin, authLoading, navigate, user]);
 
   const logFailedLogin = async (email: string) => {
     try {
