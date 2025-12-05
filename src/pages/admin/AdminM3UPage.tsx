@@ -1,13 +1,13 @@
 /**
  * AdminM3UPage - Hub de gestão M3U
  * Rota: /admin/m3u
- * Abas: Listas, Sync, Editor, Import History, Stats, VOD Storage, CF Stream, Storage Report
+ * Abas: Listas, Sync, Editor, Ingest, Import History, Stats, VOD Storage, CF Stream, Storage Report
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { List, RefreshCw, Pencil, Palette, History, BarChart3, TrendingUp, Film, Cloud, HardDrive, PieChart } from "lucide-react";
+import { List, RefreshCw, Pencil, Palette, History, BarChart3, TrendingUp, Film, Cloud, HardDrive, PieChart, Download } from "lucide-react";
 import AdminM3ULists from "../AdminM3ULists";
 import AdminM3USyncContent from "../AdminM3USyncContent";
 import AdminM3UContentEditor from "../AdminM3UContentEditor";
@@ -19,6 +19,7 @@ import AdminCFStreamDashboard from "../AdminCFStreamDashboard";
 import AdminM3UCustomDashboard from "../AdminM3UCustomDashboard";
 import { PlaylistStorageManager } from "@/components/admin/m3u/PlaylistStorageManager";
 import { StorageConsolidatedReport } from "@/components/admin/storage";
+import { IngestMetricsDashboard } from "@/components/admin/m3u/IngestMetricsDashboard";
 
 export default function AdminM3UPage() {
   const [activeTab, setActiveTab] = useState("listas");
@@ -47,6 +48,12 @@ export default function AdminM3UPage() {
       label: "Custom",
       icon: <Palette className="h-4 w-4" />,
       content: <AdminM3UCustomDashboard />
+    },
+    {
+      value: "ingest",
+      label: "Ingest",
+      icon: <Download className="h-4 w-4" />,
+      content: <IngestMetricsDashboard />
     },
     {
       value: "history",
