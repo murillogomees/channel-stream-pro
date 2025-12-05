@@ -2952,6 +2952,108 @@ export type Database = {
           },
         ]
       }
+      m3u_ingest_jobs: {
+        Row: {
+          bytes_transferred: number | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          ingest_method: string | null
+          metadata: Json | null
+          object_key: string
+          origin_url: string
+          retry_count: number | null
+          source_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          bytes_transferred?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          ingest_method?: string | null
+          metadata?: Json | null
+          object_key: string
+          origin_url: string
+          retry_count?: number | null
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          bytes_transferred?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          ingest_method?: string | null
+          metadata?: Json | null
+          object_key?: string
+          origin_url?: string
+          retry_count?: number | null
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      m3u_ingest_metrics: {
+        Row: {
+          bytes_transferred: number | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          ingest_method: string | null
+          object_key: string | null
+          origin_url: string | null
+          retry_count: number | null
+          status: string | null
+          trace_id: string
+          worker_duration_ms: number | null
+        }
+        Insert: {
+          bytes_transferred?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          ingest_method?: string | null
+          object_key?: string | null
+          origin_url?: string | null
+          retry_count?: number | null
+          status?: string | null
+          trace_id: string
+          worker_duration_ms?: number | null
+        }
+        Update: {
+          bytes_transferred?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          ingest_method?: string | null
+          object_key?: string | null
+          origin_url?: string | null
+          retry_count?: number | null
+          status?: string | null
+          trace_id?: string
+          worker_duration_ms?: number | null
+        }
+        Relationships: []
+      }
       m3u_list_favorites: {
         Row: {
           admin_id: string
@@ -4502,10 +4604,13 @@ export type Database = {
           expires_at: string | null
           filename: string
           id: string
+          ingest_duration_ms: number | null
+          ingest_method: string | null
           opts: Json | null
           original_source: string | null
           probe_summary: Json | null
           quarantined_count: number | null
+          r2_object_key: string | null
           sha256: string
           size_bytes: number | null
           source_domain: string | null
@@ -4524,10 +4629,13 @@ export type Database = {
           expires_at?: string | null
           filename: string
           id?: string
+          ingest_duration_ms?: number | null
+          ingest_method?: string | null
           opts?: Json | null
           original_source?: string | null
           probe_summary?: Json | null
           quarantined_count?: number | null
+          r2_object_key?: string | null
           sha256: string
           size_bytes?: number | null
           source_domain?: string | null
@@ -4546,10 +4654,13 @@ export type Database = {
           expires_at?: string | null
           filename?: string
           id?: string
+          ingest_duration_ms?: number | null
+          ingest_method?: string | null
           opts?: Json | null
           original_source?: string | null
           probe_summary?: Json | null
           quarantined_count?: number | null
+          r2_object_key?: string | null
           sha256?: string
           size_bytes?: number | null
           source_domain?: string | null
@@ -4759,6 +4870,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      r2_signed_url_logs: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          expected_size: number | null
+          expires_at: string | null
+          id: string
+          object_key: string
+          requested_by: string | null
+          trace_id: string | null
+          ttl_seconds: number | null
+          used: boolean | null
+          used_at: string | null
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          expected_size?: number | null
+          expires_at?: string | null
+          id?: string
+          object_key: string
+          requested_by?: string | null
+          trace_id?: string | null
+          ttl_seconds?: number | null
+          used?: boolean | null
+          used_at?: string | null
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          expected_size?: number | null
+          expires_at?: string | null
+          id?: string
+          object_key?: string
+          requested_by?: string | null
+          trace_id?: string | null
+          ttl_seconds?: number | null
+          used?: boolean | null
+          used_at?: string | null
+        }
+        Relationships: []
       }
       r2_storage_objects: {
         Row: {
@@ -6916,6 +7069,23 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_ingest_metrics_summary: {
+        Row: {
+          avg_bytes: number | null
+          avg_duration_ms: number | null
+          avg_retries: number | null
+          error_rate_pct: number | null
+          failed: number | null
+          fallback_count: number | null
+          hour: string | null
+          signed_url_count: number | null
+          stream_count: number | null
+          successful: number | null
+          total_bytes: number | null
+          total_requests: number | null
+        }
+        Relationships: []
+      }
       vw_playlist_metrics: {
         Row: {
           active_playlists: number | null
@@ -7034,6 +7204,10 @@ export type Database = {
       cleanup_old_auth_logs: { Args: never; Returns: undefined }
       cleanup_old_cf_stream_uploads: { Args: never; Returns: undefined }
       cleanup_old_import_cache: { Args: never; Returns: undefined }
+      cleanup_old_ingest_metrics: {
+        Args: { days_to_keep?: number }
+        Returns: number
+      }
       cleanup_old_logs: {
         Args: { days_to_keep?: number }
         Returns: {

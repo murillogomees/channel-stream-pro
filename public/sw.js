@@ -96,6 +96,8 @@ const SKIP_PATTERNS = [
   /doubleclick\.net/i,
   /google-analytics\.com/i,
   /googletagmanager\.com/i,
+  /supabase\.co/i,
+  /supabase\.in/i,
 ];
 
 function shouldSkipRequest(url) {
@@ -302,7 +304,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase')) {
+  // Supabase URLs são completamente ignoradas via SKIP_PATTERNS
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirst(request, CACHE_NAMES.DYNAMIC));
     return;
   }
