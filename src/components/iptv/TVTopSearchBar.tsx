@@ -15,7 +15,7 @@ interface TVTopSearchBarProps {
 export function TVTopSearchBar({
   value,
   onChange,
-  isSearching = true,
+  isSearching = false,
   placeholder = "Buscar canais, filmes e séries...",
   className,
   onFocus,

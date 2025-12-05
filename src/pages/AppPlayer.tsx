@@ -7,7 +7,7 @@ import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import { IptvPlayer } from '@/modules/player/iptv';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
-import { useDirectDatabaseSearch } from '@/hooks/useDirectDatabaseSearch';
+import { useUltraFastSearch } from '@/hooks/useUltraFastSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { LoadingProgressBar } from '@/components/iptv/LoadingProgressBar';
@@ -63,19 +63,18 @@ export default function AppPlayer() {
     isLoading: favoritesLoading
   } = useFavoriteChannels();
 
-  // Direct database search - fast background queries
+  // Ultra-fast database search using GIN full-text index
   const {
     query: backendQuery,
     results: backendResults,
     isSearching,
     totalCount: backendTotalResults,
     updateQuery: updateBackendSearch,
-    clearSearch,
-    hasResults: isBackendSearchActive
-  } = useDirectDatabaseSearch({
-    debounceMs: 200,
-    limit: 100
-  });
+    clearSearch
+  } = useUltraFastSearch(100);
+  
+  // Derived state for search active
+  const isBackendSearchActive = backendQuery.length >= 2 && backendResults.length > 0;
   const [activeTab, setActiveTab] = useState<'home' | 'live' | 'movies' | 'series' | 'favorites'>('home');
 
   // Use startTransition for tab changes to keep UI responsive
@@ -252,7 +251,7 @@ export default function AppPlayer() {
         tvg_logo: r.tvg_logo,
         tvg_id: r.tvg_id,
         category_id: 'search',
-        category_name: r.group_title,
+        category_name: r.group_title || 'Busca',
         order_position: 0
       }));
     }
@@ -273,7 +272,7 @@ export default function AppPlayer() {
           tvg_logo: r.tvg_logo,
           tvg_id: r.tvg_id,
           category_id: 'search',
-          category_name: r.group_title,
+          category_name: r.group_title || 'Busca',
           order_position: 0
         }));
       }
