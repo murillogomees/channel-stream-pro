@@ -463,7 +463,7 @@ export default function AdminClientes() {
             >
               <Filter className="h-4 w-4" />
             </Button>
-            <Button onClick={() => navigate('/admin/clientes/novo')} className="w-full sm:w-auto">
+            <Button onClick={() => navigate('/admin/usuarios?tab=create')} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Novo Cliente
             </Button>
@@ -626,7 +626,7 @@ export default function AdminClientes() {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => navigate(`/admin/clientes/editar/${cliente.id}`)}
+                        onClick={() => navigate(`/admin/usuarios?edit=${cliente.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

@@ -3,7 +3,6 @@
  */
 
 export { default as AdminDashboardPage } from './AdminDashboardPage';
-export { default as AdminClientesPage } from './AdminClientesPage';
 export { default as AdminM3UPage } from './AdminM3UPage';
 export { default as AdminNotificacoesPage } from './AdminNotificacoesPage';
 export { default as AdminSegurancaPage } from './AdminSegurancaPage';

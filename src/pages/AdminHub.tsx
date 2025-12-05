@@ -86,10 +86,10 @@ export default function AdminHub() {
 
   const categories = [
     {
-      title: 'Clientes',
+      title: 'Usuários',
       description: 'Gerenciar assinantes e cadastros',
       icon: Users,
-      href: '/admin/clientes',
+      href: '/admin/usuarios',
       badge: stats.vencendoHoje > 0 ? `${stats.vencendoHoje} vencendo` : undefined,
       badgeVariant: stats.vencendoHoje > 0 ? 'destructive' as const : undefined,
       stats: [
@@ -147,7 +147,7 @@ export default function AdminHub() {
   ];
 
   const quickActions = [
-    { title: 'Novo Cliente', icon: Plus, href: '/admin/clientes/novo' },
+    { title: 'Novo Usuário', icon: Plus, href: '/admin/usuarios?tab=create' },
     { title: 'Sync M3U', icon: RefreshCw, href: '/admin/m3u-sync' },
     { title: 'Planos', icon: CreditCard, href: '/dashboard/plans' },
     { title: 'Homepage', icon: FileText, href: '/dashboard/homepage' },

@@ -705,7 +705,7 @@ export default function AdminClienteForm() {
       }
     }
     
-    navigate('/admin/clientes');
+    navigate('/admin/usuarios');
     } catch (error) {
       console.error('Erro no submit:', error);
       toast({
@@ -725,7 +725,7 @@ export default function AdminClienteForm() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => navigate('/admin/clientes')}
+            onClick={() => navigate('/admin/usuarios')}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -1051,7 +1051,7 @@ export default function AdminClienteForm() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/admin/clientes')}
+                  onClick={() => navigate('/admin/usuarios')}
                   className="w-full sm:w-auto"
                 >
                   Cancelar

@@ -23,7 +23,6 @@ const SignUp = lazy(() => import("./pages/SignUp"));
 // ADMIN PAGES - Consolidated Hub Structure
 // ========================================
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
-const AdminClientesPage = lazy(() => import("./pages/admin/AdminClientesPage"));
 const AdminM3UPage = lazy(() => import("./pages/admin/AdminM3UPage"));
 const AdminNotificacoesPage = lazy(() => import("./pages/admin/AdminNotificacoesPage"));
 const AdminSegurancaPage = lazy(() => import("./pages/admin/AdminSegurancaPage"));
@@ -114,7 +113,6 @@ const App = () => (
             ======================================== */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
-            <Route path="/admin/clientes" element={<ProtectedRoute requireAdmin><AdminClientesPage /></ProtectedRoute>} />
             <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UPage /></ProtectedRoute>} />
             <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoesPage /></ProtectedRoute>} />
             <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><AdminSegurancaPage /></ProtectedRoute>} />
