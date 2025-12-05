@@ -306,3 +306,31 @@ export interface HomeSection {
   showViewAll?: boolean;
   layout?: 'row' | 'grid' | 'hero';
 }
+
+// =============================================================================
+// QOS & HEALTH MONITORING
+// =============================================================================
+
+export interface QoSMetrics {
+  buffering_ratio: number;
+  startup_time_ms: number;
+  bitrate_kbps: number;
+  dropped_frames: number;
+  errors_count: number;
+  latency_ms: number;
+}
+
+export interface HealthStatus {
+  overall: 'healthy' | 'degraded' | 'critical';
+  cdn: 'online' | 'degraded' | 'offline';
+  streaming: 'online' | 'degraded' | 'offline';
+  database: 'online' | 'degraded' | 'offline';
+}
+
+export interface StreamHealth {
+  channel_id: string;
+  status: 'online' | 'offline' | 'unknown';
+  uptime_percentage: number;
+  last_check_at: string;
+  error_message?: string;
+}
