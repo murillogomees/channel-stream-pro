@@ -1,12 +1,18 @@
 /**
  * VideoPlayer - Simplificado para Confiabilidade
  * Prioriza startup rápido sobre otimizações complexas
+ * 
+ * Orientação:
+ * - Por padrão: tela permanece vertical (portrait)
+ * - Ao dar play ou fullscreen: muda para horizontal (landscape)
+ * - O player nunca "quebra" - ou está fixo ou fullscreen horizontal
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RefreshCw, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useOrientationLock } from "@/hooks/useOrientationLock";
 
 interface VideoPlayerProps {
   url: string;
@@ -62,6 +68,9 @@ export function VideoPlayer({
   
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCount = useRef(0);
+  
+  // Orientation lock for fullscreen player
+  const { lockToLandscape, lockToPortrait } = useOrientationLock();
 
   // Mostrar overlay
   const showOverlay = useCallback(() => {
@@ -256,15 +265,34 @@ export function VideoPlayer({
       if (document.fullscreenElement) {
         await document.exitFullscreen();
         setFullscreen(false);
+        // Return to portrait when exiting fullscreen
+        await lockToPortrait();
       } else {
         await container.requestFullscreen();
         setFullscreen(true);
+        // Lock to landscape when entering fullscreen
+        await lockToLandscape();
       }
     } catch (e) {
       console.warn('[VideoPlayer] Fullscreen error:', e);
     }
     showOverlay();
   };
+
+  // Handle fullscreen changes (e.g., when user presses Escape)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFs = !!document.fullscreenElement;
+      setFullscreen(isFs);
+      if (!isFs) {
+        // Return to portrait when fullscreen is exited by any means
+        lockToPortrait();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [lockToPortrait]);
 
   const handleRetry = () => {
     retryCount.current = 0;

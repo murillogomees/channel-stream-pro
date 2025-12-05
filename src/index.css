@@ -593,3 +593,31 @@
 .animate-shimmer {
   animation: shimmer 2s infinite;
 }
+
+/* App Mode - Fullscreen native app experience */
+body.app-mode {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Prevent any scrolling/bouncing outside app boundaries */
+body.app-mode,
+body.app-mode html {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Player fullscreen in landscape */
+.player-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  background: black !important;
+}

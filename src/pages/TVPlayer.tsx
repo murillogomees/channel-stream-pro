@@ -9,7 +9,11 @@
  * - Android TV / Fire Stick
  * - WebView
  * 
- * @version 1.0.0
+ * Orientação:
+ * - Por padrão: tela vertical (portrait)
+ * - Player ativo/fullscreen: tela horizontal (landscape)
+ * 
+ * @version 1.1.0
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,6 +27,8 @@ import {
 } from '@/modules/player';
 import { telemetryService } from '@/modules/player/core';
 import { cn } from '@/lib/utils';
+import { AppLayout } from '@/components/layouts/AppLayout';
+import { useOrientationLock } from '@/hooks/useOrientationLock';
 
 export default function TVPlayer() {
   const [searchParams] = useSearchParams();
@@ -36,6 +42,10 @@ export default function TVPlayer() {
 
   const [showChannelList, setShowChannelList] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Orientation lock - landscape when playing
+  const { lockToLandscape, lockToPortrait } = useOrientationLock();
 
   // Initialize focus manager for TV navigation
   useFocusManagerInit();
@@ -120,16 +130,21 @@ export default function TVPlayer() {
   const handleReady = useCallback(() => {
     telemetryService.recordPlaybackStart();
     setError(null);
-  }, []);
+    setIsPlaying(true);
+    // Lock to landscape when video starts playing
+    lockToLandscape();
+  }, [lockToLandscape]);
 
   const handleBack = useCallback(() => {
+    // Return to portrait when leaving player
+    lockToPortrait();
     navigate(-1);
-  }, [navigate]);
+  }, [navigate, lockToPortrait]);
 
   // No URL provided
   if (!playableUrl) {
     return (
-      <div className="fixed inset-0 bg-background flex items-center justify-center">
+      <AppLayout className="flex items-center justify-center">
         <div className="text-center p-8">
           <h1 className="text-2xl font-bold text-foreground mb-4">
             Nenhum canal selecionado
@@ -144,12 +159,12 @@ export default function TVPlayer() {
             Voltar
           </button>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black">
+    <AppLayout className="bg-black">
       {/* Player */}
       <VideoPlayer
         url={playableUrl}
@@ -214,6 +229,6 @@ export default function TVPlayer() {
         <p>INFO = Lista de canais</p>
         <p>BACK = Voltar</p>
       </div>
-    </div>
+    </AppLayout>
   );
 }

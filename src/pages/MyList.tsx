@@ -15,6 +15,7 @@ import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { cn } from '@/lib/utils';
 import { featureFlagsService } from '@/services/featureFlagsService';
+import { AppLayout } from '@/components/layouts/AppLayout';
 
 type ViewMode = 'grid' | 'list';
 type FilterTab = 'all' | 'live' | 'movies' | 'series';
@@ -98,8 +99,7 @@ export default function MyList() {
   }, [toggleFavorite]);
 
   return (
-    <div className={cn(
-      'min-h-screen bg-background',
+    <AppLayout allowScroll className={cn(
       isTV ? 'p-8' : 'p-4 md:p-6'
     )}>
       {/* Header */}
@@ -375,6 +375,6 @@ export default function MyList() {
           </AnimatePresence>
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
