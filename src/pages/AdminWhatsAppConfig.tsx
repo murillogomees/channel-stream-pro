@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { WhatsAppService } from '@/services/whatsapp';
-import { AlertCircle, CheckCircle2, Loader2, Key, Shield, ArrowLeft, MessageSquare } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Key, Shield, MessageSquare, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminWhatsAppConfig() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { config, loading: configLoading, saveConfig } = useWhatsAppConfig();
   const [appkey, setAppkey] = useState('');
@@ -166,34 +165,24 @@ export default function AdminWhatsAppConfig() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-4 lg:p-8 overflow-x-hidden">
-      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate('/admin/dashboard')}
-            className="flex-shrink-0"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-foreground truncate">
-              Configuração WhatsApp
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-              Configure as credenciais para envio de notificações
-            </p>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Credenciais WhatsApp API
-            </CardTitle>
-            <CardDescription>
+    <div className="space-y-6">
+      {/* Credentials Card */}
+      <Card className="border-integration-messaging/30">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 rounded-lg bg-integration-messaging-bg">
+                  <Shield className="h-5 w-5 text-integration-messaging" />
+                </div>
+                Credenciais WhatsApp API
+              </CardTitle>
+              {config.enabled ? (
+                <Badge className="bg-success/20 text-success border-success/30">Configurado</Badge>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">Não Configurado</Badge>
+              )}
+            </div>
+            <CardDescription className="mt-2">
               Configure suas credenciais da API WhatsApp para envio automático de mensagens
             </CardDescription>
           </CardHeader>
@@ -344,68 +333,71 @@ export default function AdminWhatsAppConfig() {
         </Card>
 
         {/* Card de Funcionalidades */}
-        <Card>
+        <Card className="border-integration-messaging/20">
           <CardHeader>
-            <CardTitle>Funcionalidades Disponíveis</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-integration-messaging" />
+              Funcionalidades Disponíveis
+            </CardTitle>
             <CardDescription>
               O que você pode fazer com a integração WhatsApp
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Envio automático de mensagens de boas-vindas para novos clientes</span>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Envio automático de mensagens de boas-vindas para novos clientes</span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Notificações de vencimento de plano (automáticas)</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Notificações de vencimento de plano (automáticas)</span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Alertas para administradores sobre novos cadastros</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Alertas para administradores sobre novos cadastros</span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Mensagens personalizadas com templates</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Mensagens personalizadas com templates</span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Envio de arquivos e imagens para clientes</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Envio de arquivos e imagens para clientes</span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Sistema de retry automático para mensagens falhadas</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Sistema de retry automático para mensagens falhadas</span>
               </li>
             </ul>
           </CardContent>
         </Card>
 
         {/* Card de Status */}
-        <Card>
+        <Card className="border-integration-messaging/20">
           <CardHeader>
             <CardTitle>Status da Configuração</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm text-muted-foreground">Status:</span>
                 {config.enabled ? (
-                  <Badge className="bg-green-500">Configurado</Badge>
+                  <Badge className="bg-success/20 text-success border-success/30">Configurado</Badge>
                 ) : (
                   <Badge variant="secondary">Não Configurado</Badge>
                 )}
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm text-muted-foreground">Notificações Automáticas:</span>
                 {config.autoSendEnabled ? (
-                  <Badge className="bg-blue-500">Ativadas</Badge>
+                  <Badge className="bg-info/20 text-info border-info/30">Ativadas</Badge>
                 ) : (
                   <Badge variant="outline">Desativadas</Badge>
                 )}
               </div>
               {config.autoSendEnabled && (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <span className="text-sm text-muted-foreground">Horário de Envio:</span>
                   <Badge variant="outline">{config.sendHour}:00</Badge>
                 </div>
@@ -413,22 +405,6 @@ export default function AdminWhatsAppConfig() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
-  );
-}
-
-function Badge({ children, className, variant = 'default' }: { children: React.ReactNode; className?: string; variant?: 'default' | 'secondary' | 'outline' }) {
-  const baseClasses = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold';
-  const variantClasses = {
-    default: 'bg-primary text-primary-foreground',
-    secondary: 'bg-secondary text-secondary-foreground',
-    outline: 'border border-input bg-background',
-  };
-  
-  return (
-    <span className={`${baseClasses} ${variantClasses[variant]} ${className || ''}`}>
-      {children}
-    </span>
   );
 }

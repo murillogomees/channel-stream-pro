@@ -59,6 +59,19 @@
     --stat-danger: 0 72% 50%;
     --stat-info: 210 100% 50%;
     --stat-purple: 262 83% 58%;
+    /* Integration section colors */
+    --integration-payment: 217 91% 60%;
+    --integration-payment-bg: 217 91% 97%;
+    --integration-messaging: 142 71% 45%;
+    --integration-messaging-bg: 142 71% 97%;
+    --integration-cdn: 25 95% 53%;
+    --integration-cdn-bg: 25 95% 97%;
+    --integration-transcode: 262 83% 58%;
+    --integration-transcode-bg: 262 83% 97%;
+    --integration-cache: 199 89% 48%;
+    --integration-cache-bg: 199 89% 97%;
+    --integration-qa: 340 82% 52%;
+    --integration-qa-bg: 340 82% 97%;
     --chart-1: 158 64% 51%;
     --chart-2: 141 69% 58%;
     --chart-3: 172 66% 50%;
@@ -144,6 +157,19 @@
     --stat-danger: 0 84% 60%;
     --stat-info: 210 100% 60%;
     --stat-purple: 262 83% 68%;
+    /* Integration section colors (dark mode) */
+    --integration-payment: 217 91% 65%;
+    --integration-payment-bg: 217 50% 15%;
+    --integration-messaging: 142 71% 50%;
+    --integration-messaging-bg: 142 50% 12%;
+    --integration-cdn: 25 95% 58%;
+    --integration-cdn-bg: 25 60% 12%;
+    --integration-transcode: 262 83% 65%;
+    --integration-transcode-bg: 262 50% 15%;
+    --integration-cache: 199 89% 55%;
+    --integration-cache-bg: 199 50% 12%;
+    --integration-qa: 340 82% 60%;
+    --integration-qa-bg: 340 50% 12%;
     --chart-1: 156 71% 66%;
     --chart-2: 141 76% 73%;
     --chart-3: 170 76% 64%;
