@@ -21,9 +21,9 @@ const CORS_HEADERS = {
 };
 
 const CONFIG = {
-  DEFAULT_LIMIT: 5000,
-  MAX_LIMIT: 50000, // Allow very large batches for full loading
-  CACHE_MAX_AGE: 300, // 5 minutes
+  DEFAULT_LIMIT: 10000,  // Increased from 5000 for fewer requests
+  MAX_LIMIT: 50000,      // Allow very large batches for full loading
+  CACHE_MAX_AGE: 300,    // 5 minutes
 };
 
 Deno.serve(async (req) => {

@@ -47,17 +47,17 @@ interface CachedPlaylist {
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-  INITIAL_BATCH_SIZE: 5000,
+  INITIAL_BATCH_SIZE: 10000,    // Increased from 5000 - server supports 50k max
   BACKGROUND_BATCH_SIZE: 10000,
   PARALLEL_BATCHES: 3,
   MAX_RETRIES: 3,
   MAX_RETRY_CYCLES: 5,
   MAX_CONSECUTIVE_EMPTY: 3,
   CACHE_TTL_MS: 24 * 60 * 60 * 1000,  // 24 hours - aggressive caching
-  DB_NAME: 'iptv_playlist_v7',         // New version for cache update
+  DB_NAME: 'iptv_playlist_v8',         // New version for new batch size
   DB_VERSION: 1,
   STORE_NAME: 'playlists',
-  CATEGORIES_STORE: 'categories',      // Lazy loading: store categories separately
+  CATEGORIES_STORE: 'categories',
   BATCH_DELAY_MS: 100,
   RETRY_DELAY_MS: 2000,
   PLAYLIST_SERVE_URL: 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve',
