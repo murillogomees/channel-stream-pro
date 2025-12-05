@@ -1,5 +1,5 @@
 /**
- * Profile Service - Manages user profiles
+ * Profile Service - Manages user profiles with caching and deduplication
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,14 @@ function mapDbProfile(data: any): UserProfile {
 
 class ProfileService {
   private currentProfileId: string | null = null;
+  
+  // Cache for current profile to avoid redundant queries
+  private cachedProfile: UserProfile | null = null;
+  private profileCacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 30000; // 30 seconds
+  
+  // Deduplication: prevent multiple simultaneous requests
+  private profileLoadPromise: Promise<UserProfile | null> | null = null;
 
   /**
    * Get all profiles for current user
@@ -39,10 +47,34 @@ class ProfileService {
   }
 
   /**
-   * Get current active profile
+   * Get current active profile with caching and deduplication
    */
   async getCurrentProfile(): Promise<UserProfile | null> {
-    // Check memory cache
+    // Return from cache if still valid
+    if (this.cachedProfile && Date.now() - this.profileCacheTimestamp < this.CACHE_TTL) {
+      return this.cachedProfile;
+    }
+
+    // Deduplicate simultaneous requests
+    if (this.profileLoadPromise) {
+      return this.profileLoadPromise;
+    }
+
+    this.profileLoadPromise = this._fetchCurrentProfile();
+    
+    try {
+      const result = await this.profileLoadPromise;
+      return result;
+    } finally {
+      this.profileLoadPromise = null;
+    }
+  }
+
+  /**
+   * Internal method to fetch current profile
+   */
+  private async _fetchCurrentProfile(): Promise<UserProfile | null> {
+    // Check memory cache for ID
     if (this.currentProfileId) {
       const { data } = await supabase
         .from('user_profiles')
@@ -50,7 +82,11 @@ class ProfileService {
         .eq('id', this.currentProfileId)
         .single();
       
-      if (data) return mapDbProfile(data);
+      if (data) {
+        this.cachedProfile = mapDbProfile(data);
+        this.profileCacheTimestamp = Date.now();
+        return this.cachedProfile;
+      }
     }
 
     // Check localStorage
@@ -64,7 +100,9 @@ class ProfileService {
       
       if (data) {
         this.currentProfileId = data.id;
-        return mapDbProfile(data);
+        this.cachedProfile = mapDbProfile(data);
+        this.profileCacheTimestamp = Date.now();
+        return this.cachedProfile;
       }
     }
 
@@ -74,6 +112,8 @@ class ProfileService {
     
     if (defaultProfile) {
       this.setCurrentProfile(defaultProfile.id);
+      this.cachedProfile = defaultProfile;
+      this.profileCacheTimestamp = Date.now();
       return defaultProfile;
     }
 
@@ -86,6 +126,24 @@ class ProfileService {
   setCurrentProfile(profileId: string): void {
     this.currentProfileId = profileId;
     localStorage.setItem('iptv_current_profile', profileId);
+    // Invalidate cache to force reload on next getCurrentProfile
+    this.cachedProfile = null;
+    this.profileCacheTimestamp = 0;
+  }
+
+  /**
+   * Invalidate cache (call when profile changes externally)
+   */
+  invalidateCache(): void {
+    this.cachedProfile = null;
+    this.profileCacheTimestamp = 0;
+  }
+
+  /**
+   * Get cached profile ID without async call
+   */
+  getCachedProfileId(): string | null {
+    return this.currentProfileId || localStorage.getItem('iptv_current_profile');
   }
 
   /**
@@ -143,6 +201,11 @@ class ProfileService {
       return null;
     }
 
+    // Invalidate cache if updating current profile
+    if (this.currentProfileId === profileId) {
+      this.invalidateCache();
+    }
+
     return mapDbProfile(data);
   }
 
@@ -164,6 +227,7 @@ class ProfileService {
     if (this.currentProfileId === profileId) {
       this.currentProfileId = null;
       localStorage.removeItem('iptv_current_profile');
+      this.invalidateCache();
     }
 
     return true;
