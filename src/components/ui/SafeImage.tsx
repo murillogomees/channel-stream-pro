@@ -43,12 +43,30 @@ export function SafeImage({
 
   // Validar URL antes de renderizar
   const isValidUrl = (url: string) => {
+    if (!url || typeof url !== 'string') return false;
+    
     try {
-      const parsed = new URL(url, window.location.origin);
-      // Rejeitar URLs que definitivamente vão falhar
-      if (url.includes('None') || url.includes('undefined') || url.includes('null')) {
+      // Rejeitar URLs obviamente inválidas
+      const invalidPatterns = [
+        'None', 'undefined', 'null', 
+        '/_small.jpg', '/_medium.jpg', '/_large.jpg', // URLs com nome de arquivo vazio
+        '/images/_', // Padrão comum de URL quebrada
+      ];
+      
+      if (invalidPatterns.some(pattern => url.includes(pattern))) {
         return false;
       }
+      
+      // Rejeitar URLs muito curtas ou sem extensão válida para imagens
+      const pathname = new URL(url, window.location.origin).pathname;
+      if (pathname.length < 5) return false;
+      
+      // Verificar se tem um nome de arquivo válido (não apenas extensão)
+      const filename = pathname.split('/').pop() || '';
+      if (filename.startsWith('_') || filename.startsWith('.')) {
+        return false;
+      }
+      
       return true;
     } catch {
       return false;
