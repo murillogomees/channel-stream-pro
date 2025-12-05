@@ -193,6 +193,14 @@ function isVodContent(url: string): boolean {
 }
 
 /**
+ * Check if URL is HTTP (requires proxy to avoid Mixed Content blocking)
+ */
+function isHttpUrl(url: string): boolean {
+  if (!url) return false;
+  return url.toLowerCase().startsWith('http://');
+}
+
+/**
  * Get optimized playback URL for a channel
  * 
  * Priority:
@@ -261,9 +269,9 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     }
   }
 
-  // Priority 4: VOD content - use direct URL (no proxy to avoid timeouts)
-  if (isVodContent(channel.stream_url)) {
-    console.log('[CDN Routing] VOD content - using direct URL (no proxy):', channel.name);
+  // Priority 4: VOD content - use direct URL only if HTTPS (avoid Mixed Content)
+  if (isVodContent(channel.stream_url) && !isHttpUrl(channel.stream_url)) {
+    console.log('[CDN Routing] VOD content HTTPS - using direct URL:', channel.name);
     return {
       url: channel.stream_url,
       source: 'origin',
@@ -271,8 +279,14 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // Priority 5: Stream proxy (only for live streams)
+  // Priority 5: Stream proxy (live streams OR HTTP content to bypass Mixed Content blocking)
   const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
+  
+  if (isHttpUrl(channel.stream_url)) {
+    console.log('[CDN Routing] HTTP content - routing through proxy to bypass Mixed Content:', channel.name);
+  } else {
+    console.log('[CDN Routing] Using stream proxy:', channel.name);
+  }
   
   metrics.stream_proxy_requests++;
   
