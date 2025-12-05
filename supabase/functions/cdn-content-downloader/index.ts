@@ -65,29 +65,42 @@ serve(async (req) => {
     let downloadResult;
     if (job.contentType === 'live') {
       downloadResult = await downloadLiveManifest(job, supabase);
+      
+      return new Response(
+        JSON.stringify({ success: true, result: downloadResult }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     } else {
-      downloadResult = await downloadVODContent(job, supabase);
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        result: downloadResult
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+      // Para VOD, delegar para download-vod que suporta chunked downloads
+      console.log('[VOD] Delegating to download-vod function for chunked download...');
+      
+      const { data, error } = await supabase.functions.invoke('download-vod', {
+        body: { 
+          channelId: job.channelId,
+          force: true // Forçar novo download se existir
+        }
+      });
+      
+      if (error) {
+        throw new Error(`download-vod error: ${error.message}`);
       }
-    );
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          delegated: true,
+          downloadId: data?.downloadId,
+          result: data 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
 
   } catch (error: any) {
     console.error('[CDN Downloader] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
