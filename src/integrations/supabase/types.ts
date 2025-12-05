@@ -8109,7 +8109,7 @@ export type Database = {
       }
       validate_sql_syntax: { Args: { sql: string }; Returns: boolean }
       verify_user_totp: {
-        Args: { p_token: string; p_user_id: string }
+        Args: { p_totp_secret: string; p_user_id: string }
         Returns: boolean
       }
     }
