@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { isValidImageUrl } from '@/lib/imageUtils';
 import { ContinueWatchingRow } from './ContinueWatchingRow';
 import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
+import { groupChannelsBySeries, groupRecommendationItems, detectContentType } from '../utils/contentGrouper';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
 interface SeriesContinuation {
@@ -284,63 +285,45 @@ export function HomeView({
     seriesContinuations.length > 0 || 
     recommendationGroups.length > 0;
 
-  // Helper to detect content type
-  const detectContentType = (channel: Channel): 'movie' | 'episode' | 'live' => {
-    const url = channel.stream_url?.toLowerCase() || '';
-    const name = channel.name?.toLowerCase() || '';
-    const group = (channel.group_title || channel.category_name || '').toLowerCase();
-    
-    const seriesKeywords = ['série', 'series', 'seriado', 'novela', 'temporada', 'season', 'episódio', 'dorama', 'anime'];
-    const movieKeywords = ['filme', 'movie', 'cinema', 'vod filme', 'filmes', 'movies', 'film', 'peliculas', 'lançamento'];
-    
-    // URL-based detection
-    if (url.includes('/series/')) return 'episode';
-    if (url.includes('/movie/')) return 'movie';
-    if (url.includes('/live/')) return 'live';
-    
-    // Episode pattern in name
-    if (/S\d{1,2}\s*E\d{1,3}/i.test(name) || /\d{1,2}x\d{1,3}/i.test(name)) {
-      return 'episode';
-    }
-    
-    // Group/category-based
-    if (seriesKeywords.some(kw => group.includes(kw)) && !movieKeywords.some(kw => group.includes(kw))) {
-      return 'episode';
-    }
-    if (movieKeywords.some(kw => group.includes(kw))) {
-      return 'movie';
-    }
-    
-    return 'live';
-  };
-
-  // MEMOIZE shuffled recommendation groups - stable until data changes
+  // MEMOIZE shuffled recommendation groups - GROUP by series, then shuffle
   const shuffledRecommendationGroups = useMemo(() => {
-    return recommendationGroups.map(group => ({
-      ...group,
-      items: shuffleArray(group.items.filter(item => item.content_logo)),
-    }));
+    return recommendationGroups.map(group => {
+      // Filter items with logos, group by series, then shuffle
+      const withLogos = group.items.filter(item => item.content_logo);
+      const grouped = groupRecommendationItems(withLogos);
+      return {
+        ...group,
+        items: shuffleArray(grouped),
+      };
+    });
   }, [recommendationGroups, sessionKey]);
 
-  // MEMOIZE shuffled forYouMix - stable until data changes
+  // MEMOIZE shuffled forYouMix - GROUP by series, then shuffle
   const shuffledForYouMix = useMemo(() => {
-    return shuffleArray(forYouMix.filter(item => item.content_logo)).slice(0, 20);
+    const withLogos = forYouMix.filter(item => item.content_logo);
+    const grouped = groupRecommendationItems(withLogos);
+    return shuffleArray(grouped).slice(0, 20);
   }, [forYouMix, sessionKey]);
 
   // Default content sections for new users - RANDOMIZED once per session
   const defaultSections = useMemo(() => {
     if (hasPersonalizedContent || allChannels.length === 0) return [];
 
-    // Separate channels by content type - only with cover images
+    // Only channels with valid cover images
+    const validChannels = allChannels.filter(ch => isValidImageUrl(ch.tvg_logo));
+    
+    // Group all channels by series first (removes duplicate episodes)
+    const groupedChannels = groupChannelsBySeries(validChannels);
+    
+    // Separate grouped channels by content type
     const movies: Channel[] = [];
     const series: Channel[] = [];
     const live: Channel[] = [];
     
-    for (const ch of allChannels) {
-      if (!isValidImageUrl(ch.tvg_logo)) continue; // Skip channels without valid cover image
+    for (const ch of groupedChannels) {
       const type = detectContentType(ch);
       if (type === 'movie') movies.push(ch);
-      else if (type === 'episode') series.push(ch);
+      else if (type === 'series') series.push(ch);
       else live.push(ch);
     }
 
@@ -366,24 +349,11 @@ export function HomeView({
     }
     
     if (series.length > 0) {
-      // Group series episodes by series name
-      const seriesMap = new Map<string, Channel>();
-      for (const ch of series) {
-        const seriesName = ch.name
-          .replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '')
-          .replace(/\s*\d{1,2}x\d{1,3}.*/gi, '')
-          .replace(/\s*Temporada\s*\d+.*/gi, '')
-          .trim();
-        if (!seriesMap.has(seriesName)) {
-          seriesMap.set(seriesName, ch);
-        }
-      }
-      
       sections.push({
         title: '📺 Séries',
         icon: PlaySquare,
-        channels: shuffleArray(Array.from(seriesMap.values())).slice(0, 20),
-        type: 'episode',
+        channels: shuffleArray(series).slice(0, 20),
+        type: 'series',
       });
     }
 
