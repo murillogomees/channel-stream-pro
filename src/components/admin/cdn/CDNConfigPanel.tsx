@@ -7,12 +7,37 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Server, HardDrive, Zap, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { Server, HardDrive, Zap, RefreshCw, CheckCircle, XCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+
+interface SecretField {
+  value: string;
+  masked: string;
+  configured: boolean;
+}
+
+interface R2Config {
+  accountId: SecretField;
+  accessKeyId: SecretField;
+  secretAccessKey: SecretField;
+  bucketName: SecretField;
+  publicDomain: SecretField;
+}
 
 export function CDNConfigPanel() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [loadingSecrets, setLoadingSecrets] = useState(true);
   const [testing, setTesting] = useState(false);
+  
+  // Visibilidade dos campos
+  const [showAccountId, setShowAccountId] = useState(false);
+  const [showAccessKeyId, setShowAccessKeyId] = useState(false);
+  const [showSecretAccessKey, setShowSecretAccessKey] = useState(false);
+  
+  // Valores dos secrets carregados
+  const [r2Secrets, setR2Secrets] = useState<R2Config | null>(null);
+  
+  // Config editável
   const [config, setConfig] = useState({
     r2BucketName: 'iptvlink-cdn',
     r2AccountId: '',
@@ -28,11 +53,37 @@ export function CDNConfigPanel() {
 
   useEffect(() => {
     loadConfig();
+    loadSecrets();
   }, []);
+
+  const loadSecrets = async () => {
+    setLoadingSecrets(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-r2-config');
+      
+      if (error) throw error;
+      
+      if (data?.success && data.config) {
+        setR2Secrets(data.config);
+        
+        // Preencher config com valores reais se existirem
+        setConfig(prev => ({
+          ...prev,
+          r2AccountId: data.config.accountId.value || prev.r2AccountId,
+          r2AccessKeyId: data.config.accessKeyId.value || prev.r2AccessKeyId,
+          r2SecretAccessKey: data.config.secretAccessKey.value || prev.r2SecretAccessKey,
+          r2BucketName: data.config.bucketName.value || prev.r2BucketName,
+        }));
+      }
+    } catch (error: any) {
+      console.error('Error loading secrets:', error);
+    } finally {
+      setLoadingSecrets(false);
+    }
+  };
 
   const loadConfig = async () => {
     try {
-      // Carregar configuração atual do banco
       const { data, error } = await supabase
         .from('content_routing_config')
         .select('*')
@@ -87,7 +138,6 @@ export function CDNConfigPanel() {
     setTestResult(null);
 
     try {
-      // Testar conexão com R2
       const { data, error } = await supabase.functions.invoke('test-r2-connection', {
         body: {
           accountId: config.r2AccountId,
@@ -154,6 +204,56 @@ export function CDNConfigPanel() {
     }
   };
 
+  // Componente de input com máscara e toggle
+  const SecretInput = ({ 
+    label, 
+    value, 
+    onChange, 
+    secretField, 
+    show, 
+    onToggle,
+    placeholder 
+  }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    secretField?: SecretField;
+    show: boolean;
+    onToggle: () => void;
+    placeholder: string;
+  }) => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2">
+        {label}
+        {secretField?.configured && (
+          <Badge variant="secondary" className="text-xs">Configurado</Badge>
+        )}
+      </Label>
+      <div className="relative">
+        <Input
+          value={show ? value : (secretField?.masked || value)}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          type={show ? 'text' : 'password'}
+          className="pr-10"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+          onClick={onToggle}
+        >
+          {show ? (
+            <EyeOff className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <Card>
@@ -173,6 +273,9 @@ export function CDNConfigPanel() {
               <HardDrive className="h-4 w-4" />
               <h3 className="text-sm font-medium">Cloudflare R2</h3>
               <Badge variant="outline">iptvlink-cdn</Badge>
+              {loadingSecrets && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -187,35 +290,35 @@ export function CDNConfigPanel() {
                 <p className="text-xs text-muted-foreground">Nome fixo do bucket</p>
               </div>
 
-              <div className="space-y-2">
-                <Label>Account ID</Label>
-                <Input
-                  value={config.r2AccountId}
-                  onChange={(e) => setConfig({ ...config, r2AccountId: e.target.value })}
-                  placeholder="account-id"
-                  type="password"
-                />
-              </div>
+              <SecretInput
+                label="Account ID"
+                value={config.r2AccountId}
+                onChange={(value) => setConfig({ ...config, r2AccountId: value })}
+                secretField={r2Secrets?.accountId}
+                show={showAccountId}
+                onToggle={() => setShowAccountId(!showAccountId)}
+                placeholder="account-id"
+              />
 
-              <div className="space-y-2">
-                <Label>Access Key ID</Label>
-                <Input
-                  value={config.r2AccessKeyId}
-                  onChange={(e) => setConfig({ ...config, r2AccessKeyId: e.target.value })}
-                  placeholder="access-key"
-                  type="password"
-                />
-              </div>
+              <SecretInput
+                label="Access Key ID"
+                value={config.r2AccessKeyId}
+                onChange={(value) => setConfig({ ...config, r2AccessKeyId: value })}
+                secretField={r2Secrets?.accessKeyId}
+                show={showAccessKeyId}
+                onToggle={() => setShowAccessKeyId(!showAccessKeyId)}
+                placeholder="access-key"
+              />
 
-              <div className="space-y-2">
-                <Label>Secret Access Key</Label>
-                <Input
-                  value={config.r2SecretAccessKey}
-                  onChange={(e) => setConfig({ ...config, r2SecretAccessKey: e.target.value })}
-                  placeholder="secret-key"
-                  type="password"
-                />
-              </div>
+              <SecretInput
+                label="Secret Access Key"
+                value={config.r2SecretAccessKey}
+                onChange={(value) => setConfig({ ...config, r2SecretAccessKey: value })}
+                secretField={r2Secrets?.secretAccessKey}
+                show={showSecretAccessKey}
+                onToggle={() => setShowSecretAccessKey(!showSecretAccessKey)}
+                placeholder="secret-key"
+              />
             </div>
 
             {/* Teste de Conexão */}
