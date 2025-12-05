@@ -4,7 +4,7 @@
  * Handles HTTP→HTTPS proxy, protocol detection, and performance optimization
  */
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 
 export type StreamProtocol = 'hls' | 'ts' | 'mp4' | 'dash' | 'unknown';
 export type StreamSource = 'direct' | 'proxy' | 'r2' | 'cf-stream';
