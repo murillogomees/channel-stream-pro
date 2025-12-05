@@ -607,6 +607,9 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
     // Salvar metadados no r2_storage_objects para visualização no CDN Dashboard
     const r2Bucket = Deno.env.get('R2_BUCKET') || 'iptv-vod';
     const r2PublicDomain = Deno.env.get('R2_PUBLIC_DOMAIN') || 'cdn.iptvlink.com.br';
+    const r2Key = isHLS 
+      ? `vod/${channel.id}/playlist.m3u8` 
+      : `vod/${channel.id}/video.${ext}`;
     const publicCdnUrl = `https://${r2PublicDomain}/${r2Key}`;
     const downloadInfo = await supabase.from('vod_downloads').select('file_size_bytes').eq('id', downloadId).maybeSingle();
     const fileSizeBytes = downloadInfo?.data?.file_size_bytes || 0;
