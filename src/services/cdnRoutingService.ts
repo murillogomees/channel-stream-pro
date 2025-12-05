@@ -314,18 +314,15 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // ===== PRIORIDADE 5: PROXY (HTTP → HTTPS - Mixed Content) =====
+  // ===== PRIORIDADE 5: HTTP - LINK DIRETO (sem proxy) =====
   if (isHttpUrl(channel.stream_url)) {
-    const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
-    
-    console.log('[CDN Routing] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
-    metrics.stream_proxy_requests++;
+    console.log('[CDN Routing] 🔗 HTTP - Link Direto:', channel.name);
+    metrics.direct_requests++;
     
     return {
-      url: proxyUrl,
-      source: 'stream_proxy',
+      url: channel.stream_url,
+      source: 'direct',
       requiresToken: false,
-      fallbackUrl: channel.stream_url,
     };
   }
 
