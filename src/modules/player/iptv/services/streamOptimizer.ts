@@ -38,19 +38,51 @@ class StreamOptimizerService {
   }
 
   /**
+   * Extract original URL if wrapped in proxy
+   */
+  private extractOriginalUrl(url: string): string {
+    // Check if URL is our proxy URL
+    if (url.includes('/stream-proxy?') || url.includes('/stream-proxy%3F')) {
+      try {
+        const urlObj = new URL(url);
+        const originalUrl = urlObj.searchParams.get('url');
+        if (originalUrl) {
+          return decodeURIComponent(originalUrl);
+        }
+      } catch {
+        // Try regex fallback
+        const match = url.match(/[?&]url=([^&]+)/);
+        if (match) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch {
+            return url;
+          }
+        }
+      }
+    }
+    return url;
+  }
+
+  /**
    * Detect stream protocol from URL
+   * 
+   * IMPORTANT: NO port-based heuristics!
+   * Protocol is determined by extension or Content-Type only.
    * 
    * Xtream API patterns:
    * - /live/user/pass/id.ts - Live TS stream
    * - /movie/user/pass/id.mp4 - VOD MP4
    * - /series/user/pass/id.mp4 - Series VOD
-   * - /user/pass/id - Numeric ID = Live TS stream (most common for TV ao vivo)
+   * - /user/pass/id - Unknown (requires Content-Type check)
    */
   detectProtocol(url: string): StreamProtocol {
-    const lowerUrl = url.toLowerCase();
+    // Extract original URL if wrapped in proxy
+    const actualUrl = this.extractOriginalUrl(url);
+    const lowerUrl = actualUrl.toLowerCase();
     let pathname = '';
     try {
-      pathname = new URL(url, 'http://dummy').pathname.toLowerCase();
+      pathname = new URL(actualUrl, 'http://dummy').pathname.toLowerCase();
     } catch {
       pathname = lowerUrl;
     }
@@ -60,42 +92,37 @@ class StreamOptimizerService {
       return 'hls';
     }
     
-    // Check for explicit MP4/video files (before VOD path check)
+    // Check for explicit MP4/video files
     if (pathname.endsWith('.mp4') || pathname.endsWith('.mkv') || pathname.endsWith('.webm') || 
         pathname.endsWith('.avi') || pathname.endsWith('.mov')) {
       return 'mp4';
     }
     
-    // Check for VOD/Movie content (MP4) - Xtream format
-    if (lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) {
+    // Check for VOD/Movie content (MP4) - Xtream format with file extension
+    // Only if URL has video extension in path
+    if ((lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) &&
+        (pathname.endsWith('.mp4') || pathname.endsWith('.mkv') || pathname.endsWith('.avi'))) {
       return 'mp4';
     }
     
     // Check for DASH
-    if (lowerUrl.includes('.mpd')) {
+    if (lowerUrl.includes('.mpd') || pathname.endsWith('.mpd')) {
       return 'dash';
     }
     
-    // Check for explicit TS streams
+    // Check for explicit TS streams (file extension only)
     if (pathname.endsWith('.ts')) {
       return 'ts';
     }
-    
-    // Xtream API live stream detection:
-    // URLs like /user/pass/id (no extension) on ports 8880, 8080 etc = Live TS
-    // These are the most common IPTV live streams
-    const xtreamPattern = /\/\d+\/\d+\/\d+$/; // /user/pass/channelId
-    const livePattern = /\/live\//;
-    const iptvPorts = [':8880', ':8080', ':25461', ':80/'];
-    
-    const isXtreamLive = xtreamPattern.test(pathname) || livePattern.test(lowerUrl);
-    const isIptvPort = iptvPorts.some(port => lowerUrl.includes(port));
-    
-    if (isXtreamLive || isIptvPort) {
-      // Xtream live streams are MPEG-TS format
+
+    // Check for live Xtream with .ts extension pattern
+    if (lowerUrl.includes('/live/') && pathname.endsWith('.ts')) {
       return 'ts';
     }
     
+    // IMPORTANT: We do NOT assume protocol based on port numbers
+    // URLs without clear extension are 'unknown' and will use native playback
+    // which handles most formats including HLS, MP4, etc.
     return 'unknown';
   }
 

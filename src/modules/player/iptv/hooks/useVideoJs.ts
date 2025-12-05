@@ -386,7 +386,8 @@ export function useVideoJs({
     // Native playback (Safari, MP4, unknown formats, etc)
     console.log('[useVideoJs] Using native playback for protocol:', protocol, 'URL:', finalUrl.substring(0, 80));
     
-    // Determine correct MIME type - let browser detect for unknown
+    // Determine correct MIME type
+    // For 'unknown', try to detect from the original URL (not proxy URL)
     let mimeType: string | undefined;
     if (protocol === 'hls') {
       mimeType = 'application/x-mpegURL';
@@ -394,12 +395,36 @@ export function useVideoJs({
       mimeType = 'application/dash+xml';
     } else if (protocol === 'mp4') {
       mimeType = 'video/mp4';
+    } else if (protocol === 'ts') {
+      mimeType = 'video/mp2t';
+    } else if (protocol === 'unknown') {
+      // For unknown, try to infer from original URL if it's a proxy URL
+      const originalUrlMatch = finalUrl.match(/[?&]url=([^&]+)/);
+      if (originalUrlMatch) {
+        try {
+          const originalUrl = decodeURIComponent(originalUrlMatch[1]).toLowerCase();
+          if (originalUrl.includes('.mp4') || originalUrl.includes('/movie/') || originalUrl.includes('/series/')) {
+            mimeType = 'video/mp4';
+            console.log('[useVideoJs] Inferred MP4 from proxy original URL');
+          } else if (originalUrl.includes('.m3u8')) {
+            mimeType = 'application/x-mpegURL';
+            console.log('[useVideoJs] Inferred HLS from proxy original URL');
+          } else if (originalUrl.includes('.ts')) {
+            mimeType = 'video/mp2t';
+            console.log('[useVideoJs] Inferred TS from proxy original URL');
+          }
+        } catch {
+          // Ignore decoding errors
+        }
+      }
     }
-    // For 'unknown', don't specify MIME type - let browser auto-detect
     
     const sourceConfig: any = { src: finalUrl };
     if (mimeType) {
       sourceConfig.type = mimeType;
+      console.log('[useVideoJs] Setting MIME type:', mimeType);
+    } else {
+      console.log('[useVideoJs] No MIME type set, browser will auto-detect');
     }
     
     playerRef.current.src(sourceConfig);
