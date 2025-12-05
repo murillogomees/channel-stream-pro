@@ -28,6 +28,7 @@ export const IptvPlayer = memo(function IptvPlayer({
   authToken,
   options = {},
   onEvent,
+  className,
 }: IptvPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -246,7 +247,8 @@ export const IptvPlayer = memo(function IptvPlayer({
       ref={containerRef}
       className={cn(
         'relative w-full h-full bg-black overflow-hidden',
-        'focus:outline-none'
+        'focus:outline-none',
+        className
       )}
       onMouseMove={showControlsTemporarily}
       onClick={showControlsTemporarily}

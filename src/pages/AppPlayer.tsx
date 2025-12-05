@@ -4,7 +4,7 @@ import { Loader2, Tv, ArrowLeft, Settings, RefreshCw, Database } from 'lucide-re
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
-import SimplePlayer from '@/components/app/SimplePlayer';
+import { IptvPlayer } from '@/modules/player/iptv';
 import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useBackendSearch } from '@/hooks/useBackendSearch';
@@ -703,21 +703,25 @@ export default function AppPlayer() {
         </div>
       </main>
 
-      {/* Player Dialog - Simplificado */}
+      {/* Player Dialog - IptvPlayer Modular */}
       {showPlayerDialog && playerChannel && (
         <div className="fixed inset-0 z-50 bg-black">
-          <SimplePlayer
-            url={playerChannel.stream_url}
-            title={playerChannel.name}
-            logo={playerChannel.tvg_logo}
-            category={playerChannel.category_name || 'Geral'}
-            autoplay
-            onBack={() => {
-              setShowPlayerDialog(false);
-              setPlayerChannel(null);
-              refreshContinueWatching();
+          <IptvPlayer
+            channelId={playerChannel.id}
+            options={{
+              preferLowLatency: true,
+              maxRetries: 3,
             }}
-            onError={(err) => console.error('Player error:', err)}
+            onEvent={(evt, data) => {
+              if (evt === 'back') {
+                setShowPlayerDialog(false);
+                setPlayerChannel(null);
+                refreshContinueWatching();
+                resumeWarming();
+              } else if (evt === 'error') {
+                console.error('Player error:', data);
+              }
+            }}
             className="w-full h-full"
           />
         </div>

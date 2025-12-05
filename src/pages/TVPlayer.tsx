@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { VideoPlayer } from '@/components/player/VideoPlayer';
+import { IptvPlayer } from '@/modules/player/iptv';
 import { 
   useFocusManagerInit, 
   useBackHandler,
@@ -165,15 +165,22 @@ export default function TVPlayer() {
 
   return (
     <AppLayout className="bg-black">
-      {/* Player */}
-      <VideoPlayer
-        url={playableUrl}
-        title={channelName}
-        logo={channelLogo}
-        autoPlay
-        onError={handleError}
-        onReady={handleReady}
-        onBack={handleBack}
+      {/* Player - IptvPlayer Modular */}
+      <IptvPlayer
+        channelId={channelId}
+        options={{
+          preferLowLatency: true,
+          maxRetries: 3,
+        }}
+        onEvent={(evt, data) => {
+          if (evt === 'ready') {
+            handleReady();
+          } else if (evt === 'error') {
+            handleError(data?.message || 'Erro de reprodução');
+          } else if (evt === 'back') {
+            handleBack();
+          }
+        }}
         className="w-full h-full"
       />
 

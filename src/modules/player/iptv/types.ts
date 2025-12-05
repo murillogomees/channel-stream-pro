@@ -9,6 +9,7 @@ export interface IptvPlayerProps {
   authToken?: string;
   options?: IptvPlayerOptions;
   onEvent?: (evt: IptvPlayerEvent, data?: any) => void;
+  className?: string;
 }
 
 export interface IptvPlayerOptions {
