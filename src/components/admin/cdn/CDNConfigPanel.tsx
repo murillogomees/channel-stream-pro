@@ -106,14 +106,36 @@ export function CDNConfigPanel() {
   const saveConfig = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
+      // Check if config exists first
+      const { data: existing } = await supabase
         .from('content_routing_config')
-        .upsert({
-          config_key: 'cdn_settings',
-          config_value: config,
-          description: 'Configurações do CDN R2 e sistema de download',
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'config_key' });
+        .select('id')
+        .eq('config_key', 'cdn_settings')
+        .maybeSingle();
+
+      let error;
+      if (existing) {
+        // Update existing
+        const result = await supabase
+          .from('content_routing_config')
+          .update({
+            config_value: config,
+            description: 'Configurações do CDN R2 e sistema de download',
+            updated_at: new Date().toISOString()
+          })
+          .eq('config_key', 'cdn_settings');
+        error = result.error;
+      } else {
+        // Insert new
+        const result = await supabase
+          .from('content_routing_config')
+          .insert({
+            config_key: 'cdn_settings',
+            config_value: config,
+            description: 'Configurações do CDN R2 e sistema de download'
+          });
+        error = result.error;
+      }
 
       if (error) throw error;
 
