@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
+import { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tv, Database } from 'lucide-react';
 import logoWhite from '@/assets/logo-white-nav.webp';
@@ -22,6 +22,7 @@ import { MoviesView, SeriesView, HomeView } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
+import { useOptimizedPlaylist } from '@/hooks/useOptimizedPlaylist';
 export default function AppPlayer() {
   const navigate = useNavigate();
   const {
