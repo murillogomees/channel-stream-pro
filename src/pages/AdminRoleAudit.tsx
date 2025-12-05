@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Search, Shield, User, Calendar } from 'lucide-react';
+import { Loader2, Search, Shield, User, Calendar, Clock, RefreshCw, TrendingUp, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function AdminRoleAudit() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +24,6 @@ export default function AdminRoleAudit() {
   const loadAuditLogs = async () => {
     setLoading(true);
     try {
-      // Buscar logs de auditoria
       const { data: logs, error: logsError } = await supabase
         .from('role_audit_log')
         .select('*')
@@ -35,7 +32,6 @@ export default function AdminRoleAudit() {
 
       if (logsError) throw logsError;
 
-      // Buscar informações dos usuários afetados
       const userIds = [...new Set(logs?.map(log => log.user_id) || [])];
       const changedByIds = [...new Set(logs?.map(log => log.changed_by) || [])];
       const allUserIds = [...new Set([...userIds, ...changedByIds])];
@@ -47,7 +43,6 @@ export default function AdminRoleAudit() {
 
       const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-      // Enriquecer logs com informações dos usuários
       const enrichedLogs = logs?.map(log => ({
         ...log,
         user_email: profilesMap.get(log.user_id)?.email || 'Desconhecido',
@@ -76,132 +71,136 @@ export default function AdminRoleAudit() {
     return matchesSearch && matchesRole && matchesAction;
   });
 
-  const getActionBadgeVariant = (action: string) => {
+  const last24hCount = auditLogs.filter(l => 
+    new Date(l.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+  ).length;
+
+  const uniqueUsersCount = new Set(auditLogs.map(l => l.user_id)).size;
+
+  const getActionBadge = (action: string) => {
     switch (action) {
       case 'INSERT':
-        return 'default';
+        return <Badge className="bg-stat-success/20 text-stat-success border-stat-success/30">Adicionado</Badge>;
       case 'UPDATE':
-        return 'secondary';
+        return <Badge className="bg-stat-warning/20 text-stat-warning border-stat-warning/30">Atualizado</Badge>;
       case 'DELETE':
-        return 'destructive';
+        return <Badge className="bg-stat-danger/20 text-stat-danger border-stat-danger/30">Removido</Badge>;
       default:
-        return 'outline';
+        return <Badge variant="outline">{action}</Badge>;
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadge = (role: string) => {
     switch (role) {
+      case 'master':
+        return <Badge className="bg-stat-purple/20 text-stat-purple border-stat-purple/30">Master</Badge>;
       case 'admin':
-        return 'destructive';
+        return <Badge className="bg-stat-primary/20 text-stat-primary border-stat-primary/30">Admin</Badge>;
       case 'client':
-        return 'default';
+        return <Badge className="bg-stat-info/20 text-stat-info border-stat-info/30">Cliente</Badge>;
       default:
-        return 'outline';
+        return <Badge variant="outline">{role}</Badge>;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Carregando histórico...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-6">
-        <Button variant="ghost" onClick={() => navigate('/admin/dashboard')} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar ao Dashboard
-        </Button>
-        <h1 className="text-3xl font-bold">Auditoria de Permissões</h1>
-        <p className="text-muted-foreground mt-2">
-          Histórico completo de alterações de roles e permissões
-        </p>
-      </div>
-
-      {/* Estatísticas Resumidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total de Alterações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+    <div className="space-y-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card variant="stat">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold">{auditLogs.length}</span>
-              <Shield className="h-8 w-8 text-primary opacity-50" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total de Alterações</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{auditLogs.length}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-primary/10 flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-stat-primary" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Usuários Afetados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card variant="stat-info">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold">
-                {new Set(auditLogs.map(l => l.user_id)).size}
-              </span>
-              <User className="h-8 w-8 text-blue-500 opacity-50" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Usuários Afetados</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{uniqueUsersCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-info/10 flex items-center justify-center">
+                <User className="h-6 w-6 text-stat-info" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Últimas 24h
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card variant="stat-success">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold">
-                {auditLogs.filter(l => 
-                  new Date(l.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
-                ).length}
-              </span>
-              <Calendar className="h-8 w-8 text-green-500 opacity-50" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Últimas 24h</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{last24hCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-success/10 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-stat-success" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filtros */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      {/* Filters */}
+      <Card variant="surface">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              Filtros
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={loadAuditLogs}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por email ou nome..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
+                className="pl-10 h-11"
               />
             </div>
 
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11">
                 <SelectValue placeholder="Filtrar por role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Roles</SelectItem>
+                <SelectItem value="master">Master</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="client">Client</SelectItem>
+                <SelectItem value="client">Cliente</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11">
                 <SelectValue placeholder="Filtrar por ação" />
               </SelectTrigger>
               <SelectContent>
@@ -215,63 +214,66 @@ export default function AdminRoleAudit() {
         </CardContent>
       </Card>
 
-      {/* Tabela de Auditoria */}
+      {/* Audit Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de Alterações</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-stat-primary" />
+            Histórico de Alterações
+          </CardTitle>
           <CardDescription>
             {filteredLogs.length} registro(s) encontrado(s)
           </CardDescription>
         </CardHeader>
         <CardContent>
           {filteredLogs.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              Nenhum registro encontrado com os filtros selecionados
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertTriangle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">
+                Nenhum registro encontrado com os filtros selecionados
+              </p>
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Ação</TableHead>
-                  <TableHead>Usuário Afetado</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Alterado Por</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getActionBadgeVariant(log.action)}>
-                        {log.action === 'INSERT' ? 'Adicionado' : 
-                         log.action === 'UPDATE' ? 'Atualizado' : 'Removido'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{log.user_name}</p>
-                        <p className="text-sm text-muted-foreground">{log.user_email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleBadgeVariant(log.role)}>
-                        {log.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{log.changed_by_name}</p>
-                        <p className="text-sm text-muted-foreground">{log.changed_by_email}</p>
-                      </div>
-                    </TableCell>
+            <div className="rounded-lg border border-border/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="font-semibold">Data/Hora</TableHead>
+                    <TableHead className="font-semibold">Ação</TableHead>
+                    <TableHead className="font-semibold">Usuário Afetado</TableHead>
+                    <TableHead className="font-semibold">Role</TableHead>
+                    <TableHead className="font-semibold">Alterado Por</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredLogs.map((log) => (
+                    <TableRow key={log.id} className="hover:bg-muted/20">
+                      <TableCell className="font-mono text-sm">
+                        {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        {getActionBadge(log.action)}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-foreground">{log.user_name}</p>
+                          <p className="text-xs text-muted-foreground">{log.user_email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getRoleBadge(log.role)}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-foreground">{log.changed_by_name}</p>
+                          <p className="text-xs text-muted-foreground">{log.changed_by_email}</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

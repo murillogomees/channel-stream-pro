@@ -49,9 +49,9 @@ const PROTECTED_EMAILS = [MASTER_ADMIN_EMAIL];
 type ExtendedRole = AppRole;
 
 const ALL_ROLES: { value: AppRole; label: string; description: string; icon: React.ReactNode; color: string }[] = [
-  { value: 'client', label: 'Cliente', description: 'Acesso básico ao sistema', icon: <User className="h-4 w-4" />, color: 'text-gray-500' },
-  { value: 'admin', label: 'Admin', description: 'Acesso total ao dashboard + streaming', icon: <Shield className="h-4 w-4" />, color: 'text-blue-500' },
-  { value: 'master', label: 'Master', description: 'Controle absoluto do sistema', icon: <Star className="h-4 w-4" />, color: 'text-purple-500' },
+  { value: 'client', label: 'Cliente', description: 'Acesso básico ao sistema', icon: <User className="h-4 w-4" />, color: 'text-stat-info' },
+  { value: 'admin', label: 'Admin', description: 'Acesso total ao dashboard + streaming', icon: <Shield className="h-4 w-4" />, color: 'text-stat-primary' },
+  { value: 'master', label: 'Master', description: 'Controle absoluto do sistema', icon: <Star className="h-4 w-4" />, color: 'text-stat-purple' },
 ];
 
 const AdminCreateUser = () => {
@@ -446,26 +446,26 @@ const AdminCreateUser = () => {
 
   const getRoleBadge = (roles: AppRole[], email: string) => {
     if (isMasterAdmin(email)) {
-      return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30"><Crown className="h-3 w-3 mr-1" />Master</Badge>;
+      return <Badge className="bg-stat-purple/20 text-stat-purple border-stat-purple/30"><Crown className="h-3 w-3 mr-1" />Master</Badge>;
     }
     if (roles.includes('master')) {
-      return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30"><Star className="h-3 w-3 mr-1" />Master</Badge>;
+      return <Badge className="bg-stat-purple/20 text-stat-purple border-stat-purple/30"><Star className="h-3 w-3 mr-1" />Master</Badge>;
     }
     if (roles.includes('admin')) {
-      return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
+      return <Badge className="bg-stat-primary/20 text-stat-primary border-stat-primary/30"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
     }
-    return <Badge variant="secondary"><User className="h-3 w-3 mr-1" />Cliente</Badge>;
+    return <Badge className="bg-stat-info/20 text-stat-info border-stat-info/30"><User className="h-3 w-3 mr-1" />Cliente</Badge>;
   };
 
   return (
     <div className="space-y-6">
       <Tabs defaultValue="list" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="list" className="flex items-center gap-2">
+        <TabsList className="inline-flex h-11 p-1.5 bg-surface-1 border border-border/50 rounded-xl gap-1 max-w-md">
+          <TabsTrigger value="list" className="flex items-center gap-2 px-4 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all">
             <Users className="h-4 w-4" />
             Administradores
           </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center gap-2">
+          <TabsTrigger value="create" className="flex items-center gap-2 px-4 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all">
             <UserPlus className="h-4 w-4" />
             Criar Novo
           </TabsTrigger>
@@ -477,7 +477,7 @@ const AdminCreateUser = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5" />
+                    <ShieldCheck className="h-5 w-5 text-stat-primary" />
                     Usuários Administrativos
                   </CardTitle>
                   <CardDescription>
@@ -491,10 +491,10 @@ const AdminCreateUser = () => {
                       placeholder="Buscar..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 w-full sm:w-64"
+                      className="pl-10 h-11 w-full sm:w-64"
                     />
                   </div>
-                  <Button variant="outline" size="icon" onClick={fetchUsers} disabled={loadingUsers}>
+                  <Button variant="outline" size="icon" className="h-11 w-11" onClick={fetchUsers} disabled={loadingUsers}>
                     <RefreshCw className={`h-4 w-4 ${loadingUsers ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
@@ -506,16 +506,16 @@ const AdminCreateUser = () => {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <div className="rounded-md border">
+                <div className="rounded-lg border border-border/50 overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead>Permissão</TableHead>
-                        <TableHead className="hidden md:table-cell">Telefone</TableHead>
-                        <TableHead className="hidden lg:table-cell">Cadastro</TableHead>
-                        <TableHead className="hidden lg:table-cell">Último Acesso</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead className="font-semibold">Usuário</TableHead>
+                        <TableHead className="font-semibold">Permissão</TableHead>
+                        <TableHead className="hidden md:table-cell font-semibold">Telefone</TableHead>
+                        <TableHead className="hidden lg:table-cell font-semibold">Cadastro</TableHead>
+                        <TableHead className="hidden lg:table-cell font-semibold">Último Acesso</TableHead>
+                        <TableHead className="text-right font-semibold">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -527,11 +527,11 @@ const AdminCreateUser = () => {
                         </TableRow>
                       ) : (
                         filteredUsers.map((adminUser) => (
-                          <TableRow key={adminUser.id}>
+                          <TableRow key={adminUser.id} className="hover:bg-muted/20">
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="font-medium">{adminUser.nome}</span>
-                                <span className="text-sm text-muted-foreground">{adminUser.email}</span>
+                                <span className="font-medium text-foreground">{adminUser.nome}</span>
+                                <span className="text-xs text-muted-foreground">{adminUser.email}</span>
                               </div>
                             </TableCell>
                             <TableCell>{getRoleBadge(adminUser.roles, adminUser.email)}</TableCell>
