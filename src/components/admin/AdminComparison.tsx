@@ -1,7 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { GitCompare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { GitCompare, CheckCircle, AlertTriangle } from 'lucide-react';
+import { FormSection, DialogBody } from '@/components/ui/form-section';
 
 interface M3UList {
   id: string;
@@ -34,12 +36,13 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
   };
 
   const hasDifferences = Object.values(differences).some(d => d);
+  const diffCount = Object.values(differences).filter(Boolean).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle>
             <GitCompare className="h-5 w-5" />
             Comparação de Listas M3U
           </DialogTitle>
@@ -48,90 +51,110 @@ export function AdminComparison({ open, onOpenChange, list1, list2 }: AdminCompa
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Resumo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasDifferences ? (
-                <p className="text-sm text-muted-foreground">
-                  Foram encontradas <span className="font-bold text-foreground">{Object.values(differences).filter(Boolean).length}</span> diferenças entre as listas.
-                </p>
-              ) : (
-                <p className="text-sm text-green-600 dark:text-green-500">
-                  As listas são idênticas em todos os aspectos comparados.
-                </p>
-              )}
+        <DialogBody>
+          {/* Resumo */}
+          <Card className={hasDifferences ? 'border-amber-500/50 bg-amber-500/5' : 'border-success/50 bg-success/5'}>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                {hasDifferences ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 text-success flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <h4 className="font-semibold">
+                    {hasDifferences 
+                      ? `${diffCount} diferença(s) encontrada(s)` 
+                      : 'Listas idênticas'}
+                  </h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {hasDifferences
+                      ? 'As listas possuem diferenças nos campos destacados em amarelo.'
+                      : 'As listas são idênticas em todos os aspectos comparados.'}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-4">
-              <div className="font-semibold text-sm text-muted-foreground">Campo</div>
-              <div className="space-y-3">
-                <div className="py-2">Nome</div>
-                <div className="py-2">Descrição</div>
-                <div className="py-2">URL</div>
-                <div className="py-2">Status</div>
-                <div className="py-2">Tipos de Plano</div>
-                <div className="py-2">Uso</div>
-              </div>
+          {/* Comparação */}
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            {/* Headers */}
+            <div className="font-semibold text-muted-foreground p-3 bg-muted/30 rounded-t-lg">
+              Campo
+            </div>
+            <div className="font-semibold p-3 bg-primary/10 rounded-t-lg border-b-2 border-primary/20">
+              {list1.name}
+            </div>
+            <div className="font-semibold p-3 bg-blue-500/10 rounded-t-lg border-b-2 border-blue-500/20">
+              {list2.name}
             </div>
 
-            <div className="space-y-4">
-              <div className="font-semibold text-sm">{list1.name}</div>
-              <div className="space-y-3">
-                <div className={`py-2 ${differences.name ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list1.name}
-                </div>
-                <div className={`py-2 ${differences.description ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list1.description || <span className="text-muted-foreground italic">Sem descrição</span>}
-                </div>
-                <div className={`py-2 text-xs break-all ${differences.fileUrl ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list1.file_url}
-                </div>
-                <div className={`py-2 ${differences.status ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  <Badge variant={list1.status === 'active' ? 'default' : 'secondary'}>
-                    {list1.status === 'active' ? 'Ativa' : 'Inativa'}
-                  </Badge>
-                </div>
-                <div className={`py-2 ${differences.planType ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {(list1.plan_type || []).join(', ') || 'Nenhum'}
-                </div>
-                <div className={`py-2 ${differences.usage ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list1.usage_count || 0} clientes
-                </div>
-              </div>
+            {/* Nome */}
+            <div className="p-3 border-b flex items-center">Nome</div>
+            <div className={`p-3 border-b ${differences.name ? 'bg-amber-500/10' : ''}`}>
+              {list1.name}
+            </div>
+            <div className={`p-3 border-b ${differences.name ? 'bg-amber-500/10' : ''}`}>
+              {list2.name}
             </div>
 
-            <div className="space-y-4">
-              <div className="font-semibold text-sm">{list2.name}</div>
-              <div className="space-y-3">
-                <div className={`py-2 ${differences.name ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list2.name}
-                </div>
-                <div className={`py-2 ${differences.description ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list2.description || <span className="text-muted-foreground italic">Sem descrição</span>}
-                </div>
-                <div className={`py-2 text-xs break-all ${differences.fileUrl ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list2.file_url}
-                </div>
-                <div className={`py-2 ${differences.status ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  <Badge variant={list2.status === 'active' ? 'default' : 'secondary'}>
-                    {list2.status === 'active' ? 'Ativa' : 'Inativa'}
-                  </Badge>
-                </div>
-                <div className={`py-2 ${differences.planType ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {(list2.plan_type || []).join(', ') || 'Nenhum'}
-                </div>
-                <div className={`py-2 ${differences.usage ? 'bg-yellow-500/10 px-2 rounded' : ''}`}>
-                  {list2.usage_count || 0} clientes
-                </div>
-              </div>
+            {/* Descrição */}
+            <div className="p-3 border-b flex items-center">Descrição</div>
+            <div className={`p-3 border-b ${differences.description ? 'bg-amber-500/10' : ''}`}>
+              {list1.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+            </div>
+            <div className={`p-3 border-b ${differences.description ? 'bg-amber-500/10' : ''}`}>
+              {list2.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+            </div>
+
+            {/* URL */}
+            <div className="p-3 border-b flex items-center">URL</div>
+            <div className={`p-3 border-b text-xs break-all ${differences.fileUrl ? 'bg-amber-500/10' : ''}`}>
+              {list1.file_url}
+            </div>
+            <div className={`p-3 border-b text-xs break-all ${differences.fileUrl ? 'bg-amber-500/10' : ''}`}>
+              {list2.file_url}
+            </div>
+
+            {/* Status */}
+            <div className="p-3 border-b flex items-center">Status</div>
+            <div className={`p-3 border-b ${differences.status ? 'bg-amber-500/10' : ''}`}>
+              <Badge variant={list1.status === 'active' ? 'default' : 'secondary'}>
+                {list1.status === 'active' ? '✅ Ativa' : '❌ Inativa'}
+              </Badge>
+            </div>
+            <div className={`p-3 border-b ${differences.status ? 'bg-amber-500/10' : ''}`}>
+              <Badge variant={list2.status === 'active' ? 'default' : 'secondary'}>
+                {list2.status === 'active' ? '✅ Ativa' : '❌ Inativa'}
+              </Badge>
+            </div>
+
+            {/* Planos */}
+            <div className="p-3 border-b flex items-center">Tipos de Plano</div>
+            <div className={`p-3 border-b ${differences.planType ? 'bg-amber-500/10' : ''}`}>
+              {(list1.plan_type || []).join(', ') || 'Nenhum'}
+            </div>
+            <div className={`p-3 border-b ${differences.planType ? 'bg-amber-500/10' : ''}`}>
+              {(list2.plan_type || []).join(', ') || 'Nenhum'}
+            </div>
+
+            {/* Uso */}
+            <div className="p-3 flex items-center">Uso</div>
+            <div className={`p-3 ${differences.usage ? 'bg-amber-500/10' : ''}`}>
+              <Badge variant="outline">{list1.usage_count || 0} clientes</Badge>
+            </div>
+            <div className={`p-3 ${differences.usage ? 'bg-amber-500/10' : ''}`}>
+              <Badge variant="outline">{list2.usage_count || 0} clientes</Badge>
             </div>
           </div>
-        </div>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-12">
+            Fechar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
