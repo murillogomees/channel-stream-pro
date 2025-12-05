@@ -1,113 +1,85 @@
 /**
- * SimplePlayer - Player Simplificado de Streaming
+ * SimplePlayer - Player Otimizado de Streaming
  * 
- * Carrega conteúdo DIRETO sem proxy, CDN routing ou service workers.
- * Usa HLS.js básico para streams HLS e playback nativo para VOD.
- * 
- * VOD HTTP: Primeiro verifica R2, depois tenta proxy com detecção de timeout.
+ * FAST STARTUP: Inicia reprodução imediatamente, verifica R2 em background.
+ * Usa HLS.js agressivo para streams HLS e playback nativo para VOD.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
-  ArrowLeft, RefreshCw, Loader2, AlertCircle, Wifi, Download, Clock
+  ArrowLeft, RefreshCw, Loader2, AlertCircle, Clock, Wifi, Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { unlockForFullscreen, lockToPortrait } from '@/hooks/useGlobalOrientationLock';
 
 interface SimplePlayerProps {
   url: string;
   title?: string;
   logo?: string;
   category?: string;
-  channelId?: string; // Para verificar R2
+  channelId?: string;
   autoplay?: boolean;
   onBack?: () => void;
   onError?: (error: string) => void;
   onReady?: () => void;
-  onRequestDownload?: () => void; // Callback para solicitar download
+  onRequestDownload?: () => void;
   className?: string;
 }
 
 // Detecta tipo de conteúdo
 function getContentType(url: string): 'hls' | 'vod' | 'direct' {
   const lower = url.toLowerCase();
-  
-  if (lower.includes('.m3u8') || lower.includes('.m3u')) {
-    return 'hls';
-  }
-  
+  if (lower.includes('.m3u8') || lower.includes('.m3u')) return 'hls';
   if (lower.includes('.mp4') || lower.includes('.mkv') || 
       lower.includes('.avi') || lower.includes('.webm') ||
-      lower.includes('/movie/') || lower.includes('/series/')) {
-    return 'vod';
-  }
-  
+      lower.includes('/movie/') || lower.includes('/series/')) return 'vod';
   return 'direct';
 }
 
-// Verifica se é HTTP URL (precisa de proxy para evitar Mixed Content)
 function isHttpUrl(url: string): boolean {
   return url.toLowerCase().startsWith('http://');
 }
 
-// Verifica se a página é HTTPS
 function isSecurePage(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.protocol === 'https:';
+  return typeof window !== 'undefined' && window.location.protocol === 'https:';
 }
 
-// Supabase URL para proxy
 const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
-
-// R2 CDN URL
 const R2_CDN_URL = 'https://pub-iptvlink.r2.dev';
 
-// Verifica se VOD está disponível no R2
+// Verifica R2 em background (não bloqueia startup)
 async function checkR2Availability(channelId: string): Promise<string | null> {
   try {
-    // Busca na tabela r2_storage_objects pelo channel_id
-    const { data, error } = await (supabase as any)
+    const { data } = await (supabase as any)
       .from('r2_storage_objects')
       .select('r2_key, status')
       .eq('channel_id', channelId)
       .eq('status', 'completed')
       .maybeSingle();
     
-    if (error || !data) {
-      console.log('[SimplePlayer] VOD não encontrado no R2 para channel:', channelId);
-      return null;
-    }
-    
-    // Retorna URL do R2
-    const r2Url = `${R2_CDN_URL}/${data.r2_key}`;
-    console.log('[SimplePlayer] VOD encontrado no R2:', r2Url);
-    return r2Url;
-  } catch (e) {
-    console.warn('[SimplePlayer] Erro ao verificar R2:', e);
+    if (!data) return null;
+    return `${R2_CDN_URL}/${data.r2_key}`;
+  } catch {
     return null;
   }
 }
 
-// Converte URL HTTP para usar proxy (bypass Mixed Content)
 function getProxiedUrl(url: string): string {
-  // Se a página é HTTPS e a URL é HTTP, usa o proxy
   if (isSecurePage() && isHttpUrl(url)) {
-    console.log('[SimplePlayer] Roteando HTTP através do proxy:', url.substring(0, 50));
     return `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
 }
 
-// Detecta se é Samsung TV (Tizen)
 function isSamsungTV(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent.toLowerCase();
   return ua.includes('tizen') || ua.includes('samsung') || ua.includes('smart-tv');
 }
 
-// Detecta se é TV em geral
 function isSmartTV(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent.toLowerCase();
@@ -115,31 +87,37 @@ function isSmartTV(): boolean {
          ua.includes('smart-tv') || ua.includes('netcast') || ua.includes('viera');
 }
 
-// Configuração HLS básica e otimizada
+// Configuração HLS AGRESSIVA para startup rápido
 function getHlsConfig(): Partial<Hls['config']> {
   const isTv = isSmartTV();
   const isSamsung = isSamsungTV();
-  
-  // Samsung TVs têm problemas com Web Workers
   const enableWorker = !isSamsung && !isTv;
-  
-  console.log(`[SimplePlayer] Config: Samsung=${isSamsung}, TV=${isTv}, Worker=${enableWorker}`);
   
   return {
     enableWorker,
-    lowLatencyMode: false,
-    backBufferLength: isTv ? 15 : 30,
-    maxBufferLength: isTv ? 20 : 30,
-    maxMaxBufferLength: isTv ? 30 : 60,
-    maxBufferSize: isTv ? 30 * 1000 * 1000 : 60 * 1000 * 1000,
+    lowLatencyMode: true, // Ativado para startup rápido
+    // Buffer mínimo para iniciar rápido
+    maxBufferLength: 10,
+    maxMaxBufferLength: 30,
+    maxBufferSize: 30 * 1000 * 1000,
     maxBufferHole: 0.5,
-    startFragPrefetch: !isTv, // Desabilita prefetch em TVs para economia de memória
-    testBandwidth: true,
+    // Startup agressivo
+    startLevel: 0, // Começa na qualidade mais baixa
+    startFragPrefetch: true,
+    testBandwidth: false, // Não testa - começa direto
+    // Timeouts curtos
+    fragLoadingTimeOut: 10000,
+    manifestLoadingTimeOut: 8000,
+    levelLoadingTimeOut: 8000,
+    // Retries rápidos
+    fragLoadingMaxRetry: 2,
+    manifestLoadingMaxRetry: 2,
+    levelLoadingMaxRetry: 2,
+    fragLoadingRetryDelay: 500,
+    manifestLoadingRetryDelay: 500,
+    // Progressive para início imediato
     progressive: true,
-    fragLoadingTimeOut: isTv ? 30000 : 20000, // Mais tempo para TVs
-    fragLoadingMaxRetry: isTv ? 6 : 4, // Mais retries para TVs
-    manifestLoadingTimeOut: isTv ? 20000 : 15000,
-    manifestLoadingMaxRetry: isTv ? 5 : 3,
+    backBufferLength: 10,
   };
 }
 
@@ -186,8 +164,8 @@ export default function SimplePlayer({
     }
   }, []);
 
-  // Initialize player
-  const initPlayer = useCallback(async () => {
+  // Initialize player - FAST STARTUP
+  const initPlayer = useCallback(() => {
     const video = videoRef.current;
     if (!video || !url) {
       setError('URL não fornecida');
@@ -195,11 +173,7 @@ export default function SimplePlayer({
       return;
     }
 
-    // Se já teve erro de rede nessa sessão, não tenta mais
-    if (hasNetworkError.current) {
-      console.warn('[SimplePlayer] Bloqueado por erro de rede anterior');
-      return;
-    }
+    if (hasNetworkError.current) return;
 
     setIsLoading(true);
     setError(null);
@@ -207,30 +181,24 @@ export default function SimplePlayer({
     cleanupHls();
 
     const contentType = getContentType(url);
-    console.log('[SimplePlayer] Tipo de conteúdo:', contentType);
-    
-    // Marca se é HTTP VOD para tratamento especial de timeout
     isHttpVod.current = (contentType === 'vod' || contentType === 'direct') && isHttpUrl(url);
     loadStartTime.current = Date.now();
 
-    let finalUrl = url;
+    // FAST: Usa proxy direto, verifica R2 em background
+    let finalUrl = getProxiedUrl(url);
     
-    // Para VOD HTTP, primeiro verifica se já está no R2
+    // Background check para R2 (não bloqueia)
     if (isHttpVod.current && channelId) {
-      setLoadingMessage('Verificando cache CDN...');
-      const r2Url = await checkR2Availability(channelId);
-      
-      if (r2Url) {
-        console.log('[SimplePlayer] Usando VOD do R2 CDN');
-        finalUrl = r2Url;
-        isHttpVod.current = false; // R2 é HTTPS, não precisa proxy
-      } else {
-        console.log('[SimplePlayer] VOD não está no R2, usando proxy');
-        setLoadingMessage('Conectando via proxy...');
-        finalUrl = getProxiedUrl(url);
-      }
-    } else {
-      finalUrl = getProxiedUrl(url);
+      checkR2Availability(channelId).then(r2Url => {
+        if (r2Url && videoRef.current) {
+          console.log('[SimplePlayer] R2 disponível, switching...');
+          // Se ainda está carregando ou deu erro, troca para R2
+          if (isLoading || error) {
+            videoRef.current.src = r2Url;
+            videoRef.current.load();
+          }
+        }
+      });
     }
     
     console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
@@ -412,6 +380,16 @@ export default function SimplePlayer({
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('playing', handlePlaying);
 
+    // Handle fullscreen change (including ESC key or system back)
+    const handleFullscreenChange = () => {
+      const isFs = !!document.fullscreenElement;
+      setIsFullscreen(isFs);
+      if (!isFs) {
+        lockToPortrait(); // Return to portrait when exiting fullscreen
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
@@ -419,6 +397,7 @@ export default function SimplePlayer({
       video.removeEventListener('durationchange', handleDurationChange);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('playing', handlePlaying);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
 
@@ -451,9 +430,11 @@ export default function SimplePlayer({
     try {
       if (!document.fullscreenElement) {
         await container.requestFullscreen();
+        await unlockForFullscreen(); // Landscape no fullscreen
         setIsFullscreen(true);
       } else {
         await document.exitFullscreen();
+        await lockToPortrait(); // Volta para portrait
         setIsFullscreen(false);
       }
     } catch (e) {
