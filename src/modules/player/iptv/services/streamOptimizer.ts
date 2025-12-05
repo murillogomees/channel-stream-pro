@@ -39,6 +39,12 @@ class StreamOptimizerService {
 
   /**
    * Detect stream protocol from URL
+   * 
+   * Xtream API patterns:
+   * - /live/user/pass/id.ts - Live TS stream
+   * - /movie/user/pass/id.mp4 - VOD MP4
+   * - /series/user/pass/id.mp4 - Series VOD
+   * - /user/pass/id - Numeric ID = Live TS stream (most common for TV ao vivo)
    */
   detectProtocol(url: string): StreamProtocol {
     const lowerUrl = url.toLowerCase();
@@ -61,7 +67,6 @@ class StreamOptimizerService {
     }
     
     // Check for VOD/Movie content (MP4) - Xtream format
-    // /movie/user/pass/id.mp4 OR /movie/user/pass/id (no extension)
     if (lowerUrl.includes('/movie/') || lowerUrl.includes('/series/') || lowerUrl.includes('/vod/')) {
       return 'mp4';
     }
@@ -71,15 +76,26 @@ class StreamOptimizerService {
       return 'dash';
     }
     
-    // Check for explicit TS streams ONLY - be very conservative
-    // mpegts.js will fail if content isn't actually TS format
+    // Check for explicit TS streams
     if (pathname.endsWith('.ts')) {
       return 'ts';
     }
     
-    // For Xtream API and unknown live streams, use 'unknown' protocol
-    // This lets the player try native HTML5 video first, which handles more formats
-    // Don't assume HLS - many IPTV streams are raw TS or other formats
+    // Xtream API live stream detection:
+    // URLs like /user/pass/id (no extension) on ports 8880, 8080 etc = Live TS
+    // These are the most common IPTV live streams
+    const xtreamPattern = /\/\d+\/\d+\/\d+$/; // /user/pass/channelId
+    const livePattern = /\/live\//;
+    const iptvPorts = [':8880', ':8080', ':25461', ':80/'];
+    
+    const isXtreamLive = xtreamPattern.test(pathname) || livePattern.test(lowerUrl);
+    const isIptvPort = iptvPorts.some(port => lowerUrl.includes(port));
+    
+    if (isXtreamLive || isIptvPort) {
+      // Xtream live streams are MPEG-TS format
+      return 'ts';
+    }
+    
     return 'unknown';
   }
 

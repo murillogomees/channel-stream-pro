@@ -260,13 +260,17 @@ export function useVideoJs({
       hlsRef.current = null;
     }
 
-    // TS streams ONLY - use mpegts.js (ONLY if URL explicitly ends in .ts)
-    // Double-check URL to avoid mpegts.js failures on non-TS content
-    const isExplicitTs = finalUrl.toLowerCase().endsWith('.ts') || 
-                         (finalUrl.toLowerCase().includes('stream-proxy') && url.toLowerCase().endsWith('.ts'));
+    // TS streams - use mpegts.js for IPTV live streams
+    // Includes: explicit .ts URLs, Xtream API live streams via proxy
+    const isXtreamViaProxy = optimized.source === 'proxy' && protocol === 'ts';
+    const isExplicitTs = finalUrl.toLowerCase().endsWith('.ts');
     
-    if (protocol === 'ts' && isExplicitTs && mpegts.isSupported()) {
-      console.log('[useVideoJs] Using mpegts.js for explicit .ts URL:', finalUrl.substring(0, 80));
+    if ((protocol === 'ts' || isXtreamViaProxy) && mpegts.isSupported()) {
+      console.log('[useVideoJs] Using mpegts.js for TS stream:', {
+        protocol,
+        isProxy: optimized.source === 'proxy',
+        url: finalUrl.substring(0, 80)
+      });
       
       const player = mpegts.createPlayer({
         type: 'mpegts',
@@ -279,7 +283,7 @@ export function useVideoJs({
       player.load();
       
       player.on(mpegts.Events.MEDIA_INFO, () => {
-        console.log('[mpegts] Media info received');
+        console.log('[mpegts] Media info received, TTFF:', Date.now() - loadStartTime.current, 'ms');
         setIsBuffering(false);
         setMetrics(prev => ({
           ...prev,

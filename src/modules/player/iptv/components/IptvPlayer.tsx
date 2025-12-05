@@ -149,12 +149,19 @@ export const IptvPlayer = memo(function IptvPlayer({
   const selectChannel = useCallback((channel: IptvChannel) => {
     setCurrentChannel(channel);
     
-    // Initialize CDN failover for retry tracking
-    const endpoints = cdnFailover.buildEndpointsFromUrl(channel.url, channel.id);
+    // Initialize CDN failover with proper options
+    // For HTTP URLs, only use proxy (not R2/CF-Stream that don't exist)
+    const endpoints = cdnFailover.buildEndpointsFromUrl(
+      channel.url, 
+      channel.id,
+      {
+        hasR2: false,  // Only enable if channel.r2_uploaded exists
+        hasCfStream: false,  // Only enable if channel.cf_stream_url exists
+      }
+    );
     cdnFailover.initialize(endpoints);
     
     // Pass ORIGINAL URL to setSource - useVideoJs handles proxy internally
-    // Don't pass pre-proxied URL or protocol detection will fail
     console.log('[IptvPlayer] selectChannel:', channel.name);
     setSource(channel.url);
     
@@ -202,9 +209,14 @@ export const IptvPlayer = memo(function IptvPlayer({
   // Initialize CDN failover
   useEffect(() => {
     if (currentChannel) {
+      // Build endpoints with proper options - no R2/CF for basic IPTV
       const endpoints = cdnFailover.buildEndpointsFromUrl(
         currentChannel.url,
-        currentChannel.id
+        currentChannel.id,
+        {
+          hasR2: false,
+          hasCfStream: false,
+        }
       );
       
       // Add custom fallbacks
