@@ -326,3 +326,19 @@ verify_jwt = false
 # M3U Ingest orchestrator - streaming with fallback
 [functions.m3u-ingest]
 verify_jwt = false
+
+# ==========================================
+# IPTV PLAYER API
+# ==========================================
+
+# IPTV Play - returns signed URL with CDN list
+[functions.iptv-play]
+verify_jwt = true
+
+# IPTV Playlist - returns M3U/JSON playlist
+[functions.iptv-playlist]
+verify_jwt = true
+
+# IPTV EPG - returns program guide data
+[functions.iptv-epg]
+verify_jwt = false
