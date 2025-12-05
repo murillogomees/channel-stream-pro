@@ -319,7 +319,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [updateAuthState, loading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateAuthState]); // Remove 'loading' to prevent re-run loops
 
   const value: AuthContextType = {
     user,
