@@ -279,6 +279,10 @@ verify_jwt = false
 [functions.test-r2-connection]
 verify_jwt = false
 
+# R2 list objects test - dedicated debugging endpoint
+[functions.list-objects-test]
+verify_jwt = false
+
 # ==========================================
 # M3U CLEANING & PLAYLIST MANAGEMENT
 # ==========================================

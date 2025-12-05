@@ -158,40 +158,61 @@ async function signRequest(
     payloadHash = await sha256(body);
   }
   
-  // Canonical headers
-  const signedHeaders: Record<string, string> = {
-    ...headers,
+  // ✅ FIX: Ordenar query parameters alfabeticamente (exigência AWS Signature V4)
+  const sortedParams = [...parsedUrl.searchParams.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+  
+  // Canonical URI (path)
+  const canonicalUri = parsedUrl.pathname || '/';
+  
+  // Build headers for signing (all lowercase keys)
+  const headersToSign: Record<string, string> = {
     'host': parsedUrl.host,
     'x-amz-content-sha256': payloadHash,
     'x-amz-date': amzDate,
   };
   
-  const sortedHeaderKeys = Object.keys(signedHeaders).sort();
+  // Add provided headers (lowercase keys)
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'content-type' || lowerKey === 'content-length') {
+      headersToSign[lowerKey] = value;
+    }
+  }
+  
+  // Sort headers alphabetically by key
+  const sortedHeaderKeys = Object.keys(headersToSign).sort();
   const canonicalHeaders = sortedHeaderKeys
-    .map(key => `${key.toLowerCase()}:${signedHeaders[key].trim()}`)
+    .map(key => `${key}:${headersToSign[key].trim()}`)
     .join('\n') + '\n';
-  const signedHeadersStr = sortedHeaderKeys.map(k => k.toLowerCase()).join(';');
+  const signedHeadersStr = sortedHeaderKeys.join(';');
   
   // Canonical request
-  const canonicalUri = parsedUrl.pathname;
-  const canonicalQuerystring = parsedUrl.search.substring(1);
   const canonicalRequest = [
     method,
     canonicalUri,
-    canonicalQuerystring,
+    sortedParams,
     canonicalHeaders,
     signedHeadersStr,
     payloadHash,
   ].join('\n');
   
+  console.log('[R2-Sign] Method:', method);
+  console.log('[R2-Sign] Canonical URI:', canonicalUri);
+  console.log('[R2-Sign] Sorted Params:', sortedParams);
+  console.log('[R2-Sign] Signed Headers:', signedHeadersStr);
+  
   // String to sign
   const algorithm = 'AWS4-HMAC-SHA256';
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalRequestHash = await sha256(canonicalRequest);
   const stringToSign = [
     algorithm,
     amzDate,
     credentialScope,
-    await sha256(canonicalRequest),
+    canonicalRequestHash,
   ].join('\n');
   
   // Signature
@@ -204,12 +225,24 @@ async function signRequest(
   // Authorization header
   const authorizationHeader = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
   
+  // Build final headers for request
+  const finalHeaders: Record<string, string> = {
+    'Host': parsedUrl.host,
+    'x-amz-content-sha256': payloadHash,
+    'x-amz-date': amzDate,
+    'Authorization': authorizationHeader,
+  };
+  
+  // Add original headers
+  for (const [key, value] of Object.entries(headers)) {
+    if (!finalHeaders[key] && !finalHeaders[key.toLowerCase()]) {
+      finalHeaders[key] = value;
+    }
+  }
+  
   return {
     url,
-    headers: {
-      ...signedHeaders,
-      'Authorization': authorizationHeader,
-    },
+    headers: finalHeaders,
   };
 }
 
