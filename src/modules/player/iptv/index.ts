@@ -19,7 +19,9 @@ export { PlaylistParser, playlistParser } from './services/playlistParser';
 export { CdnFailoverService, cdnFailover } from './services/cdnFailover';
 export { EpgService, epgService } from './services/epgService';
 export { RemoteControlService, remoteControl } from './services/remoteControl';
+export { StreamOptimizerService, streamOptimizer } from './services/streamOptimizer';
 export type { RemoteAction } from './services/remoteControl';
+export type { StreamProtocol, StreamSource, OptimizedStream } from './services/streamOptimizer';
 
 // Types
 export type {
