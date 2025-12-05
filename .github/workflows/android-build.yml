@@ -1,0 +1,225 @@
+name: Android Build & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+      deploy_to_play_store:
+        description: 'Deploy to Play Store'
+        required: false
+        default: false
+        type: boolean
+      track:
+        description: 'Play Store track'
+        required: false
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+
+jobs:
+  build-android:
+    name: Build Android APK/AAB
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Decode Keystore
+        if: inputs.build_type == 'release'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Build Debug APK
+        if: inputs.build_type == 'debug'
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Build Release APK
+        if: inputs.build_type == 'release'
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=release.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+      - name: Build Release AAB (for Play Store)
+        if: inputs.build_type == 'release' && inputs.deploy_to_play_store
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=release.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+      - name: Upload Debug APK
+        if: inputs.build_type == 'debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+      - name: Upload Release APK
+        if: inputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Upload Release AAB
+        if: inputs.build_type == 'release' && inputs.deploy_to_play_store
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-bundle
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+  deploy-play-store:
+    name: Deploy to Google Play Store
+    needs: build-android
+    if: inputs.deploy_to_play_store && inputs.build_type == 'release'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-bundle
+          path: ./artifacts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Decode Service Account
+        run: |
+          echo "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+
+      - name: Upload to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: service-account.json
+          packageName: app.lovable.a6d041f19e9649e8bc86f2d4dd4bc0b2
+          releaseFiles: ./artifacts/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
+          changesNotSentForReview: false
+
+      - name: Notify Success
+        if: success()
+        run: |
+          echo "✅ Successfully deployed to Google Play Store (${{ inputs.track }} track)"
+
+      - name: Notify Failure
+        if: failure()
+        run: |
+          echo "❌ Failed to deploy to Google Play Store"
+
+  notify-slack:
+    name: Notify Build Status
+    needs: [build-android, deploy-play-store]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          BUILD_STATUS="${{ needs.build-android.result }}"
+          DEPLOY_STATUS="${{ needs.deploy-play-store.result }}"
+          
+          if [ "$BUILD_STATUS" = "success" ]; then
+            BUILD_EMOJI="✅"
+          else
+            BUILD_EMOJI="❌"
+          fi
+          
+          if [ "$DEPLOY_STATUS" = "success" ]; then
+            DEPLOY_EMOJI="✅"
+          elif [ "$DEPLOY_STATUS" = "skipped" ]; then
+            DEPLOY_EMOJI="⏭️"
+          else
+            DEPLOY_EMOJI="❌"
+          fi
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"blocks\": [
+                {
+                  \"type\": \"header\",
+                  \"text\": {
+                    \"type\": \"plain_text\",
+                    \"text\": \"Android Build Report\"
+                  }
+                },
+                {
+                  \"type\": \"section\",
+                  \"fields\": [
+                    {\"type\": \"mrkdwn\", \"text\": \"*Build:* $BUILD_EMOJI $BUILD_STATUS\"},
+                    {\"type\": \"mrkdwn\", \"text\": \"*Deploy:* $DEPLOY_EMOJI $DEPLOY_STATUS\"},
+                    {\"type\": \"mrkdwn\", \"text\": \"*Type:* ${{ inputs.build_type }}\"},
+                    {\"type\": \"mrkdwn\", \"text\": \"*Track:* ${{ inputs.track }}\"}
+                  ]
+                }
+              ]
+            }" \
+            $SLACK_WEBHOOK_URL
