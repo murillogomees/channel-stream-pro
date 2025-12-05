@@ -2,9 +2,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, XCircle, Shield, User, Database } from 'lucide-react';
+import { CheckCircle2, XCircle, Shield, User, Database, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface TestResult {
   name: string;
@@ -13,16 +14,22 @@ interface TestResult {
 }
 
 export default function AdminPermissionTest() {
-  const { user, isAuthenticated, isAdmin, isMaster, isClient, loading } = useAuth();
+  const { user, isAuthenticated, isAdmin, isMaster, isClient, loading: authLoading } = useAuth();
   const [dbTests, setDbTests] = useState<TestResult[]>([]);
   const [rpcTests, setRpcTests] = useState<TestResult[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      runDatabaseTests();
-      runRPCTests();
+    if (!authLoading && isAuthenticated) {
+      runAllTests();
     }
-  }, [loading, isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
+
+  const runAllTests = async () => {
+    setLoading(true);
+    await Promise.all([runDatabaseTests(), runRPCTests()]);
+    setLoading(false);
+  };
 
   const runDatabaseTests = async () => {
     const tests: TestResult[] = [];
@@ -33,7 +40,7 @@ export default function AdminPermissionTest() {
       tests.push({
         name: 'SELECT profiles',
         passed: !error,
-        message: error?.message
+        message: error?.message || 'Acesso permitido'
       });
     } catch (e: any) {
       tests.push({ name: 'SELECT profiles', passed: false, message: e.message });
@@ -45,7 +52,7 @@ export default function AdminPermissionTest() {
       tests.push({
         name: 'SELECT clientes',
         passed: !error,
-        message: error?.message
+        message: error?.message || 'Acesso permitido'
       });
     } catch (e: any) {
       tests.push({ name: 'SELECT clientes', passed: false, message: e.message });
@@ -57,7 +64,7 @@ export default function AdminPermissionTest() {
       tests.push({
         name: 'SELECT user_roles',
         passed: !error,
-        message: error?.message
+        message: error?.message || 'Acesso permitido'
       });
     } catch (e: any) {
       tests.push({ name: 'SELECT user_roles', passed: false, message: e.message });
@@ -76,7 +83,7 @@ export default function AdminPermissionTest() {
         tests.push({
           name: 'is_admin RPC',
           passed: !error,
-          message: error?.message || `Result: ${data}`
+          message: error?.message || `Resultado: ${data}`
         });
       } catch (e: any) {
         tests.push({ name: 'is_admin RPC', passed: false, message: e.message });
@@ -91,7 +98,7 @@ export default function AdminPermissionTest() {
         tests.push({
           name: 'has_role RPC (admin)',
           passed: !error,
-          message: error?.message || `Result: ${data}`
+          message: error?.message || `Resultado: ${data}`
         });
       } catch (e: any) {
         tests.push({ name: 'has_role RPC (admin)', passed: false, message: e.message });
@@ -101,39 +108,72 @@ export default function AdminPermissionTest() {
     setRpcTests(tests);
   };
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">Teste de Permissões</h1>
-          <p className="text-muted-foreground">Diagnóstico completo do sistema de autenticação</p>
+  const passedDbTests = dbTests.filter(t => t.passed).length;
+  const passedRpcTests = rpcTests.filter(t => t.passed).length;
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Executando diagnósticos...</span>
         </div>
       </div>
+    );
+  }
 
-      <Separator />
+  return (
+    <div className="space-y-6">
+      {/* Header with Refresh */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-stat-purple/10 flex items-center justify-center">
+            <Shield className="h-5 w-5 text-stat-purple" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Diagnóstico de Permissões</h2>
+            <p className="text-sm text-muted-foreground">Status completo do sistema de autenticação</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={runAllTests}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Re-testar
+        </Button>
+      </div>
 
       {/* Authentication Context */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
+      <Card variant="surface">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <User className="h-4 w-4 text-stat-info" />
             Contexto de Autenticação
           </CardTitle>
           <CardDescription>Estado atual do usuário autenticado</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm text-muted-foreground">Autenticado:</span>
-              <Badge variant={isAuthenticated ? "default" : "destructive"} className="ml-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+              <span className="text-xs text-muted-foreground block mb-1">Autenticado</span>
+              <Badge variant={isAuthenticated ? "default" : "destructive"} className={isAuthenticated ? "bg-stat-success/20 text-stat-success border-stat-success/30" : ""}>
                 {isAuthenticated ? 'Sim' : 'Não'}
               </Badge>
             </div>
-            <div>
-              <span className="text-sm text-muted-foreground">Carregando:</span>
-              <Badge variant={loading ? "secondary" : "outline"} className="ml-2">
-                {loading ? 'Sim' : 'Não'}
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+              <span className="text-xs text-muted-foreground block mb-1">isAdmin</span>
+              <Badge className={isAdmin ? "bg-stat-primary/20 text-stat-primary border-stat-primary/30" : "bg-muted text-muted-foreground"}>
+                {isAdmin ? 'Sim' : 'Não'}
+              </Badge>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+              <span className="text-xs text-muted-foreground block mb-1">isMaster</span>
+              <Badge className={isMaster ? "bg-stat-purple/20 text-stat-purple border-stat-purple/30" : "bg-muted text-muted-foreground"}>
+                {isMaster ? 'Sim' : 'Não'}
+              </Badge>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+              <span className="text-xs text-muted-foreground block mb-1">isClient</span>
+              <Badge className={isClient ? "bg-stat-info/20 text-stat-info border-stat-info/30" : "bg-muted text-muted-foreground"}>
+                {isClient ? 'Sim' : 'Não'}
               </Badge>
             </div>
           </div>
@@ -141,65 +181,61 @@ export default function AdminPermissionTest() {
           {user && (
             <>
               <Separator />
-              <div className="space-y-2">
-                <p className="text-sm"><strong>ID:</strong> {user.id}</p>
-                <p className="text-sm"><strong>Nome:</strong> {user.nome}</p>
-                <p className="text-sm"><strong>Email:</strong> {user.email}</p>
-                <p className="text-sm"><strong>Roles:</strong> {user.roles.join(', ')}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-transparent border border-primary/10">
+                  <p className="text-xs text-muted-foreground mb-1">Usuário</p>
+                  <p className="font-medium text-foreground">{user.nome || user.email}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-transparent border border-primary/10">
+                  <p className="text-xs text-muted-foreground mb-1">Roles Atribuídas</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {user.roles.map((role, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {role}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Permission Flags */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Flags de Permissão
-          </CardTitle>
-          <CardDescription>Verificação de roles e permissões</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="flex items-center gap-2">
-              {isAdmin ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
-              <span className="text-sm">isAdmin</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isMaster ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
-              <span className="text-sm">isMaster</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isClient ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
-              <span className="text-sm">isClient</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Database Tests */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Testes de Banco de Dados
-          </CardTitle>
-          <CardDescription>Testes de acesso SELECT em tabelas</CardDescription>
+      <Card variant={passedDbTests === dbTests.length ? "stat-success" : "stat-warning"}>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Testes de Banco de Dados
+            </CardTitle>
+            <Badge variant="outline" className="font-mono">
+              {passedDbTests}/{dbTests.length}
+            </Badge>
+          </div>
+          <CardDescription>Verificação de acesso SELECT em tabelas principais</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {dbTests.map((test, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+              <div 
+                key={idx} 
+                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                  test.passed 
+                    ? 'bg-stat-success/5 border-stat-success/20' 
+                    : 'bg-stat-danger/5 border-stat-danger/20'
+                }`}
+              >
                 {test.passed ? 
-                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" /> : 
-                  <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                  <CheckCircle2 className="h-5 w-5 text-stat-success mt-0.5 flex-shrink-0" /> : 
+                  <XCircle className="h-5 w-5 text-stat-danger mt-0.5 flex-shrink-0" />
                 }
-                <div className="flex-1">
-                  <p className="font-medium">{test.name}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-foreground">{test.name}</p>
                   {test.message && (
-                    <p className="text-sm text-muted-foreground">{test.message}</p>
+                    <p className="text-xs text-muted-foreground truncate">{test.message}</p>
                   )}
                 </div>
               </div>
@@ -209,31 +245,50 @@ export default function AdminPermissionTest() {
       </Card>
 
       {/* RPC Tests */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Testes de RPC Functions
-          </CardTitle>
-          <CardDescription>Testes de funções RPC do Supabase</CardDescription>
+      <Card variant={passedRpcTests === rpcTests.length ? "stat-success" : "stat-warning"}>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Testes de RPC Functions
+            </CardTitle>
+            <Badge variant="outline" className="font-mono">
+              {passedRpcTests}/{rpcTests.length}
+            </Badge>
+          </div>
+          <CardDescription>Verificação de funções RPC do Supabase</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {rpcTests.map((test, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                {test.passed ? 
-                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" /> : 
-                  <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                }
-                <div className="flex-1">
-                  <p className="font-medium">{test.name}</p>
-                  {test.message && (
-                    <p className="text-sm text-muted-foreground">{test.message}</p>
-                  )}
+          {rpcTests.length === 0 ? (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/30">
+              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhum teste RPC disponível</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {rpcTests.map((test, idx) => (
+                <div 
+                  key={idx} 
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                    test.passed 
+                      ? 'bg-stat-success/5 border-stat-success/20' 
+                      : 'bg-stat-danger/5 border-stat-danger/20'
+                  }`}
+                >
+                  {test.passed ? 
+                    <CheckCircle2 className="h-5 w-5 text-stat-success mt-0.5 flex-shrink-0" /> : 
+                    <XCircle className="h-5 w-5 text-stat-danger mt-0.5 flex-shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-foreground">{test.name}</p>
+                    {test.message && (
+                      <p className="text-xs text-muted-foreground truncate">{test.message}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

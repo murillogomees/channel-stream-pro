@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield, UserPlus, Trash2, RefreshCw, History, Filter, CheckSquare, XSquare } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, parseISO } from "date-fns";
+import { Shield, UserPlus, Trash2, RefreshCw, Filter, CheckSquare, XSquare, Users, Crown, Star, User, Search, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DatePicker } from "@/components/ui/date-picker";
 
 interface UserWithRole {
   id: string;
@@ -24,28 +20,13 @@ interface UserWithRole {
   roles: string[];
 }
 
-interface AuditLog {
-  id: string;
-  user_id: string;
-  changed_by: string;
-  action: 'added' | 'removed';
-  role: string;
-  created_at: string;
-  user_email?: string;
-  changed_by_email?: string;
-}
-
 const AdminUserRoles = () => {
   const { user: currentUser } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [emailFilter, setEmailFilter] = useState("");
-  const [userIdFilter, setUserIdFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("admin");
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [bulkRole, setBulkRole] = useState<string>("admin");
@@ -54,8 +35,6 @@ const AdminUserRoles = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-
-      // Call Edge Function to list users (uses service_role internally)
       const { data: usersResponse, error: usersError } = await supabase.functions.invoke('list-users');
       
       if (usersError) {
@@ -67,7 +46,6 @@ const AdminUserRoles = () => {
         throw new Error('Invalid response from list-users function');
       }
 
-      // Transform response to match UserWithRole interface
       const usersWithRoles: UserWithRole[] = usersResponse.users.map((user: any) => ({
         id: user.id,
         email: user.email || 'Sem email',
@@ -88,60 +66,9 @@ const AdminUserRoles = () => {
     }
   };
 
-  const loadAuditLogs = async () => {
-    try {
-      const { data: logs, error } = await (supabase as any)
-        .from('role_audit_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
-      
-      const enrichedLogs: AuditLog[] = (logs || []).map((log: any) => {
-        const user = (authUsers || []).find((u: any) => u.id === log.user_id);
-        const changedBy = (authUsers || []).find((u: any) => u.id === log.changed_by);
-        return {
-          id: log.id,
-          user_id: log.user_id,
-          changed_by: log.changed_by,
-          action: log.action,
-          role: log.role,
-          created_at: log.created_at,
-          user_email: user?.email || 'Usuário desconhecido',
-          changed_by_email: changedBy?.email || 'Admin desconhecido',
-        };
-      });
-
-      setAuditLogs(enrichedLogs);
-    } catch (error: any) {
-      console.error('Error loading audit logs:', error);
-    }
-  };
-
   useEffect(() => {
     loadUsers();
-    loadAuditLogs();
   }, []);
-
-  const logAuditAction = async (userId: string, action: 'added' | 'removed', role: string) => {
-    try {
-      if (!currentUser?.id) return;
-      
-      await (supabase as any)
-        .from('role_audit_log')
-        .insert([{
-          user_id: userId,
-          changed_by: currentUser.id,
-          action,
-          role: role as 'admin' | 'client',
-        }]);
-    } catch (error) {
-      console.error('Error logging audit action:', error);
-    }
-  };
 
   const handleAddRole = async (userId: string, role: string) => {
     try {
@@ -150,21 +77,15 @@ const AdminUserRoles = () => {
         throw new Error('Role inválida');
       }
 
-      // Apenas master pode criar outros masters ou modificar admins
       if (role === 'master' && !currentUser?.isMaster) {
         throw new Error('Apenas o usuário master pode criar outros masters');
       }
 
       const { error } = await (supabase as any)
         .from('user_roles')
-        .insert([{ 
-          user_id: userId, 
-          role: role
-        }]);
+        .insert([{ user_id: userId, role: role }]);
 
       if (error) throw error;
-
-      await logAuditAction(userId, 'added', role);
 
       toast({
         title: "Role adicionada",
@@ -172,7 +93,6 @@ const AdminUserRoles = () => {
       });
 
       loadUsers();
-      loadAuditLogs();
     } catch (error: any) {
       console.error('Error adding role:', error);
       toast({
@@ -193,15 +113,12 @@ const AdminUserRoles = () => {
 
       if (error) throw error;
 
-      await logAuditAction(userId, 'removed', role);
-
       toast({
         title: "Role removida",
         description: `Role "${role}" removida com sucesso.`,
       });
 
       loadUsers();
-      loadAuditLogs();
     } catch (error: any) {
       console.error('Error removing role:', error);
       toast({
@@ -222,39 +139,30 @@ const AdminUserRoles = () => {
       return;
     }
 
-    try {
-      const userIds = Array.from(selectedUsers);
-      let successCount = 0;
-      let errorCount = 0;
+    const userIds = Array.from(selectedUsers);
+    let successCount = 0;
+    let errorCount = 0;
 
-      for (const userId of userIds) {
-        try {
-          if (bulkAction === 'add') {
-            await handleAddRole(userId, bulkRole);
-          } else {
-            await handleRemoveRole(userId, bulkRole);
-          }
-          successCount++;
-        } catch (error) {
-          errorCount++;
+    for (const userId of userIds) {
+      try {
+        if (bulkAction === 'add') {
+          await handleAddRole(userId, bulkRole);
+        } else {
+          await handleRemoveRole(userId, bulkRole);
         }
+        successCount++;
+      } catch (error) {
+        errorCount++;
       }
-
-      toast({
-        title: "Ação em lote concluída",
-        description: `${successCount} usuário(s) atualizado(s). ${errorCount > 0 ? `${errorCount} erro(s).` : ''}`,
-      });
-
-      setSelectedUsers(new Set());
-      loadUsers();
-      loadAuditLogs();
-    } catch (error: any) {
-      toast({
-        title: "Erro na ação em lote",
-        description: error.message || "Tente novamente.",
-        variant: "destructive",
-      });
     }
+
+    toast({
+      title: "Ação em lote concluída",
+      description: `${successCount} usuário(s) atualizado(s). ${errorCount > 0 ? `${errorCount} erro(s).` : ''}`,
+    });
+
+    setSelectedUsers(new Set());
+    loadUsers();
   };
 
   const toggleUserSelection = (userId: string) => {
@@ -277,366 +185,272 @@ const AdminUserRoles = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesEmail = user.email.toLowerCase().includes(emailFilter.toLowerCase());
-    const matchesId = userIdFilter === "" || user.id.toLowerCase().includes(userIdFilter.toLowerCase());
     const matchesRole = roleFilter === "all" || user.roles.includes(roleFilter);
-    const matchesDate = dateFilter === "" || user.created_at.startsWith(dateFilter);
-    
-    return matchesEmail && matchesId && matchesRole && matchesDate;
+    return matchesEmail && matchesRole;
   });
 
-  const filteredLogs = auditLogs.filter(log => {
-    const matchesEmail = emailFilter === "" || log.user_email?.toLowerCase().includes(emailFilter.toLowerCase());
-    const matchesId = userIdFilter === "" || log.user_id.toLowerCase().includes(userIdFilter.toLowerCase());
-    const matchesRole = roleFilter === "all" || log.role === roleFilter;
-    const matchesDate = dateFilter === "" || log.created_at.startsWith(dateFilter);
-    
-    return matchesEmail && matchesId && matchesRole && matchesDate;
-  });
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'master':
+        return <Badge className="bg-stat-purple/20 text-stat-purple border-stat-purple/30 gap-1"><Crown className="h-3 w-3" />Master</Badge>;
+      case 'admin':
+        return <Badge className="bg-stat-primary/20 text-stat-primary border-stat-primary/30 gap-1"><Shield className="h-3 w-3" />Admin</Badge>;
+      case 'client':
+        return <Badge className="bg-stat-info/20 text-stat-info border-stat-info/30 gap-1"><User className="h-3 w-3" />Cliente</Badge>;
+      default:
+        return <Badge variant="outline">{role}</Badge>;
+    }
+  };
+
+  // Stats
+  const totalUsers = users.length;
+  const adminCount = users.filter(u => u.roles.includes('admin')).length;
+  const masterCount = users.filter(u => u.roles.includes('master')).length;
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Carregando usuários...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-            <Button variant="ghost" onClick={() => navigate('/admin/dashboard')} className="flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Voltar</span>
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card variant="stat">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total de Usuários</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{totalUsers}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-primary/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-stat-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="stat-info">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Administradores</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{adminCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-info/10 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-stat-info" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="stat-purple">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Masters</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{masterCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-stat-purple/10 flex items-center justify-center">
+                <Crown className="h-6 w-6 text-stat-purple" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card variant="surface">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              Filtros
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={loadUsers}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
             </Button>
           </div>
-          <Button onClick={() => { loadUsers(); loadAuditLogs(); }} variant="outline" className="w-full sm:w-auto">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por email..."
+                value={emailFilter}
+                onChange={(e) => setEmailFilter(e.target.value)}
+                className="pl-10 h-11"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Todas as roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as roles</SelectItem>
+                <SelectItem value="master">Master</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="client">Cliente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Alert className="mb-6">
-          <Shield className="h-4 w-4" />
-          <AlertDescription>
-            Gerencie as permissões dos usuários do sistema. Role 'admin' concede acesso total ao painel administrativo.
-          </AlertDescription>
-        </Alert>
+      {/* Bulk Actions */}
+      {selectedUsers.size > 0 && (
+        <Card variant="accent">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="h-5 w-5 text-primary" />
+                <span className="font-semibold">{selectedUsers.size} usuário(s) selecionado(s)</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <Select value={bulkAction} onValueChange={(v) => setBulkAction(v as "add" | "remove")}>
+                  <SelectTrigger className="w-32 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="add">Adicionar</SelectItem>
+                    <SelectItem value="remove">Remover</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={bulkRole} onValueChange={setBulkRole}>
+                  <SelectTrigger className="w-32 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="client">Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} size="sm">
+                  Aplicar
+                </Button>
+                <Button onClick={() => setSelectedUsers(new Set())} variant="ghost" size="sm">
+                  <XSquare className="h-4 w-4 mr-2" />
+                  Limpar
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6 h-auto">
-            <TabsTrigger value="users" className="text-xs sm:text-sm py-2">
-              <Shield className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Gerenciar Roles</span>
-              <span className="sm:hidden">Roles</span>
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="text-xs sm:text-sm py-2">
-              <History className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Histórico</span>
-              <span className="sm:hidden">Histórico</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle>Gerenciamento de Roles</CardTitle>
-                <CardDescription>
-                  Adicione ou remova roles de usuários cadastrados
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Filtros Avançados */}
-                <div className="mb-6 space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-semibold">Filtros</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Email</label>
-                      <Input
-                        placeholder="Filtrar por email..."
-                        value={emailFilter}
-                        onChange={(e) => setEmailFilter(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">ID do Usuário</label>
-                      <Input
-                        placeholder="Filtrar por ID..."
-                        value={userIdFilter}
-                        onChange={(e) => setUserIdFilter(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Role</label>
-                      <Select value={roleFilter} onValueChange={setRoleFilter}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todas as roles" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas as roles</SelectItem>
-                          <SelectItem value="master">Master</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="client">Client</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Data de Cadastro</label>
-                      <DatePicker
-                        date={dateFilter ? parseISO(dateFilter) : undefined}
-                        onDateChange={(date) => setDateFilter(date ? format(date, 'yyyy-MM-dd') : '')}
-                        placeholder="Filtrar por data"
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Ações em Lote */}
-                {selectedUsers.size > 0 && (
-                  <Card className="mb-4 border-primary">
-                    <CardContent className="pt-4">
-                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <CheckSquare className="h-5 w-5 text-primary" />
-                          <span className="font-semibold">{selectedUsers.size} usuário(s) selecionado(s)</span>
+      {/* Users Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-stat-primary" />
+            Gerenciamento de Roles
+          </CardTitle>
+          <CardDescription>
+            {filteredUsers.length} usuário(s) encontrado(s) • Adicione ou remova roles
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-border/50 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="font-semibold">Email</TableHead>
+                  <TableHead className="font-semibold">ID</TableHead>
+                  <TableHead className="font-semibold">Roles</TableHead>
+                  <TableHead className="font-semibold">Cadastro</TableHead>
+                  <TableHead className="text-right font-semibold">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      Nenhum usuário encontrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id} className="hover:bg-muted/20">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedUsers.has(user.id)}
+                          onCheckedChange={() => toggleUserSelection(user.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium text-foreground">{user.email}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {user.id.substring(0, 8)}...
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.roles.length === 0 ? (
+                            <Badge variant="outline" className="text-muted-foreground">Sem roles</Badge>
+                          ) : (
+                            user.roles.map((role) => (
+                              <div key={role} className="flex items-center">
+                                {getRoleBadge(role)}
+                                <button
+                                  onClick={() => handleRemoveRole(user.id, role)}
+                                  className="ml-1 p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))
+                          )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 flex-1">
-                          <Select value={bulkAction} onValueChange={(v) => setBulkAction(v as "add" | "remove")}>
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="add">Adicionar</SelectItem>
-                              <SelectItem value="remove">Remover</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Select value={bulkRole} onValueChange={setBulkRole}>
-                            <SelectTrigger className="w-32">
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(user.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Select
+                            value={selectedRole}
+                            onValueChange={setSelectedRole}
+                          >
+                            <SelectTrigger className="w-28 h-9">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               {currentUser?.isMaster && <SelectItem value="master">Master</SelectItem>}
                               <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="client">Client</SelectItem>
+                              <SelectItem value="client">Cliente</SelectItem>
                             </SelectContent>
                           </Select>
-                          <Button onClick={handleBulkAction} variant="default">
-                            Aplicar
-                          </Button>
-                          <Button onClick={() => setSelectedUsers(new Set())} variant="outline">
-                            <XSquare className="h-4 w-4 mr-2" />
-                            Limpar Seleção
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleAddRole(user.id, selectedRole)}
+                            disabled={user.roles.includes(selectedRole)}
+                          >
+                            <UserPlus className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
-                            onCheckedChange={toggleSelectAll}
-                          />
-                        </TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Roles</TableHead>
-                        <TableHead>Cadastrado em</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            Nenhum usuário encontrado
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>
-                              <Checkbox
-                                checked={selectedUsers.has(user.id)}
-                                onCheckedChange={() => toggleUserSelection(user.id)}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">{user.email}</TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {user.id.substring(0, 8)}...
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {user.roles.length === 0 ? (
-                                  <Badge variant="outline">Sem roles</Badge>
-                                ) : (
-                                  user.roles.map((role) => (
-                                    <Badge key={role} variant="default" className="gap-1">
-                                      {role}
-                                      <button
-                                        onClick={() => handleRemoveRole(user.id, role)}
-                                        className="ml-1 hover:text-destructive"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(user.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Select
-                                  value={selectedRole}
-                                  onValueChange={setSelectedRole}
-                                >
-                                  <SelectTrigger className="w-28">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="client">Client</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleAddRole(user.id, selectedRole)}
-                                  disabled={user.roles.includes(selectedRole)}
-                                >
-                                  <UserPlus className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="audit">
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico de Auditoria</CardTitle>
-                <CardDescription>
-                  Registro completo de todas as mudanças de roles realizadas no sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Filtros para Auditoria */}
-                <div className="mb-6 space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-semibold">Filtros</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Email</label>
-                      <Input
-                        placeholder="Filtrar por email..."
-                        value={emailFilter}
-                        onChange={(e) => setEmailFilter(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">ID do Usuário</label>
-                      <Input
-                        placeholder="Filtrar por ID..."
-                        value={userIdFilter}
-                        onChange={(e) => setUserIdFilter(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Role</label>
-                      <Select value={roleFilter} onValueChange={setRoleFilter}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todas as roles" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas as roles</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="client">Client</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Data</label>
-                      <DatePicker
-                        date={dateFilter ? parseISO(dateFilter) : undefined}
-                        onDateChange={(date) => setDateFilter(date ? format(date, 'yyyy-MM-dd') : '')}
-                        placeholder="Filtrar por data"
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data/Hora</TableHead>
-                        <TableHead>Usuário Afetado</TableHead>
-                        <TableHead>Ação</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Alterado Por</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredLogs.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
-                            Nenhum registro de auditoria encontrado
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredLogs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell>
-                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{log.user_email}</span>
-                                <span className="text-xs text-muted-foreground font-mono">
-                                  {log.user_id.substring(0, 8)}...
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={log.action === 'added' ? 'default' : 'destructive'}>
-                                {log.action === 'added' ? 'Adicionada' : 'Removida'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{log.role}</Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {log.changed_by_email}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
