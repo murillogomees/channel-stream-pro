@@ -170,8 +170,8 @@ export function useCFStreamAnalytics(timeRangeDays: number = 7) {
 
       for (const upload of uploads || []) {
         if (upload.status === 'ready') statusCounts.ready++;
-        else if (upload.status === 'processing' || upload.status === 'uploading') statusCounts.processing++;
-        else if (upload.status === 'error') statusCounts.failed++;
+        else if (upload.status === 'processing' || upload.status === 'uploading' || upload.status === 'downloading') statusCounts.processing++;
+        else if (upload.status === 'error' || upload.status === 'failed' || upload.status === 'needs_r2_fallback') statusCounts.failed++;
 
         if (upload.retry_count && upload.retry_count > 0) {
           statusCounts.total_retries++;
