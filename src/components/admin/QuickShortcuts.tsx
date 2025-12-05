@@ -171,7 +171,7 @@ export const QuickShortcuts = memo(function QuickShortcuts() {
                   <Input
                     value={formData.path}
                     onChange={(e) => setFormData({ ...formData, path: e.target.value })}
-                    placeholder="Ex: /admin/clientes"
+                    placeholder="Ex: /admin/usuarios"
                   />
                 </div>
                 <div className="space-y-2">

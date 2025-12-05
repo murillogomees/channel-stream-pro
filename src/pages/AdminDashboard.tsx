@@ -238,16 +238,16 @@ const AdminDashboard = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <NavCard
-              title="Lista de Clientes"
-              description="Visualize e gerencie todos os clientes"
+              title="Lista de Usuários"
+              description="Visualize e gerencie todos os usuários"
               icon={<Users className="h-5 w-5" />}
-              path="/admin/clientes"
+              path="/admin/usuarios"
             />
             <NavCard
-              title="Novo Cliente"
-              description="Cadastre um novo cliente no sistema"
+              title="Novo Usuário"
+              description="Cadastre um novo usuário no sistema"
               icon={<User className="h-5 w-5" />}
-              path="/admin/clientes/novo"
+              path="/admin/usuarios?tab=create"
             />
             <NavCard
               title="Usuários & Permissões"

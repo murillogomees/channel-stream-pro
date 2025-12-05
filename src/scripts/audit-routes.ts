@@ -52,20 +52,6 @@ const ROUTE_MAPPING: Record<string, RouteAudit> = {
     recommendedAction: 'Manter como hub principal',
     lineCount: 0,
   },
-  '/admin/clientes': {
-    path: '/admin/clientes',
-    file: 'src/pages/admin/AdminClientesPage.tsx',
-    title: 'Gestão de Clientes',
-    description: 'Lista, cadastro, edição e M3U dos clientes',
-    components: ['AdminShell', 'Tabs', 'AdminClienteForm', 'DataTable'],
-    dependencies: ['AdminClienteForm', 'AdminClientM3U'],
-    permissions: ['admin', 'master'],
-    tabs: ['Lista', 'Cadastrar', 'M3U', 'Atividades'],
-    category: 'hub',
-    consolidationPriority: 'none',
-    recommendedAction: 'Hub consolidado - OK',
-    lineCount: 0,
-  },
   '/admin/m3u': {
     path: '/admin/m3u',
     file: 'src/pages/admin/AdminM3UPage.tsx',
@@ -233,19 +219,6 @@ const ROUTE_MAPPING: Record<string, RouteAudit> = {
   },
 
   // ========== LEGACY PAGES (Should be removed/consolidated) ==========
-  '/admin/clientes/novo': {
-    path: '/admin/clientes/novo',
-    file: 'REDIRECT',
-    title: 'Novo Cliente (Legacy)',
-    description: 'REDIRECT → /admin/clientes?action=novo',
-    components: [],
-    dependencies: [],
-    permissions: [],
-    category: 'redirect',
-    consolidationPriority: 'high',
-    recommendedAction: 'REMOVER - já redirecionado',
-    lineCount: 0,
-  },
   '/admin/m3u-builder': {
     path: '/admin/m3u-builder',
     file: 'REDIRECT',

@@ -20,20 +20,20 @@ interface SearchItem {
 }
 
 const searchItems: SearchItem[] = [
-  // Gestão de Clientes
+  // Gestão de Usuários
   {
-    title: "Lista de Clientes",
-    description: "Visualize e gerencie todos os clientes",
-    path: "/admin/clientes",
+    title: "Lista de Usuários",
+    description: "Visualize e gerencie todos os usuários",
+    path: "/admin/usuarios",
     icon: <Users className="h-4 w-4" />,
-    category: "Clientes",
+    category: "Usuários",
   },
   {
-    title: "Novo Cliente",
-    description: "Cadastre um novo cliente",
-    path: "/admin/clientes/novo",
+    title: "Novo Usuário",
+    description: "Cadastre um novo usuário",
+    path: "/admin/usuarios?tab=create",
     icon: <User className="h-4 w-4" />,
-    category: "Clientes",
+    category: "Usuários",
   },
 
   // Notificações
