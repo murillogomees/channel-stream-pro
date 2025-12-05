@@ -64,7 +64,7 @@ export default function SignUp() {
   // Redirecionar se já autenticado
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      navigate("/app/player", { replace: true });
+      navigate("/app/profile", { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate]);
 
@@ -114,13 +114,13 @@ export default function SignUp() {
 
       if (data.user) {
         toast.success(
-          "Conta criada com sucesso! Você tem 3 dias grátis para testar a plataforma.",
+          "Conta criada com sucesso! Complete seu perfil e escolha um plano.",
           { duration: 5000 }
         );
         
-        // Se não precisa confirmar email, redireciona direto
+        // Redireciona para perfil para completar cadastro e escolher plano
         if (data.session) {
-          navigate("/app/player", { replace: true });
+          navigate("/app/profile", { replace: true });
         } else {
           toast.info("Verifique seu email para confirmar o cadastro.", { duration: 5000 });
           navigate("/login", { replace: true });
