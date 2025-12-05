@@ -42,12 +42,28 @@ function getContentType(url: string): 'hls' | 'vod' | 'direct' {
   return 'direct';
 }
 
-// Verifica se é Mixed Content (HTTP em página HTTPS)
-function isMixedContent(url: string): boolean {
+// Verifica se é HTTP URL (precisa de proxy para evitar Mixed Content)
+function isHttpUrl(url: string): boolean {
+  return url.toLowerCase().startsWith('http://');
+}
+
+// Verifica se a página é HTTPS
+function isSecurePage(): boolean {
   if (typeof window === 'undefined') return false;
-  const pageIsHttps = window.location.protocol === 'https:';
-  const urlIsHttp = url.toLowerCase().startsWith('http://');
-  return pageIsHttps && urlIsHttp;
+  return window.location.protocol === 'https:';
+}
+
+// Supabase URL para proxy
+const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
+
+// Converte URL HTTP para usar proxy (bypass Mixed Content)
+function getProxiedUrl(url: string): string {
+  // Se a página é HTTPS e a URL é HTTP, usa o proxy
+  if (isSecurePage() && isHttpUrl(url)) {
+    console.log('[SimplePlayer] Roteando HTTP através do proxy:', url.substring(0, 50));
+    return `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
 
 // Configuração HLS básica e otimizada
@@ -120,29 +136,21 @@ export default function SimplePlayer({
       return;
     }
 
-    console.log('[SimplePlayer] Iniciando:', url.substring(0, 80));
-    
-    // Verifica Mixed Content ANTES de tentar carregar
-    if (isMixedContent(url)) {
-      console.error('[SimplePlayer] Mixed Content bloqueado:', url);
-      setError('Conteúdo HTTP bloqueado. O servidor de origem não suporta conexão segura.');
-      setIsLoading(false);
-      hasNetworkError.current = true;
-      onError?.('Mixed Content blocked');
-      return;
-    }
+    // Obtém URL final (com proxy se necessário para evitar Mixed Content)
+    const finalUrl = getProxiedUrl(url);
+    console.log('[SimplePlayer] Iniciando:', finalUrl.substring(0, 80));
     
     setIsLoading(true);
     setError(null);
     cleanupHls();
 
-    const contentType = getContentType(url);
+    const contentType = getContentType(url); // Usa URL original para detectar tipo
     console.log('[SimplePlayer] Tipo de conteúdo:', contentType);
 
     // VOD ou conteúdo direto - usa playback nativo
     if (contentType === 'vod' || contentType === 'direct') {
       console.log('[SimplePlayer] Usando playback nativo');
-      video.src = url;
+      video.src = finalUrl;
       
       const handleLoaded = () => {
         console.log('[SimplePlayer] Carregado com sucesso');
@@ -181,7 +189,7 @@ export default function SimplePlayer({
           console.log(`[SimplePlayer] Tentativa ${retryCount.current}/${maxRetries}`);
           setTimeout(() => {
             video.src = '';
-            video.src = url;
+            video.src = finalUrl;
             video.load();
           }, 2000 * retryCount.current);
         } else {
@@ -205,7 +213,7 @@ export default function SimplePlayer({
       const hls = new Hls(HLS_CONFIG);
       hlsRef.current = hls;
 
-      hls.loadSource(url);
+      hls.loadSource(finalUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -248,7 +256,7 @@ export default function SimplePlayer({
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari/iOS - HLS nativo
       console.log('[SimplePlayer] Usando HLS nativo');
-      video.src = url;
+      video.src = finalUrl;
       
       video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
