@@ -311,3 +311,15 @@ verify_jwt = false
 # Consolidated storage report
 [functions.get-storage-report]
 verify_jwt = false
+
+# ==========================================
+# M3U INGEST STREAM-SAFE SYSTEM
+# ==========================================
+
+# R2 Signed Upload URL generator - requires admin auth
+[functions.r2-signed-upload]
+verify_jwt = false
+
+# M3U Ingest orchestrator - streaming with fallback
+[functions.m3u-ingest]
+verify_jwt = false
