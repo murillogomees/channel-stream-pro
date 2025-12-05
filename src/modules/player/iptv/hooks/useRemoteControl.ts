@@ -48,63 +48,105 @@ export function useRemoteControl(options: UseRemoteControlOptions = {}) {
     enabled = true,
   } = options;
 
+  // Store callbacks in refs to avoid re-initializing on every render
+  const callbacksRef = useRef({
+    onPlay,
+    onPause,
+    onTogglePlay,
+    onForward,
+    onRewind,
+    onVolumeUp,
+    onVolumeDown,
+    onMute,
+    onFullscreen,
+    onChannelUp,
+    onChannelDown,
+    onChannelDirect,
+    onBack,
+    onInfo,
+    onGuide,
+    onMenu,
+  });
+
+  const seekAmountRef = useRef(seekAmount);
   const cleanupRef = useRef<(() => void)[]>([]);
 
+  // Update refs when callbacks change (without triggering effect)
+  callbacksRef.current = {
+    onPlay,
+    onPause,
+    onTogglePlay,
+    onForward,
+    onRewind,
+    onVolumeUp,
+    onVolumeDown,
+    onMute,
+    onFullscreen,
+    onChannelUp,
+    onChannelDown,
+    onChannelDirect,
+    onBack,
+    onInfo,
+    onGuide,
+    onMenu,
+  };
+  seekAmountRef.current = seekAmount;
+
+  // Stable handler that reads from refs
   const handleAction = useCallback((action: RemoteAction) => {
+    const cb = callbacksRef.current;
+    const seek = seekAmountRef.current;
+    
     switch (action) {
       case 'play':
-        onPlay?.();
+        cb.onPlay?.();
         break;
       case 'pause':
-        onPause?.();
+        cb.onPause?.();
         break;
       case 'togglePlay':
-        onTogglePlay?.();
+        cb.onTogglePlay?.();
         break;
       case 'forward':
-        onForward?.(seekAmount);
+        cb.onForward?.(seek);
         break;
       case 'rewind':
-        onRewind?.(seekAmount);
+        cb.onRewind?.(seek);
         break;
       case 'volumeUp':
-        onVolumeUp?.();
+        cb.onVolumeUp?.();
         break;
       case 'volumeDown':
-        onVolumeDown?.();
+        cb.onVolumeDown?.();
         break;
       case 'mute':
-        onMute?.();
+        cb.onMute?.();
         break;
       case 'fullscreen':
-        onFullscreen?.();
+        cb.onFullscreen?.();
         break;
       case 'channelUp':
-        onChannelUp?.();
+        cb.onChannelUp?.();
         break;
       case 'channelDown':
-        onChannelDown?.();
+        cb.onChannelDown?.();
         break;
       case 'back':
-        onBack?.();
+        cb.onBack?.();
         break;
       case 'info':
-        onInfo?.();
+        cb.onInfo?.();
         break;
       case 'guide':
-        onGuide?.();
+        cb.onGuide?.();
         break;
       case 'menu':
-        onMenu?.();
+        cb.onMenu?.();
         break;
     }
-  }, [
-    onPlay, onPause, onTogglePlay, onForward, onRewind,
-    onVolumeUp, onVolumeDown, onMute, onFullscreen,
-    onChannelUp, onChannelDown, onBack, onInfo, onGuide, onMenu,
-    seekAmount
-  ]);
+  }, []); // No deps - reads from refs
 
+  // Initialize once when enabled changes
   useEffect(() => {
     if (!enabled) return;
 
@@ -122,18 +164,19 @@ export function useRemoteControl(options: UseRemoteControlOptions = {}) {
       cleanupRef.current.push(unsub);
     });
 
-    // Direct channel input
-    if (onChannelDirect) {
-      const unsub = remoteControl.onChannelInput(onChannelDirect);
-      cleanupRef.current.push(unsub);
-    }
+    // Direct channel input - stable callback that reads from ref
+    const handleChannelDirect = (num: number) => {
+      callbacksRef.current.onChannelDirect?.(num);
+    };
+    const unsub = remoteControl.onChannelInput(handleChannelDirect);
+    cleanupRef.current.push(unsub);
 
     return () => {
       cleanupRef.current.forEach(unsub => unsub());
       cleanupRef.current = [];
       remoteControl.destroy();
     };
-  }, [enabled, handleAction, onChannelDirect]);
+  }, [enabled, handleAction]); // handleAction is stable now
 
   return {
     seekAmount,
