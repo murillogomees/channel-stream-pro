@@ -629,6 +629,32 @@ async function processDownload(channel: any, downloadId: string, supabase: any, 
 
     console.log(`✅ [VOD] ${channel.name} em ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
+    // Auto-trigger R2 → CF Stream sync if enabled
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const cronSecret = Deno.env.get('CRON_SECRET');
+      
+      if (supabaseUrl && cronSecret) {
+        console.log(`🔄 [VOD] Triggering auto-sync to CF Stream for ${channel.name}`);
+        
+        fetch(`${supabaseUrl}/functions/v1/r2-to-cfstream-trigger`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': cronSecret,
+          },
+          body: JSON.stringify({
+            channel_id: channel.id,
+            r2_url: r2Url,
+            r2_key: isHLS ? `vod/${channel.id}/playlist.m3u8` : `vod/${channel.id}/video.${ext}`,
+            file_size_bytes: fileSizeBytes,
+          }),
+        }).catch(e => console.error(`[VOD] Auto-sync trigger error: ${e.message}`));
+      }
+    } catch (syncErr) {
+      console.error(`[VOD] Auto-sync error:`, syncErr);
+    }
+
   } catch (error: any) {
     console.error(`❌ [VOD] Falha: ${channel.name} - ${error.message}`);
     

@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStorageConsolidatedReport } from '@/hooks/useStorageConsolidatedReport';
 import { StorageCostEstimator } from './StorageCostEstimator';
 import { StorageEvolutionChart } from './StorageEvolutionChart';
 import { StorageSyncHistory } from './StorageSyncHistory';
-import { HardDrive, Cloud, Database, RefreshCw, TrendingUp, DollarSign, Activity, Zap } from 'lucide-react';
+import { StorageConfigModal } from './StorageConfigModal';
+import { VODStorageList } from './VODStorageList';
+import { HardDrive, Cloud, Database, RefreshCw, TrendingUp, DollarSign, Activity, Zap, Settings, Film } from 'lucide-react';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -18,6 +22,7 @@ function formatBytes(bytes: number): string {
 
 export function StorageConsolidatedReport() {
   const { report, config, isLoading, error, refresh, updateConfig } = useStorageConsolidatedReport();
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   if (error) {
     return (
@@ -43,10 +48,15 @@ export function StorageConsolidatedReport() {
             Visão unificada do R2 + Cloudflare Stream
           </p>
         </div>
-        <Button onClick={refresh} disabled={isLoading} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowConfigModal(true)} variant="outline" size="icon">
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button onClick={refresh} disabled={isLoading} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -148,16 +158,24 @@ export function StorageConsolidatedReport() {
         </Card>
       </div>
 
-      {/* Auto-Sync Config */}
+      {/* Auto-Sync Config Quick View */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Configuração de Auto-Sync
-          </CardTitle>
-          <CardDescription>
-            Controle a sincronização automática R2 → CF Stream
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Configuração de Auto-Sync
+              </CardTitle>
+              <CardDescription>
+                Controle a sincronização automática R2 → CF Stream
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowConfigModal(true)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-4">
@@ -183,25 +201,55 @@ export function StorageConsolidatedReport() {
         </CardContent>
       </Card>
 
-      {/* Charts and Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Evolution Chart */}
-        <StorageEvolutionChart 
-          data={report?.monthly_evolution || []} 
-          isLoading={isLoading} 
-        />
+      {/* Tabs for different views */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="vods" className="gap-2">
+            <Film className="h-4 w-4" />
+            VODs
+          </TabsTrigger>
+          <TabsTrigger value="history" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Histórico
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Cost Breakdown */}
-        <StorageCostEstimator 
-          costs={report?.costs} 
-          isLoading={isLoading} 
-        />
-      </div>
+        <TabsContent value="overview" className="space-y-6">
+          {/* Charts and Details */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <StorageEvolutionChart 
+              data={report?.monthly_evolution || []} 
+              isLoading={isLoading} 
+            />
+            <StorageCostEstimator 
+              costs={report?.costs} 
+              isLoading={isLoading} 
+            />
+          </div>
+        </TabsContent>
 
-      {/* Sync History */}
-      <StorageSyncHistory 
-        syncs={report?.recent_syncs || []} 
-        isLoading={isLoading} 
+        <TabsContent value="vods">
+          <VODStorageList />
+        </TabsContent>
+
+        <TabsContent value="history">
+          <StorageSyncHistory 
+            syncs={report?.recent_syncs || []} 
+            isLoading={isLoading} 
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Config Modal */}
+      <StorageConfigModal
+        open={showConfigModal}
+        onOpenChange={setShowConfigModal}
+        config={config}
+        onConfigUpdate={updateConfig}
       />
     </div>
   );
