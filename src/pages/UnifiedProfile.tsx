@@ -1,6 +1,7 @@
 /**
  * UnifiedProfile - Página unificada de perfil do usuário
  * Mostra informações da conta, assinatura e histórico de pagamentos
+ * Novos usuários podem completar perfil e escolher plano
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -23,7 +24,8 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,6 +43,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
 import { AppLayout } from '@/components/layouts/AppLayout';
+import { PlanCards } from '@/components/profile/PlanCards';
 
 interface ClienteData {
   id: string;
@@ -101,6 +104,13 @@ export default function UnifiedProfile() {
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  
+  // Plan selection state
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  
+  // Check if user needs to complete profile/select plan
+  const isNewUser = !cliente?.plano || cliente?.situacao === 'Testando';
+  const defaultTab = isNewUser ? 'plans' : 'subscription';
 
   useEffect(() => {
     loadData();
@@ -424,9 +434,15 @@ export default function UnifiedProfile() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="subscription" className="space-y-4">
+        <Tabs defaultValue={defaultTab} className="space-y-4">
           <ScrollArea className="w-full whitespace-nowrap">
             <TabsList className="inline-flex h-auto min-w-full p-1 bg-muted">
+              {isNewUser && (
+                <TabsTrigger value="plans" className="flex-shrink-0 px-3 py-2 text-sm">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Escolher Plano
+                </TabsTrigger>
+              )}
               <TabsTrigger value="subscription" className="flex-shrink-0 px-3 py-2 text-sm">
                 <CreditCard className="w-4 h-4 mr-2" />
                 Assinatura
@@ -446,6 +462,54 @@ export default function UnifiedProfile() {
             </TabsList>
             <ScrollBar orientation="horizontal" className="invisible" />
           </ScrollArea>
+
+          {/* Plans Tab - For new users */}
+          {isNewUser && (
+            <TabsContent value="plans" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    Escolha seu Plano
+                  </CardTitle>
+                  <CardDescription>
+                    Você está no período de teste gratuito. Escolha um plano para continuar aproveitando!
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Trial info banner */}
+                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Clock className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-foreground">Período de Teste</p>
+                        <p className="text-sm text-muted-foreground">
+                          Aproveite 3 dias grátis para testar todos os recursos. Após o período, escolha o plano ideal para você.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Plan Cards */}
+                  <PlanCards 
+                    selectedPlan={selectedPlan} 
+                    onSelectPlan={setSelectedPlan} 
+                  />
+
+                  {/* Proceed button */}
+                  {selectedPlan && (
+                    <Button 
+                      className="w-full h-12 text-base"
+                      onClick={() => navigate(`/checkout?plan=${selectedPlan}`)}
+                    >
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      Assinar Plano {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* Subscription Tab */}
           <TabsContent value="subscription" className="space-y-4">
