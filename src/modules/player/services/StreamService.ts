@@ -149,8 +149,8 @@ class StreamService {
    * 
    * 1. Cloudflare Stream (se transcodificado)
    * 2. R2 CDN (se VOD uploaded)
-   * 3. Link Direto (TV ao vivo)
-   * 4. Proxy (apenas para HTTP em página HTTPS)
+   * 3. Link Direto (para HTTPS)
+   * 4. Proxy (HTTP em página HTTPS - Mixed Content)
    */
   getPlaybackSource(channel: Channel): PlaybackSource {
     // PRIORIDADE 1: Cloudflare Stream (conteúdo transcodificado)
@@ -174,7 +174,6 @@ class StreamService {
       };
     }
 
-    // PRIORIDADE 3: Link Direto (TV ao vivo ou VOD HTTPS)
     const streamUrl = channel.stream_url;
     if (!streamUrl) {
       return {
@@ -184,27 +183,7 @@ class StreamService {
       };
     }
 
-    // Para TV ao vivo: sempre link direto
-    if (this.isLiveContent(channel)) {
-      console.log('[StreamService] 📺 TV AO VIVO - Link Direto:', channel.name);
-      return {
-        url: streamUrl,
-        source: 'direct',
-        requiresAuth: false,
-      };
-    }
-
-    // Para VOD HTTPS: link direto
-    if (this.isVodContent(channel) && streamUrl.startsWith('https://')) {
-      console.log('[StreamService] 🎬 VOD HTTPS - Link Direto:', channel.name);
-      return {
-        url: streamUrl,
-        source: 'direct',
-        requiresAuth: false,
-      };
-    }
-
-    // Para HTTPS genérico: link direto
+    // PRIORIDADE 3: Para HTTPS - link direto (funciona em todas as páginas)
     if (streamUrl.startsWith('https://')) {
       console.log('[StreamService] 🔒 HTTPS - Link Direto:', channel.name);
       return {
@@ -214,14 +193,28 @@ class StreamService {
       };
     }
 
-    // PRIORIDADE 4: Proxy (HTTP em página HTTPS - Mixed Content)
+    // PRIORIDADE 4: Proxy para HTTP (Mixed Content - obrigatório em páginas HTTPS)
+    // IMPORTANTE: Isso se aplica a TODOS os conteúdos HTTP (live, VOD, etc.)
     if (streamUrl.startsWith('http://')) {
-      console.log('[StreamService] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
+      // Só usa proxy se estamos em HTTPS (browser environment)
+      const isSecurePage = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+      
+      if (isSecurePage) {
+        console.log('[StreamService] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
+        return {
+          url: `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`,
+          source: 'proxy',
+          requiresAuth: false,
+          fallbackUrl: streamUrl,
+        };
+      }
+      
+      // Se não estamos em HTTPS (dev mode), pode usar direto
+      console.log('[StreamService] 📺 HTTP direto (não-HTTPS page):', channel.name);
       return {
-        url: `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`,
-        source: 'proxy',
+        url: streamUrl,
+        source: 'direct',
         requiresAuth: false,
-        fallbackUrl: streamUrl,
       };
     }
 
@@ -236,11 +229,22 @@ class StreamService {
 
   /**
    * Retorna URL pronta para o player (simplificado)
+   * Automaticamente aplica proxy para URLs HTTP em páginas HTTPS
    */
   getPlayableUrl(channelOrUrl: Channel | string): string {
     // Se é string direta
     if (typeof channelOrUrl === 'string') {
-      return channelOrUrl || '';
+      const url = channelOrUrl || '';
+      
+      // Se URL HTTP em página HTTPS, precisa de proxy
+      if (url.startsWith('http://')) {
+        const isSecurePage = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+        if (isSecurePage) {
+          return `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(url)}`;
+        }
+      }
+      
+      return url;
     }
     
     // Se é Channel object
