@@ -150,16 +150,14 @@ export function TVNavRail({
                 <Search className="w-5 h-5 text-sidebar-foreground/70" />
               </Button>
             )}
-            {onSettings && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onSettings}
-                className="w-12 h-12 rounded-xl hover:bg-sidebar-accent"
-              >
-                <Settings className="w-5 h-5 text-sidebar-foreground/70" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => window.location.href = '/app/profile'}
+              className="w-12 h-12 rounded-xl hover:bg-sidebar-accent"
+            >
+              <Settings className="w-5 h-5 text-sidebar-foreground/70" />
+            </Button>
           </div>
         </div>
       </nav>
