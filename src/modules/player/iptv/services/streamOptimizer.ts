@@ -71,18 +71,18 @@ class StreamOptimizerService {
       return 'dash';
     }
     
-    // Check for explicit TS streams only
+    // Check for explicit TS streams ONLY - be very conservative
+    // mpegts.js will fail if content isn't actually TS format
     if (pathname.endsWith('.ts')) {
       return 'ts';
     }
     
-    // Live streams - use TS (mpegts.js)
-    if (lowerUrl.includes('/live/') || lowerUrl.includes('stream.php')) {
-      return 'ts';
-    }
+    // For /live/ URLs and stream.php, DON'T assume TS!
+    // Many live streams are HLS or return errors. Let native video handle it.
+    // The stream-proxy will pass through whatever format the server returns.
     
     // Default to 'unknown' - will use native HTML5 video
-    // This prevents mpegts.js from being used for non-TS content
+    // This prevents mpegts.js errors on non-TS content
     return 'unknown';
   }
 
