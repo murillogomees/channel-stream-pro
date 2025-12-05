@@ -30,11 +30,18 @@ import type { MovieSortOption, SeriesSortOption } from '@/features/player/compon
 import { favoritesService as playerFavoritesService, watchProgressService, analyticsService } from '@/features/player/services';
 import type { WatchProgress, TrendingItem, ContentType, RecommendationItem } from '@/features/player/types';
 import { AppLayout } from '@/components/layouts/AppLayout';
+import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
 export default function AppPlayer() {
   const navigate = useNavigate();
   const {
-    isAdmin
+    isAdmin,
+    user
   } = useAuth();
+
+  // Check subscription status - admins bypass this check
+  const isSubscriptionExpired = !isAdmin && user?.isExpired === true;
+  const isTrial = user?.isTrial || false;
+  const planName = user?.clienteData?.plano || 'Teste';
 
   // Unified player - same content for admins and clients
   const player = useIPTVPlayerClient();
@@ -596,5 +603,13 @@ export default function AppPlayer() {
 
       {/* Floating background loading progress */}
       <LoadingProgressBar isLoading={false} isLoadingMore={isLoadingMore} loadedChannels={loadedChannels} totalChannels={totalChannels} loadingPercent={loadingPercent} loadingProgress={loadingProgress} isCached={isCached} />
+
+      {/* Subscription Expired Modal - blocks content when subscription expires */}
+      <SubscriptionExpiredModal 
+        isOpen={isSubscriptionExpired} 
+        isTrial={isTrial}
+        planName={planName}
+        daysRemaining={user?.daysRemaining || 0}
+      />
     </AppLayout>;
 }
