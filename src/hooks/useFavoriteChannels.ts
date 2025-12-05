@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 import { toast } from 'sonner';
 
 export function useFavoriteChannels() {
@@ -8,11 +9,16 @@ export function useFavoriteChannels() {
 
   const loadFavorites = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Usar cache primeiro
+      let userId = authCache.getUserId();
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id || null;
+      }
+      if (!userId) return;
 
       // Get from localStorage for now (can be migrated to Supabase table later)
-      const stored = localStorage.getItem(`iptv_favorites_${user.id}`);
+      const stored = localStorage.getItem(`iptv_favorites_${userId}`);
       if (stored) {
         setFavorites(new Set(JSON.parse(stored)));
       }
@@ -29,8 +35,13 @@ export function useFavoriteChannels() {
 
   const toggleFavorite = useCallback(async (channelId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Usar cache primeiro
+      let userId = authCache.getUserId();
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id || null;
+      }
+      if (!userId) {
         toast.error('Usuário não autenticado');
         return;
       }
@@ -46,7 +57,7 @@ export function useFavoriteChannels() {
         }
 
         // Save to localStorage
-        localStorage.setItem(`iptv_favorites_${user.id}`, JSON.stringify([...newFavorites]));
+        localStorage.setItem(`iptv_favorites_${userId}`, JSON.stringify([...newFavorites]));
         
         return newFavorites;
       });

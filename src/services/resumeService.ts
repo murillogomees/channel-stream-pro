@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 
 const LOCAL_STORAGE_KEY = 'iptv_resume_progress';
 const MAX_LOCAL_ENTRIES = 100;
@@ -81,9 +82,14 @@ class ResumeService {
   }
 
   /**
-   * Get current user ID
+   * Get current user ID (usa cache para evitar chamadas desnecessárias)
    */
   private async getUserId(): Promise<string | null> {
+    // Cache primeiro - sem network request
+    const cachedId = authCache.getUserId();
+    if (cachedId) return cachedId;
+    
+    // Fallback apenas se cache estiver vazio
     const { data: { user } } = await supabase.auth.getUser();
     return user?.id || null;
   }

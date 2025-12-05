@@ -15,6 +15,7 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole, SubscriptionStatusType } from '@/types/auth';
 import { authLoggingService } from '@/services/authLoggingService';
+import { authCache } from '@/services/authCacheService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -233,11 +234,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     cacheRef.current = null;
+    authCache.clear(); // Limpa cache global
     localStorage.removeItem('iptv_remember_me');
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
   }, [user]);
+
+  // Sincronizar AuthContext com authCache global
+  useEffect(() => {
+    authCache.setAuthState(user, session);
+  }, [user, session]);
 
   useEffect(() => {
     const REMEMBER_ME_KEY = 'iptv_remember_me';

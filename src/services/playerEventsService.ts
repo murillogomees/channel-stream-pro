@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 
 export type PlayerEventType = 
   | 'play' 
@@ -166,14 +167,19 @@ class PlayerEventsService {
     this.eventQueue = [];
 
     try {
-      // Try edge function first
-      const { data: { session } } = await supabase.auth.getSession();
+      // Try edge function first - usar cache para evitar chamadas desnecessárias
+      let accessToken = authCache.getAccessToken();
+      if (!accessToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token || null;
+      }
+      
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
       
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
       // Send to edge function
@@ -205,10 +211,15 @@ class PlayerEventsService {
    */
   private async sendToSupabase(events: PlayerEvent[]): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Usar cache primeiro
+      let userId = authCache.getUserId();
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id || null;
+      }
       
       const records = events.map(event => ({
-        profile_id: user?.id || null,
+        profile_id: userId || null,
         content_id: event.contentId,
         content_type: event.contentType,
         event_type: event.event,
