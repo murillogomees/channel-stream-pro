@@ -3,20 +3,18 @@
  * StreamService - Serviço de Streaming IPTV
  * ============================================================================
  * 
- * Centraliza toda a lógica de:
- * - Construção de URLs de proxy
- * - Validação de streams
- * - Cache de canais
- * - Healthcheck de URLs
+ * ARQUITETURA DE ENTREGA:
+ * - TV AO VIVO: Link direto (sem proxy)
+ * - VOD: R2 Cloudflare CDN
+ * - Cloudflare Stream: Para conteúdo transcodificado
  * 
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
 
-// URL do Supabase - usar valor fixo para garantir funcionamento
 const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
 
 const ENDPOINTS = {
@@ -41,6 +39,9 @@ export interface Channel {
   r2_uploaded?: boolean;
   r2_url?: string | null;
   content_type?: 'live' | 'vod' | 'unknown';
+  // Cloudflare Stream
+  cf_stream_url?: string | null;
+  cf_stream_uid?: string | null;
 }
 
 export interface Category {
@@ -65,75 +66,176 @@ export interface StreamHealthResult {
   error?: string;
 }
 
+export interface PlaybackSource {
+  url: string;
+  source: 'direct' | 'r2_cdn' | 'cloudflare_stream' | 'proxy';
+  requiresAuth: boolean;
+  fallbackUrl?: string;
+}
+
 // =============================================================================
 // STREAM SERVICE
 // =============================================================================
 
 class StreamService {
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
+  private cache: Map<string, { data: unknown; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   // ===========================================================================
-  // URL BUILDING
+  // CONTENT TYPE DETECTION
   // ===========================================================================
-
-  /**
-   * Constrói URL de proxy para um stream (DESABILITADO - carrega direto)
-   */
-  getProxyUrl(streamUrl: string): string {
-    // Proxy desabilitado - retorna URL original sempre
-    return streamUrl;
-  }
 
   /**
    * Verifica se conteúdo é VOD (filme/série)
    */
-  isVodContent(url: string): boolean {
+  isVodContent(urlOrChannel: string | Channel): boolean {
+    const url = typeof urlOrChannel === 'string' 
+      ? urlOrChannel 
+      : urlOrChannel.stream_url;
+    
     if (!url) return false;
+    
+    // Check explicit content_type first
+    if (typeof urlOrChannel === 'object') {
+      if (urlOrChannel.content_type === 'vod') return true;
+      if (urlOrChannel.is_vod) return true;
+    }
+    
     const urlLower = url.toLowerCase();
     return urlLower.includes('/movie/') || 
            urlLower.includes('/series/') || 
            urlLower.includes('/vod/') ||
-           urlLower.includes('.mp4') ||
-           urlLower.includes('.mkv') ||
-           urlLower.includes('.avi');
+           urlLower.endsWith('.mp4') ||
+           urlLower.endsWith('.mkv') ||
+           urlLower.endsWith('.avi') ||
+           urlLower.endsWith('.ts') ||
+           urlLower.endsWith('.webm');
   }
 
   /**
-   * Verifica se uma URL precisa de proxy - SEMPRE retorna false agora
+   * Verifica se conteúdo é TV ao vivo
    */
-  needsProxy(_url: string): boolean {
-    // Proxy desabilitado - carrega direto sempre
-    return false;
-  }
-
-  /**
-   * Retorna URL pronta para o player - SEMPRE carrega direto
-   */
-  getPlayableUrl(channelOrUrl: Channel | string): string {
-    // Se é objeto Channel
-    if (typeof channelOrUrl === 'object' && channelOrUrl) {
-      // Priorizar R2 URL se o VOD foi uploaded
-      if (channelOrUrl.r2_uploaded && channelOrUrl.r2_url) {
-        console.log('[StreamService] Using R2 CDN URL for:', channelOrUrl.name);
-        return channelOrUrl.r2_url;
+  isLiveContent(urlOrChannel: string | Channel): boolean {
+    if (typeof urlOrChannel === 'object') {
+      if (urlOrChannel.content_type === 'live') return true;
+      // Explicit live detection
+      const catName = urlOrChannel.category_name?.toLowerCase() || '';
+      if (catName.includes('tv') || catName.includes('live') || catName.includes('ao vivo')) {
+        return true;
       }
-      
-      const streamUrl = channelOrUrl.stream_url;
-      if (!streamUrl) return '';
-      
-      // CARREGA DIRETO - sem proxy
-      console.log('[StreamService] 🎬 DIRECT LOAD:', streamUrl.substring(0, 80));
-      return streamUrl;
     }
     
-    // Se é string direta
-    const streamUrl = channelOrUrl as string;
-    if (!streamUrl) return '';
+    const url = typeof urlOrChannel === 'string' 
+      ? urlOrChannel 
+      : urlOrChannel.stream_url;
     
-    // CARREGA DIRETO - sem proxy
-    console.log('[StreamService] 🎬 DIRECT LOAD:', streamUrl.substring(0, 80));
-    return streamUrl;
+    if (!url) return false;
+    
+    const urlLower = url.toLowerCase();
+    // Live indicators
+    return urlLower.includes('/live/') ||
+           urlLower.includes('live.m3u8') ||
+           urlLower.includes('/stream/') ||
+           urlLower.includes('iptv') ||
+           (urlLower.includes('.m3u8') && !this.isVodContent(url));
+  }
+
+  // ===========================================================================
+  // URL BUILDING - ARQUITETURA CDN
+  // ===========================================================================
+
+  /**
+   * Obtém URL de playback otimizada seguindo a arquitetura:
+   * 
+   * 1. Cloudflare Stream (se transcodificado)
+   * 2. R2 CDN (se VOD uploaded)
+   * 3. Link Direto (TV ao vivo)
+   * 4. Proxy (apenas para HTTP em página HTTPS)
+   */
+  getPlaybackSource(channel: Channel): PlaybackSource {
+    // PRIORIDADE 1: Cloudflare Stream (conteúdo transcodificado)
+    if (channel.cf_stream_url) {
+      console.log('[StreamService] ☁️ CF Stream:', channel.name);
+      return {
+        url: channel.cf_stream_url,
+        source: 'cloudflare_stream',
+        requiresAuth: false,
+      };
+    }
+
+    // PRIORIDADE 2: R2 CDN (VOD uploaded)
+    if (channel.r2_uploaded && channel.r2_url) {
+      console.log('[StreamService] 📦 R2 CDN:', channel.name);
+      return {
+        url: channel.r2_url,
+        source: 'r2_cdn',
+        requiresAuth: false,
+        fallbackUrl: channel.stream_url,
+      };
+    }
+
+    // PRIORIDADE 3: Link Direto (TV ao vivo ou VOD HTTPS)
+    const streamUrl = channel.stream_url;
+    if (!streamUrl) {
+      return {
+        url: '',
+        source: 'direct',
+        requiresAuth: false,
+      };
+    }
+
+    // Para TV ao vivo: sempre link direto
+    if (this.isLiveContent(channel)) {
+      console.log('[StreamService] 📺 TV AO VIVO - Link Direto:', channel.name);
+      return {
+        url: streamUrl,
+        source: 'direct',
+        requiresAuth: false,
+      };
+    }
+
+    // Para VOD HTTPS: link direto
+    if (streamUrl.startsWith('https://')) {
+      console.log('[StreamService] 🎬 VOD HTTPS - Link Direto:', channel.name);
+      return {
+        url: streamUrl,
+        source: 'direct',
+        requiresAuth: false,
+      };
+    }
+
+    // PRIORIDADE 4: Proxy (apenas HTTP em página HTTPS - Mixed Content)
+    if (streamUrl.startsWith('http://')) {
+      console.log('[StreamService] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
+      return {
+        url: `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`,
+        source: 'proxy',
+        requiresAuth: false,
+        fallbackUrl: streamUrl,
+      };
+    }
+
+    // Default: link direto
+    console.log('[StreamService] 🎯 Default - Link Direto:', channel.name);
+    return {
+      url: streamUrl,
+      source: 'direct',
+      requiresAuth: false,
+    };
+  }
+
+  /**
+   * Retorna URL pronta para o player (simplificado)
+   */
+  getPlayableUrl(channelOrUrl: Channel | string): string {
+    // Se é string direta
+    if (typeof channelOrUrl === 'string') {
+      return channelOrUrl || '';
+    }
+    
+    // Se é Channel object
+    const source = this.getPlaybackSource(channelOrUrl);
+    return source.url;
   }
   
   /**
@@ -142,13 +244,20 @@ class StreamService {
   isOptimizedContent(channel: Channel): boolean {
     return Boolean(channel.r2_uploaded && channel.r2_url);
   }
+
+  /**
+   * Verifica se canal tem Cloudflare Stream
+   */
+  hasCloudflareStream(channel: Channel): boolean {
+    return Boolean(channel.cf_stream_url);
+  }
   
   /**
-   * Obtém URL otimizada usando CDN Worker routing
+   * Obtém URL otimizada usando CDN Worker routing (avançado)
    */
   async getOptimizedUrl(channel: Channel): Promise<{
     url: string;
-    source: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin';
+    source: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin' | 'direct';
     requiresToken: boolean;
     fallbackUrl?: string;
   }> {
@@ -168,6 +277,24 @@ class StreamService {
   }
 
   // ===========================================================================
+  // LEGACY METHODS (mantidos para compatibilidade)
+  // ===========================================================================
+
+  /**
+   * @deprecated Use getPlaybackSource instead
+   */
+  getProxyUrl(streamUrl: string): string {
+    return streamUrl;
+  }
+
+  /**
+   * @deprecated Use getPlaybackSource instead  
+   */
+  needsProxy(_url: string): boolean {
+    return false;
+  }
+
+  // ===========================================================================
   // M3U FETCHING
   // ===========================================================================
 
@@ -182,7 +309,7 @@ class StreamService {
     const cacheKey = `m3u:${url}:${offset}:${limit}`;
 
     // Check cache
-    const cached = this.getFromCache(cacheKey);
+    const cached = this.getFromCache<M3UFetchResult>(cacheKey);
     if (cached) {
       console.log('[StreamService] M3U from cache');
       return cached;
@@ -308,8 +435,7 @@ class StreamService {
     const start = Date.now();
     
     try {
-      const proxyUrl = this.getProxyUrl(url);
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(url, {
         method: 'HEAD',
         signal: AbortSignal.timeout(10000),
       });
@@ -333,16 +459,16 @@ class StreamService {
   // CACHE
   // ===========================================================================
 
-  private getFromCache(key: string): any | null {
+  private getFromCache<T>(key: string): T | null {
     const cached = this.cache.get(key);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      return cached.data;
+      return cached.data as T;
     }
     this.cache.delete(key);
     return null;
   }
 
-  private setCache(key: string, data: any): void {
+  private setCache(key: string, data: unknown): void {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 

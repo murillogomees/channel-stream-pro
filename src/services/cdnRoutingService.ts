@@ -1,8 +1,13 @@
 /**
  * CDN Routing Service
  * 
- * Central service for intelligent CDN Worker routing decisions.
- * Determines optimal playback URLs using CDN Worker, R2, Stream, or origin.
+ * ARQUITETURA DE ENTREGA DE CONTEÚDO:
+ * =====================================
+ * 
+ * 1. TV AO VIVO → Link Direto (sem proxy, máxima performance)
+ * 2. VOD (R2 uploaded) → R2 CDN com token JWT
+ * 3. Cloudflare Stream → Para conteúdo transcodificado
+ * 4. Proxy → Apenas para HTTP em página HTTPS (Mixed Content)
  */
 
 import { generateCdnToken } from '@/services/r2CdnService';
@@ -14,7 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface PlaybackResult {
   url: string;
-  source: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin';
+  source: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin' | 'direct';
   requiresToken: boolean;
   token?: string;
   expiresAt?: number;
@@ -31,6 +36,8 @@ export interface CdnWorkerHealth {
 export interface RoutingMetrics {
   cdn_worker_requests: number;
   stream_proxy_requests: number;
+  direct_requests: number;
+  cloudflare_stream_requests: number;
   fallback_count: number;
   avg_response_time: number;
   error_rate: number;
@@ -45,6 +52,7 @@ interface Channel {
   content_type?: 'live' | 'vod' | 'unknown';
   is_vod?: boolean;
   cf_stream_url?: string | null;
+  category_name?: string;
 }
 
 // ============================================
@@ -70,6 +78,8 @@ const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
 const metrics: RoutingMetrics = {
   cdn_worker_requests: 0,
   stream_proxy_requests: 0,
+  direct_requests: 0,
+  cloudflare_stream_requests: 0,
   fallback_count: 0,
   avg_response_time: 0,
   error_rate: 0,
@@ -86,7 +96,6 @@ async function initializeConfig(): Promise<void> {
   if (CDN_WORKER_URL && R2_PUBLIC_DOMAIN) return;
 
   try {
-    // Try to get from edge function that reads secrets
     const { data, error } = await supabase.functions.invoke('cdn-config');
     
     if (!error && data) {
@@ -99,10 +108,54 @@ async function initializeConfig(): Promise<void> {
     }
   } catch (error) {
     console.warn('[CDN Routing] Config init failed, using defaults:', error);
-    // Fallback to environment or default values
-    CDN_WORKER_URL = import.meta.env.VITE_CDN_WORKER_URL || null;
-    R2_PUBLIC_DOMAIN = import.meta.env.VITE_R2_PUBLIC_DOMAIN || null;
   }
+}
+
+// ============================================
+// CONTENT TYPE DETECTION
+// ============================================
+
+/**
+ * Check if content is VOD (movie/series)
+ */
+function isVodContent(channel: Channel): boolean {
+  if (channel.content_type === 'vod') return true;
+  if (channel.is_vod) return true;
+  
+  const url = channel.stream_url?.toLowerCase() || '';
+  return url.includes('/movie/') || 
+         url.includes('/series/') || 
+         url.includes('/vod/') ||
+         url.endsWith('.mp4') ||
+         url.endsWith('.mkv') ||
+         url.endsWith('.avi') ||
+         url.endsWith('.ts') ||
+         url.endsWith('.webm');
+}
+
+/**
+ * Check if content is Live TV
+ */
+function isLiveContent(channel: Channel): boolean {
+  if (channel.content_type === 'live') return true;
+  
+  const catName = channel.category_name?.toLowerCase() || '';
+  if (catName.includes('tv') || catName.includes('live') || catName.includes('ao vivo')) {
+    return true;
+  }
+  
+  const url = channel.stream_url?.toLowerCase() || '';
+  return url.includes('/live/') ||
+         url.includes('live.m3u8') ||
+         url.includes('/stream/') ||
+         (url.includes('.m3u8') && !isVodContent(channel));
+}
+
+/**
+ * Check if URL is HTTP (needs proxy for Mixed Content)
+ */
+function isHttpUrl(url: string): boolean {
+  return url?.toLowerCase().startsWith('http://') || false;
 }
 
 // ============================================
@@ -113,7 +166,6 @@ async function initializeConfig(): Promise<void> {
  * Check CDN Worker health status
  */
 export async function checkCdnWorkerHealth(): Promise<CdnWorkerHealth> {
-  // Return cached health if recent
   const now = Date.now();
   if (now - healthCache.lastCheck < HEALTH_CHECK_INTERVAL) {
     return healthCache;
@@ -142,20 +194,12 @@ export async function checkCdnWorkerHealth(): Promise<CdnWorkerHealth> {
     clearTimeout(timeoutId);
     const responseTime = Date.now() - start;
 
-    if (response.ok) {
-      healthCache = {
-        status: responseTime > 2000 ? 'degraded' : 'healthy',
-        responseTime,
-        lastCheck: now,
-      };
-    } else {
-      healthCache = {
-        status: 'degraded',
-        responseTime,
-        lastCheck: now,
-        error: `HTTP ${response.status}`,
-      };
-    }
+    healthCache = {
+      status: response.ok ? (responseTime > 2000 ? 'degraded' : 'healthy') : 'degraded',
+      responseTime,
+      lastCheck: now,
+      error: response.ok ? undefined : `HTTP ${response.status}`,
+    };
   } catch (error) {
     healthCache = {
       status: 'down',
@@ -179,43 +223,34 @@ export function getCdnWorkerHealth(): CdnWorkerHealth {
 // ============================================
 
 /**
- * Check if URL is VOD content
- */
-function isVodContent(url: string): boolean {
-  if (!url) return false;
-  const urlLower = url.toLowerCase();
-  return urlLower.includes('/movie/') || 
-         urlLower.includes('/series/') || 
-         urlLower.includes('/vod/') ||
-         urlLower.includes('.mp4') ||
-         urlLower.includes('.mkv') ||
-         urlLower.includes('.avi');
-}
-
-/**
- * Check if URL is HTTP (requires proxy to avoid Mixed Content blocking)
- */
-function isHttpUrl(url: string): boolean {
-  if (!url) return false;
-  return url.toLowerCase().startsWith('http://');
-}
-
-/**
  * Get optimized playback URL for a channel
  * 
- * Priority:
- * 1. Cloudflare Stream (if available)
- * 2. R2 via CDN Worker (if VOD uploaded)
- * 3. R2 direct (if CDN Worker down)
- * 4. Direct URL for VOD (no proxy - avoid timeouts)
- * 5. Stream proxy (only for live streams)
+ * ARQUITETURA:
+ * ============
+ * 1. TV AO VIVO → Link Direto (máxima performance, sem latência)
+ * 2. Cloudflare Stream → Se transcodificado
+ * 3. R2 CDN Worker → Se VOD uploaded (com token JWT)
+ * 4. R2 Direct → Se CDN Worker down
+ * 5. Proxy → Apenas para HTTP (Mixed Content bypass)
  */
 export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> {
   await initializeConfig();
 
-  // Priority 1: Cloudflare Stream
+  // ===== PRIORIDADE 1: TV AO VIVO - LINK DIRETO =====
+  if (isLiveContent(channel) && !isHttpUrl(channel.stream_url)) {
+    console.log('[CDN Routing] 📺 TV AO VIVO - Link Direto:', channel.name);
+    metrics.direct_requests++;
+    return {
+      url: channel.stream_url,
+      source: 'direct',
+      requiresToken: false,
+    };
+  }
+
+  // ===== PRIORIDADE 2: CLOUDFLARE STREAM =====
   if (channel.cf_stream_url) {
-    console.log('[CDN Routing] Using Cloudflare Stream:', channel.name);
+    console.log('[CDN Routing] ☁️ Cloudflare Stream:', channel.name);
+    metrics.cloudflare_stream_requests++;
     return {
       url: channel.cf_stream_url,
       source: 'cloudflare_stream',
@@ -223,13 +258,13 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // Priority 2: R2 CDN Worker (VOD content)
+  // ===== PRIORIDADE 3: R2 CDN (VOD UPLOADED) =====
   if (channel.r2_uploaded && channel.r2_url) {
     const health = await checkCdnWorkerHealth();
     
+    // 3a: CDN Worker com token JWT
     if (health.status !== 'down' && CDN_WORKER_URL) {
       try {
-        // Generate JWT token for CDN Worker
         const tokenResult = await generateCdnToken({
           r2_key: extractR2Key(channel.r2_url),
           channel_id: channel.id,
@@ -241,37 +276,37 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
           const cdnUrl = `${CDN_WORKER_URL}/${extractR2Key(channel.r2_url)}?jwt=${tokenResult.token}`;
           
           metrics.cdn_worker_requests++;
+          console.log('[CDN Routing] 📦 R2 CDN Worker:', channel.name);
           
-          console.log('[CDN Routing] Using CDN Worker:', channel.name);
           return {
             url: cdnUrl,
             source: 'cdn_worker',
             requiresToken: true,
             token: tokenResult.token,
             expiresAt: tokenResult.expires_at,
-            fallbackUrl: channel.r2_url, // Direct R2 as fallback
+            fallbackUrl: channel.r2_url,
           };
         }
       } catch (error) {
-        console.warn('[CDN Routing] CDN Worker token generation failed:', error);
+        console.warn('[CDN Routing] CDN Worker token failed:', error);
         metrics.fallback_count++;
       }
     }
 
-    // Priority 3: Direct R2 (if CDN Worker unavailable)
-    if (channel.r2_url) {
-      console.log('[CDN Routing] Using direct R2:', channel.name);
-      return {
-        url: channel.r2_url,
-        source: 'r2_direct',
-        requiresToken: false,
-      };
-    }
+    // 3b: R2 Direct (fallback)
+    console.log('[CDN Routing] 📦 R2 Direct:', channel.name);
+    return {
+      url: channel.r2_url,
+      source: 'r2_direct',
+      requiresToken: false,
+      fallbackUrl: channel.stream_url,
+    };
   }
 
-  // Priority 4: VOD content - use direct URL only if HTTPS (avoid Mixed Content)
-  if (isVodContent(channel.stream_url) && !isHttpUrl(channel.stream_url)) {
-    console.log('[CDN Routing] VOD content HTTPS - using direct URL:', channel.name);
+  // ===== PRIORIDADE 4: VOD HTTPS - LINK DIRETO =====
+  if (isVodContent(channel) && !isHttpUrl(channel.stream_url)) {
+    console.log('[CDN Routing] 🎬 VOD HTTPS - Link Direto:', channel.name);
+    metrics.direct_requests++;
     return {
       url: channel.stream_url,
       source: 'origin',
@@ -279,23 +314,29 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
     };
   }
 
-  // Priority 5: Stream proxy (live streams OR HTTP content to bypass Mixed Content blocking)
-  const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
-  
+  // ===== PRIORIDADE 5: PROXY (HTTP → HTTPS bypass) =====
   if (isHttpUrl(channel.stream_url)) {
-    console.log('[CDN Routing] HTTP content - routing through proxy to bypass Mixed Content:', channel.name);
-  } else {
-    console.log('[CDN Routing] Using stream proxy:', channel.name);
+    const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.stream_url)}`;
+    
+    console.log('[CDN Routing] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
+    metrics.stream_proxy_requests++;
+    
+    return {
+      url: proxyUrl,
+      source: 'stream_proxy',
+      requiresToken: false,
+      fallbackUrl: channel.stream_url,
+    };
   }
+
+  // ===== DEFAULT: LINK DIRETO =====
+  console.log('[CDN Routing] 🎯 Default - Link Direto:', channel.name);
+  metrics.direct_requests++;
   
-  metrics.stream_proxy_requests++;
-  
-  console.log('[CDN Routing] Using stream proxy:', channel.name);
   return {
-    url: proxyUrl,
-    source: 'stream_proxy',
+    url: channel.stream_url,
+    source: 'direct',
     requiresToken: false,
-    fallbackUrl: channel.stream_url, // Original as last resort
   };
 }
 
@@ -305,10 +346,8 @@ export async function getPlaybackUrl(channel: Channel): Promise<PlaybackResult> 
 function extractR2Key(r2_url: string): string {
   try {
     const url = new URL(r2_url);
-    // Remove leading slash
     return url.pathname.substring(1);
   } catch {
-    // If parsing fails, assume the whole string is the key
     return r2_url;
   }
 }
@@ -370,6 +409,8 @@ export function getRoutingMetrics(): RoutingMetrics {
 export function resetMetrics(): void {
   metrics.cdn_worker_requests = 0;
   metrics.stream_proxy_requests = 0;
+  metrics.direct_requests = 0;
+  metrics.cloudflare_stream_requests = 0;
   metrics.fallback_count = 0;
   metrics.avg_response_time = 0;
   metrics.error_rate = 0;
@@ -388,6 +429,8 @@ export const cdnRoutingService = {
   getRoutingMetrics,
   resetMetrics,
   initializeConfig,
+  isLiveContent,
+  isVodContent,
 };
 
 export default cdnRoutingService;
