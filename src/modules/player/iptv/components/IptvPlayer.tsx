@@ -13,11 +13,13 @@ import {
 import { cn } from '@/lib/utils';
 import { useVideoJs } from '../hooks/useVideoJs';
 import { useRemoteControl } from '../hooks/useRemoteControl';
+import { useSmartTv } from '../hooks/useSmartTv';
 import { useEpg } from '../hooks/useEpg';
 import { cdnFailover } from '../services/cdnFailover';
 import { playlistParser } from '../services/playlistParser';
 import type { IptvPlayerProps, IptvChannel, IptvPlaylist, IptvPlayerEvent } from '../types';
 import { EpgDisplay } from './EpgDisplay';
+import { TvFocusableButton } from './TvFocusableButton';
 
 import 'video.js/dist/video-js.css';
 
@@ -33,6 +35,17 @@ export const IptvPlayer = memo(function IptvPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout>>();
   
+  // Smart TV detection
+  const { 
+    isTv, 
+    platform, 
+    uiScale, 
+    showFocusIndicators, 
+    hlsConfig,
+    focusedElement,
+    setFocus,
+  } = useSmartTv();
+  
   // State
   const [playlist, setPlaylist] = useState<IptvPlaylist | null>(null);
   const [currentChannel, setCurrentChannel] = useState<IptvChannel | null>(null);
@@ -42,7 +55,7 @@ export const IptvPlayer = memo(function IptvPlayer({
   const [volume, setVolumeState] = useState(1);
   const [isMuted, setIsMuted] = useState(options.muted ?? true);
 
-  // Video.js hook
+  // Video.js hook with Smart TV config
   const {
     videoRef,
     isReady,
@@ -61,9 +74,10 @@ export const IptvPlayer = memo(function IptvPlayer({
     options: {
       autoplay: options.autoplay ?? true,
       muted: options.muted ?? true,
-      preferLowLatency: options.preferLowLatency ?? true,
-      maxRetries: options.maxRetries ?? 3,
+      preferLowLatency: !isTv && (options.preferLowLatency ?? true), // Disable low latency on TVs
+      maxRetries: options.maxRetries ?? (isTv ? 5 : 3), // More retries on TVs
     },
+    hlsConfig: isTv ? hlsConfig : undefined, // Use TV-optimized HLS config
     onEvent: handlePlayerEvent,
   });
 

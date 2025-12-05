@@ -16,6 +16,7 @@ import 'video.js/dist/video-js.css';
 interface UseVideoJsOptions {
   src?: string;
   options?: IptvPlayerOptions;
+  hlsConfig?: Record<string, any>; // Platform-specific HLS config (Smart TV)
   onEvent?: (evt: IptvPlayerEvent, data?: any) => void;
 }
 
@@ -56,6 +57,7 @@ function isSmartTV(): boolean {
 export function useVideoJs({
   src,
   options = {},
+  hlsConfig: customHlsConfig,
   onEvent,
 }: UseVideoJsOptions): UseVideoJsReturn {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -274,18 +276,23 @@ export function useVideoJs({
 
     // HLS streams - use HLS.js with optimized config
     if (protocol === 'hls' && Hls.isSupported() && !supportsNativeHls()) {
-      console.log('[useVideoJs] Using HLS.js');
+      console.log('[useVideoJs] Using HLS.js', customHlsConfig ? '(TV config)' : '');
       
-      const hlsConfig = streamOptimizer.getHlsConfig(
+      // Base config from optimizer
+      const baseConfig = streamOptimizer.getHlsConfig(
         options.preferLowLatency ?? true,
         true // assume live
       );
       
-      const hls = new Hls({
-        ...hlsConfig,
+      // Merge with platform-specific config (Smart TV, etc)
+      const hlsConfig = {
+        ...baseConfig,
+        ...customHlsConfig, // Override with platform-specific settings
         fragLoadingMaxRetry: options.maxRetries ?? 3,
         manifestLoadingMaxRetry: options.maxRetries ?? 3,
-      });
+      };
+      
+      const hls = new Hls(hlsConfig);
 
       hlsRef.current = hls;
       hls.loadSource(finalUrl);
@@ -357,7 +364,7 @@ export function useVideoJs({
       onEvent?.('ready');
     }, { once: true });
     
-  }, [options.autoplay, options.maxRetries, options.preferLowLatency, onEvent, isBuffering]);
+  }, [options.autoplay, options.maxRetries, options.preferLowLatency, customHlsConfig, onEvent, isBuffering]);
 
   // Update source when src changes
   useEffect(() => {
