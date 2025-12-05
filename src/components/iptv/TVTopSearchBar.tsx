@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Search, X, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Search, X, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TVTopSearchBarProps {
   value: string;
@@ -15,8 +15,8 @@ interface TVTopSearchBarProps {
 export function TVTopSearchBar({
   value,
   onChange,
-  isSearching = false,
-  placeholder = 'Buscar canais, filmes e séries...',
+  isSearching = true,
+  placeholder = "Buscar canais, filmes e séries...",
   className,
   onFocus,
   onBlur,
@@ -34,42 +34,48 @@ export function TVTopSearchBar({
   }, [value]);
 
   // Handle input change with local state for smooth typing
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    
-    // Clear previous debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    
-    // Debounce the external onChange
-    debounceRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, 300);
-  }, [onChange]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value;
+      setLocalValue(newValue);
 
-  // Handle Enter key
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      // Clear debounce and trigger immediate search
+      // Clear previous debounce
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
-      onChange(localValue);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setLocalValue('');
-      onChange('');
-      inputRef.current?.blur();
-    }
-  }, [onChange, localValue]);
+
+      // Debounce the external onChange
+      debounceRef.current = setTimeout(() => {
+        onChange(newValue);
+      }, 300);
+    },
+    [onChange],
+  );
+
+  // Handle Enter key
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // Clear debounce and trigger immediate search
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+        }
+        onChange(localValue);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setLocalValue("");
+        onChange("");
+        inputRef.current?.blur();
+      }
+    },
+    [onChange, localValue],
+  );
 
   // Clear search
   const handleClear = useCallback(() => {
-    setLocalValue('');
-    onChange('');
+    setLocalValue("");
+    onChange("");
     inputRef.current?.focus();
   }, [onChange]);
 
@@ -96,16 +102,16 @@ export function TVTopSearchBar({
   return (
     <div
       className={cn(
-        'relative flex items-center transition-all duration-200',
-        isFocused ? 'w-64 sm:w-80 md:w-96' : 'w-48 sm:w-56 md:w-72',
-        className
+        "relative flex items-center transition-all duration-200",
+        isFocused ? "w-64 sm:w-80 md:w-96" : "w-48 sm:w-56 md:w-72",
+        className,
       )}
     >
-      <Search 
+      <Search
         className={cn(
-          'absolute left-3 w-4 h-4 transition-colors pointer-events-none z-10',
-          isFocused ? 'text-primary' : 'text-muted-foreground'
-        )} 
+          "absolute left-3 w-4 h-4 transition-colors pointer-events-none z-10",
+          isFocused ? "text-primary" : "text-muted-foreground",
+        )}
       />
       <input
         ref={inputRef}
@@ -117,23 +123,21 @@ export function TVTopSearchBar({
         onFocus={handleFocus}
         onBlur={handleBlur}
         className={cn(
-          'w-full h-10 sm:h-11 pl-10 pr-10 rounded-xl',
-          'bg-muted/60 border border-border/50',
-          'text-sm sm:text-base text-foreground placeholder:text-muted-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-muted/80',
-          'transition-all duration-200'
+          "w-full h-10 sm:h-11 pl-10 pr-10 rounded-xl",
+          "bg-muted/60 border border-border/50",
+          "text-sm sm:text-base text-foreground placeholder:text-muted-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 focus:bg-muted/80",
+          "transition-all duration-200",
         )}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck="false"
       />
-      
+
       {/* Right side icons */}
       <div className="absolute right-3 flex items-center gap-1">
-        {isSearching && (
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        )}
+        {isSearching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         {localValue && !isSearching && (
           <button
             type="button"
