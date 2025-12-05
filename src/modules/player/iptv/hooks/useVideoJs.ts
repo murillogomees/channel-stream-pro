@@ -100,8 +100,12 @@ export function useVideoJs({
   // Initialize player
   useEffect(() => {
     if (!videoRef.current) return;
+    
+    // Defer initialization to ensure element is in DOM (fixes Video.js warning)
+    const initTimeout = setTimeout(() => {
+      if (!videoRef.current || !document.body.contains(videoRef.current)) return;
 
-    loadStartTime.current = Date.now();
+      loadStartTime.current = Date.now();
 
     // Video.js options
     const vjsOptions: any = {
@@ -201,6 +205,12 @@ export function useVideoJs({
 
     return () => {
       clearInterval(metricsInterval);
+      cleanup();
+    };
+    }, 0); // Close setTimeout - deferred initialization
+
+    return () => {
+      clearTimeout(initTimeout);
       cleanup();
     };
   }, [options.autoplay, options.muted, options.poster, options.preferLowLatency, onEvent, cleanup]);
