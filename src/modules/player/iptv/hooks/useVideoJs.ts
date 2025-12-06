@@ -183,7 +183,12 @@ export function useVideoJs({
       onEvent?.('error', { code: err?.code, message: err?.message });
     });
 
+    // Throttle timeupdate to 1Hz (every 1 second) to reduce event spam
+    let lastTimeUpdate = 0;
     player.on('timeupdate', () => {
+      const now = Date.now();
+      if (now - lastTimeUpdate < 1000) return; // Skip if less than 1 second
+      lastTimeUpdate = now;
       onEvent?.('timeupdate', {
         currentTime: player.currentTime(),
         duration: player.duration(),
