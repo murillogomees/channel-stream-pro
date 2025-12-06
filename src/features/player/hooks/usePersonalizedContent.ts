@@ -225,8 +225,9 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     }
     remaining -= processedForYou.length;
 
-    // 5. Process Default Sections (for new users)
-    const hasPersonalized = continueWatching.length > 0 || processedSeries.length > 0 || relatedGroups.length > 0;
+    // 5. Process Default Sections - ALWAYS show these as base content
+    // hasPersonalized = true only when we have real personal data (watching history)
+    const hasPersonalized = continueWatching.length > 0 || processedSeries.length > 0;
     
     const defaultSections: Array<{ 
       title: string; 
@@ -235,7 +236,8 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       _sectionKey: string;
     }> = [];
     
-    if (!hasPersonalized && allChannels.length > 0) {
+    // Always show default sections with content
+    if (allChannels.length > 0) {
       const validChannels = allChannels.filter(ch => ch.tvg_logo);
       
       const movies: Array<Channel & { _uniqueKey: string }> = [];
