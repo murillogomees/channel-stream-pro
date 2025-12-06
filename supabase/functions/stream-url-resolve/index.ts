@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     // Fetch stream_url from database
     const { data, error } = await supabase
       .from('m3u_sync_entries')
-      .select('id, name, stream_url, tvg_logo, category_name')
+      .select('id, title, stream_url, tvg_logo, group_title')
       .eq('id', channelId)
       .single();
 
@@ -70,16 +70,16 @@ Deno.serve(async (req) => {
       streamUrl = proxyUrl;
     }
 
-    console.log(`[Stream Resolve] Resolved: ${data.name} (proxy: ${needsProxy})`);
+    console.log(`[Stream Resolve] Resolved: ${data.title} (proxy: ${needsProxy})`);
 
     return new Response(
       JSON.stringify({
         id: data.id,
-        name: data.name,
+        name: data.title,
         stream_url: streamUrl,
         original_url: data.stream_url,
         logo: data.tvg_logo,
-        category: data.category_name,
+        category: data.group_title,
         needsProxy,
       }),
       { 
