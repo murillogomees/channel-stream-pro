@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Tv, Database, Loader2 } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Tv, Database, Loader2, ArrowLeft } from 'lucide-react';
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
@@ -18,7 +18,7 @@ import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useF
 // Smart features imports
 import { useContinueWatching, useRecommendations } from '@/features/player/hooks';
 import { useSmartCache } from '@/hooks/useSmartCache';
-import { MoviesView, SeriesView, HomeView } from '@/features/player/components';
+import { MoviesView, SeriesView, HomeView, parseEpisodeInfo, getFirstEpisode } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
@@ -26,6 +26,7 @@ import { streamService } from '@/modules/player/services/StreamService';
 import { VirtualChannelList } from '@/components/app/VirtualChannelList';
 import { toast } from 'sonner';
 import { useOrientationLock } from '@/hooks/useOrientationLock';
+
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -411,34 +412,56 @@ export default function AppPlayer() {
     return name.replace(/\s*S\d{1,2}\s*E\d{1,3}.*/gi, '').replace(/\s*\d{1,2}x\d{1,3}.*/gi, '').replace(/\s*-\s*Temporada\s*\d+.*/gi, '').replace(/\s*Temporada\s*\d+.*/gi, '').replace(/\s*Season\s*\d+.*/gi, '').replace(/\s*T\d+\s*E?\d*.*/gi, '').replace(/\s*Ep[is]*[óo]*d?i?o?\s*\d+.*/gi, '').replace(/\s*\(\d{4}\)/g, '').replace(/\s*\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
   }, []);
 
+  // Detect if current channel is a series
+  const isCurrentChannelSeries = useMemo(() => {
+    if (!playerChannel) return false;
+    return playerChannel.stream_url?.includes('/series/') || 
+           /S\d{1,2}\s*E\d{1,3}/i.test(playerChannel.name) || 
+           /\d{1,2}x\d{1,3}/i.test(playerChannel.name) || 
+           /Temporada\s*\d+/i.test(playerChannel.name);
+  }, [playerChannel]);
+
   // Get related episodes for the current playing channel (for series)
   const relatedSeriesEpisodes = useMemo(() => {
-    if (!playerChannel) return [];
-
-    // Check if it's a series by looking at the URL or name pattern
-    const isSeries = playerChannel.stream_url?.includes('/series/') || /S\d{1,2}\s*E\d{1,3}/i.test(playerChannel.name) || /\d{1,2}x\d{1,3}/i.test(playerChannel.name) || /Temporada\s*\d+/i.test(playerChannel.name);
-    if (!isSeries) return [];
+    if (!playerChannel || !isCurrentChannelSeries) return [];
+    
     const seriesName = extractSeriesName(playerChannel.name);
     if (!seriesName) return [];
 
-    // Find all episodes from the same series
-    const episodes = allChannels.filter(ch => {
-      const chSeriesName = extractSeriesName(ch.name);
-      return chSeriesName === seriesName && ch.id !== playerChannel.id;
-    });
+    // Find all episodes from the same series and parse season/episode info
+    const episodes = allChannels
+      .filter(ch => {
+        const chSeriesName = extractSeriesName(ch.name);
+        return chSeriesName === seriesName;
+      })
+      .map(ch => {
+        const parsed = parseEpisodeInfo(ch.name);
+        return parsed ? { ...ch, season: parsed.season, episode: parsed.episode } : null;
+      })
+      .filter(Boolean);
 
-    // Include current episode and sort
-    return [playerChannel, ...episodes].sort((a, b) => {
-      const matchA = a.name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) || a.name.match(/(\d{1,2})x(\d{1,3})/i);
-      const matchB = b.name.match(/S(\d{1,2})[\s]*E(\d{1,3})/i) || b.name.match(/(\d{1,2})x(\d{1,3})/i);
-      if (matchA && matchB) {
-        const seasonDiff = parseInt(matchA[1]) - parseInt(matchB[1]);
-        if (seasonDiff !== 0) return seasonDiff;
-        return parseInt(matchA[2]) - parseInt(matchB[2]);
-      }
-      return a.name.localeCompare(b.name);
+    // Sort by season then episode
+    return episodes.sort((a, b) => {
+      if (a!.season !== b!.season) return a!.season - b!.season;
+      return a!.episode - b!.episode;
     });
-  }, [playerChannel, allChannels, extractSeriesName]);
+  }, [playerChannel, allChannels, extractSeriesName, isCurrentChannelSeries]);
+
+  // Current episode info
+  const currentEpisodeInfo = useMemo(() => {
+    if (!playerChannel) return null;
+    const parsed = parseEpisodeInfo(playerChannel.name);
+    return parsed ? { ...playerChannel, season: parsed.season, episode: parsed.episode } : null;
+  }, [playerChannel]);
+
+  // Episode navigation
+  const currentEpisodeIndex = useMemo(() => {
+    if (!currentEpisodeInfo || !relatedSeriesEpisodes.length) return -1;
+    return relatedSeriesEpisodes.findIndex(ep => ep!.id === currentEpisodeInfo.id);
+  }, [currentEpisodeInfo, relatedSeriesEpisodes]);
+
+  const hasPreviousEpisode = currentEpisodeIndex > 0;
+  const hasNextEpisode = currentEpisodeIndex >= 0 && currentEpisodeIndex < relatedSeriesEpisodes.length - 1;
 
   // Handle playing a different episode
   const handlePlayEpisode = useCallback((episode: any) => {
@@ -446,11 +469,60 @@ export default function AppPlayer() {
     trackChannelView(episode.id, episode.category_id);
   }, [trackChannelView]);
 
+  // Check if user has watched this series before
+  const hasSeriesWatchHistory = useCallback((seriesName: string): boolean => {
+    const normalizedName = seriesName.toLowerCase().trim();
+    return continueWatchingItems.some(item => {
+      const itemName = (item.content_name || '').toLowerCase();
+      return itemName.includes(normalizedName);
+    });
+  }, [continueWatchingItems]);
+
+  // Get first episode when user hasn't watched the series
+  const getSeriesFirstEpisode = useCallback((channel: any): any => {
+    const seriesName = extractSeriesName(channel.name);
+    if (!seriesName) return channel;
+    
+    // Find all episodes for this series
+    const episodes = allChannels
+      .filter(ch => extractSeriesName(ch.name) === seriesName)
+      .map(ch => {
+        const parsed = parseEpisodeInfo(ch.name);
+        return parsed ? { ...ch, season: parsed.season, episode: parsed.episode } : null;
+      })
+      .filter(Boolean);
+    
+    if (episodes.length === 0) return channel;
+    
+    // Get first episode (S01E01)
+    const firstEpisode = getFirstEpisode(episodes);
+    return firstEpisode || channel;
+  }, [allChannels, extractSeriesName]);
+
   // Handle play - resolve stream URL on-demand (LAZY LOADING)
   // Netflix-style: lock to landscape + fullscreen when video starts
-  const handlePlay = useCallback(async (channel: any) => {
+  // For series: if no watch history, start from S01E01
+  const handlePlay = useCallback(async (channel: any, skipSeriesCheck = false) => {
     // Lock to landscape for immersive fullscreen experience
     lockToLandscape();
+    
+    // Check if this is a series and user has no watch history
+    const isSeries = channel.stream_url?.includes('/series/') || 
+                     /S\d{1,2}\s*E\d{1,3}/i.test(channel.name) || 
+                     /\d{1,2}x\d{1,3}/i.test(channel.name) || 
+                     /Temporada\s*\d+/i.test(channel.name);
+    
+    if (isSeries && !skipSeriesCheck) {
+      const seriesName = extractSeriesName(channel.name);
+      if (seriesName && !hasSeriesWatchHistory(seriesName)) {
+        // User hasn't watched this series - start from S01E01
+        const firstEp = getSeriesFirstEpisode(channel);
+        if (firstEp && firstEp.id !== channel.id) {
+          console.log('[AppPlayer] Starting series from S01E01:', firstEp.name);
+          return handlePlay(firstEp, true); // Skip series check on recursive call
+        }
+      }
+    }
     
     // If channel already has stream_url, use it directly
     if (channel.stream_url) {
@@ -488,7 +560,25 @@ export default function AppPlayer() {
     setShowPlayerDialog(true);
     trackChannelView(channel.id, channel.category_id || 'unknown');
     pauseWarming();
-  }, [resolveChannel, trackChannelView, pauseWarming, lockToLandscape, lockToPortrait]);
+  }, [resolveChannel, trackChannelView, pauseWarming, lockToLandscape, lockToPortrait, extractSeriesName, hasSeriesWatchHistory, getSeriesFirstEpisode]);
+
+  // Navigate to previous episode
+  const handlePreviousEpisode = useCallback(async () => {
+    if (!hasPreviousEpisode) return;
+    const prevEp = relatedSeriesEpisodes[currentEpisodeIndex - 1];
+    if (prevEp) {
+      await handlePlay(prevEp, true); // Skip series check for navigation
+    }
+  }, [hasPreviousEpisode, relatedSeriesEpisodes, currentEpisodeIndex, handlePlay]);
+
+  // Navigate to next episode
+  const handleNextEpisode = useCallback(async () => {
+    if (!hasNextEpisode) return;
+    const nextEp = relatedSeriesEpisodes[currentEpisodeIndex + 1];
+    if (nextEp) {
+      await handlePlay(nextEp, true); // Skip series check for navigation
+    }
+  }, [hasNextEpisode, relatedSeriesEpisodes, currentEpisodeIndex, handlePlay]);
 
   // Loading state - show skeleton to prevent CLS
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
@@ -627,6 +717,46 @@ export default function AppPlayer() {
       {/* Player Dialog - IptvPlayer Modular - Netflix-style fullscreen */}
       {showPlayerDialog && playerChannel && (
         <div className="fixed inset-0 z-50 bg-black animate-in fade-in zoom-in-95 duration-300">
+          {/* Back button overlay */}
+          <button
+            onClick={() => {
+              lockToPortrait();
+              setShowPlayerDialog(false);
+              setPlayerChannel(null);
+              refreshContinueWatching();
+              resumeWarming();
+            }}
+            className="absolute top-4 left-4 z-[60] p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
+
+          {/* Episode navigation for series (next to volume area) */}
+          {isCurrentChannelSeries && (
+            <div className="absolute bottom-20 left-4 z-[60] flex items-center gap-2">
+              <button
+                onClick={handlePreviousEpisode}
+                disabled={!hasPreviousEpisode}
+                className={`p-2 rounded-full transition-colors ${hasPreviousEpisode ? 'bg-black/50 hover:bg-black/70' : 'bg-black/30 opacity-50 cursor-not-allowed'}`}
+                aria-label="Episódio anterior"
+              >
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <span className="text-white text-sm bg-black/50 px-3 py-1 rounded">
+                {currentEpisodeInfo ? `T${currentEpisodeInfo.season} E${currentEpisodeInfo.episode}` : ''}
+              </span>
+              <button
+                onClick={handleNextEpisode}
+                disabled={!hasNextEpisode}
+                className={`p-2 rounded-full transition-colors ${hasNextEpisode ? 'bg-black/50 hover:bg-black/70' : 'bg-black/30 opacity-50 cursor-not-allowed'}`}
+                aria-label="Próximo episódio"
+              >
+                <ArrowLeft className="w-5 h-5 text-white rotate-180" />
+              </button>
+            </div>
+          )}
+
           <IptvPlayer 
             channelId={playerChannel.id} 
             streamUrl={streamService.getPlayableUrl(playerChannel)} 
@@ -638,7 +768,6 @@ export default function AppPlayer() {
             }} 
             onEvent={(evt, data) => {
               if (evt === 'back') {
-                // Netflix-style: restore portrait when closing player
                 lockToPortrait();
                 setShowPlayerDialog(false);
                 setPlayerChannel(null);

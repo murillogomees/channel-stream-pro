@@ -37,6 +37,13 @@ interface PlayerControlsProps {
   logo?: string;
   isLive?: boolean;
   
+  // Series navigation (only for series content)
+  isSeries?: boolean;
+  hasPreviousEpisode?: boolean;
+  hasNextEpisode?: boolean;
+  onPreviousEpisode?: () => void;
+  onNextEpisode?: () => void;
+  
   // Quality
   qualityLevels?: QualityLevel[];
   currentLevel?: QualityLevel | null;
@@ -73,6 +80,11 @@ export const PlayerControls = memo(function PlayerControls({
   title,
   logo,
   isLive = false,
+  isSeries = false,
+  hasPreviousEpisode = false,
+  hasNextEpisode = false,
+  onPreviousEpisode,
+  onNextEpisode,
   qualityLevels,
   currentLevel,
   qualityMode,
@@ -186,6 +198,23 @@ export const PlayerControls = memo(function PlayerControls({
         <div className="flex items-center justify-between">
           {/* Left controls */}
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* Previous Episode (Series only) */}
+            {isSeries && onPreviousEpisode && (
+              <button
+                onClick={onPreviousEpisode}
+                disabled={!hasPreviousEpisode}
+                className={cn(
+                  "p-2 rounded-full transition-colors",
+                  hasPreviousEpisode 
+                    ? "bg-black/40 hover:bg-black/60" 
+                    : "bg-black/20 opacity-50 cursor-not-allowed"
+                )}
+                aria-label="Episódio anterior"
+              >
+                <SkipBack className="w-5 h-5 text-white" />
+              </button>
+            )}
+            
             {/* Skip back (VOD) */}
             {isVOD && (
               <button
@@ -216,6 +245,23 @@ export const PlayerControls = memo(function PlayerControls({
                 onClick={() => onSkip(10)}
                 className="p-2 rounded-full bg-black/40 hover:bg-black/60 transition-colors"
                 aria-label="+10s"
+              >
+                <SkipForward className="w-5 h-5 text-white" />
+              </button>
+            )}
+            
+            {/* Next Episode (Series only) */}
+            {isSeries && onNextEpisode && (
+              <button
+                onClick={onNextEpisode}
+                disabled={!hasNextEpisode}
+                className={cn(
+                  "p-2 rounded-full transition-colors",
+                  hasNextEpisode 
+                    ? "bg-black/40 hover:bg-black/60" 
+                    : "bg-black/20 opacity-50 cursor-not-allowed"
+                )}
+                aria-label="Próximo episódio"
               >
                 <SkipForward className="w-5 h-5 text-white" />
               </button>

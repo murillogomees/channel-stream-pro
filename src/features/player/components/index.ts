@@ -1,4 +1,14 @@
 /**
+ * Series Episode Navigator
+ */
+export { 
+  SeriesEpisodeNavigator, 
+  parseEpisodeInfo, 
+  getFirstEpisode, 
+  hasWatchHistoryForSeries 
+} from './SeriesEpisodeNavigator';
+
+/**
  * Player Components - Export all UI components
  */
 
