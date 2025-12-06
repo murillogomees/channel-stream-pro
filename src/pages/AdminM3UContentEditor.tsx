@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Tv, Film, Clapperboard, MoreHorizontal, 
   Edit, Trash2, FolderInput, ChevronDown, ChevronRight,
-  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink, RefreshCw, Database, Sparkles
+  Loader2, Save, X, Check, ArrowRightLeft, Cloud, ExternalLink, RefreshCw, Database, Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,10 +44,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { useM3USyncEditor, ContentClass, M3UEntry, CategoryGroup, CLASS_LABELS } from '@/hooks/useM3USyncEditor';
 import { useM3USync } from '@/hooks/useM3USync';
+import { useM3UGenerationValidator } from '@/hooks/useM3UGenerationValidator';
 import { toast } from '@/hooks/use-toast';
 import { VirtualizedEntryList } from '@/components/admin/m3u/VirtualizedEntryList';
 import { LoadingProgressBar } from '@/components/admin/m3u/LoadingProgressBar';
 import { CleanSyncEntriesDialog } from '@/components/admin/m3u/CleanSyncEntriesDialog';
+import { M3UGenerationValidator } from '@/components/admin/m3u/M3UGenerationValidator';
 
 const CLASS_ICONS: Record<ContentClass, typeof Tv> = {
   tv: Tv,
@@ -99,6 +102,14 @@ export default function AdminM3UContentEditor() {
   const [isGeneratingCDN, setIsGeneratingCDN] = useState(false);
   const [lastCdnUrl, setLastCdnUrl] = useState<string | null>(null);
   const [showCleanerDialog, setShowCleanerDialog] = useState(false);
+
+  // M3U Generation Validator Hook
+  const {
+    state: validatorState,
+    startValidation,
+    confirmGeneration,
+    cancelValidation,
+  } = useM3UGenerationValidator();
 
   useEffect(() => {
     fetchSources();
@@ -204,7 +215,36 @@ export default function AdminM3UContentEditor() {
     setEditingEntry(null);
   };
 
+  // Handle generate CDN with mandatory validation
   const handleGenerateCDN = async () => {
+    if (!selectedSourceId || entries.length === 0) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione uma fonte com entradas para gerar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Start mandatory validation before generation
+    await startValidation(entries, selectedSourceId);
+  };
+
+  // Handle confirmed generation after validation
+  const handleConfirmGeneration = async (options: any) => {
+    setIsGeneratingCDN(true);
+    try {
+      const result = await confirmGeneration(options);
+      if (result.success && result.cdnUrl) {
+        setLastCdnUrl(result.cdnUrl);
+      }
+    } finally {
+      setIsGeneratingCDN(false);
+    }
+  };
+
+  // Legacy direct generation (bypass validation - for admin override)
+  const handleDirectGenerateCDN = async () => {
     setIsGeneratingCDN(true);
     try {
       const result = await generateM3UCDN();
@@ -808,6 +848,16 @@ export default function AdminM3UContentEditor() {
           onCleanComplete={handleCleanComplete}
         />
       )}
+
+      {/* M3U Generation Validator Dialog - Mandatory validation before CDN generation */}
+      <M3UGenerationValidator
+        open={validatorState.showValidator}
+        onOpenChange={(open) => !open && cancelValidation()}
+        validationResult={validatorState.validationResult}
+        isValidating={validatorState.isValidating}
+        onConfirmGeneration={handleConfirmGeneration}
+        onCancel={cancelValidation}
+      />
     </div>
   );
 }
