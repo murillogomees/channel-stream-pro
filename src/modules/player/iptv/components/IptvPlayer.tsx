@@ -309,16 +309,34 @@ export const IptvPlayer = memo(function IptvPlayer({
     }
   }, [currentChannel, options.cdnFallback]);
 
-  // Handle CDN failover on error
+  // Handle CDN failover on error - with guard to prevent infinite loops
+  const lastErrorRef = useRef<string | null>(null);
+  const errorRetryCount = useRef(0);
+  const maxErrorRetries = 3;
+  
   useEffect(() => {
-    if (error && currentChannel) {
-      cdnFailover.handleError(new Error(error))
-        .then(newUrl => {
-          if (newUrl) {
-            setSource(newUrl);
-          }
-        });
+    // Skip if no error or no channel
+    if (!error || !currentChannel) return;
+    
+    // Skip if same error already handled or max retries exceeded
+    if (error === lastErrorRef.current || errorRetryCount.current >= maxErrorRetries) {
+      if (errorRetryCount.current >= maxErrorRetries) {
+        console.log('[IptvPlayer] Max CDN failover retries reached, stopping');
+      }
+      return;
     }
+    
+    lastErrorRef.current = error;
+    errorRetryCount.current++;
+    
+    console.log('[IptvPlayer] Attempting CDN failover, attempt:', errorRetryCount.current);
+    
+    cdnFailover.handleError(new Error(error))
+      .then(newUrl => {
+        if (newUrl) {
+          setSource(newUrl);
+        }
+      });
   }, [error, currentChannel, setSource]);
 
   // Remote control handlers
