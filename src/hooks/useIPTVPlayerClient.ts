@@ -342,14 +342,19 @@ export function useIPTVPlayerClient() {
     // Show simple progress without UI updates
     setLoadingProgress(`Sincronizando em segundo plano...`);
     
+    let pauseLogged = false;
     try {
       while (!controller.signal.aborted) {
         // STOP: Playback active - pause background loading
         if (isPlaybackActiveRef.current) {
-          console.log('[IPTV] Background paused - playback active');
+          if (!pauseLogged) {
+            console.log('[IPTV] Background paused - playback active');
+            pauseLogged = true;
+          }
           await new Promise(r => setTimeout(r, 1000));
           continue;
         }
+        pauseLogged = false; // Reset when resuming
 
         // STOP CONDITIONS
         if (offset >= serverTotal) {
@@ -608,14 +613,19 @@ export function useIPTVPlayerClient() {
     
     console.log(`[IPTV] Background: offset ${currentOffset}, target ${serverTotal}`);
     
+    let pauseLogged2 = false;
     try {
       while (!controller.signal.aborted) {
         // STOP: Playback active - pause background loading
         if (isPlaybackActiveRef.current) {
-          console.log('[IPTV] Background paused - playback active');
+          if (!pauseLogged2) {
+            console.log('[IPTV] Background paused - playback active');
+            pauseLogged2 = true;
+          }
           await new Promise(r => setTimeout(r, 1000));
           continue;
         }
+        pauseLogged2 = false; // Reset when resuming
 
         // STOP CONDITION 1: Reached or exceeded server total
         if (currentOffset >= serverTotal) {
