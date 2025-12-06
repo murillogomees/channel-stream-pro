@@ -246,16 +246,16 @@ const ChannelCard = memo(function ChannelCard({
   );
 });
 
-// Hero Header component
+// Hero Header component - starts right below top header
 const HeroHeader = memo(function HeroHeader() {
   return (
-    <div className="relative w-full aspect-[21/9] md:aspect-[3/1] overflow-hidden">
+    <div className="relative w-full h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] overflow-hidden">
       <img
         src={homeHeroImage}
         alt="IPTV Link"
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover object-center"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
     </div>
   );
 });
