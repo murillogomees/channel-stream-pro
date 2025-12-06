@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { Search, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,7 @@ interface TVTopSearchBarProps {
   onBlur?: () => void;
 }
 
-export function TVTopSearchBar({
+export const TVTopSearchBar = memo(function TVTopSearchBar({
   value,
   onChange,
   isSearching = false,
@@ -22,59 +22,59 @@ export function TVTopSearchBar({
   onBlur,
 }: TVTopSearchBarProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync local value with external value when it changes externally
-  useEffect(() => {
-    if (value !== localValue && !isFocused) {
-      setLocalValue(value);
-    }
-  }, [value]);
-
-  // Handle input change with local state for smooth typing
+  // Handle input change with debounce
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
-      setLocalValue(newValue);
-
+      
       // Clear previous debounce
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
 
-      // Debounce the external onChange
+      // Debounce the onChange to prevent freezing
       debounceRef.current = setTimeout(() => {
         onChange(newValue);
-      }, 300);
+      }, 250);
     },
     [onChange],
   );
 
-  // Handle Enter key
+  // Handle Enter key - immediate search
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        // Clear debounce and trigger immediate search
         if (debounceRef.current) {
           clearTimeout(debounceRef.current);
         }
-        onChange(localValue);
+        onChange(inputRef.current?.value || "");
       } else if (e.key === "Escape") {
         e.preventDefault();
-        setLocalValue("");
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+        }
+        if (inputRef.current) {
+          inputRef.current.value = "";
+        }
         onChange("");
         inputRef.current?.blur();
       }
     },
-    [onChange, localValue],
+    [onChange],
   );
 
   // Clear search
   const handleClear = useCallback(() => {
-    setLocalValue("");
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
     onChange("");
     inputRef.current?.focus();
   }, [onChange]);
@@ -89,6 +89,13 @@ export function TVTopSearchBar({
     setIsFocused(false);
     onBlur?.();
   }, [onBlur]);
+
+  // Sync input with controlled value only when empty/cleared externally
+  useEffect(() => {
+    if (inputRef.current && value === "" && inputRef.current.value !== "") {
+      inputRef.current.value = "";
+    }
+  }, [value]);
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -117,7 +124,7 @@ export function TVTopSearchBar({
         ref={inputRef}
         type="text"
         placeholder={placeholder}
-        value={localValue}
+        defaultValue={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
@@ -138,7 +145,7 @@ export function TVTopSearchBar({
       {/* Right side icons */}
       <div className="absolute right-3 flex items-center gap-1">
         {isSearching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-        {localValue && !isSearching && (
+        {value && !isSearching && (
           <button
             type="button"
             onClick={handleClear}
@@ -150,4 +157,4 @@ export function TVTopSearchBar({
       </div>
     </div>
   );
-}
+});

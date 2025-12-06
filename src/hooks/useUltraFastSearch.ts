@@ -102,19 +102,19 @@ export function useUltraFastSearch(limit: number = 100) {
     [limit]
   );
 
+  // Update query - no debounce here (component handles debounce)
   const updateQuery = useCallback(
     (newQuery: string) => {
       setQuery(newQuery);
-
-      // Clear previous debounce
+      
+      // Clear any pending debounce
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
-
-      // Debounce 150ms for fast response
-      debounceRef.current = setTimeout(() => {
-        searchDatabase(newQuery);
-      }, 150);
+      
+      // Execute search immediately (component already debounced)
+      searchDatabase(newQuery);
     },
     [searchDatabase]
   );
