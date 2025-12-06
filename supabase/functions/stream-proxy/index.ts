@@ -358,20 +358,30 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 // HTTP FETCHING
 // =============================================================================
 
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null): Headers {
+function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false): Headers {
   const headers = new Headers();
-  headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-  headers.set('Accept', '*/*');
-  headers.set('Accept-Language', 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7');
-  headers.set('Connection', 'keep-alive');
   
-  if (acceptEncoding) {
-    headers.set('Accept-Encoding', acceptEncoding);
-  }
-  
-  if (origin) {
-    headers.set('Referer', `${origin}/`);
-    headers.set('Origin', origin);
+  // For Xtream live streams, use minimal headers to avoid 405 errors
+  // Many Xtream servers reject requests with certain headers
+  if (isLiveStream) {
+    headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
+    headers.set('Accept', '*/*');
+    headers.set('Connection', 'keep-alive');
+    // Don't set Origin/Referer/Accept-Encoding for live streams
+  } else {
+    headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    headers.set('Accept', '*/*');
+    headers.set('Accept-Language', 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7');
+    headers.set('Connection', 'keep-alive');
+    
+    if (acceptEncoding) {
+      headers.set('Accept-Encoding', acceptEncoding);
+    }
+    
+    if (origin) {
+      headers.set('Referer', `${origin}/`);
+      headers.set('Origin', origin);
+    }
   }
   
   if (rangeHeader) {
@@ -539,10 +549,10 @@ Deno.serve(async (req) => {
     
     console.log(`[Proxy] ${req.method} ${reqType}: ${decodedUrl.substring(0, 60)}...`);
 
-    // Build headers
+    // Build headers - use minimal headers for live streams to avoid 405 errors
     const rangeHeader = req.headers.get('Range');
     const acceptEncoding = req.headers.get('Accept-Encoding');
-    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding);
+    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding, isLiveStream);
 
     // Fetch upstream with appropriate timeout and retries
     let timeout: number;
