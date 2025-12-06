@@ -1,0 +1,336 @@
+{
+  "generated_at": "2025-12-06T02:32:00Z",
+  "mode": "dry-run",
+  "analysis_period_days": 180,
+  
+  "summary": {
+    "total_hooks": 118,
+    "total_services": 60,
+    "total_pages": 82,
+    "total_edge_functions": 95,
+    "total_components": 150,
+    "duplicated_groups": 12,
+    "dead_code_candidates": 23,
+    "unused_tables": 15
+  },
+
+  "findings": [
+    {
+      "id": "dup-001",
+      "type": "hook",
+      "path": "src/hooks/useFastStartup.ts",
+      "duplicate_of": "src/hooks/useFastStartupV2.ts",
+      "evidence": {
+        "v1_imports": ["useOptimizedPlayer.ts", "usePlayerPerformance.ts"],
+        "v2_imports": ["usePlayerPerformanceV2.ts", "player/index.ts"],
+        "v1_lines": 305,
+        "v2_lines": 171,
+        "functionality_overlap": "95%"
+      },
+      "reason": "duplicate",
+      "recommended_action": "consolidate",
+      "canonical": "useFastStartupV2",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dup-002",
+      "type": "hook",
+      "path": "src/hooks/usePlayerPerformance.ts",
+      "duplicate_of": "src/hooks/usePlayerPerformanceV2.ts",
+      "evidence": {
+        "v1_imports": ["YouTubeStylePlayer.tsx", "useChannelPreloadEffect.ts"],
+        "v2_imports": ["player/index.ts"],
+        "v1_lines": 251,
+        "v2_lines": 204,
+        "functionality_overlap": "90%"
+      },
+      "reason": "duplicate",
+      "recommended_action": "consolidate",
+      "canonical": "usePlayerPerformanceV2",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dup-003",
+      "type": "hook_group",
+      "paths": [
+        "src/hooks/useChannelPreload.ts",
+        "src/hooks/useChannelPreloader.ts",
+        "src/hooks/useChannelPreloadEffect.ts",
+        "src/hooks/usePreloadStreams.ts",
+        "src/hooks/useIntelligentPreload.ts",
+        "src/hooks/useWorkerPreloader.ts",
+        "src/hooks/useStreamPreloader.ts"
+      ],
+      "evidence": {
+        "total_hooks": 7,
+        "functionality": "stream/channel preloading",
+        "overlap_percentage": "60-80%"
+      },
+      "reason": "duplicate",
+      "recommended_action": "consolidate",
+      "canonical": "useChannelPreload",
+      "risk": "MED",
+      "pr_url": null
+    },
+    {
+      "id": "dup-004",
+      "type": "hook_group",
+      "paths": [
+        "src/hooks/useAdaptiveBuffer.ts",
+        "src/hooks/useSmartBuffer.ts",
+        "src/hooks/useConnectionAware.ts",
+        "src/hooks/useConnectionAwarePlayer.ts"
+      ],
+      "evidence": {
+        "total_hooks": 4,
+        "functionality": "adaptive buffering based on connection",
+        "overlap_percentage": "60%"
+      },
+      "reason": "duplicate",
+      "recommended_action": "consolidate",
+      "canonical": "useSmartBuffer",
+      "risk": "MED",
+      "pr_url": null
+    },
+    {
+      "id": "dup-005",
+      "type": "service_group",
+      "paths": [
+        "src/services/abrService.ts",
+        "src/services/enhancedABRService.ts"
+      ],
+      "evidence": {
+        "functionality": "Adaptive Bitrate Rate selection",
+        "overlap_percentage": "80%"
+      },
+      "reason": "duplicate",
+      "recommended_action": "consolidate",
+      "canonical": "enhancedABRService",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-001",
+      "type": "hook",
+      "path": "src/hooks/useResume.ts",
+      "evidence": {
+        "imports_found": 0,
+        "has_duplicate": "useResumePlayback.ts"
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-002",
+      "type": "hook",
+      "path": "src/hooks/useContentCache.ts",
+      "evidence": {
+        "imports_found": 0
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-003",
+      "type": "hook",
+      "path": "src/hooks/useNetflixLazyLoad.ts",
+      "evidence": {
+        "imports_found": 0
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-004",
+      "type": "hook",
+      "path": "src/hooks/useVisibilityOptimization.ts",
+      "evidence": {
+        "imports_found": 0
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-005",
+      "type": "hook",
+      "path": "src/hooks/useVideoElementPool.ts",
+      "evidence": {
+        "imports_found": 0
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "dead-006",
+      "type": "hook",
+      "path": "src/hooks/useStreamOnDemand.ts",
+      "evidence": {
+        "imports_found": 0
+      },
+      "reason": "unused",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "test-001",
+      "type": "edge_function",
+      "path": "supabase/functions/list-objects-test",
+      "evidence": {
+        "name_pattern": "*-test*"
+      },
+      "reason": "test_only",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "test-002",
+      "type": "edge_function",
+      "path": "supabase/functions/mercado-pago-test",
+      "evidence": {
+        "name_pattern": "*-test*"
+      },
+      "reason": "test_only",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "test-003",
+      "type": "edge_function",
+      "path": "supabase/functions/mercado-pago-test-users",
+      "evidence": {
+        "name_pattern": "*-test*"
+      },
+      "reason": "test_only",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "test-004",
+      "type": "edge_function",
+      "path": "supabase/functions/test-r2-connection",
+      "evidence": {
+        "name_pattern": "*test*"
+      },
+      "reason": "test_only",
+      "recommended_action": "archive",
+      "risk": "LOW",
+      "pr_url": null
+    },
+    {
+      "id": "db-001",
+      "type": "table",
+      "path": "public.user_totp_secrets",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 3,
+        "idx_scan": 0,
+        "total_activity": 3
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    },
+    {
+      "id": "db-002",
+      "type": "table",
+      "path": "public.affiliate_marketing_materials",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 3,
+        "idx_scan": 0,
+        "total_activity": 3
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    },
+    {
+      "id": "db-003",
+      "type": "table",
+      "path": "public.channel_health",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 4,
+        "idx_scan": 0,
+        "total_activity": 4
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    },
+    {
+      "id": "db-004",
+      "type": "table",
+      "path": "public.viewer_profiles",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 4,
+        "idx_scan": 0,
+        "total_activity": 4
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    },
+    {
+      "id": "db-005",
+      "type": "table",
+      "path": "public.favorites",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 5,
+        "idx_scan": 0,
+        "total_activity": 5
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    },
+    {
+      "id": "db-006",
+      "type": "table",
+      "path": "public.epg_data",
+      "evidence": {
+        "n_live_tup": 0,
+        "seq_scan": 15,
+        "idx_scan": 0,
+        "total_activity": 15
+      },
+      "reason": "table_unused",
+      "recommended_action": "verify_then_drop",
+      "risk": "HIGH",
+      "pr_url": null
+    }
+  ],
+
+  "metrics": {
+    "hooks_coverage": "100%",
+    "services_coverage": "100%",
+    "edge_functions_coverage": "100%",
+    "tables_coverage": "100%",
+    "dead_items_with_evidence": 23,
+    "duplicate_groups_detected": 12,
+    "estimated_rollback_time_minutes": 10
+  }
+}

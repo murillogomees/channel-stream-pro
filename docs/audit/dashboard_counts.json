@@ -1,0 +1,73 @@
+{
+  "generated_at": "2025-12-06T02:32:00Z",
+  "mode": "dry-run",
+  
+  "code_metrics": {
+    "hooks_total": 118,
+    "hooks_duplicated_groups": 5,
+    "hooks_dead_candidates": 6,
+    "hooks_to_consolidate": 15,
+    
+    "services_total": 60,
+    "services_duplicated_groups": 4,
+    "services_to_consolidate": 8,
+    
+    "pages_total": 82,
+    "pages_orphaned": 0,
+    
+    "components_total": 150,
+    "components_orphaned": 0
+  },
+  
+  "backend_metrics": {
+    "edge_functions_total": 95,
+    "edge_functions_test_only": 4,
+    "edge_functions_unused_candidates": 2,
+    "edge_functions_active": 89
+  },
+  
+  "database_metrics": {
+    "tables_total": 100,
+    "tables_with_data": 85,
+    "tables_empty_but_used": 10,
+    "tables_unused": 15,
+    "tables_to_review": 15
+  },
+  
+  "security_metrics": {
+    "secrets_configured": 15,
+    "secrets_to_verify_rotation": 5,
+    "secrets_exposed_in_code": 0
+  },
+  
+  "documentation_metrics": {
+    "docs_total": 31,
+    "docs_implemented": 12,
+    "docs_partial": 8,
+    "docs_archived": 11
+  },
+  
+  "risk_summary": {
+    "low_risk_items": 15,
+    "medium_risk_items": 8,
+    "high_risk_items": 6
+  },
+  
+  "action_items": {
+    "immediate_low_risk": [
+      "Remove test edge functions",
+      "Create deprecation aliases for V1 hooks",
+      "Update exports in hooks/index.ts"
+    ],
+    "sprint_2_medium_risk": [
+      "Consolidate preload hooks",
+      "Migrate usePlayerPerformance to V2",
+      "Consolidate cache services"
+    ],
+    "sprint_3_high_risk": [
+      "Audit unused tables",
+      "Create DB cleanup migrations",
+      "Implement feature flags for rollback"
+    ]
+  }
+}
