@@ -1,24 +1,46 @@
 /**
  * Checkout Pending Page
  * Displayed when payment is pending (e.g., boleto, PIX waiting)
+ * Only accessible by authenticated users via checkout redirect
  */
 
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Copy, CheckCircle } from "lucide-react";
+import { Clock, Copy, CheckCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 export default function CheckoutPending() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   const paymentId = searchParams.get("payment_id");
   const externalReference = searchParams.get("external_reference");
   const status = searchParams.get("status") || "pending";
   const collectionStatus = searchParams.get("collection_status");
   const paymentType = searchParams.get("payment_type");
+  
+  // Check if user came from checkout
+  const fromCheckout = paymentId || location.state?.fromCheckout;
+
+  // Redirect if not authenticated or didn't come from checkout
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      if (!fromCheckout) {
+        navigate("/app/profile", { replace: true });
+        return;
+      }
+    }
+  }, [isAuthenticated, authLoading, fromCheckout, navigate]);
 
   const copyPaymentId = () => {
     if (paymentId) {
@@ -35,6 +57,15 @@ export default function CheckoutPending() {
     if (paymentType) codes.push(`type=${paymentType}`);
     return codes.length > 0 ? codes.join(' | ') : 'pending';
   };
+
+  // Show loading while checking auth
+  if (authLoading || (!isAuthenticated && !fromCheckout)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4">
@@ -126,9 +157,9 @@ export default function CheckoutPending() {
                 <Button 
                   size="lg" 
                   className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-base shadow-xl border-0 h-14 rounded-xl"
-                  onClick={() => navigate("/admin/perfil")}
+                  onClick={() => navigate("/app/profile")}
                 >
-                  Ir ao Perfil do Usuário
+                  Ir ao Meu Perfil
                 </Button>
               </motion.div>
             </div>

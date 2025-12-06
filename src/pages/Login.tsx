@@ -136,7 +136,8 @@ export default function Login() {
   };
 
   const handlePlanSelect = (plan: SubscriptionPlan) => {
-    navigate(`/checkout?plan=${plan.id}`);
+    // Redirect to signup with plan pre-selected (not checkout - user needs to register first)
+    navigate(`/signup?plan=${plan.id}`);
   };
 
   const formatPrice = (price: number) => {

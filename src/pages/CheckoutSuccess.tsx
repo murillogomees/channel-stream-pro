@@ -1,10 +1,11 @@
 /**
  * Checkout Success Page
  * Displayed after successful payment with auto-redirect
+ * Only accessible by authenticated users via checkout redirect
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,11 +15,30 @@ import { Progress } from "@/components/ui/progress";
 
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { refreshUser } = useAuth();
+  const { refreshUser, isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState(5);
   const [autoRedirect, setAutoRedirect] = useState(true);
+
+  // Check if user came from checkout (has payment params or state)
+  const paymentId = searchParams.get("payment_id");
+  const fromCheckout = paymentId || location.state?.fromCheckout;
+
+  // Redirect if not authenticated or didn't come from checkout
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      if (!fromCheckout) {
+        navigate("/app/profile", { replace: true });
+        return;
+      }
+    }
+  }, [isAuthenticated, authLoading, fromCheckout, navigate]);
 
   // Auto-redirect timer
   useEffect(() => {
@@ -47,7 +67,14 @@ export default function CheckoutSuccess() {
     init();
   }, [refreshUser]);
 
-  const paymentId = searchParams.get("payment_id");
+  // Show loading while checking auth
+  if (authLoading || (!isAuthenticated && !fromCheckout)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4">
