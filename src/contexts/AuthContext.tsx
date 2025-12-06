@@ -1,12 +1,11 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO
- * @version 3.0.0
+ * @version 3.1.0
  * 
  * Gerencia autenticação e autorização usando:
  * - Supabase Auth para identidade
- * - public.profiles para dados de perfil
+ * - public.profiles para dados de perfil + cliente (unificado)
  * - public.user_roles para permissões
- * - public.clientes para dados de cliente e vencimento
  * - public.user_subscriptions para status de assinatura
  */
 
@@ -20,9 +19,9 @@ import { authCache } from '@/services/authCacheService';
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Calcula status de acesso baseado nos dados do cliente
+ * Calcula status de acesso baseado nos dados do profile
  */
-function calculateAccessStatus(clienteData: any, subscriptionData: any): {
+function calculateAccessStatus(profile: any, subscriptionData: any): {
   hasValidAccess: boolean;
   isExpired: boolean;
   daysRemaining: number;
@@ -34,12 +33,12 @@ function calculateAccessStatus(clienteData: any, subscriptionData: any): {
   const isTrial = subscriptionData?.status === 'trial';
   const subscriptionActive = ['trial', 'active'].includes(subscriptionData?.status);
   
-  // Verificar vencimento pelo cliente
+  // Verificar vencimento pelo profile (data unificada)
   let daysRemaining = 0;
   let isExpired = false;
   
-  if (clienteData?.data_vencimento) {
-    const vencimento = new Date(clienteData.data_vencimento);
+  if (profile?.data_vencimento) {
+    const vencimento = new Date(profile.data_vencimento);
     const diffTime = vencimento.getTime() - now.getTime();
     daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     isExpired = daysRemaining < 0;
@@ -47,7 +46,7 @@ function calculateAccessStatus(clienteData: any, subscriptionData: any): {
   
   // Acesso válido = cliente ativo + não vencido + subscription ok
   const hasValidAccess = 
-    clienteData?.cliente_ativo === true && 
+    profile?.cliente_ativo === true && 
     !isExpired && 
     subscriptionActive;
   
@@ -66,15 +65,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const cacheRef = useRef<{ userId: string; data: UnifiedUser; timestamp: number } | null>(null);
 
   /**
-   * Busca dados completos do usuário: perfil + roles + cliente + subscription
+   * Busca dados completos do usuário: perfil (unificado) + roles + subscription
+   * OTIMIZADO: Apenas 2 queries paralelas (profiles já contém dados de cliente)
    */
   const fetchUserData = useCallback(async (userId: string): Promise<UnifiedUser | null> => {
     try {
-      // Fazer queries em paralelo
-      const [profileResult, rolesResult, clienteResult, subscriptionResult] = await Promise.all([
+      // Fazer queries em paralelo - apenas 2 chamadas necessárias
+      const [profileResult, rolesResult, subscriptionResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('clientes').select('id, situacao, plano, data_vencimento, valor_pago, cliente_ativo').eq('user_id', userId).maybeSingle(),
         supabase.from('user_subscriptions').select('id, status, current_period_start, current_period_end, trial_end, cancel_at_period_end, mercado_pago_subscription_id').eq('user_id', userId).maybeSingle()
       ]);
 
@@ -85,11 +84,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const profile = profileResult.data;
       const roles: AppRole[] = (rolesResult.data || []).map((r) => r.role as AppRole);
-      const clienteData = clienteResult.data;
       const subscriptionData = subscriptionResult.data;
 
-      // Calcular status de acesso
-      const accessStatus = calculateAccessStatus(clienteData, subscriptionData);
+      // Calcular status de acesso usando profile unificado
+      const accessStatus = calculateAccessStatus(profile, subscriptionData);
 
       // Montar objeto unificado
       const unifiedUser: UnifiedUser = {
@@ -103,14 +101,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isExpired: accessStatus.isExpired,
         daysRemaining: accessStatus.daysRemaining,
         isTrial: accessStatus.isTrial,
-        // Dados de cliente
-        clienteData: clienteData ? {
-          id: clienteData.id,
-          situacao: clienteData.situacao,
-          plano: clienteData.plano,
-          data_vencimento: clienteData.data_vencimento,
-          valor_pago: clienteData.valor_pago,
-          cliente_ativo: clienteData.cliente_ativo,
+        // Dados de cliente agora vêm direto do profile
+        clienteData: profile ? {
+          id: profile.id,
+          situacao: profile.situacao,
+          plano: profile.plano,
+          data_vencimento: profile.data_vencimento,
+          valor_pago: profile.valor_pago,
+          cliente_ativo: profile.cliente_ativo,
         } : undefined,
         // Dados de subscription
         subscriptionData: subscriptionData ? {
