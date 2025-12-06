@@ -253,7 +253,7 @@ const HeroHeader = memo(function HeroHeader() {
       <img
         src={homeHeroImage}
         alt="IPTV Link"
-        className="w-full h-full object-cover object-center"
+        className="w-full object-cover object-center"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
     </div>
