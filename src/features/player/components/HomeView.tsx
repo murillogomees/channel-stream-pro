@@ -2,12 +2,13 @@
  * HomeView - Optimized home tab with personalized content
  * 
  * Features:
- * - Maximum 500 content items
+ * - Maximum 500 content items (loaded independently)
  * - Priority: Continue Watching > Related > AI Suggestions
  * - Behavior-based recommendations
+ * - NO dependency on full playlist loading
  */
 
-import { memo, useRef, useState } from 'react';
+import { memo, useRef, useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +17,7 @@ import { isValidImageUrl } from '@/lib/imageUtils';
 import { ContinueWatchingRow } from './ContinueWatchingRow';
 import { createSessionKey } from '../utils/contentRandomizer';
 import { usePersonalizedContent } from '../hooks/usePersonalizedContent';
+import { useHomeChannels } from '@/hooks/useHomeChannels';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
 interface SeriesContinuation {
@@ -39,7 +41,7 @@ interface HomeViewProps {
   loadingRecommendations: boolean;
   onPlayRecommendation: (item: RecommendationItem) => void;
   onPlayChannel: (channel: Channel) => void;
-  allChannels: Channel[];
+  allChannels?: Channel[]; // Now optional - we use our own limited hook
 }
 
 // Horizontal scroll row component
@@ -287,10 +289,22 @@ export function HomeView({
   loadingRecommendations,
   onPlayRecommendation,
   onPlayChannel,
-  allChannels,
+  allChannels: externalChannels, // Renamed - we prefer our own limited channels
 }: HomeViewProps) {
   // Session key for stable randomization
   const [sessionKey] = useState(() => createSessionKey());
+
+  // Use our own lightweight hook - loads ONLY 500 channels
+  const { channels: homeChannels, isLoading: loadingHomeChannels } = useHomeChannels();
+  
+  // Use home channels if available, fallback to external (but limited)
+  const limitedChannels = useMemo(() => {
+    if (homeChannels.length > 0) {
+      return homeChannels as Channel[];
+    }
+    // Fallback: limit external channels to 500
+    return (externalChannels || []).slice(0, 500);
+  }, [homeChannels, externalChannels]);
 
   // Use optimized personalized content hook (max 500 items)
   const {
@@ -306,11 +320,11 @@ export function HomeView({
     seriesContinuations,
     recommendationGroups,
     forYouMix,
-    allChannels,
+    allChannels: limitedChannels,
     sessionKey,
   });
 
-  if (loadingContinueWatching && loadingRecommendations) {
+  if ((loadingContinueWatching && loadingRecommendations) || loadingHomeChannels) {
     return <LoadingSkeleton />;
   }
 
