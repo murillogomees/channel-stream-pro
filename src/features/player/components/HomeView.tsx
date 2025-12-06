@@ -192,8 +192,8 @@ const ChannelCard = memo(function ChannelCard({
 });
 
 // Hero Header component - starts right below top header
-const HeroHeader = memo(function HeroHeader() {
-  return <div className="relative w-full h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] overflow-hidden">
+const HeroHeader = memo(function HeroHeader({ className }: { className?: string }) {
+  return <div className={cn("relative w-full h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] overflow-hidden", className)}>
       <img src={homeHeroImage} alt="IPTV Link" className="w-full object-cover object-center" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
     </div>;
