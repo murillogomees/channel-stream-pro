@@ -271,10 +271,17 @@ export function useVideoJs({
     const isXtreamViaProxy = optimized.source === 'proxy' && protocol === 'ts';
     const isExplicitTs = finalUrl.toLowerCase().endsWith('.ts');
     
-    if ((protocol === 'ts' || isXtreamViaProxy) && mpegts.isSupported()) {
-      console.log('[useVideoJs] Using mpegts.js for TS stream:', {
+    // Detect Xtream live stream pattern: /user/pass/channelId (numeric ending)
+    const isXtreamLivePattern = /\/\d+$/.test(url) && !url.includes('.m3u8') && !url.includes('.mp4');
+    
+    // Use mpegts.js for TS streams OR Xtream live streams (numeric IDs)
+    const shouldUseMpegts = (protocol === 'ts' || isXtreamViaProxy || (protocol === 'unknown' && isXtreamLivePattern)) && mpegts.isSupported();
+    
+    if (shouldUseMpegts) {
+      console.log('[useVideoJs] Using mpegts.js for live stream:', {
         protocol,
         isProxy: optimized.source === 'proxy',
+        isXtreamLive: isXtreamLivePattern,
         url: finalUrl.substring(0, 80)
       });
       
