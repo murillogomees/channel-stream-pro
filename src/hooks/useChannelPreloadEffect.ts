@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { usePlayerPerformance } from './usePlayerPerformance';
+import { useChannelPreloader } from './useChannelPreloader';
 
 interface Channel {
   id: string;
@@ -25,8 +25,14 @@ export function useChannelPreloadEffect({
   currentChannelId,
   enabled = true,
 }: UseChannelPreloadEffectOptions) {
-  const performance = usePlayerPerformance({ enablePreload: enabled });
   const lastPreloadedRef = useRef<string>('');
+  
+  // Use the unified preloader
+  const preloader = useChannelPreloader({
+    channels: channels as Array<{ id: string; name: string; stream_url: string }>,
+    currentChannelId,
+    enabled,
+  });
 
   /**
    * Preload adjacent channels when current channel changes
@@ -40,75 +46,55 @@ export function useChannelPreloadEffect({
     const currentIndex = channels.findIndex(c => c.id === currentChannelId);
     if (currentIndex === -1) return;
 
-    const preloadBatch: Array<{ url: string; priority: 'high' | 'medium' | 'low' }> = [];
+    // Preload adjacent channels using preloader
+    const adjacentUrls: string[] = [];
 
     // High priority: immediate neighbors
-    if (currentIndex > 0) {
-      preloadBatch.push({
-        url: channels[currentIndex - 1].stream_url,
-        priority: 'high',
-      });
+    if (currentIndex > 0 && channels[currentIndex - 1].stream_url) {
+      adjacentUrls.push(channels[currentIndex - 1].stream_url);
     }
-    if (currentIndex < channels.length - 1) {
-      preloadBatch.push({
-        url: channels[currentIndex + 1].stream_url,
-        priority: 'high',
-      });
+    if (currentIndex < channels.length - 1 && channels[currentIndex + 1].stream_url) {
+      adjacentUrls.push(channels[currentIndex + 1].stream_url);
     }
 
     // Medium priority: 2 steps away
-    if (currentIndex > 1) {
-      preloadBatch.push({
-        url: channels[currentIndex - 2].stream_url,
-        priority: 'medium',
-      });
+    if (currentIndex > 1 && channels[currentIndex - 2].stream_url) {
+      adjacentUrls.push(channels[currentIndex - 2].stream_url);
     }
-    if (currentIndex < channels.length - 2) {
-      preloadBatch.push({
-        url: channels[currentIndex + 2].stream_url,
-        priority: 'medium',
-      });
-    }
-
-    // Low priority: 3 steps away
-    if (currentIndex < channels.length - 3) {
-      preloadBatch.push({
-        url: channels[currentIndex + 3].stream_url,
-        priority: 'low',
-      });
+    if (currentIndex < channels.length - 2 && channels[currentIndex + 2].stream_url) {
+      adjacentUrls.push(channels[currentIndex + 2].stream_url);
     }
 
     // Execute preload
-    if (preloadBatch.length > 0) {
-      console.log(`[ChannelPreload] Preloading ${preloadBatch.length} adjacent channels`);
-      performance.preloadBatch(preloadBatch);
+    if (adjacentUrls.length > 0) {
+      console.log(`[ChannelPreload] Preloading ${adjacentUrls.length} adjacent channels`);
+      adjacentUrls.forEach(url => preloader.preloadUrl(url));
     }
-  }, [currentChannelId, channels, enabled, performance]);
+  }, [currentChannelId, channels, enabled, preloader]);
 
   /**
    * Check if a channel is preloaded
    */
   const isChannelPreloaded = useCallback((channelId: string): boolean => {
-    const channel = channels.find(c => c.id === channelId);
-    if (!channel) return false;
-    return performance.isUrlPreloaded(channel.stream_url);
-  }, [channels, performance]);
+    const status = preloader.getChannelPreloadStatus(channelId);
+    return status.isPreloaded;
+  }, [preloader]);
 
   /**
    * Manually preload a specific channel
    */
   const preloadChannel = useCallback(async (channelId: string): Promise<boolean> => {
     const channel = channels.find(c => c.id === channelId);
-    if (!channel) return false;
-    const result = await performance.preloadStream(channel.stream_url, 'high');
-    return !!result;
-  }, [channels, performance]);
+    if (!channel?.stream_url) return false;
+    preloader.preloadUrl(channel.stream_url);
+    return true;
+  }, [channels, preloader]);
 
   return {
     isChannelPreloaded,
     preloadChannel,
-    metrics: performance.metrics,
-    isWorkerReady: performance.isWorkerReady,
+    stats: preloader.stats,
+    isPreloading: preloader.isPreloading,
   };
 }
 

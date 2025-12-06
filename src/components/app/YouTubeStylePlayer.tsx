@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
 import { useMovieMetadata } from "@/features/player/hooks/useMovieMetadata";
-import { usePlayerPerformance } from "@/hooks/usePlayerPerformance";
+import { usePlayerPerformanceV2 } from "@/hooks/usePlayerPerformanceV2";
 import { getOptimizedHlsConfig, getMpegtsConfig, detectConnectionQuality } from "@/config/playerBufferConfig";
 
 interface ContentMetadata {
@@ -115,9 +115,9 @@ export default function YouTubeStylePlayer({
   seriesEpisodes = [],
   onPlayEpisode,
 }: YouTubeStylePlayerProps) {
-  // Unified Performance Hook
+  // Unified Performance Hook (V2)
   const streamInfo = detectStreamType(url);
-  const performance = usePlayerPerformance({ isLive: !streamInfo.isVod, enablePreload: true });
+  const performanceV2 = usePlayerPerformanceV2({ isLive: !streamInfo.isVod, enabled: true });
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -317,10 +317,9 @@ export default function YouTubeStylePlayer({
           hasConnectedOnceRef.current = true;
           setConnectionStatus('connected');
         }
-        // Track playback start and record first frame for metrics
+        // Track playback start - V2 doesn't have recordFirstFrame, just track locally
         if (!hasStartedPlayingRef.current) {
           hasStartedPlayingRef.current = true;
-          performance.recordFirstFrame();
           onPlaybackStart?.();
         }
       },
@@ -380,9 +379,6 @@ export default function YouTubeStylePlayer({
 
   // HLS Player initialization function - PERFORMANCE OPTIMIZED
   const initHlsPlayer = useCallback((streamUrl: string, video: HTMLVideoElement) => {
-    // Start performance timing
-    performance.startTiming();
-    
     // Detect connection quality for adaptive config
     const connectionQuality = detectConnectionQuality();
     console.log(`[Player] Connection quality: ${connectionQuality}`);
@@ -401,8 +397,8 @@ export default function YouTubeStylePlayer({
     });
     hlsRef.current = hls;
 
-    // Attach to adaptive buffer for monitoring
-    performance.attachHls(hls, video);
+    // Attach to performance V2 for monitoring
+    performanceV2.attach(hls, video);
 
     hls.loadSource(streamUrl);
     hls.attachMedia(video);
@@ -413,7 +409,7 @@ export default function YouTubeStylePlayer({
     const MAX_RECOVERY_ATTEMPTS = 8;
     
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      performance.recordManifestLoaded();
+      // Manifest loaded - no specific tracking needed with V2
       setIsLoading(false);
       hasConnectedOnceRef.current = true;
       setConnectionStatus('connected');
@@ -498,13 +494,13 @@ export default function YouTubeStylePlayer({
     });
 
     return () => {
-      performance.detach();
+      performanceV2.cleanup();
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [autoplay, onReady, onError, performance]);
+  }, [autoplay, onReady, onError, performanceV2, streamInfo.isLive]);
 
   // Initialize player
   useEffect(() => {
