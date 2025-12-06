@@ -458,30 +458,17 @@ async function processPayment(supabase: any, paymentData: any) {
   // Map status
   const { systemStatus, clienteAtivo } = mapPaymentStatus(status);
   
-  // Get client info for WhatsApp - tenta profiles primeiro, depois clientes
-  let cliente = null;
-  
+  // Get client info for WhatsApp from profiles table
   const { data: profile } = await supabase
     .from("profiles")
     .select("nome, contact_phone, email")
     .eq("id", userId)
     .single();
   
-  if (profile) {
-    cliente = {
-      nome: profile.nome || profile.email || 'Cliente',
-      telefone: profile.contact_phone,
-    };
-  } else {
-    // Fallback para tabela clientes (legado)
-    const { data: clienteData } = await supabase
-      .from("clientes")
-      .select("nome, telefone")
-      .eq("user_id", userId)
-      .single();
-    
-    cliente = clienteData;
-  }
+  const cliente = profile ? {
+    nome: profile.nome || profile.email || 'Cliente',
+    telefone: profile.contact_phone,
+  } : null;
   
   // Update subscription based on status
   if (status === "approved") {
@@ -516,7 +503,7 @@ async function processPayment(supabase: any, paymentData: any) {
         onConflict: "user_id,role",
       });
     
-    // Update profiles table
+    // Update profiles table with payment info
     await supabase
       .from("profiles")
       .update({
@@ -540,22 +527,6 @@ async function processPayment(supabase: any, paymentData: any) {
       })
       .eq("id", userId);
   }
-  
-  // Update clientes table (legado) with all payment info
-  await supabase
-    .from("clientes")
-    .update({
-      situacao: systemStatus,
-      cliente_ativo: clienteAtivo,
-      plano: planoNome,
-      data_contratacao: status === "approved" ? dataPagamento.toISOString() : undefined,
-      data_ultimo_pagamento: status === "approved" ? dataPagamento.toISOString() : undefined,
-      data_vencimento: status === "approved" ? dataVencimento.toISOString() : undefined,
-      valor_pago: paymentData.transaction_amount,
-      forma_ultimo_pagamento: formaPagamento,
-      is_recorrente: status === "approved",
-    })
-    .eq("user_id", userId);
   
   // Send WhatsApp notification for ALL status changes
   if (cliente && cliente.telefone) {
