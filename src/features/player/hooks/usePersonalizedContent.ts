@@ -5,9 +5,10 @@
  * - Maximum 500 items total
  * - Priority: Continue Watching > Related > AI Suggestions
  * - Behavior-based recommendations
+ * - Stable hook order (no conditional hooks)
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useRef } from 'react';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 import { groupRecommendationItems, detectContentType } from '../utils/contentGrouper';
 import { shuffleArray } from '../utils/contentRandomizer';
@@ -34,13 +35,19 @@ interface PersonalizedContentInput {
   sessionKey: string;
 }
 
-interface PersonalizedSection {
-  id: string;
-  title: string;
-  subtitle?: string;
-  type: 'continue' | 'series' | 'related' | 'foryou' | 'default';
-  items: any[];
-  priority: number;
+// Generate unique key for items
+function generateUniqueKey(item: any, prefix: string, index: number, usedKeys: Set<string>): string {
+  const baseId = item.id || item.content_id || item.channel_id || `idx${index}`;
+  let key = `${prefix}-${baseId}`;
+  
+  let counter = 0;
+  while (usedKeys.has(key)) {
+    counter++;
+    key = `${prefix}-${baseId}-${counter}`;
+  }
+  
+  usedKeys.add(key);
+  return key;
 }
 
 export function usePersonalizedContent(input: PersonalizedContentInput) {
@@ -53,65 +60,28 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     sessionKey,
   } = input;
 
-  // Global ID tracker to prevent duplicates across all sections
-  const usedIds = useMemo(() => new Set<string>(), [sessionKey]);
+  // Use ref for session key to avoid recreating data on each render
+  const sessionRef = useRef(sessionKey);
+  const shuffledDataRef = useRef<{
+    key: string;
+    continueWatching: WatchProgress[];
+    seriesContinuations: typeof seriesContinuations;
+    relatedGroups: RecommendationGroup[];
+    forYouMix: RecommendationItem[];
+    defaultSections: Array<{ title: string; type: string; channels: Channel[] }>;
+  } | null>(null);
 
-  // Helper to generate unique key with index fallback
-  const getUniqueKey = useCallback((item: any, sectionPrefix: string, index: number): string => {
-    const baseId = item.id || item.content_id || item.channel_id || '';
-    let key = `${sectionPrefix}-${baseId}`;
+  // Process all content in a single useMemo to maintain stable hook order
+  const processedContent = useMemo(() => {
+    const usedKeys = new Set<string>();
+    const usedContentIds = new Set<string>();
     
-    // If already used, append index
-    if (usedIds.has(key)) {
-      key = `${sectionPrefix}-${baseId}-${index}`;
-    }
-    
-    usedIds.add(key);
-    return key;
-  }, [usedIds]);
-
-  // Calculate total items budget
-  const calculateBudget = useCallback(() => {
+    // Calculate budget
     let remaining = MAX_TOTAL_ITEMS;
-    const budgets = {
-      continueWatching: 0,
-      seriesContinuations: 0,
-      related: 0,
-      forYou: 0,
-      defaults: 0,
-    };
-
-    // Priority 1: Continue Watching (highest priority)
-    budgets.continueWatching = Math.min(continueWatchingItems.length, MAX_CONTINUE_WATCHING);
-    remaining -= budgets.continueWatching;
-
-    // Priority 2: Series continuations
-    budgets.seriesContinuations = Math.min(seriesContinuations.length, 10);
-    remaining -= budgets.seriesContinuations;
-
-    // Priority 3: Related content (based on what user watches)
-    const totalRelated = recommendationGroups.reduce((sum, g) => sum + g.items.length, 0);
-    budgets.related = Math.min(totalRelated, Math.min(remaining * 0.5, 200));
-    remaining -= budgets.related;
-
-    // Priority 4: For You mix
-    budgets.forYou = Math.min(forYouMix.length, Math.min(remaining * 0.5, MAX_FOR_YOU));
-    remaining -= budgets.forYou;
-
-    // Priority 5: Default sections for remaining budget
-    budgets.defaults = Math.max(0, remaining);
-
-    return budgets;
-  }, [continueWatchingItems.length, seriesContinuations.length, recommendationGroups, forYouMix.length]);
-
-  // Process continue watching (highest priority) - deduplicated
-  const processedContinueWatching = useMemo(() => {
-    usedIds.clear(); // Reset for each calculation
     
-    const uniqueItems: WatchProgress[] = [];
-    const seenContentIds = new Set<string>();
-    
-    const sorted = [...continueWatchingItems]
+    // 1. Process Continue Watching (highest priority)
+    const continueWatching: Array<WatchProgress & { _uniqueKey: string }> = [];
+    const sortedContinue = [...continueWatchingItems]
       .filter(item => item.content_logo)
       .sort((a, b) => {
         const dateA = new Date(a.updated_at || 0).getTime();
@@ -119,189 +89,189 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
         return dateB - dateA;
       });
     
-    for (const item of sorted) {
-      const contentKey = item.content_id || item.id;
-      if (!seenContentIds.has(contentKey)) {
-        seenContentIds.add(contentKey);
-        uniqueItems.push({
+    for (const item of sortedContinue) {
+      const contentId = item.content_id || item.id;
+      if (!usedContentIds.has(contentId) && continueWatching.length < MAX_CONTINUE_WATCHING) {
+        usedContentIds.add(contentId);
+        continueWatching.push({
           ...item,
-          _uniqueKey: `cw-${contentKey}-${uniqueItems.length}`,
-        } as WatchProgress & { _uniqueKey: string });
-        usedIds.add(contentKey);
+          _uniqueKey: generateUniqueKey(item, 'cw', continueWatching.length, usedKeys),
+        });
       }
-      if (uniqueItems.length >= MAX_CONTINUE_WATCHING) break;
     }
-    
-    return uniqueItems;
-  }, [continueWatchingItems, usedIds]);
+    remaining -= continueWatching.length;
 
-  // Process series continuations - deduplicated
-  const processedSeriesContinuations = useMemo(() => {
-    const uniqueItems: typeof seriesContinuations = [];
+    // 2. Process Series Continuations
+    const processedSeries: Array<typeof seriesContinuations[0] & { _uniqueKey: string }> = [];
     const seenSeries = new Set<string>();
     
     for (const item of seriesContinuations) {
+      if (processedSeries.length >= 10) break;
+      
       const seriesKey = item.seriesName.toLowerCase().trim();
       const channelId = item.nextEpisode?.id || '';
       
-      if (!seenSeries.has(seriesKey) && !usedIds.has(channelId)) {
-        seenSeries.add(seriesKey);
-        usedIds.add(channelId);
-        uniqueItems.push({
-          ...item,
-          _uniqueKey: `sc-${channelId}-${uniqueItems.length}`,
-        } as any);
+      if (!seenSeries.has(seriesKey) && !usedContentIds.has(channelId)) {
+        if (item.logo || item.nextEpisode?.tvg_logo) {
+          seenSeries.add(seriesKey);
+          usedContentIds.add(channelId);
+          processedSeries.push({
+            ...item,
+            _uniqueKey: generateUniqueKey({ id: channelId }, 'sc', processedSeries.length, usedKeys),
+          });
+        }
       }
-      if (uniqueItems.length >= 10) break;
     }
+    remaining -= processedSeries.length;
+
+    // 3. Process Related Groups
+    const totalRelatedBudget = Math.min(remaining * 0.5, 200);
+    const itemsPerGroup = Math.floor(totalRelatedBudget / Math.max(1, recommendationGroups.length));
+    const cappedItemsPerGroup = Math.min(itemsPerGroup, MAX_RELATED_PER_CATEGORY);
     
-    return uniqueItems.filter(item => item.logo || item.nextEpisode.tvg_logo);
-  }, [seriesContinuations, usedIds]);
-
-  // Process related content - deduplicated
-  const processedRelated = useMemo(() => {
-    const budget = calculateBudget();
-    let itemsPerGroup = Math.floor(budget.related / Math.max(1, recommendationGroups.length));
-    itemsPerGroup = Math.min(itemsPerGroup, MAX_RELATED_PER_CATEGORY);
-
-    return recommendationGroups.map((group, groupIndex) => {
-      const uniqueItems: any[] = [];
+    const relatedGroups: Array<RecommendationGroup & { items: Array<RecommendationItem & { _uniqueKey: string }> }> = [];
+    let relatedTotal = 0;
+    
+    for (let gIdx = 0; gIdx < recommendationGroups.length; gIdx++) {
+      const group = recommendationGroups[gIdx];
       const withLogos = group.items.filter(item => item.content_logo);
       const grouped = groupRecommendationItems(withLogos);
       const shuffled = shuffleArray(grouped);
       
+      const uniqueItems: Array<RecommendationItem & { _uniqueKey: string }> = [];
+      
       for (const item of shuffled) {
+        if (uniqueItems.length >= cappedItemsPerGroup) break;
+        
         const contentId = item.content_id || item.id || '';
-        if (!usedIds.has(contentId)) {
-          usedIds.add(contentId);
+        if (!usedContentIds.has(contentId)) {
+          usedContentIds.add(contentId);
           uniqueItems.push({
             ...item,
-            _uniqueKey: `rel-${groupIndex}-${contentId}-${uniqueItems.length}`,
+            _uniqueKey: generateUniqueKey(item, `rel${gIdx}`, uniqueItems.length, usedKeys),
           });
         }
-        if (uniqueItems.length >= itemsPerGroup) break;
       }
       
-      return {
-        ...group,
-        items: uniqueItems,
-      };
-    }).filter(g => g.items.length > 0);
-  }, [recommendationGroups, calculateBudget, usedIds, sessionKey]);
+      if (uniqueItems.length > 0) {
+        relatedGroups.push({
+          ...group,
+          items: uniqueItems,
+        });
+        relatedTotal += uniqueItems.length;
+      }
+    }
+    remaining -= relatedTotal;
 
-  // Process For You mix - deduplicated
-  const processedForYou = useMemo(() => {
-    const withLogos = forYouMix.filter(item => item.content_logo);
-    const grouped = groupRecommendationItems(withLogos);
-    const shuffled = shuffleArray(grouped);
+    // 4. Process For You
+    const forYouWithLogos = forYouMix.filter(item => item.content_logo);
+    const forYouGrouped = groupRecommendationItems(forYouWithLogos);
+    const forYouShuffled = shuffleArray(forYouGrouped);
     
-    const uniqueItems: any[] = [];
-    for (const item of shuffled) {
+    const processedForYou: Array<RecommendationItem & { _uniqueKey: string }> = [];
+    
+    for (const item of forYouShuffled) {
+      if (processedForYou.length >= Math.min(remaining * 0.5, MAX_FOR_YOU)) break;
+      
       const contentId = item.content_id || item.id || '';
-      if (!usedIds.has(contentId)) {
-        usedIds.add(contentId);
-        uniqueItems.push({
+      if (!usedContentIds.has(contentId)) {
+        usedContentIds.add(contentId);
+        processedForYou.push({
           ...item,
-          _uniqueKey: `fy-${contentId}-${uniqueItems.length}`,
+          _uniqueKey: generateUniqueKey(item, 'fy', processedForYou.length, usedKeys),
         });
       }
-      if (uniqueItems.length >= MAX_FOR_YOU) break;
     }
+    remaining -= processedForYou.length;
+
+    // 5. Process Default Sections (only if no personalized content)
+    const hasPersonalized = continueWatching.length > 0 || processedSeries.length > 0 || relatedGroups.length > 0;
     
-    return uniqueItems;
-  }, [forYouMix, usedIds, sessionKey]);
-
-  // Process default sections - deduplicated
-  const processedDefaults = useMemo(() => {
-    const hasPersonalized = 
-      processedContinueWatching.length > 0 || 
-      processedSeriesContinuations.length > 0 ||
-      processedRelated.length > 0;
-
-    if (hasPersonalized || allChannels.length === 0) return [];
-
-    const budget = calculateBudget();
-    const validChannels = allChannels.filter(ch => ch.tvg_logo);
+    const defaultSections: Array<{ 
+      title: string; 
+      type: string; 
+      channels: Array<Channel & { _uniqueKey: string }> 
+    }> = [];
     
-    // Group by content type
-    const movies: Array<Channel & { _uniqueKey: string }> = [];
-    const series: Array<Channel & { _uniqueKey: string }> = [];
-    const live: Array<Channel & { _uniqueKey: string }> = [];
-    const seen = new Set<string>();
-
-    for (const ch of validChannels) {
-      // Deduplicate by series/content and global ID
-      const key = ch.name.split(/S\d|E\d|\d+x\d+/i)[0].trim().toLowerCase();
-      if (seen.has(key) || usedIds.has(ch.id)) continue;
-      seen.add(key);
-      usedIds.add(ch.id);
-
-      const channelWithKey = {
-        ...ch,
-        _uniqueKey: `def-${ch.id}-${seen.size}`,
-      };
-
-      const type = detectContentType(ch);
-      if (type === 'movie') movies.push(channelWithKey);
-      else if (type === 'series') series.push(channelWithKey);
-      else live.push(channelWithKey);
+    if (!hasPersonalized && allChannels.length > 0) {
+      const validChannels = allChannels.filter(ch => ch.tvg_logo);
+      
+      const movies: Array<Channel & { _uniqueKey: string }> = [];
+      const series: Array<Channel & { _uniqueKey: string }> = [];
+      const live: Array<Channel & { _uniqueKey: string }> = [];
+      const seenNames = new Set<string>();
+      
+      for (const ch of validChannels) {
+        const nameKey = ch.name.split(/S\d|E\d|\d+x\d+/i)[0].trim().toLowerCase();
+        if (seenNames.has(nameKey) || usedContentIds.has(ch.id)) continue;
+        
+        seenNames.add(nameKey);
+        usedContentIds.add(ch.id);
+        
+        const channelWithKey = {
+          ...ch,
+          _uniqueKey: generateUniqueKey(ch, 'def', seenNames.size, usedKeys),
+        };
+        
+        const type = detectContentType(ch);
+        if (type === 'movie') movies.push(channelWithKey);
+        else if (type === 'series') series.push(channelWithKey);
+        else live.push(channelWithKey);
+      }
+      
+      const perSection = Math.floor(remaining / 3);
+      const limit = Math.min(perSection, MAX_DEFAULT_PER_SECTION);
+      
+      if (live.length > 0) {
+        defaultSections.push({
+          title: '📺 TV ao Vivo',
+          type: 'live',
+          channels: shuffleArray(live).slice(0, limit),
+        });
+      }
+      if (movies.length > 0) {
+        defaultSections.push({
+          title: '🎬 Filmes',
+          type: 'movie',
+          channels: shuffleArray(movies).slice(0, limit),
+        });
+      }
+      if (series.length > 0) {
+        defaultSections.push({
+          title: '📺 Séries',
+          type: 'series',
+          channels: shuffleArray(series).slice(0, limit),
+        });
+      }
     }
 
-    const perSection = Math.floor(budget.defaults / 3);
-    const sections: Array<{ title: string; type: string; channels: Array<Channel & { _uniqueKey: string }> }> = [];
+    // Calculate totals
+    let totalCount = continueWatching.length + processedSeries.length;
+    totalCount += relatedGroups.reduce((sum, g) => sum + g.items.length, 0);
+    totalCount += processedForYou.length;
+    totalCount += defaultSections.reduce((sum, s) => sum + s.channels.length, 0);
 
-    if (live.length > 0) {
-      sections.push({
-        title: '📺 TV ao Vivo',
-        type: 'live',
-        channels: shuffleArray(live).slice(0, Math.min(perSection, MAX_DEFAULT_PER_SECTION)),
-      });
-    }
-    if (movies.length > 0) {
-      sections.push({
-        title: '🎬 Filmes',
-        type: 'movie',
-        channels: shuffleArray(movies).slice(0, Math.min(perSection, MAX_DEFAULT_PER_SECTION)),
-      });
-    }
-    if (series.length > 0) {
-      sections.push({
-        title: '📺 Séries',
-        type: 'series',
-        channels: shuffleArray(series).slice(0, Math.min(perSection, MAX_DEFAULT_PER_SECTION)),
-      });
-    }
-
-    return sections;
-  }, [allChannels, processedContinueWatching.length, processedSeriesContinuations.length, processedRelated.length, calculateBudget, usedIds, sessionKey]);
-
-  // Total count for metrics
-  const totalItemCount = useMemo(() => {
-    let count = processedContinueWatching.length;
-    count += processedSeriesContinuations.length;
-    count += processedRelated.reduce((sum, g) => sum + g.items.length, 0);
-    count += processedForYou.length;
-    count += processedDefaults.reduce((sum, s) => sum + s.channels.length, 0);
-    return count;
-  }, [processedContinueWatching, processedSeriesContinuations, processedRelated, processedForYou, processedDefaults]);
-
-  // Check if user has personalized content
-  const hasPersonalizedContent = useMemo(() => {
-    return processedContinueWatching.length > 0 || 
-           processedSeriesContinuations.length > 0 ||
-           processedRelated.length > 0;
-  }, [processedContinueWatching.length, processedSeriesContinuations.length, processedRelated.length]);
+    return {
+      continueWatching,
+      seriesContinuations: processedSeries,
+      relatedGroups,
+      forYouMix: processedForYou,
+      defaultSections,
+      hasPersonalizedContent: hasPersonalized,
+      totalItemCount: Math.min(totalCount, MAX_TOTAL_ITEMS),
+    };
+  }, [
+    continueWatchingItems, 
+    seriesContinuations, 
+    recommendationGroups, 
+    forYouMix, 
+    allChannels,
+    sessionKey,
+  ]);
 
   return {
-    continueWatching: processedContinueWatching,
-    seriesContinuations: processedSeriesContinuations,
-    relatedGroups: processedRelated,
-    forYouMix: processedForYou,
-    defaultSections: processedDefaults,
-    hasPersonalizedContent,
-    totalItemCount,
+    ...processedContent,
     maxItems: MAX_TOTAL_ITEMS,
-    getUniqueKey,
   };
 }
 

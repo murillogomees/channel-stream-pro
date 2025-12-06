@@ -104,17 +104,20 @@ const ChannelItem = memo(function ChannelItem({
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {onFavoriteToggle && (
-            <button
+            <span
+              role="button"
+              tabIndex={0}
               onClick={handleFavoriteClick}
+              onKeyDown={(e) => e.key === 'Enter' && handleFavoriteClick(e as any)}
               className={cn(
-                "p-1.5 rounded-full transition-colors",
+                "p-1.5 rounded-full transition-colors cursor-pointer",
                 isFav 
                   ? "text-yellow-500 hover:text-yellow-600" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Star className={cn("w-4 h-4", isFav && "fill-current")} />
-            </button>
+            </span>
           )}
           
           {isActive && (
