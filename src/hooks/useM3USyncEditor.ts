@@ -195,11 +195,14 @@ export function useM3USyncEditor() {
         }
       }
 
-      // Optimized loading: larger pages with high parallelism
+      // Optimized loading: balanced parallelism to avoid server overload
+      // Supabase has issues with high offsets (>50k) causing 500 errors
       const PAGE_SIZE = 1000; // Supabase limit
-      const PARALLEL_REQUESTS = 15; // Maximum parallelism for faster loading
-      const MAX_RETRIES = 2; // Reduce retries for faster failure
-      const BATCH_DELAY_MS = 50; // Minimal delay between batches
+      const MAX_SAFE_OFFSET = 50000; // Beyond this, Supabase may timeout
+      const PARALLEL_REQUESTS_NORMAL = 8; // Normal parallelism for safe range
+      const PARALLEL_REQUESTS_HIGH_OFFSET = 3; // Reduced parallelism for high offsets
+      const MAX_RETRIES = 2;
+      const BATCH_DELAY_MS = 100; // Delay between batches to avoid rate limits
 
       console.log(`[M3USyncEditor] Starting optimized load for source: ${sourceId}`);
 
@@ -233,7 +236,9 @@ export function useM3USyncEditor() {
       const totalPages = Math.ceil(totalCount / PAGE_SIZE);
       let loadedEntries: any[] = [];
       
-      console.log(`[M3USyncEditor] Loading ${totalPages} pages of ${PAGE_SIZE} entries each`);
+      // Limit pages to safe offset range to avoid 500 errors
+      const safePages = Math.min(totalPages, Math.ceil(MAX_SAFE_OFFSET / PAGE_SIZE));
+      console.log(`[M3USyncEditor] Loading ${safePages} pages of ${PAGE_SIZE} entries each (limited to ${MAX_SAFE_OFFSET} offset for stability)`);
 
       // Track if we hit a 500 error (server timeout on high offsets)
       let hitServerError = false;
@@ -296,13 +301,22 @@ export function useM3USyncEditor() {
         }
       };
 
+      // Adaptive parallelism based on current offset
+      const getCurrentParallelism = (currentPage: number): number => {
+        const currentOffset = currentPage * PAGE_SIZE;
+        return currentOffset >= MAX_SAFE_OFFSET * 0.8 
+          ? PARALLEL_REQUESTS_HIGH_OFFSET 
+          : PARALLEL_REQUESTS_NORMAL;
+      };
+
       // Progressive loading - fetch and display as data comes in
       let lastProgressLog = 0;
-      for (let i = 0; i < totalPages && !hitServerError; i += PARALLEL_REQUESTS) {
+      for (let i = 0; i < safePages && !hitServerError; i += getCurrentParallelism(i)) {
         if (signal.aborted) return;
         
+        const parallelism = getCurrentParallelism(i);
         const batch = Array.from(
-          { length: Math.min(PARALLEL_REQUESTS, totalPages - i) },
+          { length: Math.min(parallelism, safePages - i) },
           (_, idx) => i + idx
         );
         
@@ -358,8 +372,9 @@ export function useM3USyncEditor() {
           console.log(`[M3USyncEditor] Progress: ${loadedEntries.length.toLocaleString()}/${totalCount.toLocaleString()} (${currentPercent}%)`);
         }
         
-        // Small delay between batches to avoid rate limits
-        if (i + PARALLEL_REQUESTS < totalPages && !hitServerError) {
+        // Delay between batches to avoid rate limits
+        const nextParallelism = getCurrentParallelism(i + parallelism);
+        if (i + parallelism < safePages && !hitServerError) {
           await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
         }
       }
