@@ -316,13 +316,13 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Default sections - All devices */}
-      {!hasPersonalizedContent && defaultSections.map(section => <ContentRow key={(section as any)._sectionKey || section.type} title={section.title} icon={sectionIcons[section.type] || Tv} isEmpty={section.channels.length === 0}>
+      {/* Default sections - Always show as base content */}
+      {defaultSections.map(section => <ContentRow key={(section as any)._sectionKey || section.type} title={section.title} icon={sectionIcons[section.type] || Tv} isEmpty={section.channels.length === 0}>
           {section.channels.map(channel => <ChannelCard key={(channel as any)._uniqueKey || channel.id} channel={channel} onPlay={() => onPlayChannel(channel)} icon={sectionIcons[section.type]} />)}
         </ContentRow>)}
 
-      {/* Empty state */}
-      {!hasPersonalizedContent && defaultSections.length === 0 && !loadingRecommendations && <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4">
+      {/* Empty state - Only when no content at all */}
+      {defaultSections.length === 0 && !loadingRecommendations && <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4">
           <Tv className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground/40 mb-3 sm:mb-4" />
           <h3 className="text-base sm:text-lg font-medium text-foreground mb-2">Comece a assistir</h3>
           <p className="text-sm text-muted-foreground max-w-md">
