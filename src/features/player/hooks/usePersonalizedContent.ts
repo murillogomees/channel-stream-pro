@@ -10,7 +10,6 @@
 
 import { useMemo, useRef } from 'react';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
-import { groupRecommendationItems, detectContentType } from '../utils/contentGrouper';
 
 const MAX_TOTAL_ITEMS = 500;
 const MAX_CONTINUE_WATCHING = 20;
@@ -34,12 +33,36 @@ interface PersonalizedContentInput {
   sessionKey: string;
 }
 
-// Stable unique key counter
-let globalKeyCounter = 0;
+// Detect content type from channel
+function detectContentType(channel: Channel): 'movie' | 'series' | 'live' {
+  const name = (channel.name || '').toLowerCase();
+  const group = (channel.group_title || '').toLowerCase();
+  const url = (channel.stream_url || '').toLowerCase();
+  
+  if (group.includes('filme') || group.includes('movie') || name.includes('filme')) {
+    return 'movie';
+  }
+  if (group.includes('serie') || group.includes('series') || /s\d+e\d+/i.test(name) || /\d+x\d+/i.test(name)) {
+    return 'series';
+  }
+  if (url.includes('.m3u8') && !url.includes('vod')) {
+    return 'live';
+  }
+  return 'live';
+}
 
-// Generate deterministic unique key
-function getStableKey(contentId: string, prefix: string): string {
-  return `${prefix}_${contentId}_${++globalKeyCounter}`;
+// Group recommendation items by content ID
+function groupRecommendationItems(items: RecommendationItem[]): RecommendationItem[] {
+  const seen = new Map<string, RecommendationItem>();
+  
+  for (const item of items) {
+    const key = item.content_id || item.id || '';
+    if (!seen.has(key)) {
+      seen.set(key, item);
+    }
+  }
+  
+  return Array.from(seen.values());
 }
 
 // Stable shuffle using session key (same session = same order)
@@ -71,15 +94,16 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     sessionKey,
   } = input;
 
-  // Refs to maintain stable state across renders (append-only)
-  const processedIdsRef = useRef<Set<string>>(new Set());
+  // Use ref for stable key generation (survives hot reload)
+  const keyCounterRef = useRef(0);
   const stableKeysRef = useRef<Map<string, string>>(new Map());
   
   // Get or create stable key for an item
   const getOrCreateStableKey = (id: string, prefix: string): string => {
     const cacheKey = `${prefix}:${id}`;
     if (!stableKeysRef.current.has(cacheKey)) {
-      stableKeysRef.current.set(cacheKey, getStableKey(id, prefix));
+      keyCounterRef.current += 1;
+      stableKeysRef.current.set(cacheKey, `${prefix}_${id}_${keyCounterRef.current}`);
     }
     return stableKeysRef.current.get(cacheKey)!;
   };
@@ -103,7 +127,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     for (const item of sortedContinue) {
       if (continueWatching.length >= MAX_CONTINUE_WATCHING) break;
       const contentId = item.content_id || item.id || '';
-      if (usedIds.has(contentId)) continue;
+      if (!contentId || usedIds.has(contentId)) continue;
       
       usedIds.add(contentId);
       continueWatching.push({
@@ -130,7 +154,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       usedIds.add(channelId);
       processedSeries.push({
         ...item,
-        _uniqueKey: getOrCreateStableKey(channelId, 'sc'),
+        _uniqueKey: getOrCreateStableKey(channelId || seriesKey, 'sc'),
       });
     }
     remaining -= processedSeries.length;
@@ -148,9 +172,10 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     
     for (let gIdx = 0; gIdx < recommendationGroups.length; gIdx++) {
       const group = recommendationGroups[gIdx];
+      if (!group || !group.items) continue;
+      
       const withLogos = group.items.filter(item => item.content_logo);
       const grouped = groupRecommendationItems(withLogos);
-      // Use stable shuffle based on session key
       const shuffled = stableShuffleWithSeed(grouped, `${sessionKey}-rel-${gIdx}`);
       
       const uniqueItems: Array<RecommendationItem & { _uniqueKey: string }> = [];
@@ -159,7 +184,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
         if (uniqueItems.length >= cappedItemsPerGroup) break;
         
         const contentId = item.content_id || item.id || '';
-        if (usedIds.has(contentId)) continue;
+        if (!contentId || usedIds.has(contentId)) continue;
         
         usedIds.add(contentId);
         uniqueItems.push({
@@ -172,7 +197,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
         relatedGroups.push({
           ...group,
           items: uniqueItems,
-          _groupKey: `group-${gIdx}-${group.type}`,
+          _groupKey: `group-${gIdx}-${group.type || 'unknown'}`,
         });
         relatedTotal += uniqueItems.length;
       }
@@ -190,7 +215,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       if (processedForYou.length >= Math.min(remaining * 0.5, MAX_FOR_YOU)) break;
       
       const contentId = item.content_id || item.id || '';
-      if (usedIds.has(contentId)) continue;
+      if (!contentId || usedIds.has(contentId)) continue;
       
       usedIds.add(contentId);
       processedForYou.push({
@@ -246,7 +271,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       
       if (live.length > 0) {
         defaultSections.push({
-          title: '📺 TV ao Vivo',
+          title: 'TV ao Vivo',
           type: 'live',
           channels: live.slice(0, MAX_DEFAULT_PER_SECTION),
           _sectionKey: 'default-live',
@@ -254,7 +279,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       }
       if (movies.length > 0) {
         defaultSections.push({
-          title: '🎬 Filmes',
+          title: 'Filmes',
           type: 'movie',
           channels: movies.slice(0, MAX_DEFAULT_PER_SECTION),
           _sectionKey: 'default-movie',
@@ -262,7 +287,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
       }
       if (series.length > 0) {
         defaultSections.push({
-          title: '📺 Séries',
+          title: 'Séries',
           type: 'series',
           channels: series.slice(0, MAX_DEFAULT_PER_SECTION),
           _sectionKey: 'default-series',
