@@ -9,6 +9,14 @@ export {
 } from './SeriesEpisodeNavigator';
 
 /**
+ * Series Program Guide - Season/Episode selector for player
+ */
+export { 
+  SeriesProgramGuide, 
+  parseEpisodeInfo as parseSeriesEpisodeInfo 
+} from './SeriesProgramGuide';
+
+/**
  * Player Components - Export all UI components
  */
 

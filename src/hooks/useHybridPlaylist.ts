@@ -91,28 +91,24 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     
-    // Get client's assigned playlist
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    
-    if (!profile) return null;
-    
-    // Get assigned M3U list
-    const { data: assignment } = await supabase
+    // Get client's assigned playlist - simplified query without nested relation
+    const { data: assignment, error } = await supabase
       .from('client_m3u_lists')
-      .select('m3u_list_id, m3u_lists(id, name)')
-      .eq('client_id', profile.id)
+      .select('m3u_list_id')
+      .eq('client_id', user.id)
       .eq('is_active', true)
-      .single();
+      .limit(1)
+      .maybeSingle();
+    
+    if (error) {
+      console.warn('[Hybrid] Assignment query error:', error.message);
+    }
     
     if (assignment?.m3u_list_id) {
       return assignment.m3u_list_id;
     }
     
-    // Fallback: use default playlist
+    // Fallback: use default playlist (loads from m3u_sync_entries directly)
     return 'default';
   }, []);
 
@@ -156,37 +152,94 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     }
   }, [groupChannels]);
 
-  // Fallback: Load directly from database
+  // Fallback: Load directly from database - progressive loading for better UX
   const loadFromDatabase = useCallback(async (): Promise<boolean> => {
     try {
-      setLoadingProgress('Carregando do banco...');
+      setLoadingProgress('Carregando catálogo...');
       
-      // Load first batch of channels (without stream_url for speed)
-      const { data: channels, error, count } = await supabase
+      // Get total count first
+      const { count: totalCount } = await supabase
         .from('m3u_sync_entries')
-        .select('id, title, tvg_logo, group_title', { count: 'exact' })
-        .limit(5000);
+        .select('id', { count: 'exact', head: true });
       
-      if (error || !channels) {
-        console.error('[Hybrid] Database error:', error);
+      setTotalChannels(totalCount || 0);
+      
+      // Load ALL channels in parallel batches for complete content
+      const BATCH_SIZE = 10000;
+      const batches = Math.ceil((totalCount || 0) / BATCH_SIZE);
+      const allChannels: LightChannel[] = [];
+      
+      // Load first batch immediately for fast initial render
+      const { data: firstBatch, error: firstError } = await supabase
+        .from('m3u_sync_entries')
+        .select('id, title, tvg_logo, group_title')
+        .order('group_title', { ascending: true })
+        .order('title', { ascending: true })
+        .range(0, BATCH_SIZE - 1);
+      
+      if (firstError) {
+        console.error('[Hybrid] Database error:', firstError);
         return false;
       }
       
-      const lightChannels: LightChannel[] = channels.map((ch, idx) => ({
-        id: ch.id,
-        name: ch.title || 'Canal',
-        logo: ch.tvg_logo,
-        cat: ch.group_title || 'Geral',
-        seq: idx,
-      }));
+      if (firstBatch) {
+        const firstChannels = firstBatch.map((ch, idx) => ({
+          id: ch.id,
+          name: ch.title || 'Canal',
+          logo: ch.tvg_logo,
+          cat: ch.group_title || 'Geral',
+          seq: idx,
+        }));
+        allChannels.push(...firstChannels);
+        
+        // Show first batch immediately
+        allChannelsRef.current = [...allChannels];
+        setLoadedChannels(allChannels.length);
+        setCategories(groupChannels([...allChannels]));
+        setHasPlaylist(true);
+        
+        console.log(`[Hybrid] First batch: ${allChannels.length} channels`);
+      }
       
-      allChannelsRef.current = lightChannels;
-      setTotalChannels(count || lightChannels.length);
-      setLoadedChannels(lightChannels.length);
-      setCategories(groupChannels(lightChannels));
-      setHasPlaylist(true);
-      
-      console.log(`[Hybrid] DB loaded: ${lightChannels.length}/${count} channels`);
+      // Load remaining batches in background
+      if (batches > 1) {
+        const loadRemainingBatches = async () => {
+          for (let i = 1; i < batches; i++) {
+            const start = i * BATCH_SIZE;
+            const end = start + BATCH_SIZE - 1;
+            
+            const { data: batch } = await supabase
+              .from('m3u_sync_entries')
+              .select('id, title, tvg_logo, group_title')
+              .order('group_title', { ascending: true })
+              .order('title', { ascending: true })
+              .range(start, end);
+            
+            if (batch) {
+              const batchChannels = batch.map((ch, idx) => ({
+                id: ch.id,
+                name: ch.title || 'Canal',
+                logo: ch.tvg_logo,
+                cat: ch.group_title || 'Geral',
+                seq: start + idx,
+              }));
+              allChannels.push(...batchChannels);
+              
+              // Update state periodically (not on every batch to avoid re-renders)
+              if (i % 3 === 0 || i === batches - 1) {
+                allChannelsRef.current = [...allChannels];
+                setLoadedChannels(allChannels.length);
+                setCategories(groupChannels([...allChannels]));
+              }
+            }
+          }
+          
+          console.log(`[Hybrid] DB fully loaded: ${allChannels.length} channels`);
+        };
+        
+        // Start background loading after a delay
+        setTimeout(loadRemainingBatches, 100);
+      }
       
       return true;
     } catch (error) {
