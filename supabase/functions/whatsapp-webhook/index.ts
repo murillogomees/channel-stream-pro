@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'https://sdvyxdghxqmntyoweqbd.supabase.co',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-smartone-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-signature',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 

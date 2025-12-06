@@ -389,10 +389,6 @@ Campos que requerem sanitização:
 - HMAC signature (`x-webhook-signature`)
 - Bearer token (`WHATSAPP_WEBHOOK_SECRET`)
 
-### SmartOne Webhook
-
-**Validação:** HMAC com `SMARTONE_WEBHOOK_SECRET`
-
 ---
 
 ## 10. Rate Limiting
@@ -560,14 +556,6 @@ curl -I https://[r2-bucket].r2.cloudflarestorage.com/test.txt
 | `R2_SECRET_ACCESS_KEY` | Secret key do R2 | ✅ |
 | `R2_BUCKET_NAME` | Nome do bucket (iptvlink-cdn) | ✅ |
 | `JWT_SECRET` | Secret para validação JWT no Worker | ✅ |
-
-### SmartOne IPTV
-
-| Variável | Descrição | Obrigatória |
-|----------|-----------|-------------|
-| `SMARTONE_API_URL` | URL base da API SmartOne | ⚠️ |
-| `SMARTONE_API_KEY` | Chave de API SmartOne | ⚠️ |
-| `SMARTONE_WEBHOOK_SECRET` | Secret para webhooks | ⚠️ |
 
 ### MercadoPago
 
@@ -1079,20 +1067,6 @@ x-webhook-signature: [HMAC-SHA256]
 {
   "event": "message_read",
   "messageId": "msg_xxx",
-  "timestamp": "2025-12-05T10:00:00Z"
-}
-```
-
-#### SmartOne Webhook
-
-```
-POST /functions/v1/smartone-webhook
-Content-Type: application/json
-x-webhook-signature: [HMAC-SHA256]
-
-{
-  "event": "playlist_updated",
-  "playlistId": "xxx",
   "timestamp": "2025-12-05T10:00:00Z"
 }
 ```
