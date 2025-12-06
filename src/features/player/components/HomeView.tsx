@@ -286,39 +286,95 @@ export function HomeView({
   if (loadingContinueWatching && loadingRecommendations || loadingHomeChannels) {
     return <LoadingSkeleton />;
   }
-  return <div className="pb-8 space-y-2">
+  // Get first 6 channels for mobile grid (2 cols x 3 rows)
+  const mobileGridChannels = useMemo(() => {
+    const allFromSections = defaultSections.flatMap(s => s.channels);
+    const fromRecommendations = processedForYou.map(item => ({
+      id: item.content_id,
+      name: item.content_name,
+      tvg_logo: item.content_logo,
+      stream_url: '',
+      category_name: item.content_category
+    } as Channel));
+    const combined = [...fromRecommendations, ...allFromSections];
+    return combined.slice(0, 6);
+  }, [defaultSections, processedForYou]);
+
+  return <div className="pb-20 sm:pb-8 space-y-2">
       {/* Hero Header - Compact on mobile */}
-      <HeroHeader className="h-[140px] sm:h-[180px] md:h-64 lg:h-80 mb-2 sm:mb-4" />
+      <HeroHeader className="h-[120px] sm:h-[180px] md:h-64 lg:h-80 mb-2 sm:mb-4" />
 
-      {/* Continue Watching - HIGHEST PRIORITY (Most viewed by user) */}
-      {continueWatching.length > 0 && <ContinueWatchingRow items={continueWatching} onPlay={onPlayContinue} onRemove={onRemoveContinue} isLoading={loadingContinueWatching} />}
+      {/* MOBILE: Grid 2 cols x 3 rows immediately after hero */}
+      <div className="sm:hidden px-2">
+        <div className="grid grid-cols-2 gap-2">
+          {mobileGridChannels.map(channel => (
+            <div 
+              key={channel.id} 
+              className="group cursor-pointer"
+              onClick={() => onPlayChannel(channel)}
+            >
+              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+                {isValidImageUrl(channel.tvg_logo) ? (
+                  <img 
+                    src={channel.tvg_logo} 
+                    alt={channel.name} 
+                    className="w-full h-full object-cover" 
+                    loading="lazy" 
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-muted-foreground/20 to-muted-foreground/5 flex items-center justify-center">
+                    <Tv className="w-8 h-8 text-muted-foreground/40" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-active:opacity-100 transition-opacity flex items-center justify-center">
+                  <Play className="w-8 h-8 text-white fill-current" />
+                </div>
+              </div>
+              <p className="mt-1 text-[11px] font-medium text-foreground line-clamp-1">{channel.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {/* Series Continuations - Next Episodes */}
-      {processedSeries.length > 0 && <ContentRow title="Continuar Séries" subtitle="Próximos episódios" icon={PlaySquare} isEmpty={false}>
+      {/* DESKTOP: Continue Watching Row */}
+      {continueWatching.length > 0 && <div className="hidden sm:block">
+        <ContinueWatchingRow items={continueWatching} onPlay={onPlayContinue} onRemove={onRemoveContinue} isLoading={loadingContinueWatching} />
+      </div>}
+
+      {/* DESKTOP: Series Continuations */}
+      {processedSeries.length > 0 && <div className="hidden sm:block">
+        <ContentRow title="Continuar Séries" subtitle="Próximos episódios" icon={PlaySquare} isEmpty={false}>
           {processedSeries.map(item => <SeriesContinuationCard key={(item as any)._uniqueKey || item.seriesName} item={item} onPlay={() => onPlaySeries(item.nextEpisode)} />)}
-        </ContentRow>}
+        </ContentRow>
+      </div>}
 
-      {/* Related Content Groups - Based on viewing behavior (Recommendations) */}
-      {relatedGroups.map(group => <ContentRow key={(group as any)._groupKey || `group-${group.type}`} title={group.title} icon={TrendingUp} badge="Baseado no que você viu" isEmpty={group.items.length === 0}>
-          {group.items.map(item => <RecommendationCard key={(item as any)._uniqueKey || item.id || item.content_id} item={item} onPlay={() => onPlayRecommendation(item)} />)}
-        </ContentRow>)}
+      {/* DESKTOP: Related Content Groups */}
+      <div className="hidden sm:block">
+        {relatedGroups.map(group => <ContentRow key={(group as any)._groupKey || `group-${group.type}`} title={group.title} icon={TrendingUp} badge="Baseado no que você viu" isEmpty={group.items.length === 0}>
+            {group.items.map(item => <RecommendationCard key={(item as any)._uniqueKey || item.id || item.content_id} item={item} onPlay={() => onPlayRecommendation(item)} />)}
+          </ContentRow>)}
+      </div>
 
-      {/* For You Mix - AI/Behavior based */}
-      {processedForYou.length > 0 && <ContentRow title="Para Você" subtitle="Sugestões personalizadas" icon={Sparkles} badge="IA" isEmpty={false}>
+      {/* DESKTOP: For You Mix */}
+      {processedForYou.length > 0 && <div className="hidden sm:block">
+        <ContentRow title="Para Você" subtitle="Sugestões personalizadas" icon={Sparkles} badge="IA" isEmpty={false}>
           {processedForYou.map(item => <RecommendationCard key={(item as any)._uniqueKey || item.id || item.content_id} item={item} onPlay={() => onPlayRecommendation(item)} />)}
-        </ContentRow>}
+        </ContentRow>
+      </div>}
 
-      {/* Default sections for new users */}
-      {!hasPersonalizedContent && defaultSections.map(section => <ContentRow key={(section as any)._sectionKey || section.type} title={section.title} icon={sectionIcons[section.type] || Tv} isEmpty={section.channels.length === 0}>
-          {section.channels.map(channel => <ChannelCard key={(channel as any)._uniqueKey || channel.id} channel={channel} onPlay={() => onPlayChannel(channel)} icon={sectionIcons[section.type]} />)}
-        </ContentRow>)}
+      {/* DESKTOP: Default sections */}
+      <div className="hidden sm:block">
+        {!hasPersonalizedContent && defaultSections.map(section => <ContentRow key={(section as any)._sectionKey || section.type} title={section.title} icon={sectionIcons[section.type] || Tv} isEmpty={section.channels.length === 0}>
+            {section.channels.map(channel => <ChannelCard key={(channel as any)._uniqueKey || channel.id} channel={channel} onPlay={() => onPlayChannel(channel)} icon={sectionIcons[section.type]} />)}
+          </ContentRow>)}
+      </div>
 
       {/* Empty state */}
-      {!hasPersonalizedContent && defaultSections.length === 0 && !loadingRecommendations && <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+      {!hasPersonalizedContent && defaultSections.length === 0 && mobileGridChannels.length === 0 && !loadingRecommendations && <div className="flex flex-col items-center justify-center py-20 text-center px-4">
           <Tv className="w-16 h-16 text-muted-foreground/40 mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">Comece a assistir</h3>
           <p className="text-muted-foreground max-w-md">
-            Explore as categorias para descobrir conteúdos. Suas recomendações personalizadas aparecerão aqui.
+            Explore as categorias para descobrir conteúdos.
           </p>
         </div>}
     </div>;
