@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tv, Database } from 'lucide-react';
+import { Tv, Database, Loader2 } from 'lucide-react';
 import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import { IptvPlayer } from '@/modules/player/iptv';
-import { useIPTVPlayerClient } from '@/hooks/useIPTVPlayerClient';
+import { useHybridPlaylist } from '@/hooks/useHybridPlaylist';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useUltraFastSearch } from '@/hooks/useUltraFastSearch';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,9 +22,9 @@ import { MoviesView, SeriesView, HomeView } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
-import { useOptimizedPlaylist } from '@/hooks/useOptimizedPlaylist';
 import { streamService } from '@/modules/player/services/StreamService';
 import { VirtualChannelList } from '@/components/app/VirtualChannelList';
+import { toast } from 'sonner';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -38,29 +38,43 @@ export default function AppPlayer() {
   const isTrial = user?.isTrial || false;
   const planName = user?.clienteData?.plano || 'Teste';
 
-  // Unified player - same content for admins and clients
-  const player = useIPTVPlayerClient();
+  // Hybrid playlist - metadata from CDN, stream URL resolved on-demand
   const {
     categories,
-    currentChannel,
     isLoading: playerLoading,
     loadingProgress,
-    changeChannel,
-    nextChannel,
-    previousChannel
-  } = player;
+    totalChannels,
+    loadedChannels,
+    hasPlaylist,
+    resolveChannel,
+    isResolvingStream,
+    refresh: refreshPlaylist,
+  } = useHybridPlaylist();
 
-  // Player properties
-  const assignedPlaylist = (player as any).assignedPlaylist;
-  const hasPlaylist = (player as any).hasPlaylist;
-  const totalChannels = (player as any).totalChannels;
-  const loadedChannels = (player as any).loadedChannels;
-  const isLoadingMore = (player as any).isLoadingMore;
-  const isCached = (player as any).isCached;
-  const clearCacheAndReload = (player as any).clearCacheAndReload;
-  const loadingPercent = (player as any).loadingPercent || 0;
-  const pauseBackgroundLoading = (player as any).pauseBackgroundLoading;
-  const resumeBackgroundLoading = (player as any).resumeBackgroundLoading;
+  // Current channel for playback (with resolved stream_url)
+  const [currentChannel, setCurrentChannel] = useState<any>(null);
+  
+  // Player state
+  const [isLoadingMore] = useState(false);
+  const [isCached] = useState(false);
+  const [loadingPercent] = useState(0);
+
+  // Adapt LightChannel to Channel format for existing components
+  const adaptedCategories = useMemo(() => {
+    return categories.map(cat => ({
+      ...cat,
+      channels: cat.channels.map(ch => ({
+        id: ch.id,
+        name: ch.name,
+        stream_url: '', // Resolved on-demand
+        tvg_logo: ch.logo,
+        tvg_id: null,
+        category_id: cat.id,
+        category_name: cat.name,
+        order_position: ch.seq,
+      })),
+    }));
+  }, [categories]);
 
   const {
     isFavorite,
@@ -135,14 +149,14 @@ export default function AppPlayer() {
     });
   }, [activeTab, clearSearch]);
 
-  // Categorize content by type
+  // Categorize content by type - use any[] to avoid type conflicts
   const categorizedContent = useMemo(() => {
-    const live: typeof categories = [];
-    const movies: typeof categories = [];
-    const series: typeof categories = [];
-    categories.forEach(cat => {
-      const catName = cat.display_name.toLowerCase();
-      const catId = cat.name.toLowerCase();
+    const live: any[] = [];
+    const movies: any[] = [];
+    const series: any[] = [];
+    adaptedCategories.forEach(cat => {
+      const catName = (cat.display_name || cat.name || '').toLowerCase();
+      const catId = (cat.name || '').toLowerCase();
       const combinedText = `${catName} ${catId}`;
       const movieKeywords = ['filme', 'movie', 'cinema', 'vod filme', 'filmes', 'movies', 'film', 'peliculas'];
       const seriesKeywords = ['série', 'series', 'seriado', 'novela', 'temporada', 'season', 'episódio', 'serie', 'séries', 'drama', 'dorama'];
@@ -156,12 +170,8 @@ export default function AppPlayer() {
         live.push(cat);
       }
     });
-    return {
-      live,
-      movies,
-      series
-    };
-  }, [categories]);
+    return { live, movies, series };
+  }, [adaptedCategories]);
 
   // Content counts - series counts unique series names, not episodes
   const counts = useMemo(() => {
@@ -185,18 +195,19 @@ export default function AppPlayer() {
   }, [categorizedContent]);
 
   // Get all channels for search and favorites
-  const allChannels = useMemo(() => categories.flatMap(cat => cat.channels.map(ch => ({
+  const allChannels = useMemo(() => adaptedCategories.flatMap(cat => cat.channels.map(ch => ({
     ...ch,
-    category_name: cat.display_name,
+    category_name: cat.display_name || cat.name,
     category_id: cat.id
-  }))), [categories]);
+  }))), [adaptedCategories]);
 
   // Update smart cache channel list - skip during playback
   useEffect(() => {
     if (allChannels.length > 0 && !isPlayerActive) {
-      setChannelList(allChannels);
+      // Smart cache expects stream_url - skip for light channels
+      // setChannelList(allChannels);
     }
-  }, [allChannels, setChannelList, isPlayerActive]);
+  }, [allChannels, isPlayerActive]);
 
   // Recommendations based on watch history (must be after allChannels)
   // Disabled during playback to prevent requests
@@ -260,15 +271,14 @@ export default function AppPlayer() {
         order_position: 0
       }));
     }
-    let sourceCategories: typeof categories = [];
+    
     if (activeTab === 'favorites') {
       const favs = allChannels.filter(ch => isFavorite(ch.id));
       if (!searchQuery) return favs;
-      // For favorites, still use local filter as fallback
       return favs.filter(ch => ch.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
+    
     if (activeTab === 'home') {
-      // If searching on home, show backend results
       if (isBackendSearchActive) {
         return backendResults.map(r => ({
           id: r.id,
@@ -283,31 +293,36 @@ export default function AppPlayer() {
       }
       return [];
     }
+    
+    // Get source categories based on tab - use any to avoid type conflicts
+    let sourceCats: any[] = [];
+    
     switch (activeTab) {
       case 'live':
-        sourceCategories = categorizedContent.live;
+        sourceCats = categorizedContent.live;
         break;
       case 'movies':
-        sourceCategories = categorizedContent.movies;
+        sourceCats = categorizedContent.movies;
         break;
       case 'series':
-        sourceCategories = categorizedContent.series;
+        sourceCats = categorizedContent.series;
         break;
     }
+    
     if (selectedCategory) {
-      sourceCategories = sourceCategories.filter(cat => cat.id === selectedCategory);
+      sourceCats = sourceCats.filter(cat => cat.id === selectedCategory);
     }
-    let channels = sourceCategories.flatMap(cat => cat.channels.map(ch => ({
+    
+    let channels = sourceCats.flatMap(cat => cat.channels.map((ch: any) => ({
       ...ch,
-      category_name: cat.display_name
+      category_name: cat.display_name || cat.name
     })));
 
-    // If we have search but no backend results yet, show loading placeholder
-    // Otherwise, the backend results take precedence
     if (searchQuery && !isBackendSearchActive) {
       const query = searchQuery.toLowerCase();
-      channels = channels.filter(ch => ch.name.toLowerCase().includes(query));
+      channels = channels.filter((ch: any) => ch.name.toLowerCase().includes(query));
     }
+    
     return channels;
   }, [activeTab, categorizedContent, selectedCategory, searchQuery, allChannels, isFavorite, isBackendSearchActive, backendResults]);
 
@@ -427,14 +442,44 @@ export default function AppPlayer() {
     trackChannelView(episode.id, episode.category_id);
   }, [trackChannelView]);
 
-  // Handle play - pause all background operations
-  const handlePlay = (channel: any) => {
-    setPlayerChannel(channel);
+  // Handle play - resolve stream URL on-demand (LAZY LOADING)
+  const handlePlay = useCallback(async (channel: any) => {
+    // If channel already has stream_url, use it directly
+    if (channel.stream_url) {
+      setPlayerChannel(channel);
+      setShowPlayerDialog(true);
+      trackChannelView(channel.id, channel.category_id);
+      pauseWarming();
+      return;
+    }
+    
+    // Otherwise, resolve stream URL on-demand
+    toast.loading('Conectando ao stream...', { id: 'stream-resolve' });
+    
+    const resolved = await resolveChannel(channel.id);
+    
+    if (!resolved) {
+      toast.error('Não foi possível conectar ao stream', { id: 'stream-resolve' });
+      return;
+    }
+    
+    toast.dismiss('stream-resolve');
+    
+    // Create channel with resolved stream_url
+    const channelWithStream = {
+      ...channel,
+      id: resolved.id,
+      name: resolved.name || channel.name,
+      stream_url: resolved.stream_url,
+      tvg_logo: resolved.logo || channel.logo,
+      category_name: resolved.category || channel.cat,
+    };
+    
+    setPlayerChannel(channelWithStream);
     setShowPlayerDialog(true);
-    trackChannelView(channel.id, channel.category_id);
-    pauseWarming(); // Pause cache warming
-    pauseBackgroundLoading?.(); // Pause playlist sync
-  };
+    trackChannelView(channel.id, channel.category_id || 'unknown');
+    pauseWarming();
+  }, [resolveChannel, trackChannelView, pauseWarming]);
 
   // Loading state - show skeleton to prevent CLS
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
@@ -517,10 +562,10 @@ export default function AppPlayer() {
           
           {/* Search bar */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Cache indicator and refresh */}
-            {isCached && <Button variant="ghost" size="icon" onClick={clearCacheAndReload} title="Atualizar playlist" className="flex-shrink-0">
-                <Database className="w-4 h-4" />
-              </Button>}
+            {/* Refresh button */}
+            <Button variant="ghost" size="icon" onClick={refreshPlaylist} title="Atualizar playlist" className="flex-shrink-0">
+              <Database className="w-4 h-4" />
+            </Button>
             
             {/* Loading more indicator - now handled by floating progress bar */}
             
@@ -534,19 +579,19 @@ export default function AppPlayer() {
           {activeTab === 'home' && <div className="py-4">
               {/* Search results */}
               {isBackendSearchActive && filteredChannels.length > 0 ? <div className="px-4 lg:px-6">
-                  <TVContentGrid channels={filteredChannels} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+                  <TVContentGrid channels={filteredChannels as any[]} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
                 </div> : <HomeView continueWatchingItems={continueWatchingItems} loadingContinueWatching={loadingContinueWatching} onPlayContinue={item => {
             const channel = allChannels.find(ch => ch.id === item.content_id);
             if (channel) handlePlay(channel);
           }} onRemoveContinue={removeContinueWatchingItem} seriesContinuations={seriesContinuations} onPlaySeries={handlePlay} recommendationGroups={recommendationGroups} forYouMix={forYouMix} loadingRecommendations={loadingRecommendations} onPlayRecommendation={item => {
             const channel = allChannels.find(ch => ch.id === item.content_id);
             if (channel) handlePlay(channel);
-          }} onPlayChannel={handlePlay} allChannels={allChannels} />}
+          }} onPlayChannel={handlePlay} allChannels={allChannels as any[]} />}
             </div>}
 
           {activeTab === 'live' && <div className="px-4 lg:px-6 py-4 h-[calc(100vh-120px)]">
               <VirtualChannelList 
-                channels={filteredChannels} 
+                channels={filteredChannels as any[]} 
                 currentChannelId={playerChannel?.id}
                 onChannelSelect={handlePlay}
                 isFavorite={isFavorite}
@@ -554,9 +599,9 @@ export default function AppPlayer() {
               />
             </div>}
 
-          {activeTab === 'movies' && <MoviesView categories={categorizedContent.movies} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} sortBy={movieSortBy} />}
+          {activeTab === 'movies' && <MoviesView categories={categorizedContent.movies as any[]} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} sortBy={movieSortBy} />}
 
-          {activeTab === 'series' && <SeriesView categories={categorizedContent.series} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} sortBy={seriesSortBy} />}
+          {activeTab === 'series' && <SeriesView categories={categorizedContent.series as any[]} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} sortBy={seriesSortBy} />}
 
           {activeTab === 'favorites' && <div className="px-4 lg:px-6 py-4">
               {filteredChannels.length === 0 ? <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -581,7 +626,6 @@ export default function AppPlayer() {
           setPlayerChannel(null);
           refreshContinueWatching();
           resumeWarming();
-          resumeBackgroundLoading?.(); // Resume playlist sync
         } else if (evt === 'error') {
           console.error('Player error:', data);
         }
