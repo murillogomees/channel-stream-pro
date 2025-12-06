@@ -8,13 +8,19 @@ import AdminCustomize from "./AdminCustomize";
 import AdminVariables from "./AdminVariables";
 import AdminStatusHistory from "./AdminStatusHistory";
 import AdminCustomStatusBadges from "./AdminCustomStatusBadges";
+import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
+import { MigrationStats } from "@/components/migrations/MigrationStats";
+import { MigrationScanner } from "@/components/admin/MigrationScanner";
+import { DriftFindingsTable } from "@/components/migrations/DriftFindingsTable";
+import { RLSAuditPanel } from "@/components/admin/RLSAuditPanel";
+import { MigrationHistory } from "@/components/migrations/MigrationHistory";
 
 export default function AdminSystemSettings() {
   return (
     <AdminLayout>
       <PageHeader
         title="Sistema & Configurações"
-        description="Saúde do sistema, backup e configurações avançadas"
+        description="Saúde do sistema, migrações, RLS e configurações avançadas"
         backTo="/admin/dashboard"
       />
 
@@ -26,6 +32,12 @@ export default function AdminSystemSettings() {
             </TabsTrigger>
             <TabsTrigger value="playlist" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Playlists
+            </TabsTrigger>
+            <TabsTrigger value="migrations" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              Migrações
+            </TabsTrigger>
+            <TabsTrigger value="rls" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              RLS
             </TabsTrigger>
             <TabsTrigger value="backup" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Backup
@@ -52,6 +64,20 @@ export default function AdminSystemSettings() {
 
         <TabsContent value="playlist" className="space-y-4 mt-4">
           <AdminPlaylistHealth />
+        </TabsContent>
+
+        <TabsContent value="migrations" className="space-y-4 mt-4">
+          <div className="space-y-6">
+            <MigrationStats />
+            <MigrationDashboard />
+            <MigrationScanner />
+            <DriftFindingsTable />
+            <MigrationHistory />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rls" className="space-y-4 mt-4">
+          <RLSAuditPanel />
         </TabsContent>
 
         <TabsContent value="backup" className="space-y-4 mt-4">
