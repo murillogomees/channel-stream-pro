@@ -20,3 +20,6 @@ export { useMovieMetadata } from './useMovieMetadata';
 
 // Series hooks
 export { useSeriesMetadata } from './useSeriesMetadata';
+
+// Personalized content
+export { usePersonalizedContent } from './usePersonalizedContent';
