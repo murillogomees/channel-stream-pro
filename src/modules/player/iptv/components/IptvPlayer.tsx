@@ -102,7 +102,10 @@ export const IptvPlayer = memo(function IptvPlayer({
 
   // Handle player events - memoized to prevent re-renders
   const handlePlayerEvent = useCallback((evt: IptvPlayerEvent, data?: any) => {
-    console.log('[IptvPlayer] Event:', evt, data);
+    // Skip logging high-frequency events to reduce console spam
+    if (evt !== 'timeupdate') {
+      console.log('[IptvPlayer] Event:', evt, data);
+    }
     onEventRef.current?.(evt, data);
   }, []);
 
