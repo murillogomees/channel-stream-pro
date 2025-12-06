@@ -228,12 +228,16 @@ serve(async (req) => {
 
     console.log('[CDN-Prewarm] Starting prewarm job', { jobType, config });
 
-    // Recalculate predictions
-    const { data: predictionCount, error: predError } = await supabase.rpc('calculate_prewarm_predictions');
-    if (predError) {
-      console.error('[CDN-Prewarm] Prediction calculation error:', predError);
-    } else {
-      console.log('[CDN-Prewarm] Updated predictions:', predictionCount);
+    // Try to recalculate predictions (non-fatal if it fails)
+    try {
+      const { data: predictionCount, error: predError } = await supabase.rpc('calculate_prewarm_predictions');
+      if (predError) {
+        console.warn('[CDN-Prewarm] Prediction calculation skipped:', predError.message);
+      } else {
+        console.log('[CDN-Prewarm] Updated predictions:', predictionCount);
+      }
+    } catch (rpcError) {
+      console.warn('[CDN-Prewarm] RPC not available, continuing without predictions');
     }
 
     // Get top predicted assets
