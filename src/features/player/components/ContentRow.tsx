@@ -105,9 +105,9 @@ export function ContentRow({
         ref={scrollRef}
         className="flex gap-3 px-4 lg:px-12 overflow-x-auto scrollbar-hide scroll-smooth"
       >
-        {items.map((item) => (
+        {items.map((item, index) => (
           <div
-            key={item.id}
+            key={`${item.id}-${index}`}
             className={cn(
               "flex-shrink-0 group/card cursor-pointer",
               getCardDimensions()
