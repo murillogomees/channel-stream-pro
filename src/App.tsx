@@ -42,6 +42,7 @@ const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
 // Checkout pages
 const Checkout = lazy(() => import("./pages/Checkout"));
+const CheckoutAuthenticated = lazy(() => import("./pages/CheckoutAuthenticated"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutFailure = lazy(() => import("./pages/CheckoutFailure"));
 const CheckoutPending = lazy(() => import("./pages/CheckoutPending"));
@@ -92,8 +93,9 @@ function AppContent() {
             <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
             <Route path="/login" element={<Login />} />
             
-            {/* Checkout */}
-            <Route path="/checkout" element={<Checkout />} />
+            {/* Checkout - Public for new users, Authenticated for existing */}
+            <Route path="/checkout" element={<CheckoutAuthenticated />} />
+            <Route path="/checkout/new" element={<Checkout />} />
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/failure" element={<CheckoutFailure />} />
             <Route path="/checkout/pending" element={<CheckoutPending />} />
