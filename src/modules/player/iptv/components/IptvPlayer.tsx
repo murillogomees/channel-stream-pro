@@ -219,8 +219,28 @@ export const IptvPlayer = memo(function IptvPlayer({
     onEventRef.current?.('ready', { channelCount: 1 });
   }, [streamUrl, playlistUrl, channelId, channelName, channelLogo, setSource]);
 
+  // Error recovery refs - declared BEFORE functions that use them
+  const lastErrorRef = useRef<string | null>(null);
+  const errorRetryCount = useRef(0);
+  const maxErrorRetries = 3;
+  const setSourceRef = useRef(setSource);
+  
+  // Keep setSource ref updated without triggering effects
+  useEffect(() => {
+    setSourceRef.current = setSource;
+  }, [setSource]);
+
+  // Reset error counters on channel change
+  const resetErrorState = useCallback(() => {
+    lastErrorRef.current = null;
+    errorRetryCount.current = 0;
+  }, []);
+  
   // Select channel - declared BEFORE useEffects that use it
   const selectChannel = useCallback((channel: IptvChannel) => {
+    // Reset error state for new channel
+    resetErrorState();
+    
     setCurrentChannel(channel);
     
     // Initialize CDN failover with proper options
@@ -240,15 +260,16 @@ export const IptvPlayer = memo(function IptvPlayer({
     setSource(channel.url);
     
     onEventRef.current?.('channelchange', { channel });
-  }, [setSource]);
+  }, [setSource, resetErrorState]);
 
   // Retry handler - declared after selectChannel since it depends on it
   const handleRetry = useCallback(() => {
     if (currentChannel) {
       cdnFailover.reset();
+      resetErrorState();
       selectChannel(currentChannel);
     }
-  }, [currentChannel, selectChannel]);
+  }, [currentChannel, selectChannel, resetErrorState]);
 
   // Load playlist (original behavior)
   useEffect(() => {
@@ -308,21 +329,20 @@ export const IptvPlayer = memo(function IptvPlayer({
       cdnFailover.setEventCallback(onEventRef.current || (() => {}));
     }
   }, [currentChannel, options.cdnFallback]);
-
-  // Handle CDN failover on error - with guard to prevent infinite loops
-  const lastErrorRef = useRef<string | null>(null);
-  const errorRetryCount = useRef(0);
-  const maxErrorRetries = 3;
   
+  // CDN failover effect - NO setSource in dependencies to prevent loops
   useEffect(() => {
     // Skip if no error or no channel
     if (!error || !currentChannel) return;
     
-    // Skip if same error already handled or max retries exceeded
-    if (error === lastErrorRef.current || errorRetryCount.current >= maxErrorRetries) {
-      if (errorRetryCount.current >= maxErrorRetries) {
-        console.log('[IptvPlayer] Max CDN failover retries reached, stopping');
-      }
+    // Skip if same error already handled
+    if (error === lastErrorRef.current) {
+      return;
+    }
+    
+    // Skip if max retries exceeded
+    if (errorRetryCount.current >= maxErrorRetries) {
+      console.log('[IptvPlayer] Max CDN failover retries reached, stopping');
       return;
     }
     
@@ -331,13 +351,14 @@ export const IptvPlayer = memo(function IptvPlayer({
     
     console.log('[IptvPlayer] Attempting CDN failover, attempt:', errorRetryCount.current);
     
+    // Use ref to avoid dependency on setSource
     cdnFailover.handleError(new Error(error))
       .then(newUrl => {
-        if (newUrl) {
-          setSource(newUrl);
+        if (newUrl && setSourceRef.current) {
+          setSourceRef.current(newUrl);
         }
       });
-  }, [error, currentChannel, setSource]);
+  }, [error, currentChannel]); // Removed setSource from deps
 
   // Remote control handlers
   useRemoteControl({
