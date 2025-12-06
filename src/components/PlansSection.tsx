@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Star, Zap } from "lucide-react";
@@ -29,6 +30,7 @@ interface SectionContent {
 }
 
 const PlansSection = () => {
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [content, setContent] = useState<SectionContent>({
     title: "Planos e Preços",
@@ -171,8 +173,8 @@ const PlansSection = () => {
                         value: plan.price,
                         currency: 'BRL'
                       });
-                      const message = plan.whatsapp_message || `Olá! Tenho interesse no plano ${plan.name}. Gostaria de mais informações.`;
-                      window.location.href = `https://wa.me/${content.whatsapp_number}?text=${encodeURIComponent(message)}`;
+                      // Redirect to signup with plan pre-selected
+                      navigate(`/signup?plan=${plan.id}`);
                     }}
                   >
                     {plan.cta_text}

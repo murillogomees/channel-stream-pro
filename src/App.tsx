@@ -92,12 +92,12 @@ function AppContent() {
             <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
             <Route path="/login" element={<Login />} />
             
-            {/* Checkout - Public for new users, Authenticated for existing */}
-            <Route path="/checkout" element={<CheckoutAuthenticated />} />
+            {/* Checkout - All routes require authentication */}
+            <Route path="/checkout" element={<ProtectedRoute><CheckoutAuthenticated /></ProtectedRoute>} />
             <Route path="/checkout/new" element={<Checkout />} />
-            <Route path="/checkout/success" element={<CheckoutSuccess />} />
-            <Route path="/checkout/failure" element={<CheckoutFailure />} />
-            <Route path="/checkout/pending" element={<CheckoutPending />} />
+            <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
+            <Route path="/checkout/failure" element={<ProtectedRoute><CheckoutFailure /></ProtectedRoute>} />
+            <Route path="/checkout/pending" element={<ProtectedRoute><CheckoutPending /></ProtectedRoute>} />
             
             {/* Affiliate */}
             <Route path="/afiliado" element={<ProtectedRoute><AffiliateDashboard /></ProtectedRoute>} />
