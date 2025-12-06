@@ -44,7 +44,15 @@ export interface ResolvedChannel {
 }
 
 // Cache for resolved stream URLs
-const streamUrlCache = new Map<string, { url: string; expiresAt: number }>();
+interface StreamCacheEntry {
+  url: string;
+  name?: string;
+  logo?: string | null;
+  category?: string;
+  needsProxy?: boolean;
+  expiresAt: number;
+}
+const streamUrlCache = new Map<string, StreamCacheEntry>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -102,18 +110,21 @@ export async function resolveStreamUrl(channelId: string): Promise<ResolvedChann
   // Check cache first
   const cached = streamUrlCache.get(channelId);
   if (cached && cached.expiresAt > Date.now()) {
+    console.log('[StreamResolve] Cache hit:', channelId);
     return {
       id: channelId,
-      name: '',
+      name: cached.name || '',
       stream_url: cached.url,
       original_url: cached.url,
-      logo: null,
-      category: '',
-      needsProxy: false,
+      logo: cached.logo || null,
+      category: cached.category || '',
+      needsProxy: cached.needsProxy || false,
     };
   }
 
   try {
+    console.log('[StreamResolve] Fetching:', channelId);
+    
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/stream-url-resolve?id=${channelId}`,
       {
@@ -124,7 +135,7 @@ export async function resolveStreamUrl(channelId: string): Promise<ResolvedChann
     );
 
     if (!response.ok) {
-      console.error('[PlaylistCDN] Failed to resolve stream:', response.status);
+      console.error('[StreamResolve] Failed:', response.status);
       return null;
     }
 
@@ -133,12 +144,17 @@ export async function resolveStreamUrl(channelId: string): Promise<ResolvedChann
     // Cache the result
     streamUrlCache.set(channelId, {
       url: data.stream_url,
+      name: data.name,
+      logo: data.logo,
+      category: data.category,
+      needsProxy: data.needsProxy,
       expiresAt: Date.now() + CACHE_TTL,
     });
 
+    console.log('[StreamResolve] Resolved:', data.name);
     return data;
   } catch (error) {
-    console.error('[PlaylistCDN] Error resolving stream:', error);
+    console.error('[StreamResolve] Error:', error);
     return null;
   }
 }
