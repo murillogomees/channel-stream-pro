@@ -1,21 +1,42 @@
 /**
  * Checkout Success Page
- * Displayed after successful payment
+ * Displayed after successful payment with auto-redirect
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Progress } from "@/components/ui/progress";
 
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [countdown, setCountdown] = useState(5);
+  const [autoRedirect, setAutoRedirect] = useState(true);
+
+  // Auto-redirect timer
+  useEffect(() => {
+    if (!loading && autoRedirect && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+    
+    if (countdown === 0 && autoRedirect) {
+      navigate("/app/player");
+    }
+  }, [countdown, autoRedirect, loading, navigate]);
+
+  const handleCancelAutoRedirect = useCallback(() => {
+    setAutoRedirect(false);
+  }, []);
 
   useEffect(() => {
     // Refresh user data to get updated subscription
@@ -27,7 +48,6 @@ export default function CheckoutSuccess() {
   }, [refreshUser]);
 
   const paymentId = searchParams.get("payment_id");
-  const status = searchParams.get("status");
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4">
@@ -69,9 +89,25 @@ export default function CheckoutSuccess() {
             ) : (
               <>
                 {paymentId && (
-                  <p className="text-xs text-muted-foreground mb-6">
+                  <p className="text-xs text-muted-foreground mb-4">
                     ID do pagamento: {paymentId}
                   </p>
+                )}
+                
+                {/* Auto-redirect countdown */}
+                {autoRedirect && (
+                  <div className="mb-6 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Redirecionando em {countdown} segundos...
+                    </p>
+                    <Progress value={(5 - countdown) * 20} className="h-2" />
+                    <button 
+                      onClick={handleCancelAutoRedirect}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Cancelar redirecionamento automático
+                    </button>
+                  </div>
                 )}
                 
                 <div className="flex flex-col items-center gap-4">

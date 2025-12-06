@@ -111,7 +111,50 @@ function mapPaymentStatus(mpStatus: string): { systemStatus: string; clienteAtiv
   return statusMap[mpStatus] || { systemStatus: 'Inativo', clienteAtivo: false };
 }
 
-// Envia notificação WhatsApp para o cliente
+// Mapeia motivos de rejeição do Mercado Pago para mensagens amigáveis
+function getRejectReason(statusDetail: string): string {
+  const reasons: Record<string, string> = {
+    'cc_rejected_bad_filled_card_number': 'Número do cartão incorreto',
+    'cc_rejected_bad_filled_date': 'Data de validade incorreta',
+    'cc_rejected_bad_filled_other': 'Dados do cartão incorretos',
+    'cc_rejected_bad_filled_security_code': 'Código de segurança incorreto',
+    'cc_rejected_blacklist': 'Cartão não aceito (bloqueado)',
+    'cc_rejected_call_for_authorize': 'Cartão precisa de autorização da operadora',
+    'cc_rejected_card_disabled': 'Cartão desativado',
+    'cc_rejected_card_error': 'Erro no cartão',
+    'cc_rejected_duplicated_payment': 'Pagamento duplicado',
+    'cc_rejected_high_risk': 'Pagamento recusado por risco',
+    'cc_rejected_insufficient_amount': 'Saldo insuficiente',
+    'cc_rejected_invalid_installments': 'Parcelas inválidas',
+    'cc_rejected_max_attempts': 'Limite de tentativas excedido',
+    'cc_rejected_other_reason': 'Cartão recusado',
+    'pending_contingency': 'Pagamento em análise',
+    'pending_review_manual': 'Pagamento em revisão manual',
+    'pending_waiting_payment': 'Aguardando pagamento',
+    'pending_waiting_transfer': 'Aguardando transferência',
+  };
+  
+  return reasons[statusDetail] || 'Pagamento não processado';
+}
+
+// Gera informação de status para pagamento pendente
+function getPendingStatusInfo(paymentMethodId: string, statusDetail: string): string {
+  if (paymentMethodId === 'pix') {
+    return '💡 *Dica:* O PIX geralmente é confirmado em poucos segundos. Verifique se o pagamento foi realizado.';
+  }
+  
+  if (paymentMethodId === 'bolbradesco' || statusDetail?.includes('ticket')) {
+    return '📌 *Importante:* Boletos podem levar até 3 dias úteis para compensar. Guarde o comprovante!';
+  }
+  
+  if (statusDetail === 'pending_review_manual') {
+    return '🔍 Seu pagamento está em análise manual pela operadora. Isso pode levar até 2 dias úteis.';
+  }
+  
+  return '⏳ O pagamento está sendo processado. Você será notificado assim que houver atualização.';
+}
+
+// Envia notificação WhatsApp para o cliente baseado no template do banco
 async function sendWhatsAppNotification(
   supabase: any,
   telefone: string,
@@ -120,45 +163,157 @@ async function sendWhatsAppNotification(
   plano: string,
   valor: number,
   dataVencimento: string,
-  formaPagamento: string
+  formaPagamento: string,
+  statusDetail?: string
 ) {
   if (!whatsappAppkey || !whatsappAuthkey) {
     console.log("[MP-Webhook] WhatsApp credentials not configured");
     return;
   }
 
-  // Busca template específico para o status
+  // Mapeia o status do MP para o eventType do template
+  const eventTypeMap: Record<string, string> = {
+    approved: 'payment_approved',
+    pending: 'payment_pending',
+    in_process: 'payment_in_process',
+    rejected: 'payment_rejected',
+    refunded: 'payment_refunded',
+    cancelled: 'payment_cancelled',
+  };
+
+  const eventType = eventTypeMap[status] || 'payment_pending';
+
+  // Busca template específico pelo eventType
   const { data: template } = await supabase
     .from('whatsapp_templates')
     .select('*')
-    .eq('event_type', 'mercado_pago_status')
+    .eq('event_type', eventType)
     .eq('active', true)
-    .ilike('name', `%${status}%`)
     .single();
 
   let message = '';
   
+  // Variáveis extras baseadas no status
+  const motivoErro = statusDetail ? getRejectReason(statusDetail) : 'Erro no processamento';
+  const statusInfo = getPendingStatusInfo(formaPagamento.toLowerCase(), statusDetail || '');
+  
   if (template) {
     // Substitui variáveis do template
     message = template.message
-      .replace(/\{\{nome\}\}/g, clienteNome)
-      .replace(/\{\{plano\}\}/g, plano)
-      .replace(/\{\{valor\}\}/g, `R$ ${valor.toFixed(2)}`)
-      .replace(/\{\{dataVencimento\}\}/g, new Date(dataVencimento).toLocaleDateString('pt-BR'))
-      .replace(/\{\{formaPagamento\}\}/g, formaPagamento)
-      .replace(/\{\{status\}\}/g, status);
+      .replace(/\{nome\}/g, clienteNome)
+      .replace(/\{plano\}/g, plano)
+      .replace(/\{valor\}/g, valor.toFixed(2))
+      .replace(/\{dataVencimento\}/g, new Date(dataVencimento).toLocaleDateString('pt-BR'))
+      .replace(/\{formaPagamento\}/g, formaPagamento)
+      .replace(/\{status\}/g, status)
+      .replace(/\{motivoErro\}/g, motivoErro)
+      .replace(/\{statusInfo\}/g, statusInfo);
   } else {
-    // Template padrão se não houver específico
+    // Templates padrão se não houver no banco
     const statusMessages: Record<string, string> = {
-      approved: `🎉 *Pagamento Aprovado!*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi aprovado!\n\n✅ Plano: ${plano}\n💳 Forma: ${formaPagamento}\n📅 Válido até: ${new Date(dataVencimento).toLocaleDateString('pt-BR')}\n\nSeu acesso já está ativo! Aproveite! 🎬`,
-      pending: `⏳ *Pagamento Pendente*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* está em análise.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nAssim que for aprovado, você será notificado!`,
-      in_process: `⏳ *Pagamento em Processamento*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* está sendo processado.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nEm breve você receberá a confirmação!`,
-      rejected: `❌ *Pagamento Recusado*\n\nOlá ${clienteNome}!\n\nInfelizmente seu pagamento de *R$ ${valor.toFixed(2)}* foi recusado.\n\n📋 Plano: ${plano}\n💳 Forma: ${formaPagamento}\n\nPor favor, tente novamente ou entre em contato conosco!`,
-      refunded: `💰 *Pagamento Reembolsado*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi reembolsado.\n\n📋 Plano: ${plano}\n\nQualquer dúvida, estamos à disposição!`,
-      cancelled: `🚫 *Pagamento Cancelado*\n\nOlá ${clienteNome}!\n\nSeu pagamento de *R$ ${valor.toFixed(2)}* foi cancelado.\n\n📋 Plano: ${plano}\n\nSe precisar de ajuda, entre em contato conosco!`,
+      approved: `🎉 *Pagamento Aprovado!*
+
+Olá ${clienteNome}!
+
+Seu pagamento foi confirmado com sucesso!
+
+✅ *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+💳 *Forma:* ${formaPagamento}
+📅 *Válido até:* ${new Date(dataVencimento).toLocaleDateString('pt-BR')}
+
+Seu acesso já está 100% liberado! 
+Pode entrar agora e aproveitar todo o conteúdo. 🎬
+
+Qualquer dúvida, estamos por aqui!
+
+Atenciosamente,
+IPTV LINK`,
+
+      pending: `⏳ *Pagamento Pendente*
+
+Olá ${clienteNome}!
+
+Recebemos seu pedido de pagamento e ele está aguardando confirmação.
+
+📋 *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+💳 *Forma:* ${formaPagamento}
+
+${statusInfo}
+
+Assim que o pagamento for confirmado, você será notificado e seu acesso será liberado automaticamente!
+
+Qualquer dúvida, estamos à disposição.
+
+Atenciosamente,
+IPTV LINK`,
+
+      in_process: `⏳ *Pagamento em Análise*
+
+Olá ${clienteNome}!
+
+Seu pagamento está sendo processado pela operadora.
+
+📋 *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+💳 *Forma:* ${formaPagamento}
+
+Geralmente a confirmação ocorre em poucos minutos. Você receberá uma mensagem assim que for aprovado!
+
+Atenciosamente,
+IPTV LINK`,
+
+      rejected: `❌ *Pagamento Não Aprovado*
+
+Olá ${clienteNome}!
+
+Infelizmente seu pagamento não foi processado.
+
+📋 *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+💳 *Forma:* ${formaPagamento}
+📝 *Motivo:* ${motivoErro}
+
+Por favor, verifique os dados e tente novamente, ou escolha outra forma de pagamento.
+
+Se precisar de ajuda, estamos à disposição!
+
+Atenciosamente,
+IPTV LINK`,
+
+      refunded: `💰 *Pagamento Reembolsado*
+
+Olá ${clienteNome}!
+
+Seu pagamento foi reembolsado conforme solicitação.
+
+📋 *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+
+O valor será devolvido na mesma forma de pagamento utilizada.
+
+Qualquer dúvida, estamos à disposição!
+
+Atenciosamente,
+IPTV LINK`,
+
+      cancelled: `🚫 *Pagamento Cancelado*
+
+Olá ${clienteNome}!
+
+O pagamento do seu plano foi cancelado.
+
+📋 *Plano:* ${plano}
+💰 *Valor:* R$ ${valor.toFixed(2)}
+
+Se não foi você quem cancelou, entre em contato conosco para verificar o que aconteceu.
+
+Atenciosamente,
+IPTV LINK`,
     };
 
-    message = statusMessages[status] || `Status: ${status}`;
+    message = statusMessages[status] || `Status do pagamento: ${status}`;
   }
 
   try {
@@ -183,27 +338,40 @@ async function sendWhatsAppNotification(
     
     // Log da notificação
     await supabase.from('notification_logs').insert({
-      cliente_id: null, // Será preenchido depois se necessário
+      cliente_id: null,
       cliente_nome: clienteNome,
       telefone: cleanPhone,
-      tipo: `mercado_pago_${status}`,
-      template: template?.name || 'Template Padrão',
+      tipo: eventType,
+      template: template?.name || `Pagamento ${status}`,
       data_envio: new Date().toISOString(),
       status: response.ok ? 'success' : 'error',
       resposta: result,
     });
 
-    console.log(`[MP-Webhook] WhatsApp notification sent: ${response.ok}`);
+    console.log(`[MP-Webhook] WhatsApp notification sent (${eventType}): ${response.ok}`);
   } catch (error) {
     console.error("[MP-Webhook] Error sending WhatsApp:", error);
+    
+    // Log do erro
+    await supabase.from('notification_logs').insert({
+      cliente_id: null,
+      cliente_nome: clienteNome,
+      telefone: telefone,
+      tipo: eventType,
+      template: 'Erro ao enviar',
+      data_envio: new Date().toISOString(),
+      status: 'error',
+      resposta: { error: error.message },
+    });
   }
 }
 
 async function processPayment(supabase: any, paymentData: any) {
   const externalReference = paymentData.external_reference;
   const status = paymentData.status;
+  const statusDetail = paymentData.status_detail;
   
-  console.log(`[MP-Webhook] Processing payment ${paymentData.id} with status ${status}`);
+  console.log(`[MP-Webhook] Processing payment ${paymentData.id} with status ${status} (${statusDetail})`);
   
   const statusMap: Record<string, string> = {
     approved: "approved",
@@ -247,6 +415,7 @@ async function processPayment(supabase: any, paymentData: any) {
       payer_email: paymentData.payer?.email,
       metadata: {
         mercado_pago_data: paymentData,
+        status_detail: statusDetail,
       },
       paid_at: status === "approved" ? new Date().toISOString() : null,
     }, {
@@ -289,12 +458,30 @@ async function processPayment(supabase: any, paymentData: any) {
   // Map status
   const { systemStatus, clienteAtivo } = mapPaymentStatus(status);
   
-  // Get client info for WhatsApp
-  const { data: cliente } = await supabase
-    .from("clientes")
-    .select("nome, telefone")
-    .eq("user_id", userId)
+  // Get client info for WhatsApp - tenta profiles primeiro, depois clientes
+  let cliente = null;
+  
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nome, contact_phone, email")
+    .eq("id", userId)
     .single();
+  
+  if (profile) {
+    cliente = {
+      nome: profile.nome || profile.email || 'Cliente',
+      telefone: profile.contact_phone,
+    };
+  } else {
+    // Fallback para tabela clientes (legado)
+    const { data: clienteData } = await supabase
+      .from("clientes")
+      .select("nome, telefone")
+      .eq("user_id", userId)
+      .single();
+    
+    cliente = clienteData;
+  }
   
   // Update subscription based on status
   if (status === "approved") {
@@ -328,9 +515,33 @@ async function processPayment(supabase: any, paymentData: any) {
       }, {
         onConflict: "user_id,role",
       });
+    
+    // Update profiles table
+    await supabase
+      .from("profiles")
+      .update({
+        situacao: systemStatus,
+        cliente_ativo: clienteAtivo,
+        plano: planoNome,
+        data_contratacao: dataPagamento.toISOString(),
+        data_ultimo_pagamento: dataPagamento.toISOString(),
+        data_vencimento: dataVencimento.toISOString(),
+        valor_pago: paymentData.transaction_amount,
+        forma_ultimo_pagamento: formaPagamento,
+        is_recorrente: true,
+      })
+      .eq("id", userId);
+  } else if (status === "pending" || status === "in_process") {
+    // Update profiles com status pendente
+    await supabase
+      .from("profiles")
+      .update({
+        situacao: 'Aguardando Pagamento',
+      })
+      .eq("id", userId);
   }
   
-  // Update clientes table with all payment info
+  // Update clientes table (legado) with all payment info
   await supabase
     .from("clientes")
     .update({
@@ -346,8 +557,8 @@ async function processPayment(supabase: any, paymentData: any) {
     })
     .eq("user_id", userId);
   
-  // Send WhatsApp notification
-  if (cliente) {
+  // Send WhatsApp notification for ALL status changes
+  if (cliente && cliente.telefone) {
     await sendWhatsAppNotification(
       supabase,
       cliente.telefone,
@@ -356,11 +567,14 @@ async function processPayment(supabase: any, paymentData: any) {
       planoNome,
       paymentData.transaction_amount,
       dataVencimento.toISOString(),
-      formaPagamento
+      formaPagamento,
+      statusDetail
     );
+  } else {
+    console.log(`[MP-Webhook] No phone found for user ${userId}, skipping WhatsApp notification`);
   }
   
-  return { success: true, payment };
+  return { success: true, payment, status, statusDetail };
 }
 
 serve(async (req) => {
