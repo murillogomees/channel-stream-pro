@@ -98,7 +98,6 @@ export class TemplateEngine {
     message = message.replace(/\{email\}/g, cliente.email || '');
     message = message.replace(/\{plano\}/g, cliente.plano);
     message = message.replace(/\{valor\}/g, cliente.valorPago?.toFixed(2) || '0.00');
-    message = message.replace(/\{macSmartOne\}/g, cliente.macSmartOne || '');
     
     if (cliente.dataVencimento) {
       const dataFormatada = format(new Date(cliente.dataVencimento), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -210,12 +209,11 @@ Seu acesso foi ativado com sucesso! 🚀
 • Plano: *${cliente.plano}* (${periodoPlano})
 • Valor: *R$ ${cliente.valorPago?.toFixed(2) || '0.00'}*
 • Data de Vencimento: *${dataVencimento}*
-• MAC Cadastrado: *${cliente.macSmartOne || 'Não informado'}*
 
 💡 *Dicas Importantes:*
 
 1️⃣ *Primeiro Acesso*
-Seu aplicativo SmartOne IPTV já está configurado e pronto para usar!
+Seu aplicativo IPTV já está configurado e pronto para usar!
 
 2️⃣ *Explore os Canais*
 Temos mais de 10.000 canais em Full HD e 4K.

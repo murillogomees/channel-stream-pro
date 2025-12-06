@@ -24,7 +24,6 @@ export interface UnifiedProfile {
   cliente_ativo?: boolean;
   data_ultimo_pagamento?: string;
   forma_ultimo_pagamento?: string;
-  mac_smart_one?: string;
   is_recorrente?: boolean;
   dispositivo_contratado?: string;
 }

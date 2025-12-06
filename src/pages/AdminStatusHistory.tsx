@@ -21,7 +21,6 @@ export default function AdminStatusHistory() {
     { value: 'all', label: 'Todos os Serviços' },
     { value: 'supabase', label: 'Supabase' },
     { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'smartone', label: 'SmartOne' },
     { value: 'websocket', label: 'WebSocket' },
   ];
 

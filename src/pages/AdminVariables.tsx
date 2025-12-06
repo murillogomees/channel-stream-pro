@@ -42,13 +42,6 @@ const DEFAULT_VARIABLES: SystemVariable[] = [
   },
   {
     id: '3',
-    name: 'SMARTONE_API_URL',
-    value: '',
-    description: 'URL base da API SmartOne',
-    type: 'string',
-  },
-  {
-    id: '4',
     name: 'AUTO_NOTIFICATION_HOUR',
     value: '10',
     description: 'Hora do dia para envio automático de notificações',

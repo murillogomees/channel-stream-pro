@@ -1656,7 +1656,6 @@ export type Database = {
           forma_ultimo_pagamento: string | null
           id: string
           is_recorrente: boolean | null
-          mac_smart_one: string | null
           nome: string
           origem_cadastro: Database["public"]["Enums"]["origem_cadastro"] | null
           plano: Database["public"]["Enums"]["plano_cliente"] | null
@@ -1681,7 +1680,6 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id?: string
           is_recorrente?: boolean | null
-          mac_smart_one?: string | null
           nome: string
           origem_cadastro?:
             | Database["public"]["Enums"]["origem_cadastro"]
@@ -1708,7 +1706,6 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id?: string
           is_recorrente?: boolean | null
-          mac_smart_one?: string | null
           nome?: string
           origem_cadastro?:
             | Database["public"]["Enums"]["origem_cadastro"]
@@ -1727,13 +1724,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clientes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -4049,13 +4039,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "payments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       permission_diagnostics: {
@@ -4170,13 +4153,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playback_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -4714,7 +4690,6 @@ export type Database = {
           forma_ultimo_pagamento: string | null
           id: string
           is_recorrente: boolean | null
-          mac_smart_one: string | null
           nome: string
           origem_cadastro: string | null
           plano: Database["public"]["Enums"]["plano_cliente"] | null
@@ -4744,7 +4719,6 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id: string
           is_recorrente?: boolean | null
-          mac_smart_one?: string | null
           nome: string
           origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
@@ -4774,7 +4748,6 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id?: string
           is_recorrente?: boolean | null
-          mac_smart_one?: string | null
           nome?: string
           origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
@@ -6580,13 +6553,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       user_totp_secrets: {
@@ -7004,87 +6970,6 @@ export type Database = {
       }
     }
     Views: {
-      profiles_safe: {
-        Row: {
-          cliente_ativo: boolean | null
-          contact_phone: string | null
-          created_at: string | null
-          data_contratacao: string | null
-          data_ultimo_pagamento: string | null
-          data_vencimento: string | null
-          dispositivo_contratado:
-            | Database["public"]["Enums"]["dispositivo_tipo"]
-            | null
-          email: string | null
-          has_2fa: boolean | null
-          id: string | null
-          is_recorrente: boolean | null
-          mac_smart_one: string | null
-          nome: string | null
-          origem_cadastro: string | null
-          plano: Database["public"]["Enums"]["plano_cliente"] | null
-          situacao: Database["public"]["Enums"]["situacao_cliente"] | null
-          telefone: string | null
-          telefone_whatsapp: string | null
-          theme: string | null
-          totp_enabled: boolean | null
-          totp_verified_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          cliente_ativo?: boolean | null
-          contact_phone?: string | null
-          created_at?: string | null
-          data_contratacao?: string | null
-          data_ultimo_pagamento?: string | null
-          data_vencimento?: string | null
-          dispositivo_contratado?:
-            | Database["public"]["Enums"]["dispositivo_tipo"]
-            | null
-          email?: string | null
-          has_2fa?: never
-          id?: string | null
-          is_recorrente?: boolean | null
-          mac_smart_one?: string | null
-          nome?: string | null
-          origem_cadastro?: string | null
-          plano?: Database["public"]["Enums"]["plano_cliente"] | null
-          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          telefone?: string | null
-          telefone_whatsapp?: string | null
-          theme?: string | null
-          totp_enabled?: boolean | null
-          totp_verified_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          cliente_ativo?: boolean | null
-          contact_phone?: string | null
-          created_at?: string | null
-          data_contratacao?: string | null
-          data_ultimo_pagamento?: string | null
-          data_vencimento?: string | null
-          dispositivo_contratado?:
-            | Database["public"]["Enums"]["dispositivo_tipo"]
-            | null
-          email?: string | null
-          has_2fa?: never
-          id?: string | null
-          is_recorrente?: boolean | null
-          mac_smart_one?: string | null
-          nome?: string | null
-          origem_cadastro?: string | null
-          plano?: Database["public"]["Enums"]["plano_cliente"] | null
-          situacao?: Database["public"]["Enums"]["situacao_cliente"] | null
-          telefone?: string | null
-          telefone_whatsapp?: string | null
-          theme?: string | null
-          totp_enabled?: boolean | null
-          totp_verified_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       vw_expiration_summary: {
         Row: {
           data_ultimo_pagamento: string | null

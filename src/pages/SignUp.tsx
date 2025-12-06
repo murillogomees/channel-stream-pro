@@ -10,9 +10,10 @@
  * - user_subscription = 'trial'
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, UserPlus, Loader2, ArrowLeft, Check, Sparkles } from "lucide-react";
+import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,11 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordStrong, setIsPasswordStrong] = useState(false);
+
+  const handlePasswordStrengthChange = useCallback((isStrong: boolean) => {
+    setIsPasswordStrong(isStrong);
+  }, []);
 
   // Redirecionar se já autenticado
   useEffect(() => {
@@ -284,6 +290,10 @@ export default function SignUp() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            <PasswordStrengthIndicator 
+              password={formData.password} 
+              onStrengthChange={handlePasswordStrengthChange}
+            />
           </div>
 
           {/* Confirmar Senha */}

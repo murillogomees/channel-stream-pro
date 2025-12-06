@@ -134,7 +134,6 @@ export default function AdminBackupSystem() {
         'Plano',
         'Data Cadastro',
         'Data Vencimento',
-        'MAC SmartOne',
         'Cliente Ativo',
         'Origem Cadastro',
         'M3U Lists',
@@ -149,7 +148,6 @@ export default function AdminBackupSystem() {
         cliente.plano,
         cliente.data_cadastro,
         cliente.data_vencimento || '',
-        cliente.mac_smart_one || '',
         cliente.cliente_ativo ? 'Sim' : 'Não',
         cliente.origem_cadastro || '',
         cliente.client_m3u_lists?.map((m: any) => m.m3u_lists?.name).filter(Boolean).join('; ') || '',
@@ -334,7 +332,6 @@ export default function AdminBackupSystem() {
               <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                 <li>Informações completas de todos os clientes</li>
                 <li>Listas M3U atribuídas a cada cliente</li>
-                <li>Status de sincronização SmartOne</li>
                 <li>Histórico de pagamentos e vencimentos</li>
                 <li>Origem de cadastro e metadados</li>
               </ul>

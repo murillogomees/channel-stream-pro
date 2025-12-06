@@ -94,12 +94,11 @@ Seu acesso foi ativado com sucesso! 🚀
 • Plano: *${cliente.plano}* (${periodoPlano})
 • Valor: *R$ ${cliente.valorPago.toFixed(2)}*
 • Data de Vencimento: *${dataVencimento}*
-• MAC Cadastrado: *${cliente.macSmartOne}*
 
 💡 *Dicas Importantes:*
 
 1️⃣ *Primeiro Acesso*
-Seu aplicativo SmartOne IPTV já está configurado e pronto para usar!
+Seu aplicativo IPTV já está configurado e pronto para usar!
 
 2️⃣ *Explore os Canais*
 Temos mais de 10.000 canais em Full HD e 4K. Navegue pelas categorias e encontre seus favoritos.
@@ -141,7 +140,6 @@ function generateAdminNotificationMessage(cliente: Cliente): string {
 • Nome: *${cliente.nome}*
 • WhatsApp: *${cliente.telefone}*
 • E-mail: *${cliente.email}*
-• MAC: *${cliente.macSmartOne}*
 
 💰 *Informações do Plano:*
 • Plano: *${cliente.plano}*
@@ -260,13 +258,8 @@ function generateTutorialAdminMessage(cliente: Cliente): string {
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📱 *DISPOSITIVO*
-• MAC Address: ${cliente.macSmartOne}
-
-━━━━━━━━━━━━━━━━━━━━
-
 📋 *INFORMAÇÕES DO TESTE*
-• Status: 🟢 Testando (14 dias)
+• Status: 🟢 Testando (3 dias)
 • Cadastro: ${dataContratacao}
 • Vencimento: ${dataVencimento}
 • Origem: Website (Tutorial)
@@ -274,10 +267,9 @@ function generateTutorialAdminMessage(cliente: Cliente): string {
 ━━━━━━━━━━━━━━━━━━━━
 
 💡 *PRÓXIMOS PASSOS*
-1. Verificar MAC no SmartOne
-2. Ativar playlist do cliente
-3. Acompanhar uso durante teste
-4. Contato comercial próximo ao fim
+1. Ativar playlist do cliente
+2. Acompanhar uso durante teste
+3. Contato comercial próximo ao fim
 
 ━━━━━━━━━━━━━━━━━━━━
 
