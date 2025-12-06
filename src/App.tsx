@@ -32,7 +32,7 @@ const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
-const AdminMigrations = lazy(() => import("./pages/AdminMigracoes"));
+const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage"));
 const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
 const AdminCdn = lazy(() => import("./pages/AdminCdn"));
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
@@ -124,7 +124,7 @@ function AppContent() {
             <Route path="/admin/usuarios" element={<ProtectedRoute requireAdmin><AdminUsuariosPage /></ProtectedRoute>} />
             <Route path="/admin/roles" element={<Navigate to="/admin/usuarios?tab=roles" replace />} />
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
-            <Route path="/admin/migrations" element={<ProtectedRoute requireAdmin><AdminMigrations /></ProtectedRoute>} />
+            <Route path="/admin/migrations" element={<ProtectedRoute requireAdmin><AdminMigracoesPage /></ProtectedRoute>} />
             <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
             <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
