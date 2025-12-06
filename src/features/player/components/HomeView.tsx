@@ -2,14 +2,14 @@
  * HomeView - Optimized home tab with personalized content
  * 
  * Features:
+ * - Hero header image
+ * - Most viewed content by user
+ * - Recommendations based on viewing history
  * - Maximum 500 content items (loaded independently)
- * - Priority: Continue Watching > Related > AI Suggestions
- * - Behavior-based recommendations
- * - NO dependency on full playlist loading
  */
 
 import { memo, useRef, useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare, Sparkles, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ import { ContinueWatchingRow } from './ContinueWatchingRow';
 import { createSessionKey } from '../utils/contentRandomizer';
 import { usePersonalizedContent } from '../hooks/usePersonalizedContent';
 import { useHomeChannels } from '@/hooks/useHomeChannels';
+import homeHeroImage from '@/assets/home-hero.png';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
 interface SeriesContinuation {
@@ -245,9 +246,24 @@ const ChannelCard = memo(function ChannelCard({
   );
 });
 
+// Hero Header component
+const HeroHeader = memo(function HeroHeader() {
+  return (
+    <div className="relative w-full aspect-[21/9] md:aspect-[3/1] overflow-hidden">
+      <img
+        src={homeHeroImage}
+        alt="IPTV Link"
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+    </div>
+  );
+});
+
 // Loading skeleton
 const LoadingSkeleton = () => (
   <div className="space-y-6 py-4">
+    <Skeleton className="w-full aspect-[21/9] md:aspect-[3/1]" />
     {[1, 2, 3].map((i) => (
       <div key={i} className="px-4 lg:px-12">
         <Skeleton className="h-6 w-48 mb-3" />
@@ -330,7 +346,10 @@ export function HomeView({
 
   return (
     <div className="pb-8 space-y-2">
-      {/* Continue Watching - HIGHEST PRIORITY */}
+      {/* Hero Header - Top of page */}
+      <HeroHeader />
+
+      {/* Continue Watching - HIGHEST PRIORITY (Most viewed by user) */}
       {continueWatching.length > 0 && (
         <ContinueWatchingRow
           items={continueWatching}
@@ -358,13 +377,13 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Related Content Groups - Based on viewing behavior */}
+      {/* Related Content Groups - Based on viewing behavior (Recommendations) */}
       {relatedGroups.map((group) => (
         <ContentRow
           key={(group as any)._groupKey || `group-${group.type}`}
           title={group.title}
-          icon={Clock}
-          badge="Relacionado"
+          icon={TrendingUp}
+          badge="Baseado no que você viu"
           isEmpty={group.items.length === 0}
         >
           {group.items.map((item) => (
@@ -381,7 +400,7 @@ export function HomeView({
       {processedForYou.length > 0 && (
         <ContentRow
           title="Para Você"
-          subtitle="Baseado no seu perfil"
+          subtitle="Sugestões personalizadas"
           icon={Sparkles}
           badge="IA"
           isEmpty={false}
