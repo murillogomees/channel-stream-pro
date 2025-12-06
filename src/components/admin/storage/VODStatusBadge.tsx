@@ -98,17 +98,19 @@ export function VODStatusBadge({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge 
-            variant={config.variant}
-            className={cn(
-              'gap-1 cursor-help',
-              config.colors,
-              className
-            )}
-          >
-            {config.icon}
-            {showLabel && <span>{config.label}</span>}
-          </Badge>
+          <span className="inline-flex">
+            <Badge 
+              variant={config.variant}
+              className={cn(
+                'gap-1 cursor-help',
+                config.colors,
+                className
+              )}
+            >
+              {config.icon}
+              {showLabel && <span>{config.label}</span>}
+            </Badge>
+          </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           <div className="space-y-1">
