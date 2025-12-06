@@ -51,17 +51,17 @@ export function TVContentGrid({
   }
 
   return (
-    <section className={cn("py-4 lg:py-6", className)}>
-      {/* Results count */}
-      <div className="px-4 lg:px-8 mb-3 lg:mb-4">
-        <p className="text-sm text-muted-foreground">
-          Mostrando {visibleCount} de {totalCount.toLocaleString()} itens
+    <section className={cn("py-2 sm:py-4 lg:py-6 h-full", className)}>
+      {/* Results count - smaller on mobile */}
+      <div className="px-2 sm:px-4 lg:px-8 mb-2 lg:mb-4">
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          {visibleCount} de {totalCount.toLocaleString()}
         </p>
       </div>
 
-      {/* Grid */}
-      <div className="px-4 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
+      {/* Grid - optimized for mobile: 3 cols, smaller gaps, fills screen */}
+      <div className="px-2 sm:px-4 lg:px-8">
+        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-3 lg:gap-4 xl:gap-5">
           {visibleItems.map((channel) => (
             <TVContentCard
               key={channel.id}
@@ -73,6 +73,7 @@ export function TVContentGrid({
               onPlay={() => onPlay(channel)}
               onToggleFavorite={() => onToggleFavorite(channel.id)}
               fillContainer
+              variant="default"
             />
           ))}
         </div>

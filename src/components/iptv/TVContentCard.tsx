@@ -126,14 +126,14 @@ export const TVContentCard = memo(function TVContentCard({
         </div>
       </button>
 
-      {/* Card Info */}
-      <div className="mt-2 lg:mt-3 px-0.5">
-        <h3 className="text-sm lg:text-base font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+      {/* Card Info - compact on mobile */}
+      <div className="mt-1 sm:mt-2 lg:mt-3 px-0.5">
+        <h3 className="text-[10px] sm:text-sm lg:text-base font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
           {name}
         </h3>
         
         {category && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+          <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 hidden sm:block">
             {category}
           </p>
         )}
