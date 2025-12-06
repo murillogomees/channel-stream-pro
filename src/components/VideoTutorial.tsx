@@ -20,8 +20,8 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     image: step1,
-    title: '1. Tela Inicial do SmartOne IPTV',
-    description: 'Ao abrir o app, você verá a tela inicial com o logo SmartOne e o menu inferior com 5 opções: Reload, Settings (Configurações), Channels (Canais), Movies (Filmes) e Series (Séries). Use o controle remoto para navegar.',
+    title: '1. Tela Inicial do App IPTV',
+    description: 'Ao abrir o app, você verá a tela inicial com o menu inferior com 5 opções: Reload, Settings (Configurações), Channels (Canais), Movies (Filmes) e Series (Séries). Use o controle remoto para navegar.',
     duration: 5,
   },
   {

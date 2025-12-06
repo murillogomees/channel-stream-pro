@@ -23,7 +23,6 @@ export function useClientesDb() {
     valorPago: p.valor_pago || 0,
     dataUltimoPagamento: p.data_ultimo_pagamento,
     formaUltimoPagamento: p.forma_ultimo_pagamento,
-    macSmartOne: p.mac_smart_one,
     usuarioM3u: '',
     senhaM3u: '',
     dataCadastro: p.created_at,

@@ -122,7 +122,7 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "boasvindas-3",
       title: "Instruções Iniciais",
-      content: "📺 Como começar:\n1. Abra o app SmartOne IPTV\n2. Faça login com seu email: {{email}}\n3. Aproveite nosso conteúdo!\n\nDúvidas? Entre em contato: {{empresa_telefone}}",
+      content: "📺 Como começar:\n1. Abra o app IPTV na sua TV\n2. Faça login com seu email: {{email}}\n3. Aproveite nosso conteúdo!\n\nDúvidas? Entre em contato: {{empresa_telefone}}",
       category: "Boas-vindas",
       variables: ["email", "empresa_telefone"]
     },

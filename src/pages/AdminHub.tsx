@@ -140,7 +140,7 @@ export default function AdminHub() {
     },
     {
       title: 'Integrações',
-      description: 'WhatsApp, SmartOne, Supabase',
+      description: 'WhatsApp, CDN, Supabase',
       icon: Plug,
       href: '/admin/integrations',
     },

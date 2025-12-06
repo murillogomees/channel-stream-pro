@@ -61,12 +61,6 @@ const clienteSchema = z.object({
     .max(999999.99, 'Valor muito alto'),
   dataUltimoPagamento: z.string().optional().or(z.literal('')),
   formaUltimoPagamento: z.enum(['Pix', 'TED', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', '']).optional(),
-  macSmartOne: z.string()
-    .trim()
-    .max(100, 'MAC muito longo')
-    .regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^$/, 'MAC inválido. Use formato XX:XX:XX:XX:XX:XX')
-    .optional()
-    .or(z.literal('')),
   clienteAtivo: z.boolean().optional(),
   origemCadastro: z.enum(['Google Ads', 'Facebook', 'Instagram', 'Indicação', 'Website', 'Outro', '']).optional(),
   dispositivoContratado: z.enum([
@@ -149,7 +143,6 @@ export default function AdminClienteForm() {
               valor_pago: data.valor_pago,
               data_ultimo_pagamento: data.data_ultimo_pagamento,
               forma_ultimo_pagamento: data.forma_ultimo_pagamento,
-              mac_smart_one: data.mac_smart_one,
               cliente_ativo: data.cliente_ativo,
               is_recorrente: data.is_recorrente,
               dispositivo_contratado: data.dispositivo_contratado,
@@ -168,7 +161,6 @@ export default function AdminClienteForm() {
             setValue('valorPago', cliente.valor_pago || 0);
             setValue('dataUltimoPagamento', cliente.data_ultimo_pagamento || '');
             setValue('formaUltimoPagamento', cliente.forma_ultimo_pagamento as any || '');
-            setValue('macSmartOne', cliente.mac_smart_one || '');
             setValue('clienteAtivo', cliente.cliente_ativo ?? false);
             setValue('origemCadastro', cliente.origem_cadastro as any || '');
             setValue('dispositivoContratado', cliente.dispositivo_contratado as any || '');
@@ -323,7 +315,6 @@ export default function AdminClienteForm() {
       valorPago: data.valorPago || 0,
       dataUltimoPagamento: data.dataUltimoPagamento || '',
       formaUltimoPagamento: sanitizeString(data.formaUltimoPagamento || ''),
-      macSmartOne: sanitizeMac(data.macSmartOne || ''),
       clienteAtivo: data.clienteAtivo ?? false,
       origemCadastro: data.origemCadastro as any || null,
       dispositivoContratado: data.dispositivoContratado as any || undefined,
@@ -507,7 +498,6 @@ export default function AdminClienteForm() {
             valor_pago: clienteData.valorPago || null,
             data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
             forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
-            mac_smart_one: clienteData.macSmartOne || null,
             cliente_ativo: clienteData.clienteAtivo,
             origem_cadastro: clienteData.origemCadastro || null,
             dispositivo_contratado: clienteData.dispositivoContratado || null,
@@ -968,10 +958,6 @@ export default function AdminClienteForm() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="macSmartOne">MAC Address <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
-                  <Input id="macSmartOne" placeholder="XX:XX:XX:XX:XX:XX" {...register('macSmartOne')} />
-                </div>
               </div>
 
               <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">

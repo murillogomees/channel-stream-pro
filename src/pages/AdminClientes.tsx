@@ -574,7 +574,7 @@ export default function AdminClientes() {
                     filteredClientes.map((cliente: UnifiedProfile) => (
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium whitespace-nowrap">{cliente.nome}</TableCell>
-                      <TableCell className="hidden md:table-cell">{cliente.mac_smart_one || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.email || 'N/A'}</TableCell>
                       <TableCell className="hidden lg:table-cell">{cliente.dispositivo_contratado ? dispositivoLabels[cliente.dispositivo_contratado] || cliente.dispositivo_contratado : 'N/A'}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <Badge className={situacaoColors[cliente.situacao || 'Indefinido']}>

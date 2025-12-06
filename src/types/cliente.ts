@@ -43,7 +43,6 @@ export interface ClienteDb {
   valor_pago: number;
   data_ultimo_pagamento?: string;
   forma_ultimo_pagamento?: string;
-  mac_smart_one?: string;
   usuario_m3u?: string;
   senha_m3u?: string;
   data_cadastro: string;
@@ -71,7 +70,6 @@ export interface Cliente {
   valorPago: number;
   dataUltimoPagamento?: string;
   formaUltimoPagamento?: string;
-  macSmartOne?: string;
   usuarioM3u?: string;
   senhaM3u?: string;
   dataCadastro: string;
@@ -99,7 +97,6 @@ export function dbToCliente(db: ClienteDb): Cliente {
     valorPago: db.valor_pago,
     dataUltimoPagamento: db.data_ultimo_pagamento,
     formaUltimoPagamento: db.forma_ultimo_pagamento,
-    macSmartOne: db.mac_smart_one,
     usuarioM3u: db.usuario_m3u,
     senhaM3u: db.senha_m3u,
     dataCadastro: db.data_cadastro,
@@ -128,7 +125,6 @@ export function clienteToDb(cliente: Partial<Cliente>): Partial<ClienteDb> {
     valor_pago: cliente.valorPago,
     data_ultimo_pagamento: cliente.dataUltimoPagamento,
     forma_ultimo_pagamento: cliente.formaUltimoPagamento,
-    mac_smart_one: cliente.macSmartOne,
     usuario_m3u: cliente.usuarioM3u,
     senha_m3u: cliente.senhaM3u,
     data_cadastro: cliente.dataCadastro,

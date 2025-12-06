@@ -73,7 +73,7 @@ export default function CadastroSucesso() {
               <div>
                 <h3 className="font-semibold text-lg mb-2">Aguarde a configuração</h3>
                 <p className="text-muted-foreground">
-                  Estamos configurando sua playlist automaticamente no SmartOne IPTV. 
+                  Estamos configurando sua playlist automaticamente. 
                   Isso pode levar alguns minutos.
                 </p>
               </div>
@@ -86,7 +86,7 @@ export default function CadastroSucesso() {
               <div>
                 <h3 className="font-semibold text-lg mb-2">Abra o aplicativo</h3>
                 <p className="text-muted-foreground">
-                  Abra o SmartOne IPTV na sua TV. Seus canais já estarão disponíveis!
+                  Abra o app IPTV na sua TV. Seus canais já estarão disponíveis!
                 </p>
               </div>
             </div>
@@ -95,7 +95,7 @@ export default function CadastroSucesso() {
 
         {/* Video Tutorial Card */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-4 text-center">🎬 Como Usar o SmartOne IPTV</h2>
+          <h2 className="text-3xl font-bold mb-4 text-center">🎬 Como Usar o App IPTV</h2>
           <p className="text-center text-muted-foreground mb-6">
             Assista ao tutorial interativo e aprenda a navegar pelo aplicativo
           </p>
