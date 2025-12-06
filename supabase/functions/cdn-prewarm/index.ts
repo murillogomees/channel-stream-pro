@@ -226,7 +226,7 @@ serve(async (req) => {
       segmentsPerAsset
     };
 
-    console.log('[CDN-Prewarm] Starting prewarm job', { jobType, config, cdnBaseUrl: R2_CDN_BASE_URL });
+    console.log('[CDN-Prewarm] Starting prewarm job', { jobType, config });
 
     // Recalculate predictions
     const { data: predictionCount, error: predError } = await supabase.rpc('calculate_prewarm_predictions');
@@ -336,8 +336,8 @@ serve(async (req) => {
     const result = await processPrewarmQueue(assetsToWarm, config, updateProgress);
 
     // Finalize job
-    const avgTime = assets.length > 0 
-      ? Math.round((Date.now() - new Date(job.started_at).getTime()) / assets.length)
+    const avgTime = assetsToWarm.length > 0 
+      ? Math.round((Date.now() - new Date(job.started_at).getTime()) / assetsToWarm.length)
       : 0;
 
     await supabase
