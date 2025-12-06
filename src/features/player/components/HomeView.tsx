@@ -69,31 +69,31 @@ const ContentRow = memo(function ContentRow({
     });
   };
   if (isEmpty) return null;
-  return <section className="py-4 group/section">
-      <div className="flex items-center justify-between mb-3 px-4 lg:px-12">
-        <div className="flex items-center gap-3">
-          {Icon && <Icon className="w-5 h-5 text-primary" />}
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg lg:text-xl font-semibold text-foreground">
+  return <section className="py-2 sm:py-4 group/section">
+      <div className="flex items-center justify-between mb-2 sm:mb-3 px-2 sm:px-4 lg:px-12">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {Icon && <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-foreground">
               {title}
             </h2>
-            {badge && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+            {badge && <span className="px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[10px] font-medium bg-primary/10 text-primary rounded">
                 {badge}
               </span>}
           </div>
           {subtitle && <p className="text-xs text-muted-foreground hidden sm:block">{subtitle}</p>}
         </div>
         <div className="flex gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scroll('left')}>
-            <ChevronLeft className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => scroll('left')}>
+            <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scroll('right')}>
-            <ChevronRight className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => scroll('right')}>
+            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
           </Button>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex gap-3 px-4 lg:px-12 overflow-x-auto scrollbar-hide scroll-smooth pb-2">
+      <div ref={scrollRef} className="flex gap-2 sm:gap-3 px-2 sm:px-4 lg:px-12 overflow-x-auto scrollbar-hide scroll-smooth pb-2">
         {children}
       </div>
     </section>;
@@ -108,24 +108,24 @@ const SeriesContinuationCard = memo(function SeriesContinuationCard({
   onPlay: () => void;
 }) {
   const episodeInfo = parseEpisodeFromChannel(item.nextEpisode.name);
-  return <div className="flex-shrink-0 w-[200px] lg:w-[240px] group/card cursor-pointer" onClick={onPlay}>
+  return <div className="flex-shrink-0 w-[120px] sm:w-[160px] lg:w-[200px] group/card cursor-pointer" onClick={onPlay}>
       <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
         {isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo) ? <img src={isValidImageUrl(item.logo) ? item.logo : item.nextEpisode.tvg_logo} alt={item.seriesName} className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105" loading="lazy" /> : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-            <PlaySquare className="w-12 h-12 text-primary/40" />
+            <PlaySquare className="w-8 h-8 sm:w-12 sm:h-12 text-primary/40" />
           </div>}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-          <Button size="sm" className="gap-1.5">
-            <Play className="w-4 h-4 fill-current" />
-            Continuar
+          <Button size="sm" className="gap-1 sm:gap-1.5 text-xs sm:text-sm h-7 sm:h-8">
+            <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
+            <span className="hidden sm:inline">Continuar</span>
           </Button>
         </div>
-        <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-medium">
+        <div className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 sm:px-2 py-0.5 rounded bg-primary text-primary-foreground text-[10px] sm:text-xs font-medium">
           Próximo
         </div>
       </div>
-      <div className="mt-2 space-y-0.5">
-        <h3 className="font-medium text-foreground text-sm truncate">{item.seriesName}</h3>
-        <p className="text-xs text-muted-foreground">
+      <div className="mt-1 sm:mt-2 space-y-0.5">
+        <h3 className="font-medium text-foreground text-xs sm:text-sm truncate">{item.seriesName}</h3>
+        <p className="text-[10px] sm:text-xs text-muted-foreground">
           {episodeInfo ? `T${episodeInfo.season} E${episodeInfo.episode}` : 'Próximo episódio'}
         </p>
       </div>
@@ -141,25 +141,25 @@ const RecommendationCard = memo(function RecommendationCard({
   onPlay: () => void;
 }) {
   const typeLabel = item.content_type === 'movie' ? 'Filme' : item.content_type === 'episode' ? 'Série' : item.content_type === 'live' ? 'Ao Vivo' : '';
-  return <div className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer" onClick={onPlay}>
+  return <div className="flex-shrink-0 w-[100px] sm:w-[130px] lg:w-[160px] group/card cursor-pointer" onClick={onPlay}>
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
         {item.content_logo ? <img src={item.content_logo} alt={item.content_name} className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105" loading="lazy" /> : <div className="w-full h-full bg-gradient-to-br from-muted-foreground/20 to-muted-foreground/5 flex items-center justify-center">
-            <Film className="w-10 h-10 text-muted-foreground/40" />
+            <Film className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-muted-foreground/40" />
           </div>}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-          <Button size="icon" variant="secondary" className="rounded-full h-12 w-12">
-            <Play className="w-6 h-6 fill-current" />
+          <Button size="icon" variant="secondary" className="rounded-full h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12">
+            <Play className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 fill-current" />
           </Button>
         </div>
-        {typeLabel && <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-xs">
+        {typeLabel && <div className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 sm:px-1.5 py-0.5 rounded bg-black/70 text-white text-[9px] sm:text-xs">
             {typeLabel}
           </div>}
       </div>
-      <div className="mt-2">
-        <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-tight">
+      <div className="mt-1 sm:mt-2">
+        <h3 className="font-medium text-foreground text-[10px] sm:text-xs lg:text-sm line-clamp-2 leading-tight">
           {item.content_name}
         </h3>
-        {item.content_category && <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.content_category}</p>}
+        {item.content_category && <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 truncate hidden sm:block">{item.content_category}</p>}
       </div>
     </div>;
 });
@@ -174,27 +174,27 @@ const ChannelCard = memo(function ChannelCard({
   onPlay: () => void;
   icon?: React.ElementType;
 }) {
-  return <div className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer" onClick={onPlay}>
+  return <div className="flex-shrink-0 w-[100px] sm:w-[130px] lg:w-[160px] group/card cursor-pointer" onClick={onPlay}>
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
         {isValidImageUrl(channel.tvg_logo) ? <img src={channel.tvg_logo} alt={channel.name} className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105" loading="lazy" /> : <div className="w-full h-full bg-gradient-to-br from-muted-foreground/20 to-muted-foreground/5 flex items-center justify-center">
-            {Icon ? <Icon className="w-10 h-10 text-muted-foreground/40" /> : <Film className="w-10 h-10 text-muted-foreground/40" />}
+            {Icon ? <Icon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-muted-foreground/40" /> : <Film className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-muted-foreground/40" />}
           </div>}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-          <Button size="icon" variant="secondary" className="rounded-full h-12 w-12">
-            <Play className="w-6 h-6 fill-current" />
+          <Button size="icon" variant="secondary" className="rounded-full h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12">
+            <Play className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 fill-current" />
           </Button>
         </div>
       </div>
-      <div className="mt-2">
-        <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-tight">{channel.name}</h3>
+      <div className="mt-1 sm:mt-2">
+        <h3 className="font-medium text-foreground text-[10px] sm:text-xs lg:text-sm line-clamp-2 leading-tight">{channel.name}</h3>
       </div>
     </div>;
 });
 
-// Hero Header component - starts right below top header
+// Hero Header component - compact for mobile
 const HeroHeader = memo(function HeroHeader({ className }: { className?: string }) {
-  return <div className={cn("relative w-full h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] overflow-hidden", className)}>
-      <img src={homeHeroImage} alt="IPTV Link" className="w-full object-cover object-center" />
+  return <div className={cn("relative w-full overflow-hidden", className)}>
+      <img src={homeHeroImage} alt="IPTV Link" className="w-full h-full object-cover object-center" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
     </div>;
 });
@@ -287,8 +287,8 @@ export function HomeView({
     return <LoadingSkeleton />;
   }
   return <div className="pb-8 space-y-2">
-      {/* Hero Header - Top of page */}
-      <HeroHeader className="h-96 mb-[120px] pb-0" />
+      {/* Hero Header - Compact on mobile */}
+      <HeroHeader className="h-[140px] sm:h-[180px] md:h-64 lg:h-80 mb-2 sm:mb-4" />
 
       {/* Continue Watching - HIGHEST PRIORITY (Most viewed by user) */}
       {continueWatching.length > 0 && <ContinueWatchingRow items={continueWatching} onPlay={onPlayContinue} onRemove={onRemoveContinue} isLoading={loadingContinueWatching} />}
