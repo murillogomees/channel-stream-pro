@@ -1,17 +1,21 @@
 /**
- * HomeView - Dynamic home tab with personalized content
+ * HomeView - Optimized home tab with personalized content
+ * 
+ * Features:
+ * - Maximum 500 content items
+ * - Priority: Continue Watching > Related > AI Suggestions
+ * - Behavior-based recommendations
  */
 
-import { memo, useRef, useMemo, useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare } from 'lucide-react';
+import { memo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Play, Clock, Tv, Film, PlaySquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { isValidImageUrl } from '@/lib/imageUtils';
 import { ContinueWatchingRow } from './ContinueWatchingRow';
-import { shuffleArray, createSessionKey } from '../utils/contentRandomizer';
-import { groupChannelsBySeries, groupRecommendationItems, detectContentType } from '../utils/contentGrouper';
+import { createSessionKey } from '../utils/contentRandomizer';
+import { usePersonalizedContent } from '../hooks/usePersonalizedContent';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
 interface SeriesContinuation {
@@ -24,26 +28,17 @@ interface SeriesContinuation {
 }
 
 interface HomeViewProps {
-  // Continue Watching
   continueWatchingItems: WatchProgress[];
   loadingContinueWatching: boolean;
   onPlayContinue: (item: WatchProgress) => void;
   onRemoveContinue: (contentId: string) => void;
-  
-  // Series Continuations
   seriesContinuations: SeriesContinuation[];
   onPlaySeries: (channel: Channel) => void;
-  
-  // Recommendations
   recommendationGroups: RecommendationGroup[];
   forYouMix: RecommendationItem[];
   loadingRecommendations: boolean;
   onPlayRecommendation: (item: RecommendationItem) => void;
-  
-  // Generic channel play
   onPlayChannel: (channel: Channel) => void;
-  
-  // All channels for reference
   allChannels: Channel[];
 }
 
@@ -54,12 +49,14 @@ const ContentRow = memo(function ContentRow({
   icon: Icon,
   children,
   isEmpty,
+  badge,
 }: {
   title: string;
   subtitle?: string;
   icon?: React.ElementType;
   children: React.ReactNode;
   isEmpty?: boolean;
+  badge?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -79,30 +76,25 @@ const ContentRow = memo(function ContentRow({
       <div className="flex items-center justify-between mb-3 px-4 lg:px-12">
         <div className="flex items-center gap-3">
           {Icon && <Icon className="w-5 h-5 text-primary" />}
-          <div>
+          <div className="flex items-center gap-2">
             <h2 className="text-lg lg:text-xl font-semibold text-foreground">
               {title}
             </h2>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground">{subtitle}</p>
+            {badge && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+                {badge}
+              </span>
             )}
           </div>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground hidden sm:block">{subtitle}</p>
+          )}
         </div>
         <div className="flex gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => scroll('left')}
-          >
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scroll('left')}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => scroll('right')}
-          >
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scroll('right')}>
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -129,10 +121,7 @@ const SeriesContinuationCard = memo(function SeriesContinuationCard({
   const episodeInfo = parseEpisodeFromChannel(item.nextEpisode.name);
   
   return (
-    <div
-      className="flex-shrink-0 w-[200px] lg:w-[240px] group/card cursor-pointer"
-      onClick={onPlay}
-    >
+    <div className="flex-shrink-0 w-[200px] lg:w-[240px] group/card cursor-pointer" onClick={onPlay}>
       <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
         {isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo) ? (
           <img
@@ -146,29 +135,20 @@ const SeriesContinuationCard = memo(function SeriesContinuationCard({
             <PlaySquare className="w-12 h-12 text-primary/40" />
           </div>
         )}
-
-        {/* Play overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
           <Button size="sm" className="gap-1.5">
             <Play className="w-4 h-4 fill-current" />
-            Próximo
+            Continuar
           </Button>
         </div>
-
-        {/* Badge */}
         <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-medium">
-          Continuar
+          Próximo
         </div>
       </div>
-
       <div className="mt-2 space-y-0.5">
-        <h3 className="font-medium text-foreground text-sm truncate">
-          {item.seriesName}
-        </h3>
+        <h3 className="font-medium text-foreground text-sm truncate">{item.seriesName}</h3>
         <p className="text-xs text-muted-foreground">
-          {episodeInfo 
-            ? `T${episodeInfo.season} E${episodeInfo.episode}` 
-            : 'Próximo episódio'}
+          {episodeInfo ? `T${episodeInfo.season} E${episodeInfo.episode}` : 'Próximo episódio'}
         </p>
       </div>
     </div>
@@ -188,10 +168,7 @@ const RecommendationCard = memo(function RecommendationCard({
     : item.content_type === 'live' ? 'Ao Vivo' : '';
 
   return (
-    <div
-      className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer"
-      onClick={onPlay}
-    >
+    <div className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer" onClick={onPlay}>
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
         {item.content_logo ? (
           <img
@@ -205,31 +182,62 @@ const RecommendationCard = memo(function RecommendationCard({
             <Film className="w-10 h-10 text-muted-foreground/40" />
           </div>
         )}
-
-        {/* Play overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
           <Button size="icon" variant="secondary" className="rounded-full h-12 w-12">
             <Play className="w-6 h-6 fill-current" />
           </Button>
         </div>
-
-        {/* Type badge */}
         {typeLabel && (
           <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-xs">
             {typeLabel}
           </div>
         )}
       </div>
-
       <div className="mt-2">
         <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-tight">
           {item.content_name}
         </h3>
         {item.content_category && (
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {item.content_category}
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.content_category}</p>
         )}
+      </div>
+    </div>
+  );
+});
+
+// Channel card for default sections
+const ChannelCard = memo(function ChannelCard({
+  channel,
+  onPlay,
+  icon: Icon,
+}: {
+  channel: Channel;
+  onPlay: () => void;
+  icon?: React.ElementType;
+}) {
+  return (
+    <div className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer" onClick={onPlay}>
+      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
+        {isValidImageUrl(channel.tvg_logo) ? (
+          <img
+            src={channel.tvg_logo}
+            alt={channel.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-muted-foreground/20 to-muted-foreground/5 flex items-center justify-center">
+            {Icon ? <Icon className="w-10 h-10 text-muted-foreground/40" /> : <Film className="w-10 h-10 text-muted-foreground/40" />}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+          <Button size="icon" variant="secondary" className="rounded-full h-12 w-12">
+            <Play className="w-6 h-6 fill-current" />
+          </Button>
+        </div>
+      </div>
+      <div className="mt-2">
+        <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-tight">{channel.name}</h3>
       </div>
     </div>
   );
@@ -255,12 +263,17 @@ const LoadingSkeleton = () => (
 function parseEpisodeFromChannel(name: string): { season: number; episode: number } | null {
   let match = name.match(/S(\d{1,2})\s*E(\d{1,3})/i);
   if (match) return { season: parseInt(match[1]), episode: parseInt(match[2]) };
-  
   match = name.match(/(\d{1,2})x(\d{1,3})/i);
   if (match) return { season: parseInt(match[1]), episode: parseInt(match[2]) };
-  
   return null;
 }
+
+// Icon map for default sections
+const sectionIcons: Record<string, React.ElementType> = {
+  live: Tv,
+  movie: Film,
+  series: PlaySquare,
+};
 
 export function HomeView({
   continueWatchingItems,
@@ -276,89 +289,26 @@ export function HomeView({
   onPlayChannel,
   allChannels,
 }: HomeViewProps) {
-  // Session key for randomization - changes ONLY on mount (not on re-renders)
+  // Session key for stable randomization
   const [sessionKey] = useState(() => createSessionKey());
-  
-  // Check if we have any personalized content
-  const hasPersonalizedContent = 
-    continueWatchingItems.length > 0 || 
-    seriesContinuations.length > 0 || 
-    recommendationGroups.length > 0;
 
-  // MEMOIZE shuffled recommendation groups - GROUP by series, then shuffle
-  const shuffledRecommendationGroups = useMemo(() => {
-    return recommendationGroups.map(group => {
-      // Filter items with logos, group by series, then shuffle
-      const withLogos = group.items.filter(item => item.content_logo);
-      const grouped = groupRecommendationItems(withLogos);
-      return {
-        ...group,
-        items: shuffleArray(grouped),
-      };
-    });
-  }, [recommendationGroups, sessionKey]);
-
-  // MEMOIZE shuffled forYouMix - GROUP by series, then shuffle
-  const shuffledForYouMix = useMemo(() => {
-    const withLogos = forYouMix.filter(item => item.content_logo);
-    const grouped = groupRecommendationItems(withLogos);
-    return shuffleArray(grouped).slice(0, 20);
-  }, [forYouMix, sessionKey]);
-
-  // Default content sections for new users - RANDOMIZED once per session
-  const defaultSections = useMemo(() => {
-    if (hasPersonalizedContent || allChannels.length === 0) return [];
-
-    // Only channels with valid cover images
-    const validChannels = allChannels.filter(ch => isValidImageUrl(ch.tvg_logo));
-    
-    // Group all channels by series first (removes duplicate episodes)
-    const groupedChannels = groupChannelsBySeries(validChannels);
-    
-    // Separate grouped channels by content type
-    const movies: Channel[] = [];
-    const series: Channel[] = [];
-    const live: Channel[] = [];
-    
-    for (const ch of groupedChannels) {
-      const type = detectContentType(ch);
-      if (type === 'movie') movies.push(ch);
-      else if (type === 'series') series.push(ch);
-      else live.push(ch);
-    }
-
-    const sections: { title: string; icon: React.ElementType; channels: Channel[]; type: string }[] = [];
-    
-    // RANDOMIZE and take different content each time
-    if (live.length > 0) {
-      sections.push({
-        title: '📺 TV ao Vivo',
-        icon: Tv,
-        channels: shuffleArray(live).slice(0, 20),
-        type: 'live',
-      });
-    }
-    
-    if (movies.length > 0) {
-      sections.push({
-        title: '🎬 Filmes',
-        icon: Film,
-        channels: shuffleArray(movies).slice(0, 20),
-        type: 'movie',
-      });
-    }
-    
-    if (series.length > 0) {
-      sections.push({
-        title: '📺 Séries',
-        icon: PlaySquare,
-        channels: shuffleArray(series).slice(0, 20),
-        type: 'series',
-      });
-    }
-
-    return sections;
-  }, [allChannels, hasPersonalizedContent, sessionKey]); // sessionKey forces new random on each mount
+  // Use optimized personalized content hook (max 500 items)
+  const {
+    continueWatching,
+    seriesContinuations: processedSeries,
+    relatedGroups,
+    forYouMix: processedForYou,
+    defaultSections,
+    hasPersonalizedContent,
+    totalItemCount,
+  } = usePersonalizedContent({
+    continueWatchingItems,
+    seriesContinuations,
+    recommendationGroups,
+    forYouMix,
+    allChannels,
+    sessionKey,
+  });
 
   if (loadingContinueWatching && loadingRecommendations) {
     return <LoadingSkeleton />;
@@ -366,25 +316,25 @@ export function HomeView({
 
   return (
     <div className="pb-8 space-y-2">
-      {/* Continue Watching - only items with cover images */}
-      {continueWatchingItems.filter(item => item.content_logo).length > 0 && (
+      {/* Continue Watching - HIGHEST PRIORITY */}
+      {continueWatching.length > 0 && (
         <ContinueWatchingRow
-          items={continueWatchingItems.filter(item => item.content_logo)}
+          items={continueWatching}
           onPlay={onPlayContinue}
           onRemove={onRemoveContinue}
           isLoading={loadingContinueWatching}
         />
       )}
 
-      {/* Series Continuations - Next Episodes - only with cover images */}
-      {seriesContinuations.filter(item => isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo)).length > 0 && (
+      {/* Series Continuations - Next Episodes */}
+      {processedSeries.length > 0 && (
         <ContentRow
           title="Continuar Séries"
-          subtitle="Próximos episódios das suas séries"
+          subtitle="Próximos episódios"
           icon={PlaySquare}
           isEmpty={false}
         >
-          {seriesContinuations.filter(item => isValidImageUrl(item.logo) || isValidImageUrl(item.nextEpisode.tvg_logo)).map((item) => (
+          {processedSeries.map((item) => (
             <SeriesContinuationCard
               key={item.seriesName}
               item={item}
@@ -394,36 +344,35 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Recommendation Groups - STABLE MEMOIZED (no re-shuffle on re-render) */}
-      {shuffledRecommendationGroups.map((group) => {
-        if (group.items.length === 0) return null;
-        return (
-          <ContentRow
-            key={group.type + (group.source_content || '')}
-            title={group.title}
-            icon={Clock}
-            isEmpty={false}
-          >
-            {group.items.map((item, idx) => (
-              <RecommendationCard
-                key={`${group.type}-${item.id}-${idx}`}
-                item={item}
-                onPlay={() => onPlayRecommendation(item)}
-              />
-            ))}
-          </ContentRow>
-        );
-      })}
+      {/* Related Content Groups - Based on viewing behavior */}
+      {relatedGroups.map((group) => (
+        <ContentRow
+          key={group.type + (group.source_content || '')}
+          title={group.title}
+          icon={Clock}
+          badge="Relacionado"
+          isEmpty={group.items.length === 0}
+        >
+          {group.items.map((item, idx) => (
+            <RecommendationCard
+              key={`${group.type}-${item.id}-${idx}`}
+              item={item}
+              onPlay={() => onPlayRecommendation(item)}
+            />
+          ))}
+        </ContentRow>
+      ))}
 
-      {/* For You Mix - STABLE MEMOIZED (no re-shuffle on re-render) */}
-      {shuffledForYouMix.length > 0 && (
+      {/* For You Mix - AI/Behavior based */}
+      {processedForYou.length > 0 && (
         <ContentRow
           title="Para Você"
-          subtitle="Seleção personalizada"
-          icon={Film}
+          subtitle="Baseado no seu perfil"
+          icon={Sparkles}
+          badge="IA"
           isEmpty={false}
         >
-          {shuffledForYouMix.map((item, idx) => (
+          {processedForYou.map((item, idx) => (
             <RecommendationCard
               key={`foryou-${item.id}-${idx}`}
               item={item}
@@ -433,45 +382,21 @@ export function HomeView({
         </ContentRow>
       )}
 
-      {/* Default sections for new users without watch history */}
+      {/* Default sections for new users */}
       {!hasPersonalizedContent && defaultSections.map((section) => (
         <ContentRow
           key={section.title}
           title={section.title}
-          icon={section.icon}
+          icon={sectionIcons[section.type] || Tv}
           isEmpty={section.channels.length === 0}
         >
           {section.channels.map((channel) => (
-            <div
+            <ChannelCard
               key={channel.id}
-              className="flex-shrink-0 w-[160px] lg:w-[180px] group/card cursor-pointer"
-              onClick={() => onPlayChannel(channel)}
-            >
-              <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
-                {isValidImageUrl(channel.tvg_logo) ? (
-                  <img
-                    src={channel.tvg_logo}
-                    alt={channel.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-muted-foreground/20 to-muted-foreground/5 flex items-center justify-center">
-                    <section.icon className="w-10 h-10 text-muted-foreground/40" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button size="icon" variant="secondary" className="rounded-full h-12 w-12">
-                    <Play className="w-6 h-6 fill-current" />
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-2">
-                <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-tight">
-                  {channel.name}
-                </h3>
-              </div>
-            </div>
+              channel={channel}
+              onPlay={() => onPlayChannel(channel)}
+              icon={sectionIcons[section.type]}
+            />
           ))}
         </ContentRow>
       ))}
@@ -480,9 +405,7 @@ export function HomeView({
       {!hasPersonalizedContent && defaultSections.length === 0 && !loadingRecommendations && (
         <div className="flex flex-col items-center justify-center py-20 text-center px-4">
           <Tv className="w-16 h-16 text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">
-            Comece a assistir
-          </h3>
+          <h3 className="text-lg font-medium text-foreground mb-2">Comece a assistir</h3>
           <p className="text-muted-foreground max-w-md">
             Explore as categorias para descobrir conteúdos. Suas recomendações personalizadas aparecerão aqui.
           </p>
