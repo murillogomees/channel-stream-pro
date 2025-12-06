@@ -118,7 +118,7 @@ export default function AdminDashboardPage() {
           />
           <NavCard
             title="Usuários & Permissões"
-            description="CRUD, roles, auditoria e logs"
+            description="CRUD, roles, auditoria, afiliados e logs"
             icon={<UserCog className="h-5 w-5" />}
             path="/admin/usuarios"
             badge={`${stats.total} usuários`}
@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
           />
           <NavCard
             title="Sistema"
-            description="Configurações e backup"
+            description="Configurações, migrações e RLS"
             icon={<Settings2 className="h-5 w-5" />}
             path="/admin/sistema"
             badge="Hub"
