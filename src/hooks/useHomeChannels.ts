@@ -36,53 +36,28 @@ export function useHomeChannels() {
       setIsLoading(true);
       setError(null);
 
-      // Get user's playlist assignment
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        setError('Não autenticado');
+      // Get the active playlist key from playlist_sources (not m3u_custom_lists)
+      const { data: sources, error: sourcesError } = await supabase
+        .from('playlist_sources')
+        .select('key')
+        .eq('sync_enabled', true)
+        .limit(1);
+
+      if (sourcesError) {
+        console.error('[HomeChannels] Error fetching sources:', sourcesError);
+      }
+
+      const playlistKey = sources?.[0]?.key;
+      
+      if (!playlistKey) {
+        console.log('[HomeChannels] No active playlist source found');
+        setError('Nenhuma playlist disponível');
         setIsLoading(false);
         return;
       }
 
-      // Get playlist assignment with slug
-      const { data: assignment } = await supabase
-        .from('client_m3u_custom_assignments')
-        .select(`
-          custom_list_id,
-          m3u_custom_lists:custom_list_id (
-            id,
-            name,
-            slug,
-            cdn_url,
-            status
-          )
-        `)
-        .eq('cliente_id', session.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      const customList = (assignment as any)?.m3u_custom_lists;
-      let playlistSlug = customList?.slug;
-      
-      if (!playlistSlug) {
-        // Try default playlist
-        const { data: defaultList } = await supabase
-          .from('m3u_custom_lists')
-          .select('slug')
-          .eq('status', 'active')
-          .limit(1)
-          .maybeSingle();
-
-        if (!defaultList?.slug) {
-          setError('Nenhuma playlist disponível');
-          setIsLoading(false);
-          return;
-        }
-
-        playlistSlug = defaultList.slug;
-      }
-
-      await loadFromPlaylistServe(playlistSlug);
+      console.log(`[HomeChannels] Using playlist key: ${playlistKey}`);
+      await loadFromPlaylistServe(playlistKey);
     } catch (err) {
       console.error('[HomeChannels] Error:', err);
       setError('Erro ao carregar conteúdo');
