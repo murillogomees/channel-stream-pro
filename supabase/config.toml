@@ -346,3 +346,15 @@ verify_jwt = true
 # IPTV EPG - returns program guide data
 [functions.iptv-epg]
 verify_jwt = false
+
+# ==========================================
+# HYBRID CDN ARCHITECTURE
+# ==========================================
+
+# Generate lightweight playlist JSON for CDN
+[functions.playlist-cdn-generate]
+verify_jwt = true
+
+# Resolve stream URL on-demand when user plays
+[functions.stream-url-resolve]
+verify_jwt = false
