@@ -283,10 +283,8 @@ export function HomeView({
     allChannels: limitedChannels,
     sessionKey
   });
-  if (loadingContinueWatching && loadingRecommendations || loadingHomeChannels) {
-    return <LoadingSkeleton />;
-  }
-  // Get first 6 channels for mobile grid (2 cols x 3 rows)
+
+  // Get first 6 channels for mobile grid (2 cols x 3 rows) - MUST be before early return
   const mobileGridChannels = useMemo(() => {
     const allFromSections = defaultSections.flatMap(s => s.channels);
     const fromRecommendations = processedForYou.map(item => ({
@@ -299,6 +297,10 @@ export function HomeView({
     const combined = [...fromRecommendations, ...allFromSections];
     return combined.slice(0, 6);
   }, [defaultSections, processedForYou]);
+
+  if (loadingContinueWatching && loadingRecommendations || loadingHomeChannels) {
+    return <LoadingSkeleton />;
+  }
 
   return <div className="pb-20 sm:pb-8 space-y-2">
       {/* Hero Header - Compact on mobile */}
