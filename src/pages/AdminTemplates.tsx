@@ -75,7 +75,7 @@ export default function AdminTemplates() {
     message: '',
     daysBeforeDue: 0,
     type: 'local' as 'local' | 'botbot',
-    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder',
+    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder' | 'payment_approved' | 'payment_pending' | 'payment_in_process' | 'payment_rejected' | 'payment_refunded' | 'payment_cancelled',
   });
   
   const [isSendingTest, setIsSendingTest] = useState(false);

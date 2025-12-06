@@ -3,7 +3,13 @@ export type TemplateEventType =
   | 'welcome_trial' // Novo cliente em período de teste
   | 'welcome_plan' // Novo cliente com plano contratado
   | 'renewal' // Pagamento detectado/renovação confirmada
-  | 'payment_reminder'; // Lembrete genérico de pagamento
+  | 'payment_reminder' // Lembrete genérico de pagamento
+  | 'payment_approved' // Pagamento aprovado
+  | 'payment_pending' // Pagamento pendente (boleto, pix aguardando)
+  | 'payment_in_process' // Pagamento em processamento
+  | 'payment_rejected' // Pagamento recusado
+  | 'payment_refunded' // Pagamento reembolsado
+  | 'payment_cancelled'; // Pagamento cancelado
 
 export interface WhatsappTemplate {
   id: string;

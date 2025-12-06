@@ -154,4 +154,143 @@ IPTV LINK`,
     type: 'local',
     eventType: 'payment_reminder',
   },
+  
+  // === STATUS DE PAGAMENTO (MercadoPago) ===
+  {
+    id: 'payment_approved',
+    name: 'Pagamento Aprovado',
+    message: `🎉 *Pagamento Aprovado!*
+
+Olá {nome}!
+
+Seu pagamento foi confirmado com sucesso!
+
+✅ *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+📅 *Válido até:* {dataVencimento}
+
+Seu acesso já está 100% liberado! 
+Pode entrar agora e aproveitar todo o conteúdo. 🎬
+
+Qualquer dúvida, estamos por aqui!
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor', 'formaPagamento', 'dataVencimento'],
+    type: 'local',
+    eventType: 'payment_approved',
+  },
+  {
+    id: 'payment_pending',
+    name: 'Pagamento Pendente',
+    message: `⏳ *Pagamento Pendente*
+
+Olá {nome}!
+
+Recebemos seu pedido de pagamento e ele está aguardando confirmação.
+
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+
+{statusInfo}
+
+Assim que o pagamento for confirmado, você será notificado e seu acesso será liberado automaticamente!
+
+Qualquer dúvida, estamos à disposição.
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor', 'formaPagamento', 'statusInfo'],
+    type: 'local',
+    eventType: 'payment_pending',
+  },
+  {
+    id: 'payment_in_process',
+    name: 'Pagamento em Processamento',
+    message: `⏳ *Pagamento em Análise*
+
+Olá {nome}!
+
+Seu pagamento está sendo processado pela operadora.
+
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+
+Geralmente a confirmação ocorre em poucos minutos. Você receberá uma mensagem assim que for aprovado!
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor', 'formaPagamento'],
+    type: 'local',
+    eventType: 'payment_in_process',
+  },
+  {
+    id: 'payment_rejected',
+    name: 'Pagamento Recusado',
+    message: `❌ *Pagamento Não Aprovado*
+
+Olá {nome}!
+
+Infelizmente seu pagamento não foi processado.
+
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+📝 *Motivo:* {motivoErro}
+
+Por favor, verifique os dados e tente novamente, ou escolha outra forma de pagamento.
+
+Se precisar de ajuda, estamos à disposição!
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor', 'formaPagamento', 'motivoErro'],
+    type: 'local',
+    eventType: 'payment_rejected',
+  },
+  {
+    id: 'payment_refunded',
+    name: 'Pagamento Reembolsado',
+    message: `💰 *Pagamento Reembolsado*
+
+Olá {nome}!
+
+Seu pagamento foi reembolsado conforme solicitação.
+
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+
+O valor será devolvido na mesma forma de pagamento utilizada.
+
+Qualquer dúvida, estamos à disposição!
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor'],
+    type: 'local',
+    eventType: 'payment_refunded',
+  },
+  {
+    id: 'payment_cancelled',
+    name: 'Pagamento Cancelado',
+    message: `🚫 *Pagamento Cancelado*
+
+Olá {nome}!
+
+O pagamento do seu plano foi cancelado.
+
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+
+Se não foi você quem cancelou, entre em contato conosco para verificar o que aconteceu.
+
+Atenciosamente,
+IPTV LINK`,
+    variables: ['nome', 'plano', 'valor'],
+    type: 'local',
+    eventType: 'payment_cancelled',
+  },
 ];
