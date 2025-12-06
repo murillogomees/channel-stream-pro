@@ -21,6 +21,7 @@ import { streamOptimizer } from '../services/streamOptimizer';
 import type { IptvPlayerProps, IptvChannel, IptvPlaylist, IptvPlayerEvent } from '../types';
 import { EpgDisplay } from './EpgDisplay';
 import { TvFocusableButton } from './TvFocusableButton';
+import { PlayerSettingsPanel, usePlayerSettings, type PlayerSettings } from './PlayerSettingsPanel';
 
 import 'video.js/dist/video-js.css';
 
@@ -62,9 +63,13 @@ export const IptvPlayer = memo(function IptvPlayer({
   const [currentChannel, setCurrentChannel] = useState<IptvChannel | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [showEpg, setShowEpg] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolumeState] = useState(1);
-  const [isMuted, setIsMuted] = useState(options.muted ?? true);
+  
+  // Load persisted settings
+  const { settings: playerSettings, updateSettings: setPlayerSettings, isLoaded: settingsLoaded } = usePlayerSettings();
+  const [isMuted, setIsMuted] = useState(options.muted ?? playerSettings.muted);
 
   // Handle player events - memoized to prevent re-renders
   const handlePlayerEvent = useCallback((evt: IptvPlayerEvent, data?: any) => {
@@ -82,6 +87,15 @@ export const IptvPlayer = memo(function IptvPlayer({
   }, []);
 
   // Video.js hook with Smart TV config
+  // Merge options with persisted settings
+  const mergedOptions = {
+    autoplay: options.autoplay ?? playerSettings.autoplay,
+    muted: options.muted ?? playerSettings.muted,
+    preferLowLatency: options.preferLowLatency ?? playerSettings.preferLowLatency,
+    maxRetries: options.maxRetries ?? playerSettings.maxRetries,
+    poster: options.poster,
+  };
+
   const {
     videoRef,
     isReady,
@@ -98,10 +112,10 @@ export const IptvPlayer = memo(function IptvPlayer({
     setSource,
   } = useVideoJs({
     options: {
-      autoplay: options.autoplay ?? true,
-      muted: options.muted ?? true,
-      preferLowLatency: !isTv && (options.preferLowLatency ?? true),
-      maxRetries: options.maxRetries ?? (isTv ? 5 : 3),
+      autoplay: mergedOptions.autoplay,
+      muted: mergedOptions.muted,
+      preferLowLatency: !isTv && mergedOptions.preferLowLatency,
+      maxRetries: isTv ? 5 : mergedOptions.maxRetries,
     },
     hlsConfig: isTv ? hlsConfig : undefined,
     onEvent: handlePlayerEvent,
@@ -465,6 +479,7 @@ export const IptvPlayer = memo(function IptvPlayer({
 
             {/* Settings */}
             <button
+              onClick={() => setShowSettings(true)}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
             >
               <Settings className="w-5 h-5 text-white" />
@@ -494,6 +509,14 @@ export const IptvPlayer = memo(function IptvPlayer({
           onClose={() => setShowEpg(false)}
         />
       )}
+
+      {/* Settings Panel */}
+      <PlayerSettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={playerSettings}
+        onSettingsChange={setPlayerSettings}
+      />
     </div>
   );
 });
