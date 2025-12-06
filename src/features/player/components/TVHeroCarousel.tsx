@@ -85,7 +85,7 @@ export function TVHeroCarousel({
               <img
                 src={getSafeImageUrl(item.backdrop_url)}
                 alt={item.title}
-                className="w-full h-full object-cover object-top"
+                className="w-full h-full object-cover object-center"
                 loading={index === 0 ? "eager" : "lazy"}
               />
             ) : item.poster_url ? (
