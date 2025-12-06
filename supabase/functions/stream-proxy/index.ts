@@ -410,6 +410,7 @@ async function fetchWithRetry(
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       const response = await fetch(urlToFetch, {
+        method: 'GET',
         headers,
         signal: controller.signal,
         redirect: 'follow',
