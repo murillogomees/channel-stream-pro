@@ -22,6 +22,10 @@ const ENDPOINTS = {
   M3U_FETCHER: `${SUPABASE_URL}/functions/v1/fetch-m3u-url`,
 } as const;
 
+// Cache para evitar logs duplicados e recalcular URLs
+const urlCache = new Map<string, { url: string; source: string; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minuto
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -153,78 +157,96 @@ class StreamService {
    * 4. Proxy (HTTP em página HTTPS - Mixed Content)
    */
   getPlaybackSource(channel: Channel): PlaybackSource {
+    const cacheKey = channel.id || channel.stream_url;
+    const cached = urlCache.get(cacheKey);
+    
+    // Retorna do cache se ainda válido
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return {
+        url: cached.url,
+        source: cached.source as PlaybackSource['source'],
+        requiresAuth: false,
+      };
+    }
+
+    let result: PlaybackSource;
+
     // PRIORIDADE 1: Cloudflare Stream (conteúdo transcodificado)
     if (channel.cf_stream_url) {
-      console.log('[StreamService] ☁️ CF Stream:', channel.name);
-      return {
+      result = {
         url: channel.cf_stream_url,
         source: 'cloudflare_stream',
         requiresAuth: false,
       };
     }
-
     // PRIORIDADE 2: R2 CDN (VOD uploaded)
-    if (channel.r2_uploaded && channel.r2_url) {
-      console.log('[StreamService] 📦 R2 CDN:', channel.name);
-      return {
+    else if (channel.r2_uploaded && channel.r2_url) {
+      result = {
         url: channel.r2_url,
         source: 'r2_cdn',
         requiresAuth: false,
         fallbackUrl: channel.stream_url,
       };
     }
-
-    const streamUrl = channel.stream_url;
-    if (!streamUrl) {
-      return {
-        url: '',
-        source: 'direct',
-        requiresAuth: false,
-      };
-    }
-
-    // PRIORIDADE 3: Para HTTPS - link direto (funciona em todas as páginas)
-    if (streamUrl.startsWith('https://')) {
-      console.log('[StreamService] 🔒 HTTPS - Link Direto:', channel.name);
-      return {
-        url: streamUrl,
-        source: 'direct',
-        requiresAuth: false,
-      };
-    }
-
-    // PRIORIDADE 4: Proxy para HTTP (Mixed Content - obrigatório em páginas HTTPS)
-    // IMPORTANTE: Isso se aplica a TODOS os conteúdos HTTP (live, VOD, etc.)
-    if (streamUrl.startsWith('http://')) {
-      // Só usa proxy se estamos em HTTPS (browser environment)
-      const isSecurePage = typeof window !== 'undefined' && window.location?.protocol === 'https:';
-      
-      if (isSecurePage) {
-        console.log('[StreamService] 🔄 HTTP → Proxy (Mixed Content):', channel.name);
+    else {
+      const streamUrl = channel.stream_url;
+      if (!streamUrl) {
         return {
-          url: `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`,
-          source: 'proxy',
+          url: '',
+          source: 'direct',
           requiresAuth: false,
-          fallbackUrl: streamUrl,
         };
       }
-      
-      // Se não estamos em HTTPS (dev mode), pode usar direto
-      console.log('[StreamService] 📺 HTTP direto (não-HTTPS page):', channel.name);
-      return {
-        url: streamUrl,
-        source: 'direct',
-        requiresAuth: false,
-      };
+
+      // PRIORIDADE 3: Para HTTPS - link direto
+      if (streamUrl.startsWith('https://')) {
+        result = {
+          url: streamUrl,
+          source: 'direct',
+          requiresAuth: false,
+        };
+      }
+      // PRIORIDADE 4: Proxy para HTTP (Mixed Content)
+      else if (streamUrl.startsWith('http://')) {
+        const isSecurePage = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+        
+        if (isSecurePage) {
+          result = {
+            url: `${ENDPOINTS.STREAM_PROXY}?url=${encodeURIComponent(streamUrl)}`,
+            source: 'proxy',
+            requiresAuth: false,
+            fallbackUrl: streamUrl,
+          };
+        } else {
+          result = {
+            url: streamUrl,
+            source: 'direct',
+            requiresAuth: false,
+          };
+        }
+      }
+      // Default: link direto
+      else {
+        result = {
+          url: streamUrl,
+          source: 'direct',
+          requiresAuth: false,
+        };
+      }
     }
 
-    // Default: link direto
-    console.log('[StreamService] 🎯 Default - Link Direto:', channel.name);
-    return {
-      url: streamUrl,
-      source: 'direct',
-      requiresAuth: false,
-    };
+    // Cache o resultado (log apenas na primeira vez)
+    if (!cached) {
+      console.log('[StreamService]', result.source === 'proxy' ? '🔄 Proxy' : '🎯', channel.name);
+    }
+    
+    urlCache.set(cacheKey, {
+      url: result.url,
+      source: result.source,
+      timestamp: Date.now(),
+    });
+
+    return result;
   }
 
   /**
