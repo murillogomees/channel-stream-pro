@@ -1,3 +1,10 @@
+/**
+ * ThemeContext - Gerenciamento de tema
+ * @version 2.0.0
+ * 
+ * OTIMIZADO: Usa AuthContext para evitar requisições duplicadas
+ */
+
 import { createContext, useContext, useEffect, useState, type FC, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,33 +18,58 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Armazenar userId globalmente para evitar loop com AuthContext
+let cachedUserId: string | null = null;
+let authSubscription: (() => void) | null = null;
+
 export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [userId, setUserId] = useState<string | null>(null);
-  
-  // Get user from Supabase directly to avoid circular dependency with AuthContext
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id || null);
-    });
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUserId(session?.user?.id || null);
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('app-theme') as Theme;
     return stored || 'dark';
   });
   const [isSyncing, setIsSyncing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(cachedUserId);
+  const [hasLoadedFromDb, setHasLoadedFromDb] = useState(false);
 
-  // Load theme from database when user logs in
+  // Sincronizar com auth state apenas uma vez
   useEffect(() => {
-    if (userId) {
+    // Evitar múltiplas subscrições
+    if (authSubscription) return;
+    
+    // Listener único para mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      const newUserId = session?.user?.id || null;
+      if (newUserId !== cachedUserId) {
+        cachedUserId = newUserId;
+        setUserId(newUserId);
+        setHasLoadedFromDb(false); // Reset para recarregar tema
+      }
+    });
+    
+    authSubscription = () => subscription.unsubscribe();
+    
+    // Apenas verificar sessão inicial se não temos userId
+    if (!cachedUserId) {
+      supabase.auth.getSession().then(({ data }) => {
+        const newUserId = data.session?.user?.id || null;
+        if (newUserId !== cachedUserId) {
+          cachedUserId = newUserId;
+          setUserId(newUserId);
+        }
+      });
+    }
+    
+    return () => {
+      // Não limpar subscription global - manter ativa
+    };
+  }, []);
+
+  // Carregar tema do banco apenas uma vez por usuário
+  useEffect(() => {
+    if (userId && !hasLoadedFromDb) {
       loadThemeFromDatabase(userId);
     }
-  }, [userId]);
+  }, [userId, hasLoadedFromDb]);
 
   const loadThemeFromDatabase = async (uid: string) => {
     try {
@@ -53,8 +85,10 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
         setThemeState(data.theme as Theme);
         localStorage.setItem('app-theme', data.theme);
       }
+      setHasLoadedFromDb(true);
     } catch (error) {
-      console.error('Error loading theme from database:', error);
+      console.error('[ThemeContext] Error loading theme:', error);
+      setHasLoadedFromDb(true); // Marcar como carregado mesmo em erro
     }
   };
 
@@ -70,7 +104,7 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Error saving theme to database:', error);
+      console.error('[ThemeContext] Error saving theme:', error);
     } finally {
       setIsSyncing(false);
     }
