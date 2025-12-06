@@ -62,6 +62,7 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
   const manifestRef = useRef<PlaylistManifest | null>(null);
   const allChannelsRef = useRef<LightChannel[]>([]);
   const playlistKeyRef = useRef<string>('');
+  const initCalledRef = useRef(false);
 
   // Group channels by category
   const groupChannels = useCallback((channels: LightChannel[]): Category[] => {
@@ -260,8 +261,11 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     }
   }, []);
 
-  // Initialize
+  // Initialize (with guard to prevent duplicate calls)
   const initialize = useCallback(async () => {
+    if (initCalledRef.current) return;
+    initCalledRef.current = true;
+    
     setIsLoading(true);
     setLoadingProgress('Verificando playlist...');
     
@@ -294,8 +298,9 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     }
   }, [getPlaylistKey, loadFromCDN, loadFromDatabase]);
 
-  // Refresh
+  // Refresh (resets guard to allow re-init)
   const refresh = useCallback(async () => {
+    initCalledRef.current = false;
     setCategories([]);
     allChannelsRef.current = [];
     await initialize();
