@@ -271,8 +271,23 @@ export function useVideoJs({
     const isXtreamViaProxy = optimized.source === 'proxy' && protocol === 'ts';
     const isExplicitTs = finalUrl.toLowerCase().endsWith('.ts');
     
-    // Detect Xtream live stream pattern: /user/pass/channelId (numeric ending)
-    const isXtreamLivePattern = /\/\d+$/.test(url) && !url.includes('.m3u8') && !url.includes('.mp4');
+    // Detect Xtream live stream pattern in the ORIGINAL URL (before proxy wrapping)
+    // Extract original URL from proxy parameter if it's a proxy URL
+    let originalStreamUrl = url;
+    const proxyUrlMatch = finalUrl.match(/[?&]url=([^&]+)/);
+    if (proxyUrlMatch) {
+      try {
+        originalStreamUrl = decodeURIComponent(proxyUrlMatch[1]);
+      } catch {
+        // Keep the url as-is
+      }
+    }
+    
+    // Xtream live pattern: ends with numeric ID, no file extension
+    const isXtreamLivePattern = /\/\d+$/.test(originalStreamUrl) && 
+                                !originalStreamUrl.includes('.m3u8') && 
+                                !originalStreamUrl.includes('.mp4') &&
+                                !originalStreamUrl.includes('.ts');
     
     // Use mpegts.js for TS streams OR Xtream live streams (numeric IDs)
     const shouldUseMpegts = (protocol === 'ts' || isXtreamViaProxy || (protocol === 'unknown' && isXtreamLivePattern)) && mpegts.isSupported();
@@ -282,6 +297,7 @@ export function useVideoJs({
         protocol,
         isProxy: optimized.source === 'proxy',
         isXtreamLive: isXtreamLivePattern,
+        originalStreamUrl: originalStreamUrl.substring(0, 60),
         url: finalUrl.substring(0, 80)
       });
       
