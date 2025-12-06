@@ -2,26 +2,31 @@
  * IPTV Player Component
  * 
  * Modular player with Video.js + HLS.js, CDN failover, EPG, and remote control support.
+ * Now with advanced controls: quality, speed, filters, PiP, gestures, stats, parental control.
  */
 
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
-  ArrowLeft, RefreshCw, Loader2, AlertCircle, Wifi, Settings,
-  ChevronUp, ChevronDown, Info
+  RefreshCw, Loader2, AlertCircle, Wifi, Settings,
+  ChevronUp, ChevronDown, Info, MoreVertical, PictureInPicture,
+  SkipForward, Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoJs } from '../hooks/useVideoJs';
 import { useRemoteControl } from '../hooks/useRemoteControl';
 import { useSmartTv } from '../hooks/useSmartTv';
 import { useEpg } from '../hooks/useEpg';
+import { useAdvancedPlayerControls } from '../hooks/useAdvancedPlayerControls';
+import { useTouchGestures } from '../hooks/useTouchGestures';
 import { cdnFailover } from '../services/cdnFailover';
 import { playlistParser } from '../services/playlistParser';
-import { streamOptimizer } from '../services/streamOptimizer';
 import type { IptvPlayerProps, IptvChannel, IptvPlaylist, IptvPlayerEvent } from '../types';
 import { EpgDisplay } from './EpgDisplay';
-import { TvFocusableButton } from './TvFocusableButton';
-import { PlayerSettingsPanel, usePlayerSettings, type PlayerSettings } from './PlayerSettingsPanel';
+import { PlayerSettingsPanel, usePlayerSettings } from './PlayerSettingsPanel';
+import { PlayerQuickControls } from './PlayerQuickControls';
+import { GestureOverlay } from './GestureOverlay';
+import { StatsOverlay } from './StatsOverlay';
 
 import 'video.js/dist/video-js.css';
 
@@ -64,12 +69,36 @@ export const IptvPlayer = memo(function IptvPlayer({
   const [showControls, setShowControls] = useState(true);
   const [showEpg, setShowEpg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showQuickControls, setShowQuickControls] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolumeState] = useState(1);
+  const [brightness, setBrightness] = useState(100);
   
   // Load persisted settings
   const { settings: playerSettings, updateSettings: setPlayerSettings, isLoaded: settingsLoaded } = usePlayerSettings();
   const [isMuted, setIsMuted] = useState(options.muted ?? playerSettings.muted);
+
+  // Advanced player controls
+  const advancedControls = useAdvancedPlayerControls();
+
+  // Touch gestures for mobile
+  const touchGestures = useTouchGestures({
+    config: { enabled: playerSettings.enableTouchGestures },
+    onVolumeChange: (delta) => {
+      const newVol = Math.max(0, Math.min(1, volume + delta));
+      setVolumeState(newVol);
+      setPlayerVolume?.(newVol);
+    },
+    onBrightnessChange: (delta) => {
+      const newBrightness = Math.max(50, Math.min(150, brightness + delta));
+      setBrightness(newBrightness);
+      advancedControls.setFilters({ brightness: newBrightness });
+    },
+    onSeek: (delta) => {
+      const video = videoRef.current;
+      if (video) seek?.(video.currentTime + delta);
+    },
+  });
 
   // Handle player events - memoized to prevent re-renders
   const handlePlayerEvent = useCallback((evt: IptvPlayerEvent, data?: any) => {
@@ -110,6 +139,7 @@ export const IptvPlayer = memo(function IptvPlayer({
     toggleMute,
     toggleFullscreen: vjsToggleFullscreen,
     setSource,
+    hlsInstance,
   } = useVideoJs({
     options: {
       autoplay: mergedOptions.autoplay,
@@ -120,6 +150,33 @@ export const IptvPlayer = memo(function IptvPlayer({
     hlsConfig: isTv ? hlsConfig : undefined,
     onEvent: handlePlayerEvent,
   });
+
+  // Attach advanced controls to video/hls
+  useEffect(() => {
+    if (videoRef.current) {
+      advancedControls.attachVideo(videoRef.current);
+    }
+  }, [videoRef.current, advancedControls.attachVideo]);
+
+  useEffect(() => {
+    if (hlsInstance) {
+      advancedControls.attachHls(hlsInstance);
+    }
+  }, [hlsInstance, advancedControls.attachHls]);
+
+  // Apply default filters from settings
+  useEffect(() => {
+    if (playerSettings.defaultFilters) {
+      advancedControls.setFilters(playerSettings.defaultFilters);
+    }
+  }, [playerSettings.defaultFilters]);
+
+  // Apply default playback speed
+  useEffect(() => {
+    if (playerSettings.defaultSpeed !== 1) {
+      advancedControls.setPlaybackSpeed(playerSettings.defaultSpeed);
+    }
+  }, [playerSettings.defaultSpeed]);
 
   // EPG hook
   const { currentProgram, upcomingPrograms, isLoading: epgLoading } = useEpg({
@@ -327,6 +384,17 @@ export const IptvPlayer = memo(function IptvPlayer({
     }
   }
 
+  // Handle touch gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!containerRef.current) return;
+    touchGestures.handleTouchStart(
+      e, 
+      containerRef.current.clientWidth, 
+      volume, 
+      brightness
+    );
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -337,6 +405,9 @@ export const IptvPlayer = memo(function IptvPlayer({
       )}
       onMouseMove={showControlsTemporarily}
       onClick={showControlsTemporarily}
+      onTouchStart={handleTouchStart}
+      onTouchMove={touchGestures.handleTouchMove}
+      onTouchEnd={touchGestures.handleTouchEnd}
       tabIndex={0}
     >
       {/* Video Element */}
@@ -345,6 +416,25 @@ export const IptvPlayer = memo(function IptvPlayer({
         className="video-js vjs-big-play-centered w-full h-full object-contain"
         playsInline
       />
+
+      {/* Gesture Overlay */}
+      <GestureOverlay gestureState={touchGestures.gestureState} />
+
+      {/* Stats Overlay */}
+      <StatsOverlay 
+        stats={advancedControls.state.stats} 
+        isVisible={advancedControls.state.showStats} 
+      />
+
+      {/* Sleep Timer Indicator */}
+      {advancedControls.state.sleepTimerRemaining !== null && (
+        <div className="absolute top-16 right-4 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2 z-40">
+          <Timer className="w-4 h-4 text-primary" />
+          <span className="text-white text-sm font-mono">
+            {advancedControls.state.sleepTimerRemaining} min
+          </span>
+        </div>
+      )}
 
       {/* Loading State */}
       {isBuffering && (
@@ -403,6 +493,21 @@ export const IptvPlayer = memo(function IptvPlayer({
                 </p>
               )}
             </div>
+            
+            {/* Skip Intro Button */}
+            {playerSettings.skipIntroSeconds > 0 && (
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (video) seek(video.currentTime + playerSettings.skipIntroSeconds);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <SkipForward className="w-4 h-4 text-white" />
+                <span className="text-white text-sm">Pular +{playerSettings.skipIntroSeconds}s</span>
+              </button>
+            )}
+            
             <button
               onClick={() => setShowEpg(!showEpg)}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
@@ -422,14 +527,17 @@ export const IptvPlayer = memo(function IptvPlayer({
                 {(metrics.currentBitrate / 1000000).toFixed(1)} Mbps
               </span>
               <span>Buffer: {metrics.bufferLength.toFixed(1)}s</span>
+              {advancedControls.state.playbackSpeed !== 1 && (
+                <span>{advancedControls.state.playbackSpeed}x</span>
+              )}
               {metrics.cdnSwitches > 0 && (
-                <span>CDN switches: {metrics.cdnSwitches}</span>
+                <span>CDN: {metrics.cdnSwitches}</span>
               )}
             </div>
           )}
 
           {/* Control Buttons */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Channel Nav */}
             <div className="flex flex-col gap-1">
               <button
@@ -477,6 +585,29 @@ export const IptvPlayer = memo(function IptvPlayer({
 
             <div className="flex-1" />
 
+            {/* PiP Button */}
+            {advancedControls.state.isPipSupported && playerSettings.enablePip && (
+              <button
+                onClick={advancedControls.togglePip}
+                className={cn(
+                  "p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors",
+                  advancedControls.state.isPipActive && "bg-primary/30"
+                )}
+                title="Picture-in-Picture"
+              >
+                <PictureInPicture className="w-5 h-5 text-white" />
+              </button>
+            )}
+
+            {/* Quick Controls (Quality, Speed, etc.) */}
+            <button
+              onClick={() => setShowQuickControls(!showQuickControls)}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              title="Controles rápidos"
+            >
+              <MoreVertical className="w-5 h-5 text-white" />
+            </button>
+
             {/* Settings */}
             <button
               onClick={() => setShowSettings(true)}
@@ -499,6 +630,34 @@ export const IptvPlayer = memo(function IptvPlayer({
           </div>
         </div>
       </div>
+
+      {/* Quick Controls Popup */}
+      <PlayerQuickControls
+        isOpen={showQuickControls}
+        onClose={() => setShowQuickControls(false)}
+        qualities={advancedControls.state.qualities}
+        currentQuality={advancedControls.state.currentQuality}
+        onQualityChange={advancedControls.setQuality}
+        currentSpeed={advancedControls.state.playbackSpeed}
+        onSpeedChange={advancedControls.setPlaybackSpeed}
+        audioTracks={advancedControls.state.audioTracks}
+        currentAudioTrack={advancedControls.state.currentAudioTrack}
+        onAudioChange={advancedControls.setAudioTrack}
+        subtitleTracks={advancedControls.state.subtitleTracks}
+        currentSubtitle={advancedControls.state.currentSubtitle}
+        onSubtitleChange={advancedControls.setSubtitle}
+        onSubtitleDisable={advancedControls.disableSubtitles}
+        currentAspect={advancedControls.state.aspectRatio}
+        onAspectChange={advancedControls.setAspectRatio}
+        isPipSupported={advancedControls.state.isPipSupported}
+        isPipActive={advancedControls.state.isPipActive}
+        onTogglePip={advancedControls.togglePip}
+        showStats={advancedControls.state.showStats}
+        stats={advancedControls.state.stats}
+        onToggleStats={advancedControls.toggleStats}
+        sleepTimerRemaining={advancedControls.state.sleepTimerRemaining}
+        onSetSleepTimer={advancedControls.setSleepTimer}
+      />
 
       {/* EPG Panel */}
       {showEpg && (

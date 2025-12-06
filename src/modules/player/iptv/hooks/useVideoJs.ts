@@ -23,6 +23,7 @@ interface UseVideoJsOptions {
 interface UseVideoJsReturn {
   videoRef: React.RefObject<HTMLVideoElement>;
   player: Player | null;
+  hlsInstance: Hls | null;
   isReady: boolean;
   isPlaying: boolean;
   isBuffering: boolean;
@@ -509,6 +510,7 @@ export function useVideoJs({
   return {
     videoRef,
     player: playerRef.current,
+    hlsInstance: hlsRef.current,
     isReady,
     isPlaying,
     isBuffering,
