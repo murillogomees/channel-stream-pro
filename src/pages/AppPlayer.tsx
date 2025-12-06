@@ -25,6 +25,7 @@ import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredM
 import { streamService } from '@/modules/player/services/StreamService';
 import { VirtualChannelList } from '@/components/app/VirtualChannelList';
 import { toast } from 'sonner';
+import { useOrientationLock } from '@/hooks/useOrientationLock';
 
 export default function AppPlayer() {
   const navigate = useNavigate();
@@ -32,6 +33,9 @@ export default function AppPlayer() {
     isAdmin,
     user
   } = useAuth();
+
+  // Orientation lock for Netflix-style fullscreen
+  const { lockToLandscape, lockToPortrait } = useOrientationLock();
 
   // Check subscription status - admins bypass this check
   const isSubscriptionExpired = !isAdmin && user?.isExpired === true;
@@ -443,7 +447,11 @@ export default function AppPlayer() {
   }, [trackChannelView]);
 
   // Handle play - resolve stream URL on-demand (LAZY LOADING)
+  // Netflix-style: lock to landscape + fullscreen when video starts
   const handlePlay = useCallback(async (channel: any) => {
+    // Lock to landscape for immersive fullscreen experience
+    lockToLandscape();
+    
     // If channel already has stream_url, use it directly
     if (channel.stream_url) {
       setPlayerChannel(channel);
@@ -460,6 +468,7 @@ export default function AppPlayer() {
     
     if (!resolved) {
       toast.error('Não foi possível conectar ao stream', { id: 'stream-resolve' });
+      lockToPortrait(); // Restore portrait on error
       return;
     }
     
@@ -479,7 +488,7 @@ export default function AppPlayer() {
     setShowPlayerDialog(true);
     trackChannelView(channel.id, channel.category_id || 'unknown');
     pauseWarming();
-  }, [resolveChannel, trackChannelView, pauseWarming]);
+  }, [resolveChannel, trackChannelView, pauseWarming, lockToLandscape, lockToPortrait]);
 
   // Loading state - show skeleton to prevent CLS
   if ((playerLoading || favoritesLoading) && categories.length === 0) {
@@ -615,22 +624,34 @@ export default function AppPlayer() {
         </div>
       </main>
 
-      {/* Player Dialog - IptvPlayer Modular */}
-      {showPlayerDialog && playerChannel && <div className="fixed inset-0 z-50 bg-black">
-          <IptvPlayer channelId={playerChannel.id} streamUrl={streamService.getPlayableUrl(playerChannel)} channelName={playerChannel.name} channelLogo={playerChannel.tvg_logo} options={{
-        preferLowLatency: true,
-        maxRetries: 3
-      }} onEvent={(evt, data) => {
-        if (evt === 'back') {
-          setShowPlayerDialog(false);
-          setPlayerChannel(null);
-          refreshContinueWatching();
-          resumeWarming();
-        } else if (evt === 'error') {
-          console.error('Player error:', data);
-        }
-      }} className="w-full h-full" />
-        </div>}
+      {/* Player Dialog - IptvPlayer Modular - Netflix-style fullscreen */}
+      {showPlayerDialog && playerChannel && (
+        <div className="fixed inset-0 z-50 bg-black animate-in fade-in zoom-in-95 duration-300">
+          <IptvPlayer 
+            channelId={playerChannel.id} 
+            streamUrl={streamService.getPlayableUrl(playerChannel)} 
+            channelName={playerChannel.name} 
+            channelLogo={playerChannel.tvg_logo} 
+            options={{
+              preferLowLatency: true,
+              maxRetries: 3
+            }} 
+            onEvent={(evt, data) => {
+              if (evt === 'back') {
+                // Netflix-style: restore portrait when closing player
+                lockToPortrait();
+                setShowPlayerDialog(false);
+                setPlayerChannel(null);
+                refreshContinueWatching();
+                resumeWarming();
+              } else if (evt === 'error') {
+                console.error('Player error:', data);
+              }
+            }} 
+            className="w-full h-full" 
+          />
+        </div>
+      )}
 
       {/* Floating background loading progress */}
       <LoadingProgressBar isLoading={false} isLoadingMore={isLoadingMore} loadedChannels={loadedChannels} totalChannels={totalChannels} loadingPercent={loadingPercent} loadingProgress={loadingProgress} isCached={isCached} />
