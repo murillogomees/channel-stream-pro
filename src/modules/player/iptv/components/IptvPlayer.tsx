@@ -19,6 +19,7 @@ import { useSmartTv } from '../hooks/useSmartTv';
 import { useEpg } from '../hooks/useEpg';
 import { useAdvancedPlayerControls } from '../hooks/useAdvancedPlayerControls';
 import { useTouchGestures } from '../hooks/useTouchGestures';
+import { useStreamAnalytics } from '@/hooks/useStreamAnalytics';
 import { cdnFailover } from '../services/cdnFailover';
 import { playlistParser } from '../services/playlistParser';
 import type { IptvPlayerProps, IptvChannel, IptvPlaylist, IptvPlayerEvent } from '../types';
@@ -81,6 +82,9 @@ export const IptvPlayer = memo(function IptvPlayer({
   // Advanced player controls
   const advancedControls = useAdvancedPlayerControls();
 
+  // Stream analytics for performance tracking
+  const analytics = useStreamAnalytics(channelId, undefined);
+
   // Touch gestures for mobile
   const touchGestures = useTouchGestures({
     config: { enabled: playerSettings.enableTouchGestures },
@@ -100,14 +104,33 @@ export const IptvPlayer = memo(function IptvPlayer({
     },
   });
 
+  // Ref for tracking startup - declared at component level
+  const startupTrackedRef = useRef(false);
+
   // Handle player events - memoized to prevent re-renders
   const handlePlayerEvent = useCallback((evt: IptvPlayerEvent, data?: any) => {
     // Skip logging high-frequency events to reduce console spam
     if (evt !== 'timeupdate') {
       console.log('[IptvPlayer] Event:', evt, data);
     }
+    
+    // Track analytics events
+    if (evt === 'play') {
+      analytics.startSession();
+    } else if (evt === 'buffering') {
+      analytics.recordBufferStart();
+    } else if (evt === 'error') {
+      analytics.recordError(data?.type || 'unknown', data?.error?.message || 'Unknown error');
+    } else if (evt === 'ended') {
+      analytics.endSession();
+    } else if (evt === 'channelchange') {
+      // End previous session and start new one
+      analytics.endSession();
+      startupTrackedRef.current = false;
+    }
+    
     onEventRef.current?.(evt, data);
-  }, []);
+  }, [analytics]);
 
   // Control visibility - declare early to maintain hook order
   const showControlsTemporarily = useCallback(() => {
@@ -153,6 +176,30 @@ export const IptvPlayer = memo(function IptvPlayer({
     hlsConfig: isTv ? hlsConfig : undefined,
     onEvent: handlePlayerEvent,
   });
+
+  // Track startup time when metrics become available
+  useEffect(() => {
+    if (metrics.loadTime > 0 && !startupTrackedRef.current) {
+      analytics.recordStartup(metrics.loadTime);
+      startupTrackedRef.current = true;
+    }
+  }, [metrics.loadTime, analytics]);
+
+  // Track buffer end when buffering stops
+  const wasBufferingRef = useRef(false);
+  useEffect(() => {
+    if (wasBufferingRef.current && !isBuffering) {
+      analytics.recordBufferEnd();
+    }
+    wasBufferingRef.current = isBuffering;
+  }, [isBuffering, analytics]);
+
+  // Track quality changes
+  useEffect(() => {
+    if (metrics.currentBitrate > 0) {
+      analytics.recordQualityChange(metrics.currentBitrate);
+    }
+  }, [metrics.currentBitrate, analytics]);
 
   // Attach advanced controls to video/hls
   useEffect(() => {
