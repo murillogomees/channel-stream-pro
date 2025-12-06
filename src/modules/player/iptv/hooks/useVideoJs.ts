@@ -452,6 +452,11 @@ export function useVideoJs({
           } else if (originalUrl.includes('.ts')) {
             mimeType = 'video/mp2t';
             console.log('[useVideoJs] Inferred TS from proxy original URL');
+          } else if (/\/\d+$/.test(originalUrl)) {
+            // Xtream live stream pattern: ends with numeric ID (e.g., /12345)
+            // These are MPEG-TS streams
+            mimeType = 'video/mp2t';
+            console.log('[useVideoJs] Inferred MPEG-TS from Xtream live pattern');
           }
         } catch {
           // Ignore decoding errors
