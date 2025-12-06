@@ -53,6 +53,23 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     sessionKey,
   } = input;
 
+  // Global ID tracker to prevent duplicates across all sections
+  const usedIds = useMemo(() => new Set<string>(), [sessionKey]);
+
+  // Helper to generate unique key with index fallback
+  const getUniqueKey = useCallback((item: any, sectionPrefix: string, index: number): string => {
+    const baseId = item.id || item.content_id || item.channel_id || '';
+    let key = `${sectionPrefix}-${baseId}`;
+    
+    // If already used, append index
+    if (usedIds.has(key)) {
+      key = `${sectionPrefix}-${baseId}-${index}`;
+    }
+    
+    usedIds.add(key);
+    return key;
+  }, [usedIds]);
+
   // Calculate total items budget
   const calculateBudget = useCallback(() => {
     let remaining = MAX_TOTAL_ITEMS;
@@ -87,52 +104,114 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     return budgets;
   }, [continueWatchingItems.length, seriesContinuations.length, recommendationGroups, forYouMix.length]);
 
-  // Process continue watching (highest priority)
+  // Process continue watching (highest priority) - deduplicated
   const processedContinueWatching = useMemo(() => {
-    return continueWatchingItems
-      .filter(item => item.content_logo) // Only with images
+    usedIds.clear(); // Reset for each calculation
+    
+    const uniqueItems: WatchProgress[] = [];
+    const seenContentIds = new Set<string>();
+    
+    const sorted = [...continueWatchingItems]
+      .filter(item => item.content_logo)
       .sort((a, b) => {
-        // Sort by updated_at, most recent first
         const dateA = new Date(a.updated_at || 0).getTime();
         const dateB = new Date(b.updated_at || 0).getTime();
         return dateB - dateA;
-      })
-      .slice(0, MAX_CONTINUE_WATCHING);
-  }, [continueWatchingItems]);
+      });
+    
+    for (const item of sorted) {
+      const contentKey = item.content_id || item.id;
+      if (!seenContentIds.has(contentKey)) {
+        seenContentIds.add(contentKey);
+        uniqueItems.push({
+          ...item,
+          _uniqueKey: `cw-${contentKey}-${uniqueItems.length}`,
+        } as WatchProgress & { _uniqueKey: string });
+        usedIds.add(contentKey);
+      }
+      if (uniqueItems.length >= MAX_CONTINUE_WATCHING) break;
+    }
+    
+    return uniqueItems;
+  }, [continueWatchingItems, usedIds]);
 
-  // Process series continuations
+  // Process series continuations - deduplicated
   const processedSeriesContinuations = useMemo(() => {
-    return seriesContinuations
-      .filter(item => item.logo || item.nextEpisode.tvg_logo)
-      .slice(0, 10);
-  }, [seriesContinuations]);
+    const uniqueItems: typeof seriesContinuations = [];
+    const seenSeries = new Set<string>();
+    
+    for (const item of seriesContinuations) {
+      const seriesKey = item.seriesName.toLowerCase().trim();
+      const channelId = item.nextEpisode?.id || '';
+      
+      if (!seenSeries.has(seriesKey) && !usedIds.has(channelId)) {
+        seenSeries.add(seriesKey);
+        usedIds.add(channelId);
+        uniqueItems.push({
+          ...item,
+          _uniqueKey: `sc-${channelId}-${uniqueItems.length}`,
+        } as any);
+      }
+      if (uniqueItems.length >= 10) break;
+    }
+    
+    return uniqueItems.filter(item => item.logo || item.nextEpisode.tvg_logo);
+  }, [seriesContinuations, usedIds]);
 
-  // Process related content (based on user behavior)
+  // Process related content - deduplicated
   const processedRelated = useMemo(() => {
     const budget = calculateBudget();
     let itemsPerGroup = Math.floor(budget.related / Math.max(1, recommendationGroups.length));
     itemsPerGroup = Math.min(itemsPerGroup, MAX_RELATED_PER_CATEGORY);
 
-    return recommendationGroups.map(group => {
+    return recommendationGroups.map((group, groupIndex) => {
+      const uniqueItems: any[] = [];
       const withLogos = group.items.filter(item => item.content_logo);
       const grouped = groupRecommendationItems(withLogos);
       const shuffled = shuffleArray(grouped);
       
+      for (const item of shuffled) {
+        const contentId = item.content_id || item.id || '';
+        if (!usedIds.has(contentId)) {
+          usedIds.add(contentId);
+          uniqueItems.push({
+            ...item,
+            _uniqueKey: `rel-${groupIndex}-${contentId}-${uniqueItems.length}`,
+          });
+        }
+        if (uniqueItems.length >= itemsPerGroup) break;
+      }
+      
       return {
         ...group,
-        items: shuffled.slice(0, itemsPerGroup),
+        items: uniqueItems,
       };
     }).filter(g => g.items.length > 0);
-  }, [recommendationGroups, calculateBudget, sessionKey]);
+  }, [recommendationGroups, calculateBudget, usedIds, sessionKey]);
 
-  // Process For You mix
+  // Process For You mix - deduplicated
   const processedForYou = useMemo(() => {
     const withLogos = forYouMix.filter(item => item.content_logo);
     const grouped = groupRecommendationItems(withLogos);
-    return shuffleArray(grouped).slice(0, MAX_FOR_YOU);
-  }, [forYouMix, sessionKey]);
+    const shuffled = shuffleArray(grouped);
+    
+    const uniqueItems: any[] = [];
+    for (const item of shuffled) {
+      const contentId = item.content_id || item.id || '';
+      if (!usedIds.has(contentId)) {
+        usedIds.add(contentId);
+        uniqueItems.push({
+          ...item,
+          _uniqueKey: `fy-${contentId}-${uniqueItems.length}`,
+        });
+      }
+      if (uniqueItems.length >= MAX_FOR_YOU) break;
+    }
+    
+    return uniqueItems;
+  }, [forYouMix, usedIds, sessionKey]);
 
-  // Process default sections for new users
+  // Process default sections - deduplicated
   const processedDefaults = useMemo(() => {
     const hasPersonalized = 
       processedContinueWatching.length > 0 || 
@@ -145,25 +224,31 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     const validChannels = allChannels.filter(ch => ch.tvg_logo);
     
     // Group by content type
-    const movies: Channel[] = [];
-    const series: Channel[] = [];
-    const live: Channel[] = [];
+    const movies: Array<Channel & { _uniqueKey: string }> = [];
+    const series: Array<Channel & { _uniqueKey: string }> = [];
+    const live: Array<Channel & { _uniqueKey: string }> = [];
     const seen = new Set<string>();
 
     for (const ch of validChannels) {
-      // Deduplicate by series/content
+      // Deduplicate by series/content and global ID
       const key = ch.name.split(/S\d|E\d|\d+x\d+/i)[0].trim().toLowerCase();
-      if (seen.has(key)) continue;
+      if (seen.has(key) || usedIds.has(ch.id)) continue;
       seen.add(key);
+      usedIds.add(ch.id);
+
+      const channelWithKey = {
+        ...ch,
+        _uniqueKey: `def-${ch.id}-${seen.size}`,
+      };
 
       const type = detectContentType(ch);
-      if (type === 'movie') movies.push(ch);
-      else if (type === 'series') series.push(ch);
-      else live.push(ch);
+      if (type === 'movie') movies.push(channelWithKey);
+      else if (type === 'series') series.push(channelWithKey);
+      else live.push(channelWithKey);
     }
 
     const perSection = Math.floor(budget.defaults / 3);
-    const sections: Array<{ title: string; type: string; channels: Channel[] }> = [];
+    const sections: Array<{ title: string; type: string; channels: Array<Channel & { _uniqueKey: string }> }> = [];
 
     if (live.length > 0) {
       sections.push({
@@ -188,7 +273,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     }
 
     return sections;
-  }, [allChannels, processedContinueWatching.length, processedSeriesContinuations.length, processedRelated.length, calculateBudget, sessionKey]);
+  }, [allChannels, processedContinueWatching.length, processedSeriesContinuations.length, processedRelated.length, calculateBudget, usedIds, sessionKey]);
 
   // Total count for metrics
   const totalItemCount = useMemo(() => {
@@ -216,6 +301,7 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     hasPersonalizedContent,
     totalItemCount,
     maxItems: MAX_TOTAL_ITEMS,
+    getUniqueKey,
   };
 }
 

@@ -334,9 +334,9 @@ export function HomeView({
           icon={PlaySquare}
           isEmpty={false}
         >
-          {processedSeries.map((item) => (
+          {processedSeries.map((item, idx) => (
             <SeriesContinuationCard
-              key={item.seriesName}
+              key={(item as any)._uniqueKey || `sc-${item.seriesName}-${idx}`}
               item={item}
               onPlay={() => onPlaySeries(item.nextEpisode)}
             />
@@ -345,9 +345,9 @@ export function HomeView({
       )}
 
       {/* Related Content Groups - Based on viewing behavior */}
-      {relatedGroups.map((group) => (
+      {relatedGroups.map((group, groupIdx) => (
         <ContentRow
-          key={group.type + (group.source_content || '')}
+          key={`group-${groupIdx}-${group.type}`}
           title={group.title}
           icon={Clock}
           badge="Relacionado"
@@ -355,7 +355,7 @@ export function HomeView({
         >
           {group.items.map((item, idx) => (
             <RecommendationCard
-              key={`${group.type}-${item.id}-${idx}`}
+              key={(item as any)._uniqueKey || `rel-${groupIdx}-${item.id}-${idx}`}
               item={item}
               onPlay={() => onPlayRecommendation(item)}
             />
@@ -374,7 +374,7 @@ export function HomeView({
         >
           {processedForYou.map((item, idx) => (
             <RecommendationCard
-              key={`foryou-${item.id}-${idx}`}
+              key={(item as any)._uniqueKey || `fy-${item.id}-${idx}`}
               item={item}
               onPlay={() => onPlayRecommendation(item)}
             />
@@ -383,16 +383,16 @@ export function HomeView({
       )}
 
       {/* Default sections for new users */}
-      {!hasPersonalizedContent && defaultSections.map((section) => (
+      {!hasPersonalizedContent && defaultSections.map((section, sectionIdx) => (
         <ContentRow
-          key={section.title}
+          key={`section-${sectionIdx}-${section.type}`}
           title={section.title}
           icon={sectionIcons[section.type] || Tv}
           isEmpty={section.channels.length === 0}
         >
-          {section.channels.map((channel) => (
+          {section.channels.map((channel, idx) => (
             <ChannelCard
-              key={channel.id}
+              key={(channel as any)._uniqueKey || `ch-${channel.id}-${idx}`}
               channel={channel}
               onPlay={() => onPlayChannel(channel)}
               icon={sectionIcons[section.type]}
