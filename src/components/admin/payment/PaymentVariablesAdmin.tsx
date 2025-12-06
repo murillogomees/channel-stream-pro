@@ -169,9 +169,9 @@ const databaseTables = [
     fields: ["user_id", "mercado_pago_payment_id", "mercado_pago_preference_id", "amount", "status", "payment_method", "paid_at"],
   },
   {
-    name: "clientes",
-    description: "Dados dos clientes",
-    fields: ["user_id", "nome", "telefone", "email", "plano", "situacao", "data_vencimento", "valor_pago"],
+    name: "profiles",
+    description: "Dados dos usuários/clientes (tabela unificada)",
+    fields: ["id", "nome", "contact_phone", "email", "plano", "situacao", "data_vencimento", "valor_pago", "cliente_ativo"],
   },
   {
     name: "discount_coupons",
@@ -604,14 +604,13 @@ export function PaymentVariablesAdmin() {
             <CardContent>
               <div className="p-4 bg-muted/30 rounded-lg font-mono text-xs space-y-2">
                 <p>1. Checkout → <span className="text-blue-400">auth.users</span> (cria usuário)</p>
-                <p>2. Checkout → <span className="text-blue-400">profiles</span> (dados do perfil)</p>
+                <p>2. Checkout → <span className="text-blue-400">profiles</span> (dados do perfil + cliente)</p>
                 <p>3. Checkout → <span className="text-blue-400">user_roles</span> (role: client)</p>
-                <p>4. Checkout → <span className="text-blue-400">clientes</span> (dados completos)</p>
-                <p>5. Checkout → <span className="text-blue-400">payments</span> (status: pending)</p>
-                <p>6. Checkout → <span className="text-blue-400">user_subscriptions</span> (status: trial)</p>
-                <p>7. Webhook → <span className="text-green-400">payments</span> (atualiza status)</p>
-                <p>8. Webhook → <span className="text-green-400">user_subscriptions</span> (status: active)</p>
-                <p>9. Webhook → <span className="text-green-400">clientes</span> (situacao: Ativo)</p>
+                <p>4. Checkout → <span className="text-blue-400">payments</span> (status: pending)</p>
+                <p>5. Checkout → <span className="text-blue-400">user_subscriptions</span> (status: trial)</p>
+                <p>6. Webhook → <span className="text-green-400">payments</span> (atualiza status)</p>
+                <p>7. Webhook → <span className="text-green-400">user_subscriptions</span> (status: active)</p>
+                <p>8. Webhook → <span className="text-green-400">profiles</span> (situacao: Ativo, cliente_ativo: true)</p>
               </div>
             </CardContent>
           </Card>
