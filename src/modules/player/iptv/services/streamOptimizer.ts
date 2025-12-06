@@ -194,48 +194,52 @@ class StreamOptimizerService {
 
   /**
    * Get optimized HLS.js config based on stream type
+   * Prioritizes smooth playback over low latency to prevent stuttering
    */
-  getHlsConfig(lowLatency = true, isLive = true) {
-    // Ultra-aggressive config for fastest startup
+  getHlsConfig(lowLatency = false, isLive = true) {
+    // STABILITY-FIRST config - larger buffers prevent stuttering
     const baseConfig = {
       enableWorker: !this.isSmartTV(),
-      // Minimal buffer for instant start
-      maxBufferLength: lowLatency ? 8 : 15,
-      maxMaxBufferLength: lowLatency ? 15 : 30,
-      maxBufferSize: 20 * 1000 * 1000, // 20MB
+      // LARGER buffers to prevent stuttering (was 8/15, now 30/60)
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      maxBufferSize: 60 * 1000 * 1000, // 60MB
       maxBufferHole: 0.5,
-      // Start with lowest quality for instant playback
-      startLevel: 0,
-      // Aggressive fragment loading
+      // Start with auto quality for stability
+      startLevel: -1, // Auto-select best starting level
+      // Fragment loading
       startFragPrefetch: true,
-      testBandwidth: false,
-      // Faster loading timeouts
-      fragLoadingTimeOut: 8000,
-      manifestLoadingTimeOut: 5000,
-      levelLoadingTimeOut: 8000,
-      // Retry config
-      fragLoadingMaxRetry: 3,
-      manifestLoadingMaxRetry: 3,
-      levelLoadingMaxRetry: 3,
-      fragLoadingRetryDelay: 500,
-      manifestLoadingRetryDelay: 500,
+      testBandwidth: true, // Enable bandwidth testing for better ABR
+      // Reasonable loading timeouts
+      fragLoadingTimeOut: 15000,
+      manifestLoadingTimeOut: 10000,
+      levelLoadingTimeOut: 10000,
+      // Retry config - more retries for stability
+      fragLoadingMaxRetry: 6,
+      manifestLoadingMaxRetry: 4,
+      levelLoadingMaxRetry: 4,
+      fragLoadingRetryDelay: 1000,
+      manifestLoadingRetryDelay: 1000,
       // Progressive loading
       progressive: true,
-      // Minimal back buffer
-      backBufferLength: lowLatency ? 5 : 15,
-      // Live config
-      liveSyncDurationCount: lowLatency ? 2 : 3,
-      liveMaxLatencyDurationCount: lowLatency ? 5 : 8,
+      // Back buffer for seeking
+      backBufferLength: 30,
+      // Live config - less aggressive for stability
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 10,
       liveDurationInfinity: isLive,
-      // Low latency mode
-      lowLatencyMode: lowLatency,
-      // ABR config - prefer stability
-      abrEwmaFastLive: 3,
-      abrEwmaSlowLive: 9,
-      abrEwmaFastVoD: 3,
-      abrEwmaSlowVoD: 9,
-      abrBandWidthFactor: 0.95,
-      abrBandWidthUpFactor: 0.7,
+      // Disable low latency mode to prioritize stability
+      lowLatencyMode: false,
+      // ABR config - prefer stability over quick switches
+      abrEwmaFastLive: 4,
+      abrEwmaSlowLive: 12,
+      abrEwmaFastVoD: 4,
+      abrEwmaSlowVoD: 12,
+      abrBandWidthFactor: 0.8, // Conservative bandwidth estimation
+      abrBandWidthUpFactor: 0.6, // Slower quality upgrades
+      // Nudge on stall for recovery
+      nudgeMaxRetry: 5,
+      nudgeOffset: 0.2,
     };
 
     return baseConfig;
@@ -248,22 +252,23 @@ class StreamOptimizerService {
     return {
       enableWorker: !this.isSmartTV(),
       enableStashBuffer: true,
-      stashInitialSize: 128 * 1024, // 128KB initial buffer
+      stashInitialSize: 384 * 1024, // 384KB initial buffer (was 128KB)
       isLive: true,
       lazyLoad: false,
-      lazyLoadMaxDuration: 3 * 60,
-      lazyLoadRecoverDuration: 30,
+      lazyLoadMaxDuration: 5 * 60,
+      lazyLoadRecoverDuration: 60,
       deferLoadAfterSourceOpen: false,
       autoCleanupSourceBuffer: true,
-      autoCleanupMaxBackwardDuration: 3 * 60,
-      autoCleanupMinBackwardDuration: 2 * 60,
+      autoCleanupMaxBackwardDuration: 5 * 60,
+      autoCleanupMinBackwardDuration: 3 * 60,
       fixAudioTimestampGap: true,
       accurateSeek: true,
       seekType: 'range' as const,
       rangeLoadZeroStart: false,
-      liveBufferLatencyChasing: true,
-      liveBufferLatencyMaxLatency: 1.5,
-      liveBufferLatencyMinRemain: 0.5,
+      // DISABLE latency chasing to prevent stuttering
+      liveBufferLatencyChasing: false,
+      liveBufferLatencyMaxLatency: 3.0, // Allow more latency
+      liveBufferLatencyMinRemain: 1.0, // Keep more buffer
     };
   }
 

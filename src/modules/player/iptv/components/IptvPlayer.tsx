@@ -83,7 +83,10 @@ export const IptvPlayer = memo(function IptvPlayer({
   const advancedControls = useAdvancedPlayerControls();
 
   // Stream analytics for performance tracking
-  const analytics = useStreamAnalytics(channelId, undefined);
+  // Use lazy ref to prevent re-renders during playback
+  const analyticsInstance = useStreamAnalytics(channelId, undefined);
+  const analyticsRef = useRef(analyticsInstance);
+  analyticsRef.current = analyticsInstance;
 
   // Touch gestures for mobile
   const touchGestures = useTouchGestures({
@@ -114,7 +117,8 @@ export const IptvPlayer = memo(function IptvPlayer({
       console.log('[IptvPlayer] Event:', evt, data);
     }
     
-    // Track analytics events
+    // Track analytics events via ref (no re-renders)
+    const analytics = analyticsRef.current;
     if (evt === 'play') {
       analytics.startSession();
     } else if (evt === 'buffering') {
@@ -130,7 +134,7 @@ export const IptvPlayer = memo(function IptvPlayer({
     }
     
     onEventRef.current?.(evt, data);
-  }, [analytics]);
+  }, []);
 
   // Control visibility - declare early to maintain hook order
   const showControlsTemporarily = useCallback(() => {
@@ -177,29 +181,22 @@ export const IptvPlayer = memo(function IptvPlayer({
     onEvent: handlePlayerEvent,
   });
 
-  // Track startup time when metrics become available
+  // Track startup time when metrics become available (debounced)
   useEffect(() => {
     if (metrics.loadTime > 0 && !startupTrackedRef.current) {
-      analytics.recordStartup(metrics.loadTime);
+      analyticsRef.current.recordStartup(metrics.loadTime);
       startupTrackedRef.current = true;
     }
-  }, [metrics.loadTime, analytics]);
+  }, [metrics.loadTime]);
 
-  // Track buffer end when buffering stops
+  // Track buffer end when buffering stops (minimal overhead)
   const wasBufferingRef = useRef(false);
   useEffect(() => {
     if (wasBufferingRef.current && !isBuffering) {
-      analytics.recordBufferEnd();
+      analyticsRef.current.recordBufferEnd();
     }
     wasBufferingRef.current = isBuffering;
-  }, [isBuffering, analytics]);
-
-  // Track quality changes
-  useEffect(() => {
-    if (metrics.currentBitrate > 0) {
-      analytics.recordQualityChange(metrics.currentBitrate);
-    }
-  }, [metrics.currentBitrate, analytics]);
+  }, [isBuffering]);
 
   // Attach advanced controls to video/hls
   useEffect(() => {
