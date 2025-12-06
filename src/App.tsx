@@ -56,7 +56,6 @@ const AppEntry = lazy(() => import("./pages/AppEntry"));
 const AppPlayer = lazy(() => import("./pages/AppPlayer"));
 const UnifiedProfile = lazy(() => import("./pages/UnifiedProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
-const TVPlayer = lazy(() => import("./pages/TVPlayer"));
 const MyList = lazy(() => import("./pages/MyList"));
 
 // Initialize Web Vitals
@@ -111,7 +110,7 @@ function AppContent() {
             <Route path="/app/player" element={<ProtectedRoute requireValidAccess><AppPlayer /></ProtectedRoute>} />
             <Route path="/app/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/app/mylist" element={<ProtectedRoute requireValidAccess><MyList /></ProtectedRoute>} />
-            <Route path="/tv-player" element={<TVPlayer />} />
+            {/* tv-player removed - unified with /app/player */}
             
             {/* ========================================
                 ADMIN ROUTES - Consolidated Hubs
