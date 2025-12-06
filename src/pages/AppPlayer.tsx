@@ -716,7 +716,7 @@ export default function AppPlayer() {
 
       {/* Player Dialog - IptvPlayer Modular - Netflix-style fullscreen */}
       {showPlayerDialog && playerChannel && (
-        <div className="fixed inset-0 z-50 bg-black animate-in fade-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-50 bg-black">
           {/* Back button overlay */}
           <button
             onClick={() => {
@@ -731,31 +731,6 @@ export default function AppPlayer() {
           >
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-
-          {/* Episode navigation for series (next to volume area) */}
-          {isCurrentChannelSeries && (
-            <div className="absolute bottom-20 left-4 z-[60] flex items-center gap-2">
-              <button
-                onClick={handlePreviousEpisode}
-                disabled={!hasPreviousEpisode}
-                className={`p-2 rounded-full transition-colors ${hasPreviousEpisode ? 'bg-black/50 hover:bg-black/70' : 'bg-black/30 opacity-50 cursor-not-allowed'}`}
-                aria-label="Episódio anterior"
-              >
-                <ArrowLeft className="w-5 h-5 text-white" />
-              </button>
-              <span className="text-white text-sm bg-black/50 px-3 py-1 rounded">
-                {currentEpisodeInfo ? `T${currentEpisodeInfo.season} E${currentEpisodeInfo.episode}` : ''}
-              </span>
-              <button
-                onClick={handleNextEpisode}
-                disabled={!hasNextEpisode}
-                className={`p-2 rounded-full transition-colors ${hasNextEpisode ? 'bg-black/50 hover:bg-black/70' : 'bg-black/30 opacity-50 cursor-not-allowed'}`}
-                aria-label="Próximo episódio"
-              >
-                <ArrowLeft className="w-5 h-5 text-white rotate-180" />
-              </button>
-            </div>
-          )}
 
           <IptvPlayer 
             channelId={playerChannel.id} 
@@ -775,9 +750,12 @@ export default function AppPlayer() {
                 resumeWarming();
               } else if (evt === 'error') {
                 console.error('Player error:', data);
+              } else if (evt === 'ended' && isCurrentChannelSeries && hasNextEpisode) {
+                // Auto-play next episode when current ends
+                handleNextEpisode();
               }
             }} 
-            className="w-full h-full" 
+            className="w-full h-full"
           />
         </div>
       )}

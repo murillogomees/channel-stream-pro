@@ -36,9 +36,20 @@ export function useOrientationLock(): UseOrientationLockReturn {
     setCurrentOrientation(isLandscape ? 'landscape' : 'portrait');
   }, []);
 
-  // Lock to portrait (vertical)
+  // Lock to portrait (vertical) - exit fullscreen
   const lockToPortrait = useCallback(async () => {
     try {
+      // Exit fullscreen first
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch {
+          // Might fail
+        }
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
+
       // Native Capacitor
       if (Capacitor.isNativePlatform() && ScreenOrientation) {
         await ScreenOrientation.lock({ orientation: 'portrait' });
@@ -59,8 +70,21 @@ export function useOrientationLock(): UseOrientationLockReturn {
   }, []);
 
   // Lock to landscape (horizontal) - for player fullscreen
+  // Also requests fullscreen on mobile for immersive experience
   const lockToLandscape = useCallback(async () => {
     try {
+      // Request fullscreen first (must happen on user gesture)
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) {
+        try {
+          await docEl.requestFullscreen();
+        } catch {
+          // Fullscreen might fail on some browsers
+        }
+      } else if ((docEl as any).webkitRequestFullscreen) {
+        (docEl as any).webkitRequestFullscreen();
+      }
+
       // Native Capacitor
       if (Capacitor.isNativePlatform() && ScreenOrientation) {
         await ScreenOrientation.lock({ orientation: 'landscape' });
