@@ -298,8 +298,25 @@ function isVodContent(url: string): boolean {
 }
 
 function isDirectStream(url: string): boolean {
-  const xtreamLivePattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
-  return xtreamLivePattern.test(url) && !url.includes('.m3u8') && !url.includes('.m3u');
+  // Xtream live stream patterns:
+  // /live/user/pass/channelId
+  // /user/pass/channelId (direct without /live/)
+  // Just ends with numeric ID and no file extension
+  const urlLower = url.toLowerCase();
+  
+  // Skip if it has a file extension
+  if (urlLower.includes('.m3u8') || urlLower.includes('.m3u') || 
+      urlLower.includes('.ts') || urlLower.includes('.mp4')) {
+    return false;
+  }
+  
+  // Pattern: ends with numeric ID
+  const endsWithNumericId = /\/\d+$/.test(url);
+  
+  // Pattern: typical Xtream structure user/pass/id or port:number followed by path/id
+  const xtreamPattern = /:\d+\/[^\/]+\/[^\/]+\/\d+$/.test(url);
+  
+  return endsWithNumericId || xtreamPattern;
 }
 
 function isKeyFile(url: string): boolean {
@@ -504,7 +521,7 @@ Deno.serve(async (req) => {
     const isKey = isKeyFile(decodedUrl);
     
     // Determine content type for logging
-    const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : 'M3U';
+    const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : isLiveStream ? 'LIVE' : 'M3U';
     const cacheKey = `proxy:${decodedUrl}`;
     
     // Check memory cache for manifests and keys
