@@ -249,13 +249,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const REMEMBER_ME_KEY = 'iptv_remember_me';
     
-    // Timeout de segurança
+    // Timeout de segurança - aumentado para evitar falsos positivos
     const safetyTimeout = setTimeout(() => {
       if (loading) {
-        console.warn('[AuthContext] Safety timeout triggered');
+        console.warn('[AuthContext] Safety timeout triggered after 10s');
         setLoading(false);
       }
-    }, 5000);
+    }, 10000);
 
     // Verificar remember me
     const checkRememberMe = () => {

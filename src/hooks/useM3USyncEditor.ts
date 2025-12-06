@@ -195,14 +195,13 @@ export function useM3USyncEditor() {
         }
       }
 
-      // Supabase has a default limit of 1000 rows per request
-      // Use smaller pages with more parallelism to work within this limit
-      const PAGE_SIZE = 1000; // Match Supabase default limit
-      const PARALLEL_REQUESTS = 8; // More parallel requests to compensate
-      const MAX_RETRIES = 3;
-      const BATCH_DELAY_MS = 100; // Small delay between batches to avoid rate limits
+      // Optimized loading: larger pages with high parallelism
+      const PAGE_SIZE = 1000; // Supabase limit
+      const PARALLEL_REQUESTS = 15; // Maximum parallelism for faster loading
+      const MAX_RETRIES = 2; // Reduce retries for faster failure
+      const BATCH_DELAY_MS = 50; // Minimal delay between batches
 
-      console.log(`[M3USyncEditor] Starting load for source: ${sourceId}`);
+      console.log(`[M3USyncEditor] Starting optimized load for source: ${sourceId}`);
 
       // First, get total count
       const { count, error: countError } = await supabase
@@ -335,11 +334,14 @@ export function useM3USyncEditor() {
           loadedEntries = [...loadedEntries, ...batchData];
         }
 
-        // Progressive update - show entries as they load (every 5% or 10k entries)
+        // Progressive update - show entries as they load (every 15% for performance)
         const currentPercent = Math.round((loadedEntries.length / totalCount) * 100);
-        if (currentPercent >= lastProgressLog + 5 || loadedEntries.length >= (lastProgressLog + 1) * (totalCount / 100) + 10000) {
-          const processedSoFar = processEntries(loadedEntries);
-          setEntries(processedSoFar);
+        if (currentPercent >= lastProgressLog + 15 || loadedEntries.length >= (lastProgressLog + 1) * (totalCount / 100) + 30000) {
+          // Defer processing to avoid blocking UI
+          requestAnimationFrame(() => {
+            const processedSoFar = processEntries(loadedEntries);
+            setEntries(processedSoFar);
+          });
           lastProgressLog = currentPercent;
         }
 
