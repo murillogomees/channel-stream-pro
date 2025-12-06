@@ -16,6 +16,12 @@ export { useABR } from './useABR';
 export { usePlayerAnalytics } from './usePlayerAnalytics';
 export { useResume } from './useResume';
 
+// Performance hooks (V2 is canonical, V1 are wrappers for compatibility)
+export { usePlayerPerformanceV2 } from './usePlayerPerformanceV2';
+export { useFastStartupV2 } from './useFastStartupV2';
+export { usePlayerPerformance } from './usePlayerPerformance'; // @deprecated
+export { useFastStartup } from './useFastStartup'; // @deprecated
+
 // Enhanced Player (unified hook)
 export { useEnhancedPlayer } from './useEnhancedPlayer';
 
