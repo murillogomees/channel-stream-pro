@@ -52,9 +52,7 @@ export const backupService = {
       'Plano',
       'Data Cadastro',
       'Data Vencimento',
-      'MAC SmartOne',
       'Cliente Ativo',
-      'SmartOne Status',
       'Origem Cadastro',
       'M3U Lists',
     ];
@@ -68,7 +66,6 @@ export const backupService = {
       cliente.plano,
       cliente.data_cadastro,
       cliente.data_vencimento || '',
-      cliente.mac_smart_one || '',
       cliente.cliente_ativo ? 'Sim' : 'Não',
       cliente.origem_cadastro || '',
       cliente.m3u_lists?.map((m: any) => m.name).join('; ') || '',

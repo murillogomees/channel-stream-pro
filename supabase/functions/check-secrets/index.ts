@@ -119,7 +119,6 @@ serve(async (req) => {
         'R2_ACCESS_KEY_ID',
         'R2_SECRET_ACCESS_KEY',
         'STREAM_PROXY_SECRET',
-        'SMARTONE_API_KEY',
         'CRON_SECRET',
       ];
       

@@ -34,7 +34,6 @@ export class TrialRetentionService {
         valorPago: clientData.valor_pago || 0,
         dataUltimoPagamento: clientData.data_ultimo_pagamento || '',
         formaUltimoPagamento: clientData.forma_ultimo_pagamento || '',
-        macSmartOne: clientData.mac_smart_one || '',
         dataCadastro: clientData.data_cadastro || '',
         dataUltimaEdicao: clientData.data_ultima_edicao || '',
         clienteAtivo: clientData.cliente_ativo,

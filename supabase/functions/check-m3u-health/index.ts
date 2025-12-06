@@ -82,7 +82,7 @@ serve(async (req) => {
         const response = await fetch(list.file_url, {
           method: 'HEAD',
           headers: {
-            'User-Agent': 'SmartOne-M3U-Health-Checker/1.0',
+            'User-Agent': 'IPTVLink-M3U-Health-Checker/1.0',
           },
         });
 
@@ -96,7 +96,7 @@ serve(async (req) => {
             const contentResponse = await fetch(list.file_url, {
               method: 'GET',
               headers: {
-                'User-Agent': 'SmartOne-M3U-Health-Checker/1.0',
+                'User-Agent': 'IPTVLink-M3U-Health-Checker/1.0',
               },
             });
 
