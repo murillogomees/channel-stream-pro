@@ -7573,6 +7573,7 @@ export type Database = {
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
       is_admin_or_master: { Args: { _user_id?: string }; Returns: boolean }
+      is_master: { Args: { _user_id?: string }; Returns: boolean }
       list_playlists: {
         Args: {
           p_from?: string
