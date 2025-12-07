@@ -89,18 +89,55 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setCategories(sortedCategories);
   }, []);
 
-  // Load ALL category names first for immediate display
+  // Load ALL category names using RPC or paginated approach
   const loadAllCategoryNames = useCallback(async (): Promise<string[]> => {
-    const { data, error } = await supabase
-      .from('m3u_sync_entries')
-      .select('group_title');
-    
-    if (error || !data) return [];
-    
-    // Get unique categories
-    const uniqueCategories = [...new Set(data.map(c => c.group_title || 'Geral'))];
-    console.log(`[Playlist] Found ${uniqueCategories.length} unique categories`);
-    return uniqueCategories.sort();
+    try {
+      // Use a more efficient approach: fetch categories in batches
+      const PAGE_SIZE = 50000;
+      const allCategories = new Set<string>();
+      let offset = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('m3u_sync_entries')
+          .select('group_title')
+          .order('group_title', { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        
+        if (error) {
+          console.error('[Playlist] Category fetch error:', error);
+          break;
+        }
+        
+        if (!data || data.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        // Add to set (deduplicates automatically)
+        data.forEach(row => {
+          if (row.group_title) {
+            allCategories.add(row.group_title);
+          }
+        });
+        
+        console.log(`[Playlist] Fetched ${offset + data.length} entries, found ${allCategories.size} unique categories so far`);
+        
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          offset += PAGE_SIZE;
+        }
+      }
+      
+      const uniqueCategories = Array.from(allCategories).sort();
+      console.log(`[Playlist] Found ${uniqueCategories.length} unique categories total`);
+      return uniqueCategories;
+    } catch (error) {
+      console.error('[Playlist] loadAllCategoryNames error:', error);
+      return [];
+    }
   }, []);
 
   // Load content by category in parallel batches
