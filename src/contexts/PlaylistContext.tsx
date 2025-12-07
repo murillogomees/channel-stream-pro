@@ -90,13 +90,15 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Load ALL category names using paginated approach with Supabase's 1000 row limit
-  const loadAllCategoryNames = useCallback(async (): Promise<string[]> => {
+  // Returns { categories, totalScanned } to avoid separate HEAD request
+  const loadAllCategoryNames = useCallback(async (): Promise<{ categories: string[], totalScanned: number }> => {
     try {
       // Supabase default limit is 1000 rows per request
       const PAGE_SIZE = 1000;
       const allCategories = new Set<string>();
       let offset = 0;
       let hasMore = true;
+      let totalScanned = 0;
       
       while (hasMore) {
         const { data, error } = await supabase
@@ -115,6 +117,8 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         
+        totalScanned = offset + data.length;
+        
         // Add to set (deduplicates automatically)
         data.forEach(row => {
           if (row.group_title) {
@@ -123,8 +127,8 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         });
         
         // Log progress every 50k entries
-        if ((offset + data.length) % 50000 === 0 || data.length < PAGE_SIZE) {
-          console.log(`[Playlist] Scanned ${offset + data.length} entries, found ${allCategories.size} unique categories`);
+        if (totalScanned % 50000 === 0 || data.length < PAGE_SIZE) {
+          console.log(`[Playlist] Scanned ${totalScanned} entries, found ${allCategories.size} unique categories`);
         }
         
         if (data.length < PAGE_SIZE) {
@@ -140,11 +144,11 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       }
       
       const uniqueCategories = Array.from(allCategories).sort();
-      console.log(`[Playlist] Found ${uniqueCategories.length} unique categories total`);
-      return uniqueCategories;
+      console.log(`[Playlist] Found ${uniqueCategories.length} unique categories from ${totalScanned} entries`);
+      return { categories: uniqueCategories, totalScanned };
     } catch (error) {
       console.error('[Playlist] loadAllCategoryNames error:', error);
-      return [];
+      return { categories: [], totalScanned: 0 };
     }
   }, []);
 
@@ -206,34 +210,20 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setLoadingProgress('Verificando playlist...');
     
     try {
-      // Get total count
-      const { count } = await supabase
-        .from('m3u_sync_entries')
-        .select('id', { count: 'exact', head: true });
-      
-      const total = count || 0;
-      setTotalChannels(total);
-      
-      if (total === 0) {
-        console.log('[Playlist] No entries in database');
-        setHasPlaylist(false);
-        setIsLoading(false);
-        loadingRef.current = false;
-        return;
-      }
-      
-      console.log(`[Playlist] Total entries: ${total}`);
-      setHasPlaylist(true);
-      
-      // Load all category names first
-      const categoryNames = await loadAllCategoryNames();
+      // Skip HEAD request that causes 500 errors - we'll get count during category scan
+      // Load all category names first (this also counts entries)
+      const { categories: categoryNames, totalScanned } = await loadAllCategoryNames();
+      setTotalChannels(totalScanned);
       
       if (categoryNames.length === 0) {
+        console.log('[Playlist] No categories found');
         setHasPlaylist(false);
         setIsLoading(false);
         loadingRef.current = false;
         return;
       }
+      
+      setHasPlaylist(true);
       
       // Initialize empty categories for immediate display
       for (const name of categoryNames) {
