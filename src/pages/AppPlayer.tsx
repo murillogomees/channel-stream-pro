@@ -5,7 +5,7 @@ import logoWhite from '@/assets/logo-white-nav.webp';
 import { Button } from '@/components/ui/button';
 import { TVTopSearchBar } from '@/components/iptv/TVTopSearchBar';
 import { IptvPlayer } from '@/modules/player/iptv';
-import { useHybridPlaylist } from '@/hooks/useHybridPlaylist';
+import { usePlaylist } from '@/contexts/PlaylistContext';
 import { useFavoriteChannels } from '@/hooks/useFavoriteChannels';
 import { useUltraFastSearch } from '@/hooks/useUltraFastSearch';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,7 +44,7 @@ export default function AppPlayer() {
   const isTrial = user?.isTrial || false;
   const planName = user?.clienteData?.plano || 'Teste';
 
-  // Hybrid playlist - metadata from CDN, stream URL resolved on-demand
+  // Unified playlist context - single source of truth for all tabs
   const {
     categories,
     isLoading: playerLoading,
@@ -55,7 +55,7 @@ export default function AppPlayer() {
     resolveChannel,
     isResolvingStream,
     refresh: refreshPlaylist,
-  } = useHybridPlaylist();
+  } = usePlaylist();
 
   // Current channel for playback (with resolved stream_url)
   const [currentChannel, setCurrentChannel] = useState<any>(null);
