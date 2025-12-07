@@ -3,7 +3,7 @@
  * Aba Informações: cards de dados pessoais, plano, senha e logout
  * Aba Pagamentos: histórico de pagamentos
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -78,9 +78,6 @@ export default function UnifiedProfile() {
   const { user, isAdmin, signOut, refreshUser } = useAuth();
   const { toast: shadcnToast } = useToast();
   
-  // Ativa escuta de atualizações de pagamento em tempo real
-  usePaymentRealtime();
-  
   const isAppRoute = location.pathname.startsWith('/app');
   
   const [cliente, setCliente] = useState<ClienteData | null>(null);
@@ -102,15 +99,17 @@ export default function UnifiedProfile() {
   // Plan selection state
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   
-  // Check if user is in trial or has active subscription
-  const isTrialUser = cliente?.situacao === 'Testando';
-  const hasActiveSubscription = cliente?.situacao === 'Ativo' && cliente?.plano;
+  // Check if user is in trial or has active subscription - use AuthContext data for real-time updates
+  const isTrialUser = user?.isTrial || cliente?.situacao === 'Testando';
+  const hasActiveSubscription = (user?.hasValidAccess && !user?.isTrial) || (cliente?.situacao === 'Ativo' && cliente?.plano);
+  
+  // Get plan and expiration from user context (real-time) or fall back to cliente state
+  const currentPlano = user?.clienteData?.plano || cliente?.plano;
+  const currentSituacao = user?.clienteData?.situacao || cliente?.situacao;
+  const currentDataVencimento = user?.clienteData?.data_vencimento || cliente?.data_vencimento;
+  const currentValorPago = user?.clienteData?.valor_pago || cliente?.valor_pago;
 
-  useEffect(() => {
-    loadData();
-  }, [user]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) {
       navigate('/login', { replace: true });
       return;
@@ -155,7 +154,17 @@ export default function UnifiedProfile() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, navigate]);
+
+  // Ativa escuta de atualizações de pagamento em tempo real com callback para recarregar dados locais
+  usePaymentRealtime({
+    onPaymentApproved: loadData,
+    onProfileUpdated: loadData,
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -496,11 +505,11 @@ export default function UnifiedProfile() {
             {/* Card 2: Informações do Plano - Diferente para usuários ativos vs trial */}
             {hasActiveSubscription ? (
               <CurrentPlanCard
-                plano={cliente?.plano || 'Mensal'}
-                situacao={cliente?.situacao || 'Ativo'}
-                dataVencimento={cliente?.data_vencimento}
+                plano={currentPlano || 'Mensal'}
+                situacao={currentSituacao || 'Ativo'}
+                dataVencimento={currentDataVencimento}
                 dataUltimoPagamento={payments[0]?.paid_at || null}
-                valorPago={cliente?.valor_pago}
+                valorPago={currentValorPago}
                 isRecorrente={payments.length > 1}
               />
             ) : (
@@ -531,7 +540,7 @@ export default function UnifiedProfile() {
                         Vencimento
                       </p>
                       <p className="font-medium text-foreground">
-                        {formatDate(cliente?.data_vencimento)}
+                        {formatDate(currentDataVencimento)}
                       </p>
                     </div>
 
@@ -540,8 +549,8 @@ export default function UnifiedProfile() {
                       <p className="text-sm text-muted-foreground">
                         Plano
                       </p>
-                      <Badge variant="outline" className={getSituacaoColor(cliente?.situacao)}>
-                        {getPlanLabel(cliente?.plano, cliente?.situacao)}
+                      <Badge variant="outline" className={getSituacaoColor(currentSituacao)}>
+                        {getPlanLabel(currentPlano, currentSituacao)}
                       </Badge>
                     </div>
                   </div>
