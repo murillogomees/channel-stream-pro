@@ -366,3 +366,7 @@ verify_jwt = false
 # R2 Migration Worker - batch migration processor
 [functions.r2-migration-worker]
 verify_jwt = false
+
+# R2 Upload Proxy - handles signed uploads to R2
+[functions.r2-upload-proxy]
+verify_jwt = false
