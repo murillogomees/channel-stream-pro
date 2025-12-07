@@ -88,15 +88,16 @@ export default function AdminM3UCustomDashboard() {
     try {
       setIsLoadingStats(true);
       
-      // Buscar estatísticas de conteúdo por tipo
-      const { data: entries, error } = await supabase
-        .from('m3u_sync_entries')
-        .select('group_title')
-        .eq('is_valid', true);
-
-      if (error) throw error;
-
-      // Classificar conteúdo
+      // Use RPC function to get distinct categories (much faster than full table scan)
+      const { data: categoriesData, error: catError } = await supabase
+        .rpc('get_distinct_m3u_categories');
+      
+      if (catError) {
+        console.error('Erro ao buscar categorias:', catError);
+        return;
+      }
+      
+      // Classify categories by type
       const stats: ContentStats = {
         tv: 0,
         movies: 0,
@@ -113,7 +114,7 @@ export default function AdminM3UCustomDashboard() {
         other: new Set<string>(),
       };
 
-      (entries || []).forEach((entry: any) => {
+      (categoriesData || []).forEach((entry: { group_title: string }) => {
         const groupTitle = (entry.group_title || '').toLowerCase();
         const category = entry.group_title || 'Sem Categoria';
         
@@ -127,7 +128,6 @@ export default function AdminM3UCustomDashboard() {
           groupTitle.includes('reality') ||
           groupTitle.includes('tokusatsu')
         ) {
-          stats.series++;
           categoriesSeen.series.add(category);
         } else if (
           groupTitle.includes('filme') ||
@@ -136,7 +136,6 @@ export default function AdminM3UCustomDashboard() {
           groupTitle.includes('cinema') ||
           groupTitle.includes('lançamento')
         ) {
-          stats.movies++;
           categoriesSeen.movies.add(category);
         } else if (
           groupTitle.includes('canais') ||
@@ -147,21 +146,33 @@ export default function AdminM3UCustomDashboard() {
           groupTitle.includes('globo') ||
           groupTitle.includes('pluto')
         ) {
-          stats.tv++;
           categoriesSeen.tv.add(category);
         } else {
-          stats.other++;
           categoriesSeen.other.add(category);
         }
-        stats.total++;
       });
+
+      // Get estimated total count (fast)
+      const { count } = await supabase
+        .from('m3u_sync_entries')
+        .select('*', { count: 'estimated', head: true });
+
+      stats.total = count || 0;
+      // Estimate distribution based on category ratios
+      const totalCats = categoriesSeen.tv.size + categoriesSeen.movies.size + categoriesSeen.series.size + categoriesSeen.other.size;
+      if (totalCats > 0) {
+        stats.tv = Math.round((categoriesSeen.tv.size / totalCats) * stats.total);
+        stats.movies = Math.round((categoriesSeen.movies.size / totalCats) * stats.total);
+        stats.series = Math.round((categoriesSeen.series.size / totalCats) * stats.total);
+        stats.other = stats.total - stats.tv - stats.movies - stats.series;
+      }
 
       stats.categories = {
         tv: categoriesSeen.tv.size,
         movies: categoriesSeen.movies.size,
         series: categoriesSeen.series.size,
         other: categoriesSeen.other.size,
-        total: categoriesSeen.tv.size + categoriesSeen.movies.size + categoriesSeen.series.size + categoriesSeen.other.size,
+        total: totalCats,
       };
 
       setContentStats(stats);
