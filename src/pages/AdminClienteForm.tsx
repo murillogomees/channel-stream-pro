@@ -9,6 +9,25 @@ import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler, EventNotificationHandler } from '@/services/notifications';
 import { supabase } from '@/integrations/supabase/client';
+
+// Helper para evitar erros de tipo excessivamente profundos
+const db = supabase as unknown as {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => {
+        single: () => Promise<{ data: Record<string, unknown> | null; error: Error | null }>;
+      } & Promise<{ data: Record<string, unknown>[] | null; error: Error | null }>;
+    };
+    update: (data: Record<string, unknown>) => {
+      eq: (column: string, value: unknown) => Promise<{ error: Error | null }>;
+    };
+    insert: (data: Record<string, unknown>) => {
+      select: () => {
+        single: () => Promise<{ data: Record<string, unknown> | null; error: Error | null }>;
+      };
+    };
+  };
+};
 import { activityLogService } from '@/services/activityLogService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -513,19 +532,13 @@ export default function AdminClienteForm() {
             contact_phone: clienteData.telefone,
           };
           
-          const { error: updateError } = await (supabase
-            .from('profiles')
-            .update(updatePayload) as any)
-            .eq('user_id', authUserId);
+          const { error: updateError } = await db.from('profiles').update(updatePayload).eq('user_id', authUserId);
           
           if (updateError) throw updateError;
           
           // Buscar o profile criado
-          const { data: profileData } = await (supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', authUserId)
-            .single() as any);
+          const profileResult = await db.from('profiles').select('id').eq('user_id', authUserId).single();
+          const profileData = profileResult.data as { id: string } | null;
           
           clientId = profileData?.id || authUserId;
         } else {
