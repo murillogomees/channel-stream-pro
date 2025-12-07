@@ -759,20 +759,85 @@ serve(async (req) => {
       }
 
       case 'retry_failed': {
-        const { jobId } = params;
+        const { jobId, targetTable = 'm3u_channels', batchSize = 50, concurrency = 4 } = params;
         
-        // Reset failed items for retry
-        await supabase
-          .from('r2_migration_failed')
-          .update({
-            retry_count: 0,
-            resolved: false,
-            next_retry_at: new Date().toISOString(),
-          })
-          .eq('job_id', jobId)
-          .eq('resolved', false);
+        // Get original job config if jobId provided
+        let table = targetTable;
+        if (jobId) {
+          const { data: originalJob } = await supabase
+            .from('r2_migration_jobs')
+            .select('target_table')
+            .eq('id', jobId)
+            .single();
+          if (originalJob?.target_table) {
+            table = originalJob.target_table;
+          }
+        }
 
-        return new Response(JSON.stringify({ success: true, message: 'Failed items queued for retry' }), {
+        // Create a new migration job specifically for retry
+        const { data: newJob, error: jobError } = await supabase
+          .from('r2_migration_jobs')
+          .insert({
+            job_type: 'retry',
+            target_table: table,
+            batch_size: batchSize,
+            concurrency,
+            status: 'pending',
+            config: { retryFrom: jobId || null },
+          })
+          .select()
+          .single();
+
+        if (jobError) throw jobError;
+
+        // Reset sync flags for failed items so they get processed again
+        if (table === 'm3u_channels') {
+          // Get channel IDs from failed logs
+          const { data: failedLogs } = await supabase
+            .from('r2_migration_logs')
+            .select('item_id')
+            .eq('status', 'failed')
+            .eq('item_table', 'm3u_channels')
+            .limit(1000);
+
+          if (failedLogs && failedLogs.length > 0) {
+            const channelIds = failedLogs.map(l => l.item_id);
+            await supabase
+              .from('m3u_channels')
+              .update({ is_logo_synced: false })
+              .in('id', channelIds);
+          }
+        } else if (table === 'm3u_sync_entries') {
+          const { data: failedLogs } = await supabase
+            .from('r2_migration_logs')
+            .select('item_id')
+            .eq('status', 'failed')
+            .eq('item_table', 'm3u_sync_entries')
+            .limit(1000);
+
+          if (failedLogs && failedLogs.length > 0) {
+            const entryIds = failedLogs.map(l => l.item_id);
+            await supabase
+              .from('m3u_sync_entries')
+              .update({ is_synced: false })
+              .in('id', entryIds);
+          }
+        }
+
+        // Start the worker
+        const worker = new MigrationWorker(
+          supabase,
+          { targetTable: table as any, batchSize, concurrency, maxRetries: 3, dryRun: false },
+          newJob.id
+        );
+
+        EdgeRuntime.waitUntil(worker.run());
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: `Retry migration started for ${table}`,
+          jobId: newJob.id,
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
