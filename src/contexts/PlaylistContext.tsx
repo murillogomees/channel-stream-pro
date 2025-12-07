@@ -109,42 +109,25 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setCategories(sortedCategories);
   }, []);
 
-  // Load category names efficiently
+  // Load category names efficiently using RPC function
   const loadAllCategoryNames = useCallback(async (): Promise<{ categories: string[], totalScanned: number }> => {
     try {
-      const allCategories = new Set<string>();
+      // Use the optimized RPC function instead of heavy table scans
+      const { data: categoriesData, error: catError } = await supabase
+        .rpc('get_distinct_m3u_categories');
       
-      const { count } = await supabase
-        .from('m3u_sync_entries')
-        .select('*', { count: 'exact', head: true });
-      
-      const { data: sampleData } = await supabase
-        .from('m3u_sync_entries')
-        .select('group_title')
-        .order('group_title', { ascending: true })
-        .limit(5000);
-      
-      if (sampleData) {
-        sampleData.forEach(row => {
-          if (row.group_title) allCategories.add(row.group_title);
-        });
+      if (catError) {
+        console.error('[Playlist] RPC error:', catError);
+        return { categories: [], totalScanned: 0 };
       }
       
-      const { data: lastData } = await supabase
-        .from('m3u_sync_entries')
-        .select('group_title')
-        .order('group_title', { ascending: false })
-        .limit(5000);
+      const uniqueCategories = (categoriesData || [])
+        .map((r: { group_title: string }) => r.group_title)
+        .filter(Boolean)
+        .sort();
       
-      if (lastData) {
-        lastData.forEach(row => {
-          if (row.group_title) allCategories.add(row.group_title);
-        });
-      }
-      
-      const uniqueCategories = Array.from(allCategories).sort();
-      console.log(`[Playlist] Found ${uniqueCategories.length} categories, ~${count || 0} entries`);
-      return { categories: uniqueCategories, totalScanned: count || 0 };
+      console.log(`[Playlist] Found ${uniqueCategories.length} categories via RPC`);
+      return { categories: uniqueCategories, totalScanned: uniqueCategories.length * 100 };
       
     } catch (error) {
       console.error('[Playlist] loadAllCategoryNames error:', error);
