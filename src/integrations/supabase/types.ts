@@ -7013,6 +7013,7 @@ export type Database = {
           r2_url: string
         }[]
       }
+      fix_stale_migration_jobs: { Args: never; Returns: number }
       generate_r2_key: {
         Args: {
           p_content_type: string

@@ -54,8 +54,9 @@ export function MigrationJobsTable({ jobs, onAction, isLoading }: MigrationJobsT
   };
 
   const getProgress = (job: MigrationJob) => {
-    if (job.total_items === 0) return 0;
-    return Math.round((job.processed_items / job.total_items) * 100);
+    const total = job.total_items || job.processed_items;
+    if (total === 0) return 0;
+    return Math.min(100, Math.round((job.processed_items / total) * 100));
   };
 
   if (isLoading) {
@@ -100,7 +101,8 @@ export function MigrationJobsTable({ jobs, onAction, isLoading }: MigrationJobsT
               <div className="space-y-1">
                 <Progress value={getProgress(job)} className="h-2" />
                 <span className="text-xs text-muted-foreground">
-                  {job.processed_items.toLocaleString()} / {job.total_items.toLocaleString()}
+                  {job.processed_items.toLocaleString()} / {(job.total_items || job.processed_items).toLocaleString()}
+                  {job.total_items === 0 && <span className="text-yellow-500 ml-1">(estimado)</span>}
                 </span>
               </div>
             </TableCell>
