@@ -89,11 +89,11 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setCategories(sortedCategories);
   }, []);
 
-  // Load ALL category names using RPC or paginated approach
+  // Load ALL category names using paginated approach with Supabase's 1000 row limit
   const loadAllCategoryNames = useCallback(async (): Promise<string[]> => {
     try {
-      // Use a more efficient approach: fetch categories in batches
-      const PAGE_SIZE = 50000;
+      // Supabase default limit is 1000 rows per request
+      const PAGE_SIZE = 1000;
       const allCategories = new Set<string>();
       let offset = 0;
       let hasMore = true;
@@ -122,12 +122,20 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           }
         });
         
-        console.log(`[Playlist] Fetched ${offset + data.length} entries, found ${allCategories.size} unique categories so far`);
+        // Log progress every 50k entries
+        if ((offset + data.length) % 50000 === 0 || data.length < PAGE_SIZE) {
+          console.log(`[Playlist] Scanned ${offset + data.length} entries, found ${allCategories.size} unique categories`);
+        }
         
         if (data.length < PAGE_SIZE) {
           hasMore = false;
         } else {
           offset += PAGE_SIZE;
+        }
+        
+        // Small delay every 20 batches to prevent blocking
+        if (offset % 20000 === 0) {
+          await new Promise(r => setTimeout(r, 10));
         }
       }
       
