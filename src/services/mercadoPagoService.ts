@@ -183,15 +183,10 @@ class MercadoPagoService {
   }
 
   /**
-   * Redirect to Mercado Pago checkout
+   * Redirect to Mercado Pago checkout (production mode)
    */
-  redirectToCheckout(checkoutUrl: string, sandbox = false): void {
-    // Use sandbox URL in development
-    const isDev = window.location.hostname === "localhost" || 
-                  window.location.hostname.includes("lovable");
-    
-    const url = (isDev || sandbox) ? checkoutUrl : checkoutUrl;
-    window.location.href = url;
+  redirectToCheckout(checkoutUrl: string): void {
+    window.location.href = checkoutUrl;
   }
 }
 
