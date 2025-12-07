@@ -7104,12 +7104,10 @@ export type Database = {
           should_download: boolean
         }[]
       }
-      execute_sql_as_service_role:
-        | {
-            Args: { caller_user_id?: string; sql_query: string }
-            Returns: undefined
-          }
-        | { Args: { sql_query: string }; Returns: undefined }
+      execute_sql_as_service_role: {
+        Args: { caller_user_id?: string; sql_query: string }
+        Returns: undefined
+      }
       find_playlist_by_hash: {
         Args: { p_sha256: string }
         Returns: {
