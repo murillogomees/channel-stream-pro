@@ -75,7 +75,7 @@ export default function AdminTemplates() {
     message: '',
     daysBeforeDue: 0,
     type: 'local' as 'local' | 'botbot',
-    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder' | 'payment_approved' | 'payment_pending' | 'payment_in_process' | 'payment_rejected' | 'payment_refunded' | 'payment_cancelled',
+    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder' | 'payment_approved' | 'payment_pending' | 'payment_in_process' | 'payment_rejected' | 'payment_refunded' | 'payment_cancelled' | 'manual',
   });
   
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -322,6 +322,7 @@ export default function AdminTemplates() {
       welcome_plan: 'Boas-vindas Plano',
       renewal: 'Renovação',
       payment_reminder: 'Lembrete Pgto',
+      manual: 'Manual/Automação',
     };
     return labels[eventType] || eventType;
   };
@@ -693,6 +694,7 @@ export default function AdminTemplates() {
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="manual">Manual / Para Automações</SelectItem>
                   <SelectItem value="expiration">Vencimento de Plano</SelectItem>
                   <SelectItem value="welcome_trial">Boas-vindas - Período de Teste</SelectItem>
                   <SelectItem value="welcome_plan">Boas-vindas - Plano Contratado</SelectItem>
@@ -701,7 +703,9 @@ export default function AdminTemplates() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Quando este template será enviado automaticamente
+                {formData.eventType === 'manual' 
+                  ? 'Templates manuais são usados em regras de automação ou envio manual'
+                  : 'Quando este template será enviado automaticamente'}
               </p>
             </div>
 

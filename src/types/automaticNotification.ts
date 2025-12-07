@@ -4,7 +4,8 @@ export type NotificationEventType =
   | 'payment_received'
   | 'client_update'
   | 'trial_ending'
-  | 'client_deactivation';
+  | 'client_deactivation'
+  | 'manual';
 
 export type NotificationTriggerCondition =
   | 'on_registration'
