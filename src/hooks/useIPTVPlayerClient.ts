@@ -831,13 +831,15 @@ export function useIPTVPlayerClient() {
       // Try to load from the main m3u_sync_sources (published M3U)
       console.log('[IPTV] Loading from m3u_sync_sources');
       
-      const { data: mainSource, error: sourceError } = await supabase
+      // Explicit any cast to avoid TS2589 type depth error in generated Supabase types
+      const { data: mainSourceData, error: sourceError } = await (supabase as any)
         .from('m3u_sync_sources')
         .select('id, name, source_url')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      
+      const mainSource = mainSourceData?.[0] as { id: string; name: string; source_url: string } | undefined;
 
       if (sourceError) {
         console.error('[IPTV] Main source lookup error:', sourceError);
