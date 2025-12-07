@@ -4217,6 +4217,7 @@ export type Database = {
           totp_secret: string | null
           totp_verified_at: string | null
           updated_at: string | null
+          user_id: string | null
           usuario_m3u: string | null
           valor_pago: number | null
         }
@@ -4250,6 +4251,7 @@ export type Database = {
           totp_secret?: string | null
           totp_verified_at?: string | null
           updated_at?: string | null
+          user_id?: string | null
           usuario_m3u?: string | null
           valor_pago?: number | null
         }
@@ -4283,6 +4285,7 @@ export type Database = {
           totp_secret?: string | null
           totp_verified_at?: string | null
           updated_at?: string | null
+          user_id?: string | null
           usuario_m3u?: string | null
           valor_pago?: number | null
         }
