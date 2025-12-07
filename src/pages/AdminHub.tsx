@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+
+// Helper para evitar erros de tipo excessivamente profundos
+const db = supabase as unknown as {
+  from: (table: string) => {
+    select: (columns: string, options?: { count?: string; head?: boolean }) => {
+      eq: (column: string, value: unknown) => Promise<{ data: unknown[] | null; count: number | null; error: Error | null }>;
+      single: () => Promise<{ data: unknown | null; error: Error | null }>;
+    } & Promise<{ data: unknown[] | null; count: number | null; error: Error | null }>;
+    update: (data: Record<string, unknown>) => {
+      eq: (column: string, value: unknown) => Promise<{ error: Error | null }>;
+    };
+  };
+};
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -62,33 +75,22 @@ export default function AdminHub() {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Use fetch direto para evitar problemas de tipo
-      const { data: profilesData } = await (supabase
-        .from('profiles')
-        .select('situacao, data_vencimento') as any);
+      // Usar helper db para evitar erro de tipo infinito
+      type ProfileRow = { situacao: string | null; data_vencimento: string | null };
       
-      const m3uRes = await (supabase
-        .from('m3u_sync_sources')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true) as any);
-      
-      const securityRes = await (supabase
-        .from('security_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('resolved', false) as any);
-      
-      const m3uCount = m3uRes?.count || 0;
-      const securityCount = securityRes?.count || 0;
+      const profilesResult = await db.from('profiles').select('situacao, data_vencimento');
+      const m3uResult = await db.from('m3u_sync_sources').select('id', { count: 'exact', head: true }).eq('is_active', true);
+      const securityResult = await db.from('security_events').select('id', { count: 'exact', head: true }).eq('resolved', false);
 
-      const profiles = profilesData as Array<{ situacao: string | null; data_vencimento: string | null }> || [];
+      const profiles = (profilesResult.data || []) as ProfileRow[];
       
       setStats({
         totalClientes: profiles.length,
         clientesAtivos: profiles.filter(c => c.situacao === 'Ativo').length,
         clientesTestando: profiles.filter(c => c.situacao === 'Testando').length,
         vencendoHoje: profiles.filter(c => c.data_vencimento?.startsWith(today)).length,
-        m3uLists: m3uCount || 0,
-        securityEvents: securityCount || 0,
+        m3uLists: m3uResult.count || 0,
+        securityEvents: securityResult.count || 0,
       });
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
