@@ -54,16 +54,24 @@ export function MigrationConfigPanel() {
       if (value === 'true') normalizedValue = true;
       if (value === 'false') normalizedValue = false;
       
-      const { error } = await supabase
+      console.log('[MigrationConfig] Saving:', key, normalizedValue);
+      
+      // Use update instead of upsert since records already exist
+      const { data, error } = await supabase
         .from('r2_migration_config')
-        .upsert({ 
-          key,
+        .update({ 
           value: normalizedValue,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'key' });
+        })
+        .eq('key', key)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MigrationConfig] Update error:', error);
+        throw error;
+      }
 
+      console.log('[MigrationConfig] Updated:', data);
       setConfig(prev => ({ ...prev, [key]: normalizedValue }));
       toast.success('Configuração salva');
     } catch (error) {
