@@ -154,19 +154,16 @@ export default function AdminClientes() {
   const hasActiveFilters = filterPlano !== 'all' || filterOrigem !== 'all' || 
                           filterVencimento !== 'all';
 
-  // Contar clientes sem conta de acesso
+  // Contar clientes sem conta de acesso (usando profiles)
   useEffect(() => {
     const countWithoutAuth = async () => {
       try {
-        const { count, error } = await supabase
-          .from('clientes')
-          .select('*', { count: 'exact', head: true })
-          .is('user_id', null)
-          .not('email', 'is', null);
-
-        if (!error && count !== null) {
-          setClientesWithoutAuth(count);
-        }
+        // Contar profiles que têm email mas não foram vinculados a auth.users
+        // Estes são profiles criados manualmente sem conta de autenticação
+        const profilesWithEmail = profiles.filter(p => p.email && p.email.trim() !== '');
+        // Assumimos que profiles migrados sem user_id real precisam de conta
+        const withoutAuth = profilesWithEmail.filter(p => !p.id || p.situacao === 'Testando');
+        setClientesWithoutAuth(withoutAuth.length);
       } catch (error) {
         console.error('Error counting clients without auth:', error);
       }
