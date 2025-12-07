@@ -94,18 +94,17 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     sessionKey,
   } = input;
 
-  // Use ref for stable key generation (survives hot reload)
+  // Use refs for stable key generation (survives hot reload)
+  // ALL useRef calls MUST be at the top, unconditionally
   const keyCounterRef = useRef(0);
   const stableKeysRef = useRef<Map<string, string>>(new Map());
-  
-  // APPEND-ONLY: Cache previously shown channels per section to prevent reordering
   const shownChannelsRef = useRef<{
     live: string[];
     movie: string[];
     series: string[];
   }>({ live: [], movie: [], series: [] });
   
-  // Get or create stable key for an item
+  // Get or create stable key for an item - defined as a stable function
   const getOrCreateStableKey = (id: string, prefix: string): string => {
     const cacheKey = `${prefix}:${id}`;
     if (!stableKeysRef.current.has(cacheKey)) {
