@@ -389,7 +389,7 @@ export function SeriesView({
   if (isInitializing && categories.length > 0) {
     return (
       <div className={cn('flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]', className)}>
-        <aside className="hidden lg:flex flex-col w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border">
+        <aside className="hidden lg:flex flex-col w-[280px] xl:w-[320px] 2xl:w-[360px] flex-shrink-0 border-r border-border">
           <div className="p-4 border-b border-border">
             <h2 className="font-semibold text-lg">Categorias</h2>
           </div>
@@ -411,7 +411,7 @@ export function SeriesView({
   return (
     <div className={cn('flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]', className)}>
       {/* Sidebar - Categories */}
-      <aside className="hidden lg:flex flex-col w-[240px] xl:w-[280px] flex-shrink-0 border-r border-border">
+      <aside className="hidden lg:flex flex-col w-[280px] xl:w-[320px] 2xl:w-[360px] flex-shrink-0 border-r border-border">
         <div className="p-4 border-b border-border">
           <h2 className="font-semibold text-lg">Categorias</h2>
         </div>
