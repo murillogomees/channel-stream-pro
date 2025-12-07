@@ -29,8 +29,10 @@ export default function AdminAutoNotifications() {
     event_type: 'client_registration',
     trigger_condition: 'on_registration',
     target_audience: 'client',
+    template_reference: '',
     active: true,
     priority: 0,
+    days_before: undefined,
   });
 
   useEffect(() => {
@@ -104,8 +106,10 @@ export default function AdminAutoNotifications() {
       event_type: 'client_registration',
       trigger_condition: 'on_registration',
       target_audience: 'client',
+      template_reference: '',
       active: true,
       priority: 0,
+      days_before: undefined,
     });
     setEditingRule(null);
     setIsDialogOpen(false);
@@ -257,8 +261,8 @@ export default function AdminAutoNotifications() {
                       id="days_before"
                       type="number"
                       min="0"
-                      value={formData.days_before || ''}
-                      onChange={(e) => setFormData({ ...formData, days_before: parseInt(e.target.value) || 0 })}
+                      value={formData.days_before ?? ''}
+                      onChange={(e) => setFormData({ ...formData, days_before: e.target.value ? parseInt(e.target.value) : undefined })}
                     />
                   </div>
                 )}
@@ -296,9 +300,9 @@ export default function AdminAutoNotifications() {
                   <Label htmlFor="template_reference">Referência do Template</Label>
                   <Input
                     id="template_reference"
-                    value={formData.template_reference}
+                    value={formData.template_reference ?? ''}
                     onChange={(e) => setFormData({ ...formData, template_reference: e.target.value })}
-                    placeholder="ex: welcome_trial, expiration_7_days"
+                    placeholder="ex: Primeira Chamada - 30OFF"
                   />
                 </div>
 
