@@ -6,10 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface Cliente {
+interface Profile {
   id: string;
   nome: string;
   telefone: string;
+  contact_phone: string;
   plano: string;
   valor_pago: number;
   situacao: string;
@@ -48,7 +49,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Buscar clientes que vencem nos próximos 7 dias
+    // Buscar profiles que vencem nos próximos 7 dias
     const today = new Date();
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
@@ -56,8 +57,8 @@ serve(async (req) => {
     const todayStr = today.toISOString().split('T')[0];
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-    const { data: clientes, error } = await supabase
-      .from("clientes")
+    const { data: profiles, error } = await supabase
+      .from("profiles")
       .select("*")
       .gte("data_vencimento", todayStr)
       .lte("data_vencimento", nextWeekStr)
@@ -68,7 +69,7 @@ serve(async (req) => {
       throw error;
     }
 
-    if (!clientes || clientes.length === 0) {
+    if (!profiles || profiles.length === 0) {
       console.log("Nenhum vencimento na próxima semana");
       return new Response(
         JSON.stringify({ message: "Nenhum vencimento na semana", count: 0 }),
@@ -76,20 +77,20 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Encontrados ${clientes.length} vencimentos para a semana`);
+    console.log(`Encontrados ${profiles.length} vencimentos para a semana`);
 
     // Agrupar por dia da semana
     const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const clientesPorDia: Record<string, Cliente[]> = {};
+    const profilesPorDia: Record<string, Profile[]> = {};
     
-    clientes.forEach((cliente: Cliente) => {
-      const dataVenc = new Date(cliente.data_vencimento);
+    profiles.forEach((profile: Profile) => {
+      const dataVenc = new Date(profile.data_vencimento);
       const dataKey = dataVenc.toISOString().split('T')[0];
       
-      if (!clientesPorDia[dataKey]) {
-        clientesPorDia[dataKey] = [];
+      if (!profilesPorDia[dataKey]) {
+        profilesPorDia[dataKey] = [];
       }
-      clientesPorDia[dataKey].push(cliente);
+      profilesPorDia[dataKey].push(profile);
     });
 
     // Buscar telefones de admins
@@ -111,24 +112,24 @@ serve(async (req) => {
     
     let message = `📅 *RESUMO SEMANAL*\n`;
     message += `Semana de ${startDate} a ${endDate}\n\n`;
-    message += `Total da semana: *${clientes.length} vencimentos*\n\n`;
+    message += `Total da semana: *${profiles.length} vencimentos*\n\n`;
 
     // Percorrer cada dia
-    const sortedDates = Object.keys(clientesPorDia).sort();
+    const sortedDates = Object.keys(profilesPorDia).sort();
     sortedDates.forEach((dateStr) => {
-      const clientesDia = clientesPorDia[dateStr];
+      const profilesDia = profilesPorDia[dateStr];
       const date = new Date(dateStr + 'T12:00:00');
       const diaSemana = diasSemana[date.getDay()];
       const dataFormatada = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
-      const ativos = clientesDia.filter(c => c.situacao === 'Ativo').length;
-      const testando = clientesDia.filter(c => c.situacao === 'Testando').length;
-      const devendo = clientesDia.filter(c => c.situacao === 'Devendo').length;
-      const receitaDia = clientesDia
+      const ativos = profilesDia.filter(c => c.situacao === 'Ativo').length;
+      const testando = profilesDia.filter(c => c.situacao === 'Testando').length;
+      const devendo = profilesDia.filter(c => c.situacao === 'Devendo').length;
+      const receitaDia = profilesDia
         .filter(c => c.situacao === 'Ativo')
         .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
 
-      message += `📍 *${diaSemana.toUpperCase()} (${dataFormatada})* - ${clientesDia.length} clientes\n`;
+      message += `📍 *${diaSemana.toUpperCase()} (${dataFormatada})* - ${profilesDia.length} clientes\n`;
       message += `   • ${ativos} Ativos`;
       if (testando > 0) message += ` | ${testando} Testando`;
       if (devendo > 0) message += ` | ${devendo} Devendo`;
@@ -137,11 +138,11 @@ serve(async (req) => {
     });
 
     // Destaques
-    const recorrentes = clientes.filter(c => c.is_recorrente && c.situacao === 'Ativo');
-    const maiorValor = clientes
+    const recorrentes = profiles.filter(c => c.is_recorrente && c.situacao === 'Ativo');
+    const maiorValor = profiles
       .filter(c => c.situacao === 'Ativo')
       .sort((a, b) => (b.valor_pago || 0) - (a.valor_pago || 0))[0];
-    const clientesRisco = clientes.filter(c => c.situacao === 'Devendo');
+    const clientesRisco = profiles.filter(c => c.situacao === 'Devendo');
 
     message += `🎯 *DESTAQUES:*\n`;
     if (recorrentes.length > 0) {
@@ -155,7 +156,7 @@ serve(async (req) => {
     }
 
     // Projeção total
-    const receitaTotal = clientes
+    const receitaTotal = profiles
       .filter(c => c.situacao === 'Ativo')
       .reduce((sum, c) => sum + (c.valor_pago || 0), 0);
     message += `\n💵 *PROJEÇÃO TOTAL: R$ ${receitaTotal.toFixed(2)}*`;
@@ -198,7 +199,7 @@ serve(async (req) => {
       action_description: `Resumo semanal enviado para ${sentCount} administradores`,
       entity_type: 'notification',
       metadata: {
-        total_vencimentos: clientes.length,
+        total_vencimentos: profiles.length,
         recorrentes: recorrentes.length,
         receita_projetada: receitaTotal,
         admins_notificados: sentCount
@@ -208,7 +209,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        vencimentos_semana: clientes.length,
+        vencimentos_semana: profiles.length,
         admins_notificados: sentCount,
         receita_projetada: receitaTotal
       }),

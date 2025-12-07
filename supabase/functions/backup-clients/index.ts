@@ -16,22 +16,22 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('🔄 Iniciando backup automático de clientes...');
+    console.log('🔄 Iniciando backup automático de profiles...');
 
-    // Buscar todos os clientes
-    const { data: clientes, error: clientesError } = await supabase
-      .from('clientes')
+    // Buscar todos os profiles (source of truth)
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
       .select('*')
-      .order('data_cadastro', { ascending: false });
+      .order('created_at', { ascending: false });
 
-    if (clientesError) {
-      console.error('❌ Erro ao buscar clientes:', clientesError);
-      throw clientesError;
+    if (profilesError) {
+      console.error('❌ Erro ao buscar profiles:', profilesError);
+      throw profilesError;
     }
 
-    console.log(`✅ ${clientes?.length || 0} clientes encontrados`);
+    console.log(`✅ ${profiles?.length || 0} profiles encontrados`);
 
-    // Buscar M3U lists atribuídas
+    // Buscar M3U lists atribuídas (usando profile id)
     const { data: m3uAssignments, error: m3uError } = await supabase
       .from('client_m3u_lists')
       .select(`
@@ -48,48 +48,48 @@ serve(async (req) => {
       console.error('❌ Erro ao buscar M3U assignments:', m3uError);
     }
 
-    // Criar mapa de M3U lists por cliente
-    const m3uByClient = new Map();
+    // Criar mapa de M3U lists por profile
+    const m3uByProfile = new Map();
     m3uAssignments?.forEach((assignment: any) => {
-      if (!m3uByClient.has(assignment.client_id)) {
-        m3uByClient.set(assignment.client_id, []);
+      if (!m3uByProfile.has(assignment.client_id)) {
+        m3uByProfile.set(assignment.client_id, []);
       }
-      m3uByClient.get(assignment.client_id).push({
-        name: assignment.m3u_lists.name,
-        url: assignment.m3u_lists.file_url,
+      m3uByProfile.get(assignment.client_id).push({
+        name: assignment.m3u_lists?.name,
+        url: assignment.m3u_lists?.file_url,
         is_active: assignment.is_active,
         assigned_at: assignment.assigned_at,
       });
     });
 
-    // Enriquecer dados dos clientes com M3U lists
-    const enrichedClientes = clientes?.map(cliente => ({
-      ...cliente,
-      m3u_lists: m3uByClient.get(cliente.id) || [],
+    // Enriquecer dados dos profiles com M3U lists
+    const enrichedProfiles = profiles?.map(profile => ({
+      ...profile,
+      m3u_lists: m3uByProfile.get(profile.id) || [],
     }));
 
     // Criar backup em formato JSON
     const backup = {
       timestamp: new Date().toISOString(),
-      total_clientes: enrichedClientes?.length || 0,
-      clientes: enrichedClientes,
+      total_profiles: enrichedProfiles?.length || 0,
+      profiles: enrichedProfiles,
       metadata: {
         backup_date: new Date().toISOString(),
-        backup_version: '1.0',
-        total_active: enrichedClientes?.filter(c => c.cliente_ativo).length || 0,
-        total_inactive: enrichedClientes?.filter(c => !c.cliente_ativo).length || 0,
+        backup_version: '2.0',
+        total_active: enrichedProfiles?.filter(c => c.cliente_ativo).length || 0,
+        total_inactive: enrichedProfiles?.filter(c => !c.cliente_ativo).length || 0,
         by_situation: {
-          testando: enrichedClientes?.filter(c => c.situacao === 'Testando').length || 0,
-          ativo: enrichedClientes?.filter(c => c.situacao === 'Ativo').length || 0,
-          devendo: enrichedClientes?.filter(c => c.situacao === 'Devendo').length || 0,
-          inativo: enrichedClientes?.filter(c => c.situacao === 'Inativo').length || 0,
-          lead: enrichedClientes?.filter(c => c.situacao === 'Lead').length || 0,
+          testando: enrichedProfiles?.filter(c => c.situacao === 'Testando').length || 0,
+          ativo: enrichedProfiles?.filter(c => c.situacao === 'Ativo').length || 0,
+          devendo: enrichedProfiles?.filter(c => c.situacao === 'Devendo').length || 0,
+          inativo: enrichedProfiles?.filter(c => c.situacao === 'Inativo').length || 0,
+          lead: enrichedProfiles?.filter(c => c.situacao === 'Lead').length || 0,
         },
       },
     };
 
     console.log('✅ Backup criado com sucesso');
-    console.log(`📊 Total de clientes: ${backup.total_clientes}`);
+    console.log(`📊 Total de profiles: ${backup.total_profiles}`);
     console.log(`📊 Ativos: ${backup.metadata.total_active}, Inativos: ${backup.metadata.total_inactive}`);
 
     return new Response(

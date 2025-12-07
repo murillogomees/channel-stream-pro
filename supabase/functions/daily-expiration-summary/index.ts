@@ -6,10 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface Cliente {
+interface Profile {
   id: string;
   nome: string;
   telefone: string;
+  contact_phone: string;
   plano: string;
   valor_pago: number;
   situacao: string;
@@ -50,10 +51,10 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Buscar clientes com vencimento hoje
+    // Buscar profiles com vencimento hoje (profiles é a source of truth)
     const today = new Date().toISOString().split('T')[0];
-    const { data: clientes, error } = await supabase
-      .from("clientes")
+    const { data: profiles, error } = await supabase
+      .from("profiles")
       .select("*")
       .gte("data_vencimento", today)
       .lt("data_vencimento", `${today}T23:59:59`)
@@ -63,7 +64,7 @@ serve(async (req) => {
       throw error;
     }
 
-    if (!clientes || clientes.length === 0) {
+    if (!profiles || profiles.length === 0) {
       console.log("Nenhum vencimento hoje");
       return new Response(
         JSON.stringify({ message: "Nenhum vencimento hoje", count: 0 }),
@@ -71,12 +72,12 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Encontrados ${clientes.length} vencimentos para hoje`);
+    console.log(`Encontrados ${profiles.length} vencimentos para hoje`);
 
     // Agrupar por situação
-    const ativos = clientes.filter((c: Cliente) => c.situacao === "Ativo");
-    const testando = clientes.filter((c: Cliente) => c.situacao === "Testando");
-    const devendo = clientes.filter((c: Cliente) => c.situacao === "Devendo");
+    const ativos = profiles.filter((c: Profile) => c.situacao === "Ativo");
+    const testando = profiles.filter((c: Profile) => c.situacao === "Testando");
+    const devendo = profiles.filter((c: Profile) => c.situacao === "Devendo");
 
     // Buscar telefones de admins
     const { data: admins, error: adminError } = await supabase
@@ -95,35 +96,35 @@ serve(async (req) => {
     // Formatar mensagem
     const dateStr = new Date().toLocaleDateString('pt-BR');
     let message = `📊 *RESUMO DIÁRIO - ${dateStr}*\n`;
-    message += `Vencimentos de hoje: *${clientes.length} clientes*\n\n`;
+    message += `Vencimentos de hoje: *${profiles.length} clientes*\n\n`;
 
     // Ativos
     if (ativos.length > 0) {
       message += `🟢 *ATIVOS (${ativos.length}):*\n`;
-      ativos.forEach((c: Cliente, i: number) => {
+      ativos.forEach((c: Profile, i: number) => {
         message += `${i + 1}. ${c.nome} - ${c.plano} - R$ ${c.valor_pago?.toFixed(2) || '0.00'}\n`;
         message += `   Recorrente: ${c.is_recorrente ? 'Sim' : 'Não'} | `;
         message += `Últ. Pgto: ${c.forma_ultimo_pagamento || 'N/A'}\n`;
-        message += `   Tel: ${c.telefone}\n\n`;
+        message += `   Tel: ${c.contact_phone || c.telefone}\n\n`;
       });
     }
 
     // Testando
     if (testando.length > 0) {
       message += `🟡 *TESTANDO (${testando.length}):*\n`;
-      testando.forEach((c: Cliente, i: number) => {
+      testando.forEach((c: Profile, i: number) => {
         message += `${i + 1}. ${c.nome} - Período de teste\n`;
-        message += `   Tel: ${c.telefone}\n\n`;
+        message += `   Tel: ${c.contact_phone || c.telefone}\n\n`;
       });
     }
 
     // Devendo
     if (devendo.length > 0) {
       message += `🔴 *DEVENDO (${devendo.length}):*\n`;
-      devendo.forEach((c: Cliente, i: number) => {
+      devendo.forEach((c: Profile, i: number) => {
         message += `${i + 1}. ${c.nome} - ${c.plano}\n`;
         message += `   ⚠️ ATENÇÃO: Cliente com pagamento pendente\n`;
-        message += `   Tel: ${c.telefone}\n\n`;
+        message += `   Tel: ${c.contact_phone || c.telefone}\n\n`;
       });
     }
 
@@ -170,7 +171,7 @@ serve(async (req) => {
       action_description: `Resumo diário enviado para ${sentCount} administradores`,
       entity_type: 'notification',
       metadata: {
-        total_vencimentos: clientes.length,
+        total_vencimentos: profiles.length,
         ativos: ativos.length,
         testando: testando.length,
         devendo: devendo.length,
@@ -182,7 +183,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        vencimentos: clientes.length,
+        vencimentos: profiles.length,
         admins_notificados: sentCount,
         receita_esperada: totalReceita
       }),
