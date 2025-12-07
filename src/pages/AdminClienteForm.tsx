@@ -329,47 +329,7 @@ export default function AdminClienteForm() {
         description: 'As informações foram salvas com sucesso.',
       });
 
-      // Atualizar atribuições de M3U lists para cliente existente
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-
-        // Primeiro, desativar todas as atribuições existentes
-        const { error: deactivateError } = await supabase
-          .from('client_m3u_lists')
-          .update({ is_active: false })
-          .eq('client_id', id);
-
-        if (deactivateError) throw deactivateError;
-
-        // Depois, inserir ou reativar as atribuições selecionadas
-        if (selectedM3ULists.length > 0) {
-          const newAssignments = selectedM3ULists.map(listId => ({
-            client_id: id,
-            m3u_list_id: listId,
-            assigned_by: user.id,
-            is_active: true,
-          }));
-
-          const { error: m3uError } = await supabase
-            .from('client_m3u_lists')
-            .upsert(newAssignments, {
-              onConflict: 'client_id,m3u_list_id',
-              ignoreDuplicates: false,
-            });
-
-          if (m3uError) throw m3uError;
-
-          console.log('M3U lists atualizadas:', selectedM3ULists.length);
-        }
-      } catch (error) {
-        console.error('Error updating M3U lists:', error);
-        toast({
-          title: "Erro ao atualizar listas",
-          description: "Cliente atualizado, mas houve erro ao atualizar listas M3U",
-          variant: "destructive",
-        });
-      }
+      // M3U list assignment removed - using unified m3u_sync_entries
 
       // Enviar mensagem de atualização se checkbox estiver marcado (ANTES de mostrar modal)
       if (enviarWhatsApp && clienteOriginal) {
@@ -520,35 +480,7 @@ export default function AdminClienteForm() {
               : 'O novo cliente foi adicionado com sucesso.',
           });
 
-        // Save M3U list assignments for new clients
-        if (selectedM3ULists.length > 0) {
-          try {
-            const newAssignments = selectedM3ULists.map(listId => ({
-              client_id: clientId,
-              m3u_list_id: listId,
-              assigned_by: currentUser?.id,
-              is_active: true,
-            }));
-
-            const { error: m3uError } = await supabase
-              .from('client_m3u_lists')
-              .insert(newAssignments);
-
-            if (m3uError) throw m3uError;
-
-            toast({
-              title: "Listas atribuídas",
-              description: `${selectedM3ULists.length} lista(s) M3U atribuída(s) com sucesso`,
-            });
-          } catch (error) {
-            console.error('Error assigning M3U lists:', error);
-            toast({
-              title: "Erro ao atribuir listas",
-              description: "Cliente criado, mas houve erro ao atribuir listas M3U",
-              variant: "destructive",
-            });
-          }
-        }
+        // M3U list assignment removed - using unified m3u_sync_entries
 
         // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
         if (enviarWhatsApp) {

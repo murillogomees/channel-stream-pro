@@ -21,7 +21,7 @@ interface MigrationConfig {
   concurrency: number;
   maxRetries: number;
   dryRun: boolean;
-  targetTable: 'm3u_sync_entries' | 'm3u_channels' | 'playlist_entries';
+  targetTable: 'm3u_sync_entries' | 'm3u_channels';
 }
 
 interface MigrationResult {
@@ -387,77 +387,7 @@ class MigrationWorker {
     }
   }
 
-  async processPlaylistEntry(entry: any): Promise<MigrationResult> {
-    const startTime = Date.now();
-    const result: MigrationResult = {
-      itemId: entry.id,
-      status: 'failed',
-      durationMs: 0,
-    };
-
-    try {
-      if (entry.is_output_synced && entry.r2_output_path) {
-        result.status = 'skipped';
-        result.durationMs = Date.now() - startTime;
-        return result;
-      }
-
-      const outputUrl = entry.output_url;
-      if (!outputUrl) {
-        result.status = 'skipped';
-        result.error = 'No output URL';
-        result.durationMs = Date.now() - startTime;
-        return result;
-      }
-
-      const r2Key = `playlists/${entry.playlist_id}/${entry.id}`;
-
-      if (!this.config.dryRun) {
-        // Download content
-        const downloaded = await this.r2.downloadFromUrl(outputUrl);
-        if (!downloaded) {
-          throw new Error('Playlist download failed');
-        }
-
-        // Upload to R2
-        const uploadResult = await this.r2.uploadFile(
-          r2Key,
-          downloaded.data,
-          downloaded.contentType,
-          'public, max-age=60, stale-while-revalidate=300'
-        );
-
-        if (!uploadResult) {
-          throw new Error('Playlist upload failed');
-        }
-
-        // Update DB
-        await this.supabase
-          .from('playlist_entries')
-          .update({
-            r2_output_path: r2Key,
-            r2_output_etag: uploadResult.etag,
-            is_output_synced: true,
-            output_migrated_at: new Date().toISOString(),
-          })
-          .eq('id', entry.id);
-
-        result.toPath = r2Key;
-        result.etagNew = uploadResult.etag;
-        result.sizeBytes = downloaded.data.length;
-      }
-
-      result.status = 'success';
-      result.fromUrl = outputUrl;
-      result.durationMs = Date.now() - startTime;
-      return result;
-    } catch (error) {
-      result.status = 'failed';
-      result.error = error instanceof Error ? error.message : 'Unknown error';
-      result.durationMs = Date.now() - startTime;
-      return result;
-    }
-  }
+  // processPlaylistEntry removed - playlist_entries table no longer exists
 
   async logResult(result: MigrationResult): Promise<void> {
     try {
@@ -499,9 +429,6 @@ class MigrationWorker {
               break;
             case 'm3u_channels':
               result = await this.processM3uChannel(item);
-              break;
-            case 'playlist_entries':
-              result = await this.processPlaylistEntry(item);
               break;
             default:
               result = {
@@ -592,9 +519,6 @@ class MigrationWorker {
             break;
           case 'm3u_channels':
             query = query.or('is_logo_synced.is.null,is_logo_synced.eq.false');
-            break;
-          case 'playlist_entries':
-            query = query.or('is_output_synced.is.null,is_output_synced.eq.false');
             break;
         }
 
