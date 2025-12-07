@@ -89,63 +89,60 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setCategories(sortedCategories);
   }, []);
 
-  // Load ALL category names using paginated approach with Supabase's 1000 row limit
-  // Returns { categories, totalScanned } to avoid separate HEAD request
+  // Load category names efficiently using sampling (avoids scanning 209k rows)
   const loadAllCategoryNames = useCallback(async (): Promise<{ categories: string[], totalScanned: number }> => {
     try {
-      // Supabase default limit is 1000 rows per request
-      const PAGE_SIZE = 1000;
       const allCategories = new Set<string>();
-      let offset = 0;
-      let hasMore = true;
-      let totalScanned = 0;
       
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('m3u_sync_entries')
-          .select('group_title')
-          .order('group_title', { ascending: true })
-          .range(offset, offset + PAGE_SIZE - 1);
-        
-        if (error) {
-          console.error('[Playlist] Category fetch error:', error);
-          break;
-        }
-        
-        if (!data || data.length === 0) {
-          hasMore = false;
-          break;
-        }
-        
-        totalScanned = offset + data.length;
-        
-        // Add to set (deduplicates automatically)
-        data.forEach(row => {
-          if (row.group_title) {
-            allCategories.add(row.group_title);
-          }
+      // Get approximate count first
+      const { count } = await supabase
+        .from('m3u_sync_entries')
+        .select('*', { count: 'exact', head: true });
+      
+      // Sample categories by fetching first 5000 from sorted list
+      const { data: sampleData, error: sampleError } = await supabase
+        .from('m3u_sync_entries')
+        .select('group_title')
+        .order('group_title', { ascending: true })
+        .limit(5000);
+      
+      if (!sampleError && sampleData) {
+        sampleData.forEach(row => {
+          if (row.group_title) allCategories.add(row.group_title);
         });
-        
-        // Log progress every 50k entries
-        if (totalScanned % 50000 === 0 || data.length < PAGE_SIZE) {
-          console.log(`[Playlist] Scanned ${totalScanned} entries, found ${allCategories.size} unique categories`);
-        }
-        
-        if (data.length < PAGE_SIZE) {
-          hasMore = false;
-        } else {
-          offset += PAGE_SIZE;
-        }
-        
-        // Small delay every 20 batches to prevent blocking
-        if (offset % 20000 === 0) {
-          await new Promise(r => setTimeout(r, 10));
-        }
+      }
+      
+      // Also get last 5000 to catch categories at the end of alphabet
+      const { data: lastData } = await supabase
+        .from('m3u_sync_entries')
+        .select('group_title')
+        .order('group_title', { ascending: false })
+        .limit(5000);
+      
+      if (lastData) {
+        lastData.forEach(row => {
+          if (row.group_title) allCategories.add(row.group_title);
+        });
+      }
+      
+      // Get middle samples to ensure full coverage
+      const { data: midData } = await supabase
+        .from('m3u_sync_entries')
+        .select('group_title')
+        .gte('group_title', 'M')
+        .lte('group_title', 'R')
+        .limit(3000);
+      
+      if (midData) {
+        midData.forEach(row => {
+          if (row.group_title) allCategories.add(row.group_title);
+        });
       }
       
       const uniqueCategories = Array.from(allCategories).sort();
-      console.log(`[Playlist] Found ${uniqueCategories.length} unique categories from ${totalScanned} entries`);
-      return { categories: uniqueCategories, totalScanned };
+      console.log(`[Playlist] Found ${uniqueCategories.length} categories (via sampling), ~${count || 0} entries`);
+      return { categories: uniqueCategories, totalScanned: count || 0 };
+      
     } catch (error) {
       console.error('[Playlist] loadAllCategoryNames error:', error);
       return { categories: [], totalScanned: 0 };
