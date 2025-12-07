@@ -2434,10 +2434,14 @@ export type Database = {
           created_at: string | null
           group_title: string | null
           id: string
+          is_logo_synced: boolean | null
           is_vod: boolean | null
+          logo_migrated_at: string | null
           metadata: Json | null
           name: string
           order_position: number | null
+          r2_logo_etag: string | null
+          r2_logo_path: string | null
           r2_uploaded: boolean | null
           r2_uploaded_at: string | null
           r2_url: string | null
@@ -2459,10 +2463,14 @@ export type Database = {
           created_at?: string | null
           group_title?: string | null
           id?: string
+          is_logo_synced?: boolean | null
           is_vod?: boolean | null
+          logo_migrated_at?: string | null
           metadata?: Json | null
           name: string
           order_position?: number | null
+          r2_logo_etag?: string | null
+          r2_logo_path?: string | null
           r2_uploaded?: boolean | null
           r2_uploaded_at?: string | null
           r2_url?: string | null
@@ -2484,10 +2492,14 @@ export type Database = {
           created_at?: string | null
           group_title?: string | null
           id?: string
+          is_logo_synced?: boolean | null
           is_vod?: boolean | null
+          logo_migrated_at?: string | null
           metadata?: Json | null
           name?: string
           order_position?: number | null
+          r2_logo_etag?: string | null
+          r2_logo_path?: string | null
           r2_uploaded?: boolean | null
           r2_uploaded_at?: string | null
           r2_url?: string | null
@@ -3163,9 +3175,13 @@ export type Database = {
           entry_hash: string
           group_title: string | null
           id: string
+          is_synced: boolean | null
           is_valid: boolean | null
           is_vod: boolean | null
           metadata: Json | null
+          migrated_at: string | null
+          r2_etag: string | null
+          r2_path: string | null
           raw_extinf: string | null
           source_id: string
           stream_url: string
@@ -3183,9 +3199,13 @@ export type Database = {
           entry_hash: string
           group_title?: string | null
           id?: string
+          is_synced?: boolean | null
           is_valid?: boolean | null
           is_vod?: boolean | null
           metadata?: Json | null
+          migrated_at?: string | null
+          r2_etag?: string | null
+          r2_path?: string | null
           raw_extinf?: string | null
           source_id: string
           stream_url: string
@@ -3203,9 +3223,13 @@ export type Database = {
           entry_hash?: string
           group_title?: string | null
           id?: string
+          is_synced?: boolean | null
           is_valid?: boolean | null
           is_vod?: boolean | null
           metadata?: Json | null
+          migrated_at?: string | null
+          r2_etag?: string | null
+          r2_path?: string | null
           raw_extinf?: string | null
           source_id?: string
           stream_url?: string
@@ -4298,8 +4322,12 @@ export type Database = {
           entry_hash: string
           group_title: string | null
           id: string
+          is_output_synced: boolean | null
           is_valid: boolean | null
+          output_migrated_at: string | null
           playlist_key: string
+          r2_output_etag: string | null
+          r2_output_path: string | null
           search_vector: unknown
           sequence: number | null
           stream_url: string
@@ -4317,8 +4345,12 @@ export type Database = {
           entry_hash: string
           group_title?: string | null
           id?: string
+          is_output_synced?: boolean | null
           is_valid?: boolean | null
+          output_migrated_at?: string | null
           playlist_key: string
+          r2_output_etag?: string | null
+          r2_output_path?: string | null
           search_vector?: unknown
           sequence?: number | null
           stream_url: string
@@ -4336,8 +4368,12 @@ export type Database = {
           entry_hash?: string
           group_title?: string | null
           id?: string
+          is_output_synced?: boolean | null
           is_valid?: boolean | null
+          output_migrated_at?: string | null
           playlist_key?: string
+          r2_output_etag?: string | null
+          r2_output_path?: string | null
           search_vector?: unknown
           sequence?: number | null
           stream_url?: string
@@ -5000,6 +5036,264 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "m3u_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      r2_migration_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      r2_migration_failed: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: number
+          item_id: string
+          item_table: string
+          job_id: string | null
+          max_retries: number | null
+          next_retry_at: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          retry_count: number | null
+          source_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          item_id: string
+          item_table: string
+          job_id?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          retry_count?: number | null
+          source_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          item_id?: string
+          item_table?: string
+          job_id?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          retry_count?: number | null
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_migration_failed_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "r2_migration_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      r2_migration_jobs: {
+        Row: {
+          avg_duration_ms: number | null
+          batch_size: number | null
+          concurrency: number | null
+          config: Json | null
+          created_at: string | null
+          created_by: string | null
+          error_summary: Json | null
+          failed_items: number | null
+          finished_at: string | null
+          id: string
+          job_type: string
+          last_checkpoint: Json | null
+          paused_at: string | null
+          processed_items: number | null
+          skipped_items: number | null
+          started_at: string | null
+          status: string | null
+          success_items: number | null
+          target_table: string
+          throughput_per_min: number | null
+          total_items: number | null
+        }
+        Insert: {
+          avg_duration_ms?: number | null
+          batch_size?: number | null
+          concurrency?: number | null
+          config?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          error_summary?: Json | null
+          failed_items?: number | null
+          finished_at?: string | null
+          id?: string
+          job_type?: string
+          last_checkpoint?: Json | null
+          paused_at?: string | null
+          processed_items?: number | null
+          skipped_items?: number | null
+          started_at?: string | null
+          status?: string | null
+          success_items?: number | null
+          target_table: string
+          throughput_per_min?: number | null
+          total_items?: number | null
+        }
+        Update: {
+          avg_duration_ms?: number | null
+          batch_size?: number | null
+          concurrency?: number | null
+          config?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          error_summary?: Json | null
+          failed_items?: number | null
+          finished_at?: string | null
+          id?: string
+          job_type?: string
+          last_checkpoint?: Json | null
+          paused_at?: string | null
+          processed_items?: number | null
+          skipped_items?: number | null
+          started_at?: string | null
+          status?: string | null
+          success_items?: number | null
+          target_table?: string
+          throughput_per_min?: number | null
+          total_items?: number | null
+        }
+        Relationships: []
+      }
+      r2_migration_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error: string | null
+          etag_new: string | null
+          etag_old: string | null
+          from_url: string | null
+          id: number
+          item_id: string
+          item_table: string
+          job_id: string | null
+          retry_count: number | null
+          size_bytes: number | null
+          status: string
+          to_path: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          etag_new?: string | null
+          etag_old?: string | null
+          from_url?: string | null
+          id?: number
+          item_id: string
+          item_table: string
+          job_id?: string | null
+          retry_count?: number | null
+          size_bytes?: number | null
+          status: string
+          to_path?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          etag_new?: string | null
+          etag_old?: string | null
+          from_url?: string | null
+          id?: number
+          item_id?: string
+          item_table?: string
+          job_id?: string | null
+          retry_count?: number | null
+          size_bytes?: number | null
+          status?: string
+          to_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_migration_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "r2_migration_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      r2_migration_metrics: {
+        Row: {
+          avg_latency_ms: number | null
+          bytes_uploaded: number | null
+          cache_hit_rate: number | null
+          egress_bytes: number | null
+          id: number
+          items_failed: number | null
+          items_processed: number | null
+          items_success: number | null
+          job_id: string | null
+          ops_count: number | null
+          timestamp: string | null
+        }
+        Insert: {
+          avg_latency_ms?: number | null
+          bytes_uploaded?: number | null
+          cache_hit_rate?: number | null
+          egress_bytes?: number | null
+          id?: number
+          items_failed?: number | null
+          items_processed?: number | null
+          items_success?: number | null
+          job_id?: string | null
+          ops_count?: number | null
+          timestamp?: string | null
+        }
+        Update: {
+          avg_latency_ms?: number | null
+          bytes_uploaded?: number | null
+          cache_hit_rate?: number | null
+          egress_bytes?: number | null
+          id?: number
+          items_failed?: number | null
+          items_processed?: number | null
+          items_success?: number | null
+          job_id?: string | null
+          ops_count?: number | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_migration_metrics_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "r2_migration_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -7700,6 +7994,7 @@ export type Database = {
           storage_path: string
         }[]
       }
+      get_r2_config: { Args: { p_key: string }; Returns: Json }
       get_r2_download_candidates: {
         Args: { p_limit?: number }
         Returns: {
@@ -7712,6 +8007,7 @@ export type Database = {
           views_24h: number
         }[]
       }
+      get_r2_migration_stats: { Args: never; Returns: Json }
       get_rls_coverage_summary: { Args: never; Returns: Json }
       get_security_analytics: {
         Args: { _days?: number }
@@ -7996,6 +8292,10 @@ export type Database = {
           title: string
           tvg_logo: string
         }[]
+      }
+      set_r2_config: {
+        Args: { p_key: string; p_value: Json }
+        Returns: undefined
       }
       toggle_feature_flag:
         | {
