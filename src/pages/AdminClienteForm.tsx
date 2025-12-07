@@ -334,68 +334,37 @@ export default function AdminClienteForm() {
       // Detectar se cliente foi desativado (era ativo e agora está inativo)
       const clienteDesativado = clienteOriginal?.cliente_ativo === true && clienteData.clienteAtivo === false;
 
-      // Enviar mensagem de "Primeira Chamada - 30OFF" automaticamente ao desativar cliente
+      // Disparar notificação automática ao desativar cliente (usa regras do sistema)
       if (clienteDesativado && clienteOriginal) {
         try {
-          console.log('[AdminClienteForm] Cliente desativado, enviando notificação 30OFF...');
+          console.log('[AdminClienteForm] Cliente desativado, disparando notificação automática...');
           
-          // Buscar template "Primeira Chamada - 30OFF"
-          const { data: templateData, error: templateError } = await supabase
-            .from('whatsapp_templates')
-            .select('*')
-            .ilike('name', '%Primeira Chamada%30OFF%')
-            .eq('active', true)
-            .maybeSingle();
+          const clienteAtualizado: Cliente = {
+            ...clienteData,
+            id: id,
+            dataCadastro: clienteOriginal.created_at,
+            dataUltimaEdicao: new Date().toISOString(),
+          };
 
-          if (templateError) {
-            console.error('Erro ao buscar template 30OFF:', templateError);
-          } else if (templateData && clienteData.telefone) {
-            const clienteAtualizado: Cliente = {
-              ...clienteData,
-              id: id,
-              dataCadastro: clienteOriginal.created_at,
-              dataUltimaEdicao: new Date().toISOString(),
-            };
-
-            // Usar UnifiedNotificationHandler para enviar
-            const { UnifiedNotificationHandler } = await import('@/services/notifications/handlers/UnifiedNotificationHandler');
-            const notificationHandler = new UnifiedNotificationHandler();
-            
-            const template = {
-              id: templateData.id,
-              name: templateData.name,
-              message: templateData.message,
-              variables: templateData.variables || [],
-              type: (templateData.type as 'local' | 'botbot') || 'local',
-              eventType: templateData.event_type as any,
-              daysBeforeDue: templateData.days_before_due,
-              botbotTemplateId: templateData.botbot_template_id,
-              arquivo: templateData.arquivo as any,
-            };
-
-            const result = await notificationHandler.sendToClient(clienteAtualizado, template);
-            
-            if (result.success) {
-              await activityLogService.logActivity(
-                'notification_sent',
-                `Mensagem de reativação (30OFF) enviada para ${clienteData.nome}`,
-                'cliente',
-                id,
-                { tipo: 'desativacao_30off', telefone: clienteData.telefone }
-              );
-              
-              toast({
-                title: 'Mensagem 30OFF enviada',
-                description: `WhatsApp de reativação enviado para ${clienteData.nome}`,
-              });
-            } else {
-              console.error('Falha ao enviar mensagem 30OFF:', result.error);
-            }
-          } else {
-            console.log('Template 30OFF não encontrado ou cliente sem telefone');
+          // Usar serviço de notificações automáticas
+          const { automaticNotificationTriggerService } = await import('@/services/automaticNotificationTriggerService');
+          const result = await automaticNotificationTriggerService.triggerClientDeactivation(clienteAtualizado);
+          
+          if (result.messagesSent > 0) {
+            toast({
+              title: 'Notificação automática enviada',
+              description: `${result.messagesSent} mensagem(s) enviada(s) para ${clienteData.nome}`,
+            });
+          } else if (result.errors.length > 0) {
+            console.warn('Erros ao enviar notificações:', result.errors);
+            toast({
+              title: 'Aviso',
+              description: 'Nenhuma regra de notificação automática configurada para desativação de cliente',
+              variant: 'default',
+            });
           }
         } catch (error) {
-          console.error('Erro ao enviar mensagem de desativação:', error);
+          console.error('Erro ao enviar notificação de desativação:', error);
         }
       }
 

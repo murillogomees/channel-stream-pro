@@ -3,14 +3,16 @@ export type NotificationEventType =
   | 'payment_due'
   | 'payment_received'
   | 'client_update'
-  | 'trial_ending';
+  | 'trial_ending'
+  | 'client_deactivation';
 
 export type NotificationTriggerCondition =
   | 'on_registration'
   | 'days_before_due'
   | 'on_payment'
   | 'on_update'
-  | 'on_trial_end';
+  | 'on_trial_end'
+  | 'on_deactivation';
 
 export type NotificationTargetAudience = 'client' | 'admin' | 'both';
 

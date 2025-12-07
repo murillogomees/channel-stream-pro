@@ -144,6 +144,7 @@ export default function AdminAutoNotifications() {
       payment_received: 'Pagamento Recebido',
       client_update: 'Atualização de Cliente',
       trial_ending: 'Fim do Teste',
+      client_deactivation: 'Cliente Desativado',
     };
     return labels[type] || type;
   };
@@ -223,6 +224,7 @@ export default function AdminAutoNotifications() {
                         <SelectItem value="payment_received">Pagamento Recebido</SelectItem>
                         <SelectItem value="client_update">Atualização de Cliente</SelectItem>
                         <SelectItem value="trial_ending">Fim do Teste</SelectItem>
+                        <SelectItem value="client_deactivation">Cliente Desativado</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -242,6 +244,7 @@ export default function AdminAutoNotifications() {
                         <SelectItem value="on_payment">No Pagamento</SelectItem>
                         <SelectItem value="on_update">Na Atualização</SelectItem>
                         <SelectItem value="on_trial_end">Fim do Teste</SelectItem>
+                        <SelectItem value="on_deactivation">Ao Desativar Cliente</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
