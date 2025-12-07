@@ -9,7 +9,8 @@ export type TemplateEventType =
   | 'payment_in_process' // Pagamento em processamento
   | 'payment_rejected' // Pagamento recusado
   | 'payment_refunded' // Pagamento reembolsado
-  | 'payment_cancelled'; // Pagamento cancelado
+  | 'payment_cancelled' // Pagamento cancelado
+  | 'manual'; // Template manual para uso em automações
 
 export interface WhatsappTemplate {
   id: string;
