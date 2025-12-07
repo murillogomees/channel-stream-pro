@@ -29,14 +29,21 @@ export function MigrationConfigPanel() {
 
       const configMap: Record<string, any> = {};
       data?.forEach((item) => {
-        try {
-          configMap[item.key] = typeof item.value === 'string' 
-            ? JSON.parse(item.value) 
-            : item.value;
-        } catch {
-          configMap[item.key] = item.value;
+        let value = item.value;
+        // Normalize boolean strings to actual booleans
+        if (value === 'true' || value === true) value = true;
+        else if (value === 'false' || value === false) value = false;
+        // For other values, try to parse if string
+        else if (typeof value === 'string') {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            // Keep as string if not valid JSON
+          }
         }
+        configMap[item.key] = value;
       });
+      console.log('[MigrationConfig] Loaded config:', configMap);
       setConfig(configMap);
     } catch (error) {
       console.error('Error loading config:', error);
