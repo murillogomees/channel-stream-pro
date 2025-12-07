@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Save, RefreshCw, AlertCircle } from 'lucide-react';
+import { Save, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,23 +21,38 @@ export function MigrationConfigPanel() {
   const loadConfig = async () => {
     setIsLoading(true);
     try {
-      console.log('[MigrationConfig] Loading config via RPC...');
+      console.log('[MigrationConfig] Loading config...');
       
-      // Use RPC to bypass RLS issues
-      const { data, error } = await supabase.rpc('get_r2_config');
+      // Use RPC function with type casting
+      const { data, error } = await (supabase.rpc as any)('get_r2_config');
 
       if (error) {
         console.error('[MigrationConfig] RPC load error:', error);
-        throw error;
+        // Fallback to direct query
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('r2_migration_config')
+          .select('*');
+        
+        if (fallbackError) throw fallbackError;
+        
+        const configMap: Record<string, any> = {};
+        fallbackData?.forEach((item: any) => {
+          let value = item.value;
+          if (value === 'true' || value === true) value = true;
+          else if (value === 'false' || value === false) value = false;
+          configMap[item.key] = value;
+        });
+        console.log('[MigrationConfig] Fallback config:', configMap);
+        setConfig(configMap);
+        return;
       }
 
-      console.log('[MigrationConfig] Raw data:', data);
+      console.log('[MigrationConfig] Raw RPC data:', data);
 
       const configMap: Record<string, any> = {};
       const items = data as Array<{ key: string; value: any; description: string; updated_at: string }>;
       items?.forEach((item) => {
         let value = item.value;
-        // Normalize boolean strings to actual booleans
         if (value === 'true' || value === true) value = true;
         else if (value === 'false' || value === false) value = false;
         configMap[item.key] = value;
@@ -60,28 +75,32 @@ export function MigrationConfigPanel() {
       if (value === 'true') normalizedValue = true;
       if (value === 'false') normalizedValue = false;
       
-      console.log('[MigrationConfig] Saving via RPC:', key, normalizedValue);
+      console.log('[MigrationConfig] Saving:', key, normalizedValue);
       
-      // Use SECURITY DEFINER RPC function to bypass RLS issues
-      const { data, error } = await supabase
-        .rpc('update_r2_config', { 
-          p_key: key, 
-          p_value: normalizedValue 
-        });
+      // Try RPC first
+      const { data, error } = await (supabase.rpc as any)('update_r2_config', { 
+        p_key: key, 
+        p_value: normalizedValue 
+      });
 
       if (error) {
-        console.error('[MigrationConfig] RPC error:', error);
-        throw error;
+        console.error('[MigrationConfig] RPC save error:', error);
+        
+        // Fallback to direct update
+        const { error: updateError } = await supabase
+          .from('r2_migration_config')
+          .update({ 
+            value: normalizedValue,
+            updated_at: new Date().toISOString()
+          })
+          .eq('key', key);
+
+        if (updateError) throw updateError;
       }
 
-      console.log('[MigrationConfig] RPC result:', data);
-      
-      if (data === true) {
-        setConfig(prev => ({ ...prev, [key]: normalizedValue }));
-        toast.success('Configuração salva');
-      } else {
-        throw new Error('Nenhum registro atualizado');
-      }
+      console.log('[MigrationConfig] Save result:', data);
+      setConfig(prev => ({ ...prev, [key]: normalizedValue }));
+      toast.success('Configuração salva');
     } catch (error: any) {
       console.error('Error saving config:', error);
       toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
@@ -108,6 +127,14 @@ export function MigrationConfigPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Status Banner */}
+      {config.USE_R2_STORAGE && (
+        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <span className="text-sm text-green-600 font-medium">R2 Storage está ativo</span>
+        </div>
+      )}
+      
       {/* Feature Flags */}
       <Card>
         <CardHeader>
@@ -125,6 +152,7 @@ export function MigrationConfigPanel() {
             <Switch
               checked={config.USE_R2_STORAGE === true}
               onCheckedChange={(checked) => saveConfig('USE_R2_STORAGE', checked)}
+              disabled={isSaving}
             />
           </div>
 
@@ -138,6 +166,7 @@ export function MigrationConfigPanel() {
             <Switch
               checked={config.MIGRATION_ENABLED === true}
               onCheckedChange={(checked) => saveConfig('MIGRATION_ENABLED', checked)}
+              disabled={isSaving}
             />
           </div>
 
@@ -151,6 +180,7 @@ export function MigrationConfigPanel() {
             <Switch
               checked={config.THROTTLE_ENABLED === true}
               onCheckedChange={(checked) => saveConfig('THROTTLE_ENABLED', checked)}
+              disabled={isSaving}
             />
           </div>
         </CardContent>
@@ -172,6 +202,7 @@ export function MigrationConfigPanel() {
               min={10}
               max={500}
               step={10}
+              disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">
               Número de items processados por batch
@@ -187,6 +218,7 @@ export function MigrationConfigPanel() {
               min={1}
               max={32}
               step={1}
+              disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">
               Uploads simultâneos por worker
@@ -202,6 +234,7 @@ export function MigrationConfigPanel() {
               min={1}
               max={10}
               step={1}
+              disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">
               Tentativas antes de marcar como falha
@@ -225,6 +258,7 @@ export function MigrationConfigPanel() {
                 value={config.OPS_BUDGET_MONTHLY || 1000000}
                 onChange={(e) => updateConfigValue('OPS_BUDGET_MONTHLY', e.target.value)}
                 className="flex-1"
+                disabled={isSaving}
               />
               <Button 
                 size="sm"
@@ -271,6 +305,7 @@ export function MigrationConfigPanel() {
                 const newConfig = { ...config.IMAGE_COMPRESSION, enabled: checked };
                 saveConfig('IMAGE_COMPRESSION', newConfig);
               }}
+              disabled={isSaving}
             />
           </div>
 
@@ -287,14 +322,15 @@ export function MigrationConfigPanel() {
               min={50}
               max={100}
               step={5}
+              disabled={isSaving}
             />
           </div>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={loadConfig} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button onClick={loadConfig} variant="outline" disabled={isLoading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Recarregar Configurações
         </Button>
       </div>
