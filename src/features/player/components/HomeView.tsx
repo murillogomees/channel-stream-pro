@@ -5,7 +5,7 @@
  * - Hero header image
  * - Most viewed content by user
  * - Recommendations based on viewing history
- * - Maximum 500 content items (loaded independently)
+ * - Progressive loading - content updates in background without reload
  */
 
 import { memo, useRef, useState, useMemo } from 'react';
@@ -251,19 +251,20 @@ export function HomeView({
   // Session key for stable randomization
   const [sessionKey] = useState(() => createSessionKey());
 
-  // Use our own lightweight hook - loads ONLY 500 channels
+  // Use our own lightweight hook - loads ALL channels progressively
   const {
     channels: homeChannels,
-    isLoading: loadingHomeChannels
+    isLoading: loadingHomeChannels,
+    loadedCount,
+    totalCount: totalHomeCount,
   } = useHomeChannels();
 
-  // Use home channels if available, fallback to external (but limited)
+  // Use all channels (no limit) - already loaded progressively
   const limitedChannels = useMemo(() => {
     if (homeChannels.length > 0) {
       return homeChannels as Channel[];
     }
-    // Fallback: limit external channels to 500
-    return (externalChannels || []).slice(0, 500);
+    return (externalChannels || []);
   }, [homeChannels, externalChannels]);
 
   // Use optimized personalized content hook (max 500 items)
