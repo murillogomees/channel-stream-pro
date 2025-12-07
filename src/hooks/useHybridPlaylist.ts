@@ -153,60 +153,92 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     }
   }, [groupChannels]);
 
-  // Background loader for remaining batches - NO LIMIT, loads everything
-  const loadRemainingBatchesAsync = useCallback(async (
-    initialChannels: LightChannel[], 
-    batches: number, 
-    batchSize: number,
-    total: number
-  ) => {
-    const allChannels = [...initialChannels];
+  // Load ALL categories first for immediate display
+  const loadAllCategories = useCallback(async (): Promise<string[]> => {
+    const { data: categories, error } = await supabase
+      .from('m3u_sync_entries')
+      .select('group_title')
+      .order('group_title', { ascending: true });
     
-    for (let i = 1; i < batches; i++) {
-      const start = i * batchSize;
-      const end = Math.min(start + batchSize - 1, total - 1);
+    if (error || !categories) return [];
+    
+    // Get unique categories
+    const uniqueCategories = [...new Set(categories.map(c => c.group_title || 'Geral'))];
+    console.log(`[Hybrid] Found ${uniqueCategories.length} unique categories`);
+    return uniqueCategories;
+  }, []);
+
+  // Load content by category to ensure all categories are shown from start
+  const loadContentByCategory = useCallback(async (categoryNames: string[]): Promise<boolean> => {
+    try {
+      const allChannels: LightChannel[] = [];
+      let globalSeq = 0;
       
-      setLoadingProgress(`Carregando conteúdo (${allChannels.length}/${total})...`);
+      // Process categories in batches of 5 for parallel loading
+      const CATEGORY_BATCH_SIZE = 5;
+      const categoryBatches = [];
       
-      const { data: batch, error } = await supabase
-        .from('m3u_sync_entries')
-        .select('id, title, tvg_logo, group_title')
-        .order('group_title', { ascending: true })
-        .order('title', { ascending: true })
-        .range(start, end);
-      
-      if (error) {
-        console.warn(`[Hybrid] Batch ${i} error:`, error);
-        continue;
+      for (let i = 0; i < categoryNames.length; i += CATEGORY_BATCH_SIZE) {
+        categoryBatches.push(categoryNames.slice(i, i + CATEGORY_BATCH_SIZE));
       }
       
-      if (batch) {
-        const batchChannels = batch.map((ch, idx) => ({
-          id: ch.id,
-          name: ch.title || 'Canal',
-          logo: ch.tvg_logo,
-          cat: ch.group_title || 'Geral',
-          seq: start + idx,
-        }));
-        allChannels.push(...batchChannels);
+      for (let batchIdx = 0; batchIdx < categoryBatches.length; batchIdx++) {
+        const batch = categoryBatches[batchIdx];
         
-        // Update state (append-only)
+        setLoadingProgress(`Carregando categorias (${batchIdx * CATEGORY_BATCH_SIZE + batch.length}/${categoryNames.length})...`);
+        
+        // Load all categories in this batch in parallel
+        const batchPromises = batch.map(async (catName) => {
+          const { data: channels, error } = await supabase
+            .from('m3u_sync_entries')
+            .select('id, title, tvg_logo, group_title')
+            .eq('group_title', catName)
+            .order('title', { ascending: true });
+          
+          if (error || !channels) return [];
+          
+          return channels.map((ch) => ({
+            id: ch.id,
+            name: ch.title || 'Canal',
+            logo: ch.tvg_logo,
+            cat: ch.group_title || 'Geral',
+            seq: 0,
+          }));
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Add all channels from this batch
+        batchResults.forEach(channels => {
+          channels.forEach(ch => {
+            ch.seq = globalSeq++;
+            allChannels.push(ch);
+          });
+        });
+        
+        // Update state after each batch of categories
         allChannelsRef.current = [...allChannels];
         setLoadedChannels(allChannels.length);
         setCategories(groupChannels([...allChannels]));
         
-        console.log(`[Hybrid] Loaded ${allChannels.length} of ${total}`);
+        console.log(`[Hybrid] Loaded ${allChannels.length} channels from ${(batchIdx + 1) * CATEGORY_BATCH_SIZE} categories`);
+        
+        // Small delay to not block UI
+        if (batchIdx < categoryBatches.length - 1) {
+          await new Promise(r => setTimeout(r, 30));
+        }
       }
       
-      // Very small delay between batches to not block UI
-      await new Promise(r => setTimeout(r, 50));
+      setLoadingProgress('');
+      console.log(`[Hybrid] Complete: ${allChannels.length} channels in ${categoryNames.length} categories`);
+      return true;
+    } catch (error) {
+      console.error('[Hybrid] loadContentByCategory error:', error);
+      return false;
     }
-    
-    setLoadingProgress('');
-    console.log(`[Hybrid] DB fully loaded: ${allChannels.length} channels`);
   }, [groupChannels]);
 
-  // Fallback: Load directly from database - loads ALL content progressively
+  // Fallback: Load directly from database - loads ALL content by category
   const loadFromDatabase = useCallback(async (): Promise<boolean> => {
     try {
       setLoadingProgress('Carregando catálogo...');
@@ -225,57 +257,35 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
       }
 
       console.log(`[Hybrid] Total entries: ${total}`);
+      setHasPlaylist(true);
 
-      // Load ALL channels progressively in larger batches (no limit)
-      const BATCH_SIZE = 20000; // Increased batch size for faster loading
-      const batches = Math.ceil(total / BATCH_SIZE);
-      const allChannels: LightChannel[] = [];
+      // First, load all unique category names
+      const categoryNames = await loadAllCategories();
       
-      // Load first batch immediately for fast initial render
-      setLoadingProgress(`Carregando conteúdo (0/${total})...`);
-      const { data: firstBatch, error: firstError } = await supabase
-        .from('m3u_sync_entries')
-        .select('id, title, tvg_logo, group_title')
-        .order('group_title', { ascending: true })
-        .order('title', { ascending: true })
-        .range(0, Math.min(BATCH_SIZE, total) - 1);
-      
-      if (firstError) {
-        console.error('[Hybrid] Database error:', firstError);
+      if (categoryNames.length === 0) {
+        console.log('[Hybrid] No categories found');
         return false;
       }
-      
-      if (firstBatch) {
-        const firstChannels = firstBatch.map((ch, idx) => ({
-          id: ch.id,
-          name: ch.title || 'Canal',
-          logo: ch.tvg_logo,
-          cat: ch.group_title || 'Geral',
-          seq: idx,
-        }));
-        allChannels.push(...firstChannels);
-        
-        // Show first batch immediately
-        allChannelsRef.current = [...allChannels];
-        setLoadedChannels(allChannels.length);
-        setCategories(groupChannels([...allChannels]));
-        setHasPlaylist(true);
-        
-        console.log(`[Hybrid] First batch: ${allChannels.length} channels`);
-      }
-      
-      // Load remaining batches in background without blocking UI
-      if (batches > 1) {
-        // Don't await - load in background
-        loadRemainingBatchesAsync(allChannels, batches, BATCH_SIZE, total);
-      }
+
+      // Initialize empty categories structure for immediate display
+      const emptyCategories: Category[] = categoryNames.map((name, idx) => ({
+        id: `cat-${idx}`,
+        name,
+        display_name: name,
+        icon: null,
+        channels: [],
+      }));
+      setCategories(emptyCategories);
+
+      // Load content by category (ensures all categories show from start)
+      await loadContentByCategory(categoryNames);
       
       return true;
     } catch (error) {
       console.error('[Hybrid] DB load error:', error);
       return false;
     }
-  }, [groupChannels, loadRemainingBatchesAsync]);
+  }, [loadAllCategories, loadContentByCategory]);
 
   // Resolve stream URL on-demand (when user clicks to play)
   const resolveChannel = useCallback(async (channelId: string): Promise<ResolvedChannel | null> => {
