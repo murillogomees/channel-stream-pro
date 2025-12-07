@@ -56,8 +56,8 @@ export function useSubscription() {
     loadSubscriptionData();
   }, [loadSubscriptionData]);
 
-  const createCheckout = useCallback(async (planId: string) => {
-    const checkout = await mercadoPagoService.createCheckout(planId);
+  const createCheckout = useCallback(async (planId: string, couponCode?: string) => {
+    const checkout = await mercadoPagoService.createCheckout(planId, { couponCode });
     
     // Always use production URL (init_point) for real payments
     mercadoPagoService.redirectToCheckout(checkout.init_point);

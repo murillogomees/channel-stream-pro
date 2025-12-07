@@ -33,12 +33,15 @@ class MercadoPagoService {
 
   /**
    * Create a checkout session for a subscription plan
+   * @param planId - The subscription plan ID
+   * @param options - Checkout options including coupon code and redirect URLs
    */
   async createCheckout(planId: string, options?: {
+    couponCode?: string;
     successUrl?: string;
     failureUrl?: string;
     pendingUrl?: string;
-  }): Promise<CheckoutResponse> {
+  }): Promise<CheckoutResponse & { original_price?: number; final_price?: number; discount_applied?: number }> {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.access_token) {
@@ -53,6 +56,7 @@ class MercadoPagoService {
       },
       body: JSON.stringify({
         plan_id: planId,
+        coupon_code: options?.couponCode,
         success_url: options?.successUrl || `${window.location.origin}/checkout/success`,
         failure_url: options?.failureUrl || `${window.location.origin}/checkout/failure`,
         pending_url: options?.pendingUrl || `${window.location.origin}/checkout/pending`,
