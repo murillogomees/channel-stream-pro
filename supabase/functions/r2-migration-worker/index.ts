@@ -789,9 +789,6 @@ serve(async (req) => {
           case 'm3u_channels':
             updateData = { is_logo_synced: false, r2_logo_path: null, r2_logo_etag: null };
             break;
-          case 'playlist_entries':
-            updateData = { is_output_synced: false, r2_output_path: null, r2_output_etag: null };
-            break;
         }
 
         await supabase.from(table).update(updateData).eq('id', itemId);
