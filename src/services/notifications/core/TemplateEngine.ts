@@ -93,31 +93,40 @@ export class TemplateEngine {
   ): string {
     let message = typeof template === 'string' ? template : template.message;
     
-    message = message.replace(/\{nome\}/g, cliente.nome);
-    message = message.replace(/\{telefone\}/g, cliente.telefone || '');
-    message = message.replace(/\{email\}/g, cliente.email || '');
-    message = message.replace(/\{plano\}/g, cliente.plano);
-    message = message.replace(/\{valor\}/g, cliente.valorPago?.toFixed(2) || '0.00');
+    // Suporta tanto {variavel} quanto {{variavel}} para compatibilidade
+    const replaceVar = (varName: string, value: string) => {
+      message = message.replace(new RegExp(`\\{\\{${varName}\\}\\}`, 'g'), value);
+      message = message.replace(new RegExp(`\\{${varName}\\}`, 'g'), value);
+    };
+    
+    replaceVar('nome', cliente.nome);
+    replaceVar('telefone', cliente.telefone || '');
+    replaceVar('email', cliente.email || '');
+    replaceVar('plano', cliente.plano);
+    replaceVar('valor', cliente.valorPago?.toFixed(2) || '0.00');
     
     if (cliente.dataVencimento) {
       const dataFormatada = format(new Date(cliente.dataVencimento), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-      message = message.replace(/\{dataVencimento\}/g, dataFormatada);
+      replaceVar('dataVencimento', dataFormatada);
+      replaceVar('data_vencimento', dataFormatada);
     }
     
     if (cliente.dataContratacao) {
       const dataContratacao = format(new Date(cliente.dataContratacao), "dd/MM/yyyy");
-      message = message.replace(/\{dataContratacao\}/g, dataContratacao);
+      replaceVar('dataContratacao', dataContratacao);
+      replaceVar('data_contratacao', dataContratacao);
     }
     
     if (cliente.dataVencimento) {
       const diasAteVencimento = this.getDaysUntilDue(cliente.dataVencimento);
-      message = message.replace(/\{diasAteVencimento\}/g, Math.abs(diasAteVencimento).toString());
+      replaceVar('diasAteVencimento', Math.abs(diasAteVencimento).toString());
+      replaceVar('dias_restantes', Math.abs(diasAteVencimento).toString());
+      replaceVar('diasRestantes', Math.abs(diasAteVencimento).toString());
     }
     
     if (extraVars) {
       Object.entries(extraVars).forEach(([key, value]) => {
-        const regex = new RegExp(`\\{${key}\\}`, 'g');
-        message = message.replace(regex, value);
+        replaceVar(key, value);
       });
     }
     

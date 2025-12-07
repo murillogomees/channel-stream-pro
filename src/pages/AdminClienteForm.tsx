@@ -493,35 +493,46 @@ export default function AdminClienteForm() {
           }
         }
 
-        const { data: newClientData, error: insertError } = await supabase
-          .from('clientes')
-          .insert({
+        // Criar cliente no banco - O profiles é criado automaticamente pelo trigger quando auth.user é criado
+        if (authUserId) {
+          // Atualizar profile existente criado pelo trigger
+          const updatePayload: Record<string, unknown> = {
             nome: clienteData.nome,
             telefone: clienteData.telefone,
-            email: clienteData.email || null,
+            email: clienteData.email,
             situacao: clienteData.situacao,
-            data_contratacao: clienteData.dataContratacao || null,
-            data_vencimento: clienteData.dataVencimento || null,
+            data_contratacao: clienteData.dataContratacao,
+            data_vencimento: clienteData.dataVencimento,
             plano: clienteData.plano,
-            valor_pago: clienteData.valorPago || null,
-            data_ultimo_pagamento: clienteData.dataUltimoPagamento || null,
-            forma_ultimo_pagamento: clienteData.formaUltimoPagamento || null,
+            valor_pago: clienteData.valorPago,
+            data_ultimo_pagamento: clienteData.dataUltimoPagamento,
+            forma_ultimo_pagamento: clienteData.formaUltimoPagamento,
             cliente_ativo: clienteData.clienteAtivo,
-            origem_cadastro: clienteData.origemCadastro || null,
-            dispositivo_contratado: clienteData.dispositivoContratado || null,
-            data_cadastro: new Date().toISOString(),
-            data_ultima_edicao: new Date().toISOString(),
-            user_id: authUserId // Vincular ao usuário de autenticação se criado
-          })
-          .select()
-          .single();
-
-          if (insertError) throw insertError;
-          if (!newClientData) throw new Error('Failed to create client');
-
-          clientId = newClientData.id;
+            origem_cadastro: clienteData.origemCadastro,
+            dispositivo_contratado: clienteData.dispositivoContratado,
+            contact_phone: clienteData.telefone,
+          };
           
-          console.log('Cliente criado com sucesso:', clientId, authUserId ? '(com conta de acesso)' : '(sem conta de acesso)');
+          const { error: updateError } = await (supabase
+            .from('profiles')
+            .update(updatePayload) as any)
+            .eq('user_id', authUserId);
+          
+          if (updateError) throw updateError;
+          
+          // Buscar o profile criado
+          const { data: profileData } = await (supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', authUserId)
+            .single() as any);
+          
+          clientId = profileData?.id || authUserId;
+        } else {
+          throw new Error('Não foi possível criar o cliente sem conta de acesso. Um email válido é necessário.');
+        }
+
+        console.log('Cliente criado com sucesso:', clientId, authUserId ? '(com conta de acesso)' : '(sem conta de acesso)');
 
           // Registrar atividade de criação
           await activityLogService.logActivity(
