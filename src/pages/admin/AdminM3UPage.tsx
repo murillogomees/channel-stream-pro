@@ -1,36 +1,22 @@
 /**
  * AdminM3UPage - Hub de gestão M3U
  * Rota: /admin/m3u
- * Abas: Listas, Sync, Editor, Ingest, Import History, Stats, VOD Storage, CF Stream, Storage Report
+ * Abas: Sync, Editor, Custom, Histórico
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { List, RefreshCw, Pencil, Palette, History, BarChart3, TrendingUp, Film, Cloud, HardDrive, PieChart, Download } from "lucide-react";
-import AdminM3ULists from "../AdminM3ULists";
+import { RefreshCw, Pencil, Palette, History } from "lucide-react";
 import AdminM3USyncContent from "../AdminM3USyncContent";
 import AdminM3UContentEditor from "../AdminM3UContentEditor";
 import AdminM3UImportHistory from "../AdminM3UImportHistory";
-import AdminM3UListStats from "../AdminM3UListStats";
-import AdminM3UUsageReport from "../AdminM3UUsageReport";
-import AdminVODStorage from "../AdminVODStorage";
-import AdminCFStreamDashboard from "../AdminCFStreamDashboard";
 import AdminM3UCustomDashboard from "../AdminM3UCustomDashboard";
-import { PlaylistStorageManager } from "@/components/admin/m3u/PlaylistStorageManager";
-import { StorageConsolidatedReport } from "@/components/admin/storage";
-import { IngestMetricsDashboard } from "@/components/admin/m3u/IngestMetricsDashboard";
 
 export default function AdminM3UPage() {
-  const [activeTab, setActiveTab] = useState("listas");
+  const [activeTab, setActiveTab] = useState("sync");
 
   const tabs = [
-    {
-      value: "listas",
-      label: "Listas",
-      icon: <List className="h-4 w-4" />,
-      content: <AdminM3ULists />
-    },
     {
       value: "sync",
       label: "Sync",
@@ -50,62 +36,20 @@ export default function AdminM3UPage() {
       content: <AdminM3UCustomDashboard />
     },
     {
-      value: "ingest",
-      label: "Ingest",
-      icon: <Download className="h-4 w-4" />,
-      content: <IngestMetricsDashboard />
-    },
-    {
       value: "history",
       label: "Histórico",
       icon: <History className="h-4 w-4" />,
       content: <AdminM3UImportHistory />
-    },
-    {
-      value: "stats",
-      label: "Stats",
-      icon: <BarChart3 className="h-4 w-4" />,
-      content: <AdminM3UListStats />
-    },
-    {
-      value: "usage",
-      label: "Uso",
-      icon: <TrendingUp className="h-4 w-4" />,
-      content: <AdminM3UUsageReport />
-    },
-    {
-      value: "vod",
-      label: "VOD Storage",
-      icon: <Film className="h-4 w-4" />,
-      content: <AdminVODStorage />
-    },
-    {
-      value: "cfstream",
-      label: "CF Stream",
-      icon: <Cloud className="h-4 w-4" />,
-      content: <AdminCFStreamDashboard />
-    },
-    {
-      value: "storage",
-      label: "Storage",
-      icon: <HardDrive className="h-4 w-4" />,
-      content: <PlaylistStorageManager />
-    },
-    {
-      value: "storage-report",
-      label: "Relatório",
-      icon: <PieChart className="h-4 w-4" />,
-      content: <StorageConsolidatedReport />
     }
   ];
 
   return (
     <AdminShell 
-      title="Gestão M3U & Playlists"
-      description="Listas, sincronização, builder e relatórios"
+      title="Gestão M3U"
+      description="Sincronização, editor e histórico de importação"
     >
       <ResponsiveTabs
-        defaultValue="listas"
+        defaultValue="sync"
         value={activeTab}
         onValueChange={setActiveTab}
         tabs={tabs}

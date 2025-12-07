@@ -53,10 +53,6 @@ export { useNetflixLazyLoad } from './useNetflixLazyLoad';
 // Cloudflare Stream Signed URLs
 export { useSignedStreamUrl, clearSignedUrlCache, preloadSignedUrl } from './useSignedStreamUrl';
 
-// Cloudflare Stream Analytics
-export { useCFStreamAnalytics, TIME_RANGES } from './useCFStreamAnalytics';
-export type { ChannelMetrics, AggregatedMetrics, MetricsTimeRange } from './useCFStreamAnalytics';
-
 // Smart Cache
 export { useSmartCache } from './useSmartCache';
 export type { SmartCacheStats, UseSmartCacheOptions } from './useSmartCache';

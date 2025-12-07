@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader, AdminLayout } from "@/components/admin";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminAnalytics from "./AdminAnalytics";
-import AdminConversionDashboard from "./AdminConversionDashboard";
 import AdminCoupons from "./AdminCoupons";
 import { StreamingDashboard } from "@/components/admin/streaming";
 
@@ -11,7 +10,7 @@ export default function AdminAnalyticsHub() {
     <AdminLayout>
       <PageHeader
         title="Analytics & Performance"
-        description="Métricas gerais, streaming, conversão e gestão de cupons"
+        description="Métricas gerais, streaming e gestão de cupons"
         backTo="/admin/dashboard"
       />
 
@@ -23,9 +22,6 @@ export default function AdminAnalyticsHub() {
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               📊 Analytics
-            </TabsTrigger>
-            <TabsTrigger value="conversion" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              🎯 Conversão
             </TabsTrigger>
             <TabsTrigger value="coupons" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               🎟️ Cupons
@@ -40,10 +36,6 @@ export default function AdminAnalyticsHub() {
 
         <TabsContent value="analytics" className="space-y-4 mt-4">
           <AdminAnalytics />
-        </TabsContent>
-
-        <TabsContent value="conversion" className="space-y-4 mt-4">
-          <AdminConversionDashboard />
         </TabsContent>
 
         <TabsContent value="coupons" className="space-y-4 mt-4">

@@ -7,7 +7,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { resolveStreamUrl, type ResolvedChannel } from '@/services/playlistCdnService';
 
 interface LightChannel {
   id: string;
@@ -15,6 +14,16 @@ interface LightChannel {
   logo: string | null;
   cat: string;
   seq: number;
+}
+
+interface ResolvedChannel {
+  id: string;
+  name: string;
+  stream_url: string;
+  original_url: string;
+  logo: string | null;
+  category: string | null;
+  needsProxy: boolean;
 }
 
 interface Category {
@@ -44,6 +53,20 @@ interface PlaylistContextType {
 
 const PlaylistContext = createContext<PlaylistContextType | null>(null);
 
+// Resolve stream URL on-demand via edge function
+async function resolveStreamUrl(channelId: string): Promise<ResolvedChannel | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stream-url-resolve', {
+      body: { channelId }
+    });
+    
+    if (error || !data) return null;
+    return data as ResolvedChannel;
+  } catch {
+    return null;
+  }
+}
+
 export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [allChannels, setAllChannels] = useState<LightChannel[]>([]);
@@ -61,7 +84,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
 
   // Group channels into categories (append-only to prevent UI shifts)
   const updateCategoriesAppendOnly = useCallback((newChannels: LightChannel[]) => {
-    // Add new channels to existing categories or create new categories
     for (const channel of newChannels) {
       const catName = channel.cat || 'Geral';
       
@@ -75,44 +97,39 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         });
       }
       
-      // Only add if not already present
       const cat = categoryMapRef.current.get(catName)!;
       if (!cat.channels.some(ch => ch.id === channel.id)) {
         cat.channels.push(channel);
       }
     }
     
-    // Convert map to sorted array
     const sortedCategories = Array.from(categoryMapRef.current.values())
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
     
     setCategories(sortedCategories);
   }, []);
 
-  // Load category names efficiently using sampling (avoids scanning 209k rows)
+  // Load category names efficiently
   const loadAllCategoryNames = useCallback(async (): Promise<{ categories: string[], totalScanned: number }> => {
     try {
       const allCategories = new Set<string>();
       
-      // Get approximate count first
       const { count } = await supabase
         .from('m3u_sync_entries')
         .select('*', { count: 'exact', head: true });
       
-      // Sample categories by fetching first 5000 from sorted list
-      const { data: sampleData, error: sampleError } = await supabase
+      const { data: sampleData } = await supabase
         .from('m3u_sync_entries')
         .select('group_title')
         .order('group_title', { ascending: true })
         .limit(5000);
       
-      if (!sampleError && sampleData) {
+      if (sampleData) {
         sampleData.forEach(row => {
           if (row.group_title) allCategories.add(row.group_title);
         });
       }
       
-      // Also get last 5000 to catch categories at the end of alphabet
       const { data: lastData } = await supabase
         .from('m3u_sync_entries')
         .select('group_title')
@@ -125,22 +142,8 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         });
       }
       
-      // Get middle samples to ensure full coverage
-      const { data: midData } = await supabase
-        .from('m3u_sync_entries')
-        .select('group_title')
-        .gte('group_title', 'M')
-        .lte('group_title', 'R')
-        .limit(3000);
-      
-      if (midData) {
-        midData.forEach(row => {
-          if (row.group_title) allCategories.add(row.group_title);
-        });
-      }
-      
       const uniqueCategories = Array.from(allCategories).sort();
-      console.log(`[Playlist] Found ${uniqueCategories.length} categories (via sampling), ~${count || 0} entries`);
+      console.log(`[Playlist] Found ${uniqueCategories.length} categories, ~${count || 0} entries`);
       return { categories: uniqueCategories, totalScanned: count || 0 };
       
     } catch (error) {
@@ -149,24 +152,23 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Load content by category in parallel batches
+  // Load content by category
   const loadContentByCategories = useCallback(async (categoryNames: string[]) => {
-    const PARALLEL_CATEGORIES = 10; // Load 10 categories at a time
+    const PARALLEL_CATEGORIES = 10;
     
     for (let i = 0; i < categoryNames.length; i += PARALLEL_CATEGORIES) {
       const batch = categoryNames.slice(i, i + PARALLEL_CATEGORIES);
       
       setLoadingProgress(`Carregando ${Math.min(i + PARALLEL_CATEGORIES, categoryNames.length)}/${categoryNames.length} categorias...`);
       
-      // Load all categories in batch in parallel
       const promises = batch.map(async (catName) => {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('m3u_sync_entries')
           .select('id, title, tvg_logo, group_title')
           .eq('group_title', catName)
           .order('title', { ascending: true });
         
-        if (error || !data) return [];
+        if (!data) return [];
         
         return data.map((ch, idx): LightChannel => ({
           id: ch.id,
@@ -180,17 +182,12 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       const results = await Promise.all(promises);
       const newChannels = results.flat();
       
-      // Append to existing channels (never reorder)
       allChannelsRef.current = [...allChannelsRef.current, ...newChannels];
       setAllChannels([...allChannelsRef.current]);
       setLoadedChannels(allChannelsRef.current.length);
       
-      // Update categories (append-only)
       updateCategoriesAppendOnly(newChannels);
       
-      console.log(`[Playlist] Loaded ${allChannelsRef.current.length} channels`);
-      
-      // Small delay to keep UI responsive
       if (i + PARALLEL_CATEGORIES < categoryNames.length) {
         await new Promise(r => setTimeout(r, 20));
       }
@@ -207,13 +204,10 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setLoadingProgress('Verificando playlist...');
     
     try {
-      // Skip HEAD request that causes 500 errors - we'll get count during category scan
-      // Load all category names first (this also counts entries)
       const { categories: categoryNames, totalScanned } = await loadAllCategoryNames();
       setTotalChannels(totalScanned);
       
       if (categoryNames.length === 0) {
-        console.log('[Playlist] No categories found');
         setHasPlaylist(false);
         setIsLoading(false);
         loadingRef.current = false;
@@ -222,7 +216,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       
       setHasPlaylist(true);
       
-      // Initialize empty categories for immediate display
       for (const name of categoryNames) {
         if (!categoryMapRef.current.has(name)) {
           categoryMapRef.current.set(name, {
@@ -238,10 +231,8 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         a.display_name.localeCompare(b.display_name)
       ));
       
-      // Mark as not loading so UI can show categories immediately
       setIsLoading(false);
       
-      // Load content by categories (append-only)
       await loadContentByCategories(categoryNames);
       
       setLoadingProgress('');

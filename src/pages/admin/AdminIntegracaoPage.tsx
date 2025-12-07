@@ -1,7 +1,6 @@
 /**
- * AdminIntegracaoPage - Hub de integrações redesenhado
+ * AdminIntegracaoPage - Hub de integrações
  * Rota: /admin/integracao
- * Usa ResponsiveTabs com Select dropdown igual à página de notificações
  */
 
 import { useState } from "react";
@@ -12,13 +11,11 @@ import {
   FileText, 
   MessageCircle, 
   Globe, 
-  RefreshCw, 
   Zap, 
   TestTube
 } from "lucide-react";
 import AdminWhatsAppConfig from "../AdminWhatsAppConfig";
 import AdminCdn from "../AdminCdn";
-import AdminTranscodeQueue from "../AdminTranscodeQueue";
 import AdminSmartCache from "../AdminSmartCache";
 import AdminQADashboard from "../AdminQADashboard";
 import MercadoPagoIntegration from "@/components/admin/mercadopago/MercadoPagoIntegration";
@@ -51,12 +48,6 @@ export default function AdminIntegracaoPage() {
       label: "CDN",
       icon: <Globe className="h-4 w-4" />,
       content: <AdminCdn />
-    },
-    {
-      value: "transcode",
-      label: "Transcode",
-      icon: <RefreshCw className="h-4 w-4" />,
-      content: <AdminTranscodeQueue />
     },
     {
       value: "cache",
