@@ -326,6 +326,39 @@ class MigrationWorker {
         return result;
       }
 
+      // Validate URL before attempting download
+      // Skip invalid URLs (null paths, "None", empty paths, etc.)
+      const invalidPatterns = [
+        /None$/i,           // URLs ending with "None"
+        /null$/i,           // URLs ending with "null"
+        /undefined$/i,      // URLs ending with "undefined"
+        /\/$/,              // URLs ending with just a slash
+        /\/$\/?$/,          // URLs with just slashes
+      ];
+      
+      const isInvalidUrl = invalidPatterns.some(pattern => pattern.test(logoUrl)) ||
+                           logoUrl.includes('/None') ||
+                           logoUrl.includes('/null') ||
+                           logoUrl.includes('/undefined') ||
+                           !logoUrl.match(/^https?:\/\/.+\/.+/); // Must have protocol and path
+      
+      if (isInvalidUrl) {
+        result.status = 'skipped';
+        result.error = `Invalid logo URL: ${logoUrl.substring(0, 100)}`;
+        result.durationMs = Date.now() - startTime;
+        
+        // Mark as synced with empty path to avoid retrying
+        await this.supabase
+          .from('m3u_channels')
+          .update({
+            is_logo_synced: true,
+            logo_migrated_at: new Date().toISOString(),
+          })
+          .eq('id', channel.id);
+        
+        return result;
+      }
+
       const r2Key = `logos/${channel.id}`;
 
       if (!this.config.dryRun) {
