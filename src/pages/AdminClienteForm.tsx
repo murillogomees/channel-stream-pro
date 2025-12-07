@@ -960,7 +960,8 @@ export default function AdminClienteForm() {
               </div>
 
               {/* Switch de notificação de desativação - aparece quando desativando cliente */}
-              {id && clienteOriginal?.cliente_ativo !== false && !watch('clienteAtivo') && (
+              {/* Mostra quando: editando (id existe), cliente era ativo ou null/undefined, e agora está sendo desativado */}
+              {id && clienteOriginal && clienteOriginal.cliente_ativo !== false && watch('clienteAtivo') === false && (
                 <div className="flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200"
                   style={{
                     backgroundColor: enviarNotificacaoDesativacao ? 'hsl(var(--warning) / 0.1)' : 'hsl(var(--muted) / 0.3)',

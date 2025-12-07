@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/cliente';
 import { automaticNotificationRuleService } from './automaticNotificationRuleService';
 import { activityLogService } from './activityLogService';
-import type { NotificationEventType } from '@/types/automaticNotification';
 
 export class AutomaticNotificationTriggerService {
   
@@ -15,7 +14,7 @@ export class AutomaticNotificationTriggerService {
    * Dispara notificações automáticas para um evento específico
    */
   async triggerEvent(
-    eventType: NotificationEventType,
+    eventType: string,
     cliente: Cliente,
     extraVars?: Record<string, string>
   ): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
@@ -28,7 +27,7 @@ export class AutomaticNotificationTriggerService {
       
       if (rules.length === 0) {
         console.log(`[AutoNotificationTrigger] Nenhuma regra ativa para evento: ${eventType}`);
-        return { success: true, messagesSent: 0, errors: [] };
+        return { success: true, messagesSent: 0, errors: [`Nenhuma regra ativa para ${eventType}`] };
       }
 
       console.log(`[AutoNotificationTrigger] Processando ${rules.length} regras para evento: ${eventType}`);
@@ -166,6 +165,238 @@ export class AutomaticNotificationTriggerService {
    */
   async triggerClientUpdate(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
     return this.triggerEvent('client_update', cliente);
+  }
+
+  /**
+   * Dispara notificação de reativação de cliente
+   */
+  async triggerClientReactivation(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('client_reactivation', cliente);
+  }
+
+  /**
+   * Dispara notificação de upgrade de plano
+   */
+  async triggerPlanUpgrade(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('plan_upgrade', cliente);
+  }
+
+  /**
+   * Dispara notificação de downgrade de plano
+   */
+  async triggerPlanDowngrade(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('plan_downgrade', cliente);
+  }
+
+  /**
+   * Dispara notificação de trial expirando
+   */
+  async triggerTrialExpiring(cliente: Cliente, daysRemaining: number): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('trial_expiring', cliente, { diasRestantes: String(daysRemaining) });
+  }
+
+  /**
+   * Dispara notificação de trial expirado
+   */
+  async triggerTrialExpired(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('trial_expired', cliente);
+  }
+
+  /**
+   * Dispara notificação de assinatura expirada
+   */
+  async triggerSubscriptionExpired(cliente: Cliente, daysAfter: number): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('subscription_expired', cliente, { diasExpirado: String(daysAfter) });
+  }
+
+  /**
+   * Dispara notificação de usuário inativo
+   */
+  async triggerUserInactive(cliente: Cliente, daysInactive: number): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('user_inactive', cliente, { diasInativo: String(daysInactive) });
+  }
+
+  /**
+   * Dispara notificação de pagamento recebido
+   */
+  async triggerPaymentReceived(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('payment_received', cliente);
+  }
+
+  /**
+   * Dispara notificação de pagamento pendente
+   */
+  async triggerPaymentPending(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('payment_pending', cliente);
+  }
+
+  /**
+   * Dispara notificação de pagamento falhou
+   */
+  async triggerPaymentFailed(cliente: Cliente): Promise<{ success: boolean; messagesSent: number; errors: string[] }> {
+    return this.triggerEvent('payment_failed', cliente);
+  }
+
+  /**
+   * Processa clientes inativos e dispara notificações
+   * Esta função deve ser chamada por um job agendado (cron)
+   */
+  async processInactiveUsers(): Promise<{ processed: number; notified: number; errors: string[] }> {
+    const errors: string[] = [];
+    let processed = 0;
+    let notified = 0;
+
+    try {
+      // Buscar regras de inatividade ativas
+      const rules = await automaticNotificationRuleService.getActiveRulesByEventType('user_inactive');
+      
+      if (rules.length === 0) {
+        console.log('[AutoNotificationTrigger] Nenhuma regra de inatividade ativa');
+        return { processed: 0, notified: 0, errors: [] };
+      }
+
+      // Processar cada regra de inatividade
+      for (const rule of rules) {
+        if (!rule.days_before) continue;
+
+        const daysInactive = rule.days_before;
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - daysInactive);
+
+        // Buscar clientes inativos
+        const { data: inactiveClients, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('cliente_ativo', true)
+          .lt('updated_at', cutoffDate.toISOString())
+          .not('telefone', 'is', null);
+
+        if (error) {
+          console.error('[AutoNotificationTrigger] Erro ao buscar clientes inativos:', error);
+          errors.push(`Erro ao buscar clientes inativos: ${error.message}`);
+          continue;
+        }
+
+        console.log(`[AutoNotificationTrigger] Encontrados ${inactiveClients?.length || 0} clientes inativos há ${daysInactive} dias`);
+
+        for (const profile of inactiveClients || []) {
+          processed++;
+          
+          const cliente: Cliente = {
+            id: profile.id,
+            nome: profile.nome,
+            telefone: profile.telefone || '',
+            email: profile.email || '',
+            situacao: profile.situacao || 'Ativo',
+            plano: profile.plano || 'Mensal',
+            dataContratacao: profile.data_contratacao || '',
+            dataVencimento: profile.data_vencimento || '',
+            valorPago: profile.valor_pago || 0,
+            clienteAtivo: profile.cliente_ativo ?? true,
+            dataCadastro: profile.created_at || '',
+            dataUltimaEdicao: profile.updated_at || '',
+          };
+
+          const result = await this.triggerUserInactive(cliente, daysInactive);
+          
+          if (result.messagesSent > 0) {
+            notified++;
+          }
+          
+          if (result.errors.length > 0) {
+            errors.push(...result.errors);
+          }
+        }
+      }
+
+      return { processed, notified, errors };
+
+    } catch (error: any) {
+      console.error('[AutoNotificationTrigger] Erro ao processar usuários inativos:', error);
+      return { processed: 0, notified: 0, errors: [error.message] };
+    }
+  }
+
+  /**
+   * Processa clientes com assinatura expirando e dispara notificações
+   * Esta função deve ser chamada por um job agendado (cron)
+   */
+  async processExpiringSubscriptions(): Promise<{ processed: number; notified: number; errors: string[] }> {
+    const errors: string[] = [];
+    let processed = 0;
+    let notified = 0;
+
+    try {
+      // Buscar regras de vencimento ativas
+      const rules = await automaticNotificationRuleService.getActiveRulesByEventType('payment_due');
+      
+      if (rules.length === 0) {
+        console.log('[AutoNotificationTrigger] Nenhuma regra de vencimento ativa');
+        return { processed: 0, notified: 0, errors: [] };
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const rule of rules) {
+        if (rule.days_before === null || rule.days_before === undefined) continue;
+
+        const targetDate = new Date(today);
+        targetDate.setDate(targetDate.getDate() + rule.days_before);
+        const targetDateStr = targetDate.toISOString().split('T')[0];
+
+        // Buscar clientes com vencimento nesta data
+        const { data: expiringClients, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('cliente_ativo', true)
+          .eq('data_vencimento', targetDateStr)
+          .not('telefone', 'is', null);
+
+        if (error) {
+          console.error('[AutoNotificationTrigger] Erro ao buscar clientes:', error);
+          errors.push(`Erro: ${error.message}`);
+          continue;
+        }
+
+        console.log(`[AutoNotificationTrigger] Encontrados ${expiringClients?.length || 0} clientes com vencimento em ${rule.days_before} dias`);
+
+        for (const profile of expiringClients || []) {
+          processed++;
+          
+          const cliente: Cliente = {
+            id: profile.id,
+            nome: profile.nome,
+            telefone: profile.telefone || '',
+            email: profile.email || '',
+            situacao: profile.situacao || 'Ativo',
+            plano: profile.plano || 'Mensal',
+            dataContratacao: profile.data_contratacao || '',
+            dataVencimento: profile.data_vencimento || '',
+            valorPago: profile.valor_pago || 0,
+            clienteAtivo: profile.cliente_ativo ?? true,
+            dataCadastro: profile.created_at || '',
+            dataUltimaEdicao: profile.updated_at || '',
+          };
+
+          const result = await this.triggerEvent('payment_due', cliente, { diasRestantes: String(rule.days_before) });
+          
+          if (result.messagesSent > 0) {
+            notified++;
+          }
+          
+          if (result.errors.length > 0) {
+            errors.push(...result.errors);
+          }
+        }
+      }
+
+      return { processed, notified, errors };
+
+    } catch (error: any) {
+      console.error('[AutoNotificationTrigger] Erro ao processar vencimentos:', error);
+      return { processed: 0, notified: 0, errors: [error.message] };
+    }
   }
 }
 
