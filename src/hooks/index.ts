@@ -80,3 +80,6 @@ export type { ABRTuningConfig, ABRMetrics } from '@/services/enhancedABRService'
 export type { ResumeProgress } from '@/services/resumeService';
 export type { PlayerEventType, PlayerEvent } from '@/services/playerEventsService';
 export type { FeatureFlag } from '@/services/featureFlagsService';
+
+// Quality Levels
+export { useQualityLevels } from './useQualityLevels';

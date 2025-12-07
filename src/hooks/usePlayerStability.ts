@@ -12,7 +12,7 @@ import { useCallback, useRef, useState } from 'react';
 import { usePlaybackWatchdog } from './usePlaybackWatchdog';
 import { useNetworkAdaptation } from './useNetworkAdaptation';
 import { useStallPrediction } from './useStallPrediction';
-import { useQualityLevels } from '@/components/app/QualitySelector';
+import { useQualityLevels } from './useQualityLevels';
 
 interface StabilityStats {
   watchdogRecoveries: number;
