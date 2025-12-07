@@ -332,7 +332,6 @@ export function R2MigrationDashboard() {
                     <SelectContent>
                       <SelectItem value="m3u_sync_entries">M3U Sync Entries</SelectItem>
                       <SelectItem value="m3u_channels">M3U Channels</SelectItem>
-                      <SelectItem value="playlist_entries">Playlist Entries</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
