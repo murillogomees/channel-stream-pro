@@ -4981,6 +4981,63 @@ export type Database = {
           },
         ]
       }
+      rls_audit_resolutions: {
+        Row: {
+          applied_fix: string | null
+          created_at: string
+          id: string
+          issue_description: string
+          issue_hash: string
+          issue_type: string
+          policy_name: string | null
+          resolution_notes: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          suggested_fix: string | null
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          applied_fix?: string | null
+          created_at?: string
+          id?: string
+          issue_description: string
+          issue_hash: string
+          issue_type: string
+          policy_name?: string | null
+          resolution_notes?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string
+          suggested_fix?: string | null
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          applied_fix?: string | null
+          created_at?: string
+          id?: string
+          issue_description?: string
+          issue_hash?: string
+          issue_type?: string
+          policy_name?: string | null
+          resolution_notes?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          suggested_fix?: string | null
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rls_fix_backups: {
         Row: {
           backup_timestamp: string

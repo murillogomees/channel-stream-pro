@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag, RefreshCw, Cloud } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag, RefreshCw, Cloud, Shield } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
@@ -19,9 +19,9 @@ import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
 import { MigrationStats } from "@/components/migrations/MigrationStats";
 import { MigrationScanner } from "@/components/admin/MigrationScanner";
 import { DriftFindingsTable } from "@/components/migrations/DriftFindingsTable";
-import { RLSAuditPanel } from "@/components/admin/RLSAuditPanel";
 import { MigrationHistory } from "@/components/migrations/MigrationHistory";
 import { R2MigrationDashboard } from "@/components/admin/migration/R2MigrationDashboard";
+import { InteractiveRLSAuditPanel } from "@/components/admin/security/InteractiveRLSAuditPanel";
 
 export default function AdminSistemaPage() {
   const [activeTab, setActiveTab] = useState("health");
@@ -43,10 +43,15 @@ export default function AdminSistemaPage() {
           <MigrationDashboard />
           <MigrationScanner />
           <DriftFindingsTable />
-          <RLSAuditPanel />
           <MigrationHistory />
         </div>
       )
+    },
+    {
+      value: "rls-audit",
+      label: "RLS Audit",
+      icon: <Shield className="h-4 w-4" />,
+      content: <InteractiveRLSAuditPanel />
     },
     {
       value: "r2",
