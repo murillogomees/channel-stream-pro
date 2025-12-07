@@ -36,11 +36,79 @@ interface MigrationResult {
   error?: string;
 }
 
+interface InitialCounts {
+  processedCount: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+}
+
 // Simple SHA-256 hash for content verification
 async function sha256(data: Uint8Array): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Get config from database (dynamic reading)
+async function getConfigFromDb(supabase: ReturnType<typeof createClient>): Promise<{ batchSize: number; concurrency: number }> {
+  try {
+    const { data, error } = await supabase
+      .from('r2_migration_config')
+      .select('key, value')
+      .in('key', ['BATCH_SIZE', 'CONCURRENCY']);
+
+    if (error || !data) {
+      console.log('[Migration] Using default config values');
+      return { batchSize: 50, concurrency: 5 };
+    }
+
+    const batchSizeConfig = data.find(c => c.key === 'BATCH_SIZE');
+    const concurrencyConfig = data.find(c => c.key === 'CONCURRENCY');
+
+    return {
+      batchSize: batchSizeConfig ? parseInt(batchSizeConfig.value, 10) || 50 : 50,
+      concurrency: concurrencyConfig ? parseInt(concurrencyConfig.value, 10) || 5 : 5,
+    };
+  } catch (e) {
+    console.error('[Migration] Failed to read config from DB:', e);
+    return { batchSize: 50, concurrency: 5 };
+  }
+}
+
+// Auto-continue with retry and exponential backoff
+async function autoContinueWithRetry(
+  supabase: ReturnType<typeof createClient>,
+  jobId: string,
+  maxAttempts = 3
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`[Migration] Auto-continue attempt ${attempt}/${maxAttempts} for job ${jobId}`);
+      
+      const { error } = await supabase.functions.invoke('r2-migration-worker', {
+        body: { action: 'continue', jobId },
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log(`[Migration] Auto-continue successful for job ${jobId}`);
+      return true;
+    } catch (e) {
+      console.error(`[Migration] Auto-continue attempt ${attempt} failed:`, e);
+      
+      if (attempt < maxAttempts) {
+        const backoffMs = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
+        console.log(`[Migration] Retrying in ${backoffMs}ms...`);
+        await new Promise(r => setTimeout(r, backoffMs));
+      }
+    }
+  }
+  
+  console.error(`[Migration] All auto-continue attempts failed for job ${jobId}`);
+  return false;
 }
 
 // Generate AWS Signature V4 for R2
@@ -173,27 +241,36 @@ class R2Storage {
   }
 }
 
-// Migration Worker
+// Migration Worker with persistent progress
 class MigrationWorker {
   private supabase: ReturnType<typeof createClient>;
   private r2: R2Storage;
   private config: MigrationConfig;
   private jobId: string;
-  private processedCount = 0;
-  private successCount = 0;
-  private failedCount = 0;
-  private skippedCount = 0;
+  private processedCount: number;
+  private successCount: number;
+  private failedCount: number;
+  private skippedCount: number;
   private startTime = Date.now();
 
   constructor(
     supabase: ReturnType<typeof createClient>,
     config: MigrationConfig,
-    jobId: string
+    jobId: string,
+    initialCounts?: InitialCounts
   ) {
     this.supabase = supabase;
     this.r2 = new R2Storage(supabase);
     this.config = config;
     this.jobId = jobId;
+    
+    // Initialize with existing progress or start from 0
+    this.processedCount = initialCounts?.processedCount || 0;
+    this.successCount = initialCounts?.successCount || 0;
+    this.failedCount = initialCounts?.failedCount || 0;
+    this.skippedCount = initialCounts?.skippedCount || 0;
+    
+    console.log(`[Migration] Worker initialized with counts: processed=${this.processedCount}, success=${this.successCount}, failed=${this.failedCount}, skipped=${this.skippedCount}`);
   }
 
   async processM3uSyncEntry(entry: any): Promise<MigrationResult> {
@@ -544,6 +621,9 @@ class MigrationWorker {
         throughput_per_min: throughputPerMin,
         last_checkpoint: {
           processed: this.processedCount,
+          success: this.successCount,
+          failed: this.failedCount,
+          skipped: this.skippedCount,
           timestamp: new Date().toISOString(),
         },
       })
@@ -551,7 +631,7 @@ class MigrationWorker {
   }
 
   async run(): Promise<{ success: boolean; processed: number; failed: number; shouldContinue: boolean }> {
-    console.log(`[Migration] Starting job ${this.jobId} for ${this.config.targetTable}`);
+    console.log(`[Migration] Starting job ${this.jobId} for ${this.config.targetTable} (batch=${this.config.batchSize}, concurrency=${this.config.concurrency})`);
     
     // Maximum execution time per run (25 seconds to stay within Edge Function limits)
     const MAX_EXECUTION_TIME_MS = 25000;
@@ -584,6 +664,9 @@ class MigrationWorker {
               status: 'running',
               last_checkpoint: {
                 processed: this.processedCount,
+                success: this.successCount,
+                failed: this.failedCount,
+                skipped: this.skippedCount,
                 timestamp: new Date().toISOString(),
                 needsContinuation: true,
               },
@@ -706,7 +789,14 @@ serve(async (req) => {
 
     switch (action) {
       case 'start': {
-        const { targetTable, batchSize = 100, concurrency = 8, dryRun = false } = params;
+        const { targetTable, dryRun = false } = params;
+
+        // Always read config from database for dynamic values
+        const dbConfig = await getConfigFromDb(supabase);
+        const batchSize = dbConfig.batchSize;
+        const concurrency = dbConfig.concurrency;
+
+        console.log(`[Migration] Starting with config: batchSize=${batchSize}, concurrency=${concurrency}`);
 
         // Create job record
         const { data: job, error: jobError } = await supabase
@@ -724,15 +814,26 @@ serve(async (req) => {
 
         if (jobError) throw jobError;
 
-        // Get total count
-        const { count } = await supabase
-          .from(targetTable)
-          .select('*', { count: 'exact', head: true });
+        // Get total count of unsynced items
+        let countQuery = supabase.from(targetTable).select('*', { count: 'exact', head: true });
+        
+        switch (targetTable) {
+          case 'm3u_sync_entries':
+            countQuery = countQuery.or('is_synced.is.null,is_synced.eq.false');
+            break;
+          case 'm3u_channels':
+            countQuery = countQuery.or('is_logo_synced.is.null,is_logo_synced.eq.false');
+            break;
+        }
+        
+        const { count } = await countQuery;
 
         await supabase
           .from('r2_migration_jobs')
           .update({ total_items: count || 0 })
           .eq('id', job.id);
+
+        console.log(`[Migration] Job ${job.id} created with ${count} total items to process`);
 
         // Start worker with auto-continuation
         const runMigrationWithContinuation = async () => {
@@ -744,16 +845,9 @@ serve(async (req) => {
           
           const result = await worker.run();
           
-          // If should continue, invoke self to continue processing
+          // If should continue, invoke self to continue processing with retry
           if (result.shouldContinue) {
-            console.log(`[Migration] Auto-continuing job ${job.id}...`);
-            try {
-              await supabase.functions.invoke('r2-migration-worker', {
-                body: { action: 'continue', jobId: job.id },
-              });
-            } catch (e) {
-              console.error('[Migration] Failed to auto-continue:', e);
-            }
+            await autoContinueWithRetry(supabase, job.id);
           }
         };
 
@@ -762,7 +856,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           jobId: job.id,
-          message: `Migration job started for ${targetTable}`,
+          message: `Migration job started for ${targetTable} (batch=${batchSize}, concurrency=${concurrency})`,
+          config: { batchSize, concurrency },
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -808,31 +903,41 @@ serve(async (req) => {
           .single();
 
         if (job && (job.status === 'running' || job.status === 'paused')) {
+          // Always read current config from database
+          const dbConfig = await getConfigFromDb(supabase);
+          
+          console.log(`[Migration] Resuming job ${jobId} with config: batchSize=${dbConfig.batchSize}, concurrency=${dbConfig.concurrency}`);
+          
+          // Load existing progress from job checkpoint
+          const checkpoint = job.last_checkpoint || {};
+          const initialCounts: InitialCounts = {
+            processedCount: checkpoint.processed || job.processed_items || 0,
+            successCount: checkpoint.success || job.success_items || 0,
+            failedCount: checkpoint.failed || job.failed_items || 0,
+            skippedCount: checkpoint.skipped || job.skipped_items || 0,
+          };
+          
+          console.log(`[Migration] Loaded progress: processed=${initialCounts.processedCount}, success=${initialCounts.successCount}, failed=${initialCounts.failedCount}, skipped=${initialCounts.skippedCount}`);
+
           const runMigrationWithContinuation = async () => {
             const worker = new MigrationWorker(
               supabase,
               {
                 targetTable: job.target_table as any,
-                batchSize: job.batch_size,
-                concurrency: job.concurrency,
+                batchSize: dbConfig.batchSize,
+                concurrency: dbConfig.concurrency,
                 maxRetries: 3,
                 dryRun: job.config?.dryRun || false,
               },
-              job.id
+              job.id,
+              initialCounts
             );
             
             const result = await worker.run();
             
-            // Auto-continue if needed
+            // Auto-continue if needed with retry
             if (result.shouldContinue) {
-              console.log(`[Migration] Auto-continuing job ${job.id}...`);
-              try {
-                await supabase.functions.invoke('r2-migration-worker', {
-                  body: { action: 'continue', jobId: job.id },
-                });
-              } catch (e) {
-                console.error('[Migration] Failed to auto-continue:', e);
-              }
+              await autoContinueWithRetry(supabase, job.id);
             }
           };
 
@@ -891,7 +996,10 @@ serve(async (req) => {
       }
 
       case 'retry_failed': {
-        const { jobId, targetTable = 'm3u_channels', batchSize = 50, concurrency = 4 } = params;
+        const { jobId, targetTable = 'm3u_channels' } = params;
+        
+        // Always read current config from database
+        const dbConfig = await getConfigFromDb(supabase);
         
         // Get original job config if jobId provided
         let table = targetTable;
@@ -906,21 +1014,36 @@ serve(async (req) => {
           }
         }
 
+        // Count pending items for this table
+        let countQuery = supabase.from(table).select('*', { count: 'exact', head: true });
+        switch (table) {
+          case 'm3u_sync_entries':
+            countQuery = countQuery.or('is_synced.is.null,is_synced.eq.false');
+            break;
+          case 'm3u_channels':
+            countQuery = countQuery.or('is_logo_synced.is.null,is_logo_synced.eq.false');
+            break;
+        }
+        const { count: pendingCount } = await countQuery;
+
         // Create a new migration job specifically for retry
         const { data: newJob, error: jobError } = await supabase
           .from('r2_migration_jobs')
           .insert({
             job_type: 'retry',
             target_table: table,
-            batch_size: batchSize,
-            concurrency,
+            batch_size: dbConfig.batchSize,
+            concurrency: dbConfig.concurrency,
             status: 'pending',
+            total_items: pendingCount || 0,
             config: { retryFrom: jobId || null },
           })
           .select()
           .single();
 
         if (jobError) throw jobError;
+
+        console.log(`[Migration] Retry job ${newJob.id} created with ${pendingCount} pending items`);
 
         // Reset sync flags for failed items so they get processed again
         if (table === 'm3u_channels') {
@@ -960,21 +1083,14 @@ serve(async (req) => {
         const runMigrationWithContinuation = async () => {
           const worker = new MigrationWorker(
             supabase,
-            { targetTable: table as any, batchSize, concurrency, maxRetries: 3, dryRun: false },
+            { targetTable: table as any, batchSize: dbConfig.batchSize, concurrency: dbConfig.concurrency, maxRetries: 3, dryRun: false },
             newJob.id
           );
           
           const result = await worker.run();
           
           if (result.shouldContinue) {
-            console.log(`[Migration] Auto-continuing retry job ${newJob.id}...`);
-            try {
-              await supabase.functions.invoke('r2-migration-worker', {
-                body: { action: 'continue', jobId: newJob.id },
-              });
-            } catch (e) {
-              console.error('[Migration] Failed to auto-continue:', e);
-            }
+            await autoContinueWithRetry(supabase, newJob.id);
           }
         };
 
@@ -984,6 +1100,8 @@ serve(async (req) => {
           success: true, 
           message: `Retry migration started for ${table}`,
           jobId: newJob.id,
+          config: { batchSize: dbConfig.batchSize, concurrency: dbConfig.concurrency },
+          totalItems: pendingCount,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
