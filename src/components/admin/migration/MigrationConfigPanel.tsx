@@ -49,17 +49,22 @@ export function MigrationConfigPanel() {
   const saveConfig = async (key: string, value: any) => {
     setIsSaving(true);
     try {
+      // Normalize boolean values
+      let normalizedValue = value;
+      if (value === 'true') normalizedValue = true;
+      if (value === 'false') normalizedValue = false;
+      
       const { error } = await supabase
         .from('r2_migration_config')
-        .update({ 
-          value: JSON.stringify(value),
+        .upsert({ 
+          key,
+          value: normalizedValue,
           updated_at: new Date().toISOString()
-        })
-        .eq('key', key);
+        }, { onConflict: 'key' });
 
       if (error) throw error;
 
-      setConfig(prev => ({ ...prev, [key]: value }));
+      setConfig(prev => ({ ...prev, [key]: normalizedValue }));
       toast.success('Configuração salva');
     } catch (error) {
       console.error('Error saving config:', error);
@@ -102,8 +107,8 @@ export function MigrationConfigPanel() {
               </p>
             </div>
             <Switch
-              checked={config.USE_R2_STORAGE === 'true' || config.USE_R2_STORAGE === true}
-              onCheckedChange={(checked) => saveConfig('USE_R2_STORAGE', checked.toString())}
+              checked={config.USE_R2_STORAGE === true}
+              onCheckedChange={(checked) => saveConfig('USE_R2_STORAGE', checked)}
             />
           </div>
 
@@ -115,8 +120,8 @@ export function MigrationConfigPanel() {
               </p>
             </div>
             <Switch
-              checked={config.MIGRATION_ENABLED === 'true' || config.MIGRATION_ENABLED === true}
-              onCheckedChange={(checked) => saveConfig('MIGRATION_ENABLED', checked.toString())}
+              checked={config.MIGRATION_ENABLED === true}
+              onCheckedChange={(checked) => saveConfig('MIGRATION_ENABLED', checked)}
             />
           </div>
 
@@ -128,8 +133,8 @@ export function MigrationConfigPanel() {
               </p>
             </div>
             <Switch
-              checked={config.THROTTLE_ENABLED === 'true' || config.THROTTLE_ENABLED === true}
-              onCheckedChange={(checked) => saveConfig('THROTTLE_ENABLED', checked.toString())}
+              checked={config.THROTTLE_ENABLED === true}
+              onCheckedChange={(checked) => saveConfig('THROTTLE_ENABLED', checked)}
             />
           </div>
         </CardContent>
