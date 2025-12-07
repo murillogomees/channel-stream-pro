@@ -1606,6 +1606,20 @@ export type Database = {
             foreignKeyName: "clientes_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profile_identities"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "clientes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profile_sessions"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "clientes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -3708,6 +3722,20 @@ export type Database = {
             foreignKeyName: "payments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profile_identities"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profile_sessions"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -3820,6 +3848,20 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "playback_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profile_identities"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "playback_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profile_sessions"
+            referencedColumns: ["profile_id"]
+          },
           {
             foreignKeyName: "playback_tokens_user_id_fkey"
             columns: ["user_id"]
@@ -4373,6 +4415,27 @@ export type Database = {
             referencedColumns: ["job_id"]
           },
         ]
+      }
+      profiles_orphan_archive: {
+        Row: {
+          archived_at: string | null
+          id: string
+          original_data: Json
+          reason: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          id: string
+          original_data: Json
+          reason?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          id?: string
+          original_data?: Json
+          reason?: string | null
+        }
+        Relationships: []
       }
       pwa_settings: {
         Row: {
@@ -6390,6 +6453,20 @@ export type Database = {
             foreignKeyName: "user_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profile_identities"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profile_sessions"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -6739,6 +6816,37 @@ export type Database = {
       }
     }
     Views: {
+      profile_identities: {
+        Row: {
+          identity_created_at: string | null
+          identity_data: Json | null
+          identity_id: string | null
+          identity_updated_at: string | null
+          last_sign_in_at: string | null
+          nome: string | null
+          profile_email: string | null
+          profile_id: string | null
+          provider: string | null
+        }
+        Relationships: []
+      }
+      profile_sessions: {
+        Row: {
+          aal: "aal1" | "aal2" | "aal3" | null
+          email: string | null
+          factor_id: string | null
+          ip: unknown
+          nome: string | null
+          not_after: string | null
+          profile_id: string | null
+          refreshed_at: string | null
+          session_created_at: string | null
+          session_id: string | null
+          session_updated_at: string | null
+          user_agent: string | null
+        }
+        Relationships: []
+      }
       vw_expiration_summary: {
         Row: {
           data_ultimo_pagamento: string | null
@@ -7270,6 +7378,7 @@ export type Database = {
           storage_path: string
         }[]
       }
+      get_profile_auth_status: { Args: { p_profile_id: string }; Returns: Json }
       get_profile_or_cliente: {
         Args: { p_id: string }
         Returns: {
@@ -7283,6 +7392,7 @@ export type Database = {
           telefone: string
         }[]
       }
+      get_profile_with_auth: { Args: { p_user_id: string }; Returns: Json }
       get_r2_config:
         | {
             Args: never
@@ -7458,6 +7568,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      invalidate_profile_sessions: {
+        Args: { p_profile_id: string }
+        Returns: number
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
       is_admin_or_master: { Args: { _user_id?: string }; Returns: boolean }
