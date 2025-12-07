@@ -59,13 +59,8 @@ export function useSubscription() {
   const createCheckout = useCallback(async (planId: string) => {
     const checkout = await mercadoPagoService.createCheckout(planId);
     
-    // Redirect to sandbox URL in development
-    const isDev = window.location.hostname === "localhost" || 
-                  window.location.hostname.includes("lovable");
-    
-    mercadoPagoService.redirectToCheckout(
-      isDev ? checkout.sandbox_init_point : checkout.init_point
-    );
+    // Always use production URL (init_point) for real payments
+    mercadoPagoService.redirectToCheckout(checkout.init_point);
     
     return checkout;
   }, []);
