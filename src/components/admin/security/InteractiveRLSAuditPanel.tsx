@@ -195,14 +195,52 @@ export function InteractiveRLSAuditPanel() {
   };
 
   const handleApplyFix = async (issue: RLSIssueWithResolution) => {
-    // Copy SQL to clipboard and show instructions
-    if (issue.suggested_fix) {
-      await navigator.clipboard.writeText(issue.suggested_fix);
-      toast.success('SQL copiado! Cole no painel de migrations para aplicar.', { duration: 5000 });
+    if (!issue.suggested_fix) {
+      toast.error('Nenhum SQL de correção disponível');
+      return;
     }
-    
-    // Mark as in progress
-    await handleStatusChange(issue, 'in_progress', 'Fix SQL copiado para aplicação manual');
+
+    try {
+      // Call the rls-fix edge function to actually apply the fix
+      const { data, error } = await supabase.functions.invoke('rls-fix', {
+        body: {
+          confirm: true,
+          sql_apply: issue.suggested_fix,
+          severity: issue.severity,
+          schema_name: 'public',
+          table_name: issue.table,
+          policy_name: issue.policy_name || null,
+          issue_id: issue.id || `${issue.table}-${Date.now()}`
+        }
+      });
+
+      if (error) {
+        console.error('Error applying fix:', error);
+        toast.error(`Erro ao aplicar fix: ${error.message}`);
+        await handleStatusChange(issue, 'in_progress', `Falha ao aplicar: ${error.message}`);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success('Fix aplicado com sucesso!');
+        await handleStatusChange(issue, 'resolved', `Aplicado automaticamente. Backup ID: ${data.backup_id || 'N/A'}`);
+        // Reload data to reflect changes
+        loadAllData();
+      } else if (data?.error) {
+        toast.error(`Erro: ${data.error}`);
+        await handleStatusChange(issue, 'in_progress', data.error);
+      }
+    } catch (err: any) {
+      console.error('Exception applying fix:', err);
+      toast.error(`Exceção: ${err.message}`);
+      
+      // Fallback: copy to clipboard
+      if (issue.suggested_fix) {
+        await navigator.clipboard.writeText(issue.suggested_fix);
+        toast.info('SQL copiado para clipboard como fallback', { duration: 3000 });
+      }
+      await handleStatusChange(issue, 'in_progress', 'Falha na aplicação automática - SQL copiado para aplicação manual');
+    }
   };
 
   const handleBulkAcknowledge = async () => {
