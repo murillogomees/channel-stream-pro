@@ -28,18 +28,18 @@ export default function AdminBackupSystem() {
 
   const fetchStats = async () => {
     try {
-      const { data: clientes, error } = await supabase
-        .from('clientes')
-        .select('*');
+      const { data: profiles, error } = await (supabase
+        .from('profiles')
+        .select('*') as any);
 
       if (error) throw error;
 
       const stats: BackupStats = {
-        total: clientes?.length || 0,
-        ativos: clientes?.filter(c => c.cliente_ativo).length || 0,
-        inativos: clientes?.filter(c => !c.cliente_ativo).length || 0,
-        testando: clientes?.filter(c => c.situacao === 'Testando').length || 0,
-        vencidos: clientes?.filter(c => {
+        total: profiles?.length || 0,
+        ativos: profiles?.filter((c: any) => c.cliente_ativo).length || 0,
+        inativos: profiles?.filter((c: any) => !c.cliente_ativo).length || 0,
+        testando: profiles?.filter((c: any) => c.situacao === 'Testando').length || 0,
+        vencidos: profiles?.filter((c: any) => {
           if (!c.data_vencimento) return false;
           return new Date(c.data_vencimento) < new Date();
         }).length || 0,
@@ -55,16 +55,16 @@ export default function AdminBackupSystem() {
     try {
       setLoading(true);
       
-      const { data: clientes, error } = await supabase
-        .from('clientes')
-        .select('*');
+      const { data: profiles, error } = await (supabase
+        .from('profiles')
+        .select('*') as any);
 
       if (error) throw error;
 
       const backup = {
         timestamp: new Date().toISOString(),
-        total_clientes: clientes?.length || 0,
-        clientes: clientes,
+        total_profiles: profiles?.length || 0,
+        profiles: profiles,
         metadata: {
           backup_date: new Date().toISOString(),
           backup_version: '1.0',
@@ -85,7 +85,7 @@ export default function AdminBackupSystem() {
 
       toast({
         title: 'Backup exportado com sucesso',
-        description: `${clientes?.length || 0} clientes exportados em JSON`,
+        description: `${profiles?.length || 0} perfis exportados em JSON`,
       });
     } catch (error: any) {
       console.error('Erro ao exportar JSON:', error);
@@ -103,9 +103,9 @@ export default function AdminBackupSystem() {
     try {
       setLoading(true);
       
-      const { data: clientes, error } = await supabase
-        .from('clientes')
-        .select('*');
+      const { data: profiles, error } = await (supabase
+        .from('profiles')
+        .select('*') as any);
 
       if (error) throw error;
 
@@ -123,17 +123,17 @@ export default function AdminBackupSystem() {
         'M3U Lists',
       ];
 
-      const rows = clientes?.map(cliente => [
-        cliente.id,
-        cliente.nome,
-        cliente.telefone,
-        cliente.email || '',
-        cliente.situacao,
-        cliente.plano,
-        cliente.data_cadastro,
-        cliente.data_vencimento || '',
-        cliente.cliente_ativo ? 'Sim' : 'Não',
-        cliente.origem_cadastro || '',
+      const rows = profiles?.map((profile: any) => [
+        profile.id,
+        profile.nome,
+        profile.telefone,
+        profile.email || '',
+        profile.situacao,
+        profile.plano,
+        profile.created_at,
+        profile.data_vencimento || '',
+        profile.cliente_ativo ? 'Sim' : 'Não',
+        profile.origem_cadastro || '',
       ]);
 
       const csv = [
@@ -159,7 +159,7 @@ export default function AdminBackupSystem() {
 
       toast({
         title: 'Backup exportado com sucesso',
-        description: `${clientes?.length || 0} clientes exportados em CSV`,
+        description: `${profiles?.length || 0} perfis exportados em CSV`,
       });
     } catch (error: any) {
       console.error('Erro ao exportar CSV:', error);
