@@ -21,33 +21,32 @@ export function MigrationConfigPanel() {
   const loadConfig = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('r2_migration_config')
-        .select('*');
+      console.log('[MigrationConfig] Loading config via RPC...');
+      
+      // Use RPC to bypass RLS issues
+      const { data, error } = await supabase.rpc('get_r2_config');
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MigrationConfig] RPC load error:', error);
+        throw error;
+      }
+
+      console.log('[MigrationConfig] Raw data:', data);
 
       const configMap: Record<string, any> = {};
-      data?.forEach((item) => {
+      const items = data as Array<{ key: string; value: any; description: string; updated_at: string }>;
+      items?.forEach((item) => {
         let value = item.value;
         // Normalize boolean strings to actual booleans
         if (value === 'true' || value === true) value = true;
         else if (value === 'false' || value === false) value = false;
-        // For other values, try to parse if string
-        else if (typeof value === 'string') {
-          try {
-            value = JSON.parse(value);
-          } catch {
-            // Keep as string if not valid JSON
-          }
-        }
         configMap[item.key] = value;
       });
-      console.log('[MigrationConfig] Loaded config:', configMap);
+      console.log('[MigrationConfig] Processed config:', configMap);
       setConfig(configMap);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading config:', error);
-      toast.error('Erro ao carregar configurações');
+      toast.error(`Erro ao carregar: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -61,29 +60,31 @@ export function MigrationConfigPanel() {
       if (value === 'true') normalizedValue = true;
       if (value === 'false') normalizedValue = false;
       
-      console.log('[MigrationConfig] Saving:', key, normalizedValue);
+      console.log('[MigrationConfig] Saving via RPC:', key, normalizedValue);
       
-      // Use update instead of upsert since records already exist
+      // Use SECURITY DEFINER RPC function to bypass RLS issues
       const { data, error } = await supabase
-        .from('r2_migration_config')
-        .update({ 
-          value: normalizedValue,
-          updated_at: new Date().toISOString()
-        })
-        .eq('key', key)
-        .select();
+        .rpc('update_r2_config', { 
+          p_key: key, 
+          p_value: normalizedValue 
+        });
 
       if (error) {
-        console.error('[MigrationConfig] Update error:', error);
+        console.error('[MigrationConfig] RPC error:', error);
         throw error;
       }
 
-      console.log('[MigrationConfig] Updated:', data);
-      setConfig(prev => ({ ...prev, [key]: normalizedValue }));
-      toast.success('Configuração salva');
-    } catch (error) {
+      console.log('[MigrationConfig] RPC result:', data);
+      
+      if (data === true) {
+        setConfig(prev => ({ ...prev, [key]: normalizedValue }));
+        toast.success('Configuração salva');
+      } else {
+        throw new Error('Nenhum registro atualizado');
+      }
+    } catch (error: any) {
       console.error('Error saving config:', error);
-      toast.error('Erro ao salvar configuração');
+      toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsSaving(false);
     }
