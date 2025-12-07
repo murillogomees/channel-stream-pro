@@ -79,6 +79,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileResult.error) {
         console.error('[AuthContext] Erro ao buscar perfil:', profileResult.error);
+        
+        // Se erro 406 (sem resultados) ou 403 (não autorizado), sessão está inválida
+        if (profileResult.error.code === 'PGRST116' || profileResult.status === 403 || profileResult.status === 406) {
+          console.warn('[AuthContext] Sessão inválida detectada, forçando logout');
+          await supabase.auth.signOut();
+          return null;
+        }
         return null;
       }
 
