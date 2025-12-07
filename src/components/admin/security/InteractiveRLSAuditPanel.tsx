@@ -62,8 +62,64 @@ export function InteractiveRLSAuditPanel() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [bulkFixing, setBulkFixing] = useState(false);
 
+  // Initial load
   useEffect(() => {
     loadAllData();
+  }, []);
+
+  // Realtime subscription for live updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('rls-audit-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rls_audit_resolutions'
+        },
+        (payload) => {
+          console.log('[RLS Audit] Realtime update:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const updated = payload.new as Resolution;
+            
+            // Update resolutions state
+            setResolutions(prev => {
+              const exists = prev.find(r => r.id === updated.id);
+              if (exists) {
+                return prev.map(r => r.id === updated.id ? updated : r);
+              }
+              return [...prev, updated];
+            });
+            
+            // Update issues state with new resolution data
+            setIssues(prev => prev.map(issue => {
+              const hash = `${issue.table}:${issue.policy_name || 'no-policy'}:${issue.issue}`.replace(/\s+/g, '-').toLowerCase();
+              if (hash === updated.issue_hash) {
+                return {
+                  ...issue,
+                  id: updated.id,
+                  status: updated.status as any,
+                  resolution_notes: updated.resolution_notes || undefined,
+                  suggested_fix: updated.suggested_fix || undefined
+                };
+              }
+              return issue;
+            }));
+          }
+          
+          if (payload.eventType === 'DELETE') {
+            const deleted = payload.old as Resolution;
+            setResolutions(prev => prev.filter(r => r.id !== deleted.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadAllData = async () => {
@@ -258,9 +314,9 @@ export function InteractiveRLSAuditPanel() {
       generated_at: new Date().toISOString(),
       summary: {
         total_issues: issues.length,
-        pending: issues.filter(i => i.status === 'pending' || !i.status).length,
-        resolved: issues.filter(i => i.status === 'resolved').length,
-        ignored: issues.filter(i => i.status === 'ignored' || i.status === 'false_positive').length,
+        pending: pendingIssues.length,
+        in_progress: stats.inProgressIssues.length,
+        resolved: resolvedIssues.length,
         security_score: securityScore
       },
       issues: issues.map(i => ({
@@ -302,14 +358,46 @@ export function InteractiveRLSAuditPanel() {
     });
   }, [issues, searchTerm, severityFilter, statusFilter]);
 
-  // Calculate stats
-  const pendingIssues = issues.filter(i => !i.status || i.status === 'pending' || i.status === 'acknowledged' || i.status === 'in_progress');
-  const resolvedIssues = issues.filter(i => i.status === 'resolved' || i.status === 'ignored' || i.status === 'false_positive');
-  const criticalPending = pendingIssues.filter(i => i.severity === 'critical').length;
-  const highPending = pendingIssues.filter(i => i.severity === 'high').length;
-  
-  const securityScore = Math.max(0, 100 - (criticalPending * 20 + highPending * 10));
-  const progressPercent = issues.length > 0 ? (resolvedIssues.length / issues.length) * 100 : 100;
+  // Calculate stats with useMemo for performance
+  const stats = useMemo(() => {
+    const pendingIssues = issues.filter(i => !i.status || i.status === 'pending' || i.status === 'acknowledged' || i.status === 'in_progress');
+    const resolvedIssues = issues.filter(i => i.status === 'resolved' || i.status === 'ignored' || i.status === 'false_positive');
+    const inProgressIssues = issues.filter(i => i.status === 'in_progress');
+    
+    const criticalTotal = issues.filter(i => i.severity === 'critical').length;
+    const criticalPending = pendingIssues.filter(i => i.severity === 'critical').length;
+    const criticalResolved = resolvedIssues.filter(i => i.severity === 'critical').length;
+    
+    const highTotal = issues.filter(i => i.severity === 'high').length;
+    const highPending = pendingIssues.filter(i => i.severity === 'high').length;
+    const highResolved = resolvedIssues.filter(i => i.severity === 'high').length;
+    
+    const mediumPending = pendingIssues.filter(i => i.severity === 'medium').length;
+    
+    // Security score calculation based on severity weights
+    // Start at 100, deduct points for unresolved issues
+    const maxDeduction = criticalTotal * 20 + highTotal * 10 + issues.filter(i => i.severity === 'medium').length * 5;
+    const currentDeduction = criticalPending * 20 + highPending * 10 + mediumPending * 5;
+    const securityScore = maxDeduction > 0 
+      ? Math.round(100 - (currentDeduction / maxDeduction) * 100)
+      : 100;
+    
+    const progressPercent = issues.length > 0 ? (resolvedIssues.length / issues.length) * 100 : 100;
+
+    return {
+      pendingIssues,
+      resolvedIssues,
+      inProgressIssues,
+      criticalPending,
+      criticalResolved,
+      highPending,
+      highResolved,
+      securityScore: Math.max(0, Math.min(100, securityScore)),
+      progressPercent
+    };
+  }, [issues]);
+
+  const { pendingIssues, resolvedIssues, criticalPending, highPending, securityScore, progressPercent } = stats;
 
   return (
     <div className="space-y-6">
