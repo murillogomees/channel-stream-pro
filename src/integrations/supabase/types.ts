@@ -7214,7 +7214,6 @@ export type Database = {
           nome: string
           plano: string
           situacao: string
-          source_table: string
           telefone: string
         }[]
       }
