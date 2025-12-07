@@ -182,8 +182,8 @@ const AdminDashboard = () => {
                     />
                     <QuickStat
                       icon={<AlertTriangle className="h-5 w-5" />}
-                      label="Ativos Vencidos"
-                      value={stats.ativosVencidos}
+                      label="Vencidos"
+                      value={stats.vencidos}
                       variant="danger"
                     />
                   </>

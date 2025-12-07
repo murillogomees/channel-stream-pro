@@ -105,17 +105,35 @@ export function useProfiles() {
     const cincoProximos = new Date();
     cincoProximos.setDate(now.getDate() + 5);
 
+    // Ativos: cliente_ativo = true E situação = 'Ativo' E não vencido
+    const ativos = profiles.filter(p => {
+      if (!p.cliente_ativo || p.situacao !== 'Ativo') return false;
+      if (!p.data_vencimento) return true; // Sem data = considerado ativo
+      const vencimento = new Date(p.data_vencimento);
+      return vencimento >= now;
+    }).length;
+
+    // Inativos: cliente_ativo = false OU situação = 'Inativo'
+    const inativos = profiles.filter(p => 
+      p.cliente_ativo === false || p.situacao === 'Inativo'
+    ).length;
+
+    // Vencendo nos próximos 5 dias (com assinatura ainda válida)
     const vencendoProximos5Dias = profiles.filter(p => {
       if (!p.data_vencimento) return false;
       const vencimento = new Date(p.data_vencimento);
       return vencimento >= now && vencimento <= cincoProximos;
     }).length;
 
-    const ativosVencidos = profiles.filter(p => {
-      if (p.situacao !== 'Ativo' || !p.data_vencimento) return false;
+    // Vencidos: data_vencimento < hoje (independente do status)
+    const vencidos = profiles.filter(p => {
+      if (!p.data_vencimento) return false;
       const vencimento = new Date(p.data_vencimento);
       return vencimento < now;
     }).length;
+
+    // Em teste: situação = 'Testando'
+    const emTeste = profiles.filter(p => p.situacao === 'Testando').length;
 
     const porSituacao = profiles.reduce((acc, p) => {
       const situacao = p.situacao || 'Indefinido';
@@ -125,8 +143,11 @@ export function useProfiles() {
 
     return { 
       total, 
+      ativos,
+      inativos,
       vencendoProximos5Dias, 
-      ativosVencidos,
+      vencidos,
+      emTeste,
       porSituacao 
     };
   }, [profiles]);
