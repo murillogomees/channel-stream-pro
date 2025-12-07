@@ -42,6 +42,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { PlanCards } from '@/components/profile/PlanCards';
+import { CurrentPlanCard } from '@/components/profile/CurrentPlanCard';
+import { usePaymentRealtime } from '@/hooks/usePaymentRealtime';
 
 interface ClienteData {
   id: string;
@@ -73,8 +75,11 @@ interface Payment {
 export default function UnifiedProfile() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, signOut, refreshUser } = useAuth();
   const { toast: shadcnToast } = useToast();
+  
+  // Ativa escuta de atualizações de pagamento em tempo real
+  usePaymentRealtime();
   
   const isAppRoute = location.pathname.startsWith('/app');
   
@@ -97,8 +102,9 @@ export default function UnifiedProfile() {
   // Plan selection state
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   
-  // Check if user is in trial
+  // Check if user is in trial or has active subscription
   const isTrialUser = cliente?.situacao === 'Testando';
+  const hasActiveSubscription = cliente?.situacao === 'Ativo' && cliente?.plano;
 
   useEffect(() => {
     loadData();
@@ -111,16 +117,26 @@ export default function UnifiedProfile() {
     }
 
     try {
-      // Load cliente data
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('id, nome, email, telefone, plano, situacao, data_vencimento, data_contratacao, valor_pago')
-        .eq('user_id', user.id)
+      // Load profile data (tabela unificada - não usar clientes que está deprecated)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, nome, email, contact_phone, plano, situacao, data_vencimento, data_contratacao, valor_pago')
+        .eq('id', user.id)
         .maybeSingle();
 
-      if (clienteData) {
-        setCliente(clienteData);
-        setWhatsapp(formatPhone(clienteData.telefone || ''));
+      if (profileData) {
+        setCliente({
+          id: profileData.id,
+          nome: profileData.nome || '',
+          email: profileData.email,
+          telefone: profileData.contact_phone || '',
+          plano: profileData.plano,
+          situacao: profileData.situacao,
+          data_vencimento: profileData.data_vencimento,
+          data_contratacao: profileData.data_contratacao,
+          valor_pago: profileData.valor_pago,
+        });
+        setWhatsapp(formatPhone(profileData.contact_phone || ''));
       }
 
       // Load payments
@@ -154,7 +170,7 @@ export default function UnifiedProfile() {
   };
 
   const handleSaveWhatsapp = async () => {
-    if (!cliente?.id) return;
+    if (!user?.id) return;
     
     const phoneNumbers = whatsapp.replace(/\D/g, '');
     if (phoneNumbers.length < 10) {
@@ -165,9 +181,9 @@ export default function UnifiedProfile() {
     setSavingWhatsapp(true);
     try {
       const { error } = await supabase
-        .from('clientes')
-        .update({ telefone: phoneNumbers })
-        .eq('id', cliente.id);
+        .from('profiles')
+        .update({ contact_phone: phoneNumbers })
+        .eq('id', user.id);
 
       if (error) throw error;
       toast.success('WhatsApp atualizado com sucesso!');
@@ -477,78 +493,89 @@ export default function UnifiedProfile() {
               </CardContent>
             </Card>
 
-            {/* Card 2: Informações do Plano */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                  Meu Plano
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Data de Cadastro/Renovação */}
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Data de Cadastro
-                    </p>
-                    <p className="font-medium text-foreground">
-                      {formatDate(cliente?.data_contratacao)}
-                    </p>
-                  </div>
-
-                  {/* Data de Vencimento */}
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      Vencimento
-                    </p>
-                    <p className="font-medium text-foreground">
-                      {formatDate(cliente?.data_vencimento)}
-                    </p>
-                  </div>
-
-                  {/* Modelo do Plano */}
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      Plano
-                    </p>
-                    <Badge variant="outline" className={getSituacaoColor(cliente?.situacao)}>
-                      {getPlanLabel(cliente?.plano, cliente?.situacao)}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Plan selection for trial users */}
-                {isTrialUser && (
-                  <div className="mt-6 pt-6 border-t border-border">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold text-foreground">Escolha seu plano</h3>
+            {/* Card 2: Informações do Plano - Diferente para usuários ativos vs trial */}
+            {hasActiveSubscription ? (
+              <CurrentPlanCard
+                plano={cliente?.plano || 'Mensal'}
+                situacao={cliente?.situacao || 'Ativo'}
+                dataVencimento={cliente?.data_vencimento}
+                dataUltimoPagamento={payments[0]?.paid_at || null}
+                valorPago={cliente?.valor_pago}
+                isRecorrente={payments.length > 1}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                    Meu Plano
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Data de Cadastro/Renovação */}
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Data de Cadastro
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {formatDate(cliente?.data_contratacao)}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Seu período de teste está ativo. Escolha um plano para continuar aproveitando após o término.
-                    </p>
-                    
-                    <PlanCards 
-                      selectedPlan={selectedPlan} 
-                      onSelectPlan={setSelectedPlan} 
-                    />
 
-                    {selectedPlan && (
-                      <Button 
-                        className="w-full h-12 text-base mt-4"
-                        onClick={() => navigate(`/checkout?plan=${selectedPlan}`)}
-                      >
-                        <CreditCard className="w-5 h-5 mr-2" />
-                        Assinar Plano {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
-                      </Button>
-                    )}
+                    {/* Data de Vencimento */}
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Vencimento
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {formatDate(cliente?.data_vencimento)}
+                      </p>
+                    </div>
+
+                    {/* Modelo do Plano */}
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Plano
+                      </p>
+                      <Badge variant="outline" className={getSituacaoColor(cliente?.situacao)}>
+                        {getPlanLabel(cliente?.plano, cliente?.situacao)}
+                      </Badge>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+
+                  {/* Plan selection for trial users */}
+                  {isTrialUser && (
+                    <div className="mt-6 pt-6 border-t border-border">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold text-foreground">Escolha seu plano</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Seu período de teste está ativo. Escolha um plano para continuar aproveitando após o término.
+                      </p>
+                      
+                      <PlanCards 
+                        selectedPlan={selectedPlan} 
+                        onSelectPlan={setSelectedPlan} 
+                      />
+
+                      {selectedPlan && (
+                        <Button 
+                          className="w-full h-12 text-base mt-4"
+                          onClick={() => navigate(`/checkout?plan=${selectedPlan}`)}
+                        >
+                          <CreditCard className="w-5 h-5 mr-2" />
+                          Assinar Plano {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Card 3: Alterar Senha */}
             <Card>
