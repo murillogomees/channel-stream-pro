@@ -5,7 +5,6 @@ import { Database, CheckCircle, Clock, AlertTriangle, Zap, HardDrive } from 'luc
 interface MigrationStats {
   sync_entries: { total: number; synced: number; pending: number };
   channels: { total: number; synced: number; pending: number };
-  playlist_entries: { total: number; synced: number; pending: number };
   jobs: { total: number; running: number; completed: number; failed: number };
   failed_items: number;
 }
@@ -39,9 +38,9 @@ export function MigrationStatsCards({ stats, isLoading }: MigrationStatsCardsPro
     return null;
   }
 
-  const totalItems = stats.sync_entries.total + stats.channels.total + stats.playlist_entries.total;
-  const syncedItems = stats.sync_entries.synced + stats.channels.synced + stats.playlist_entries.synced;
-  const pendingItems = stats.sync_entries.pending + stats.channels.pending + stats.playlist_entries.pending;
+  const totalItems = stats.sync_entries.total + stats.channels.total;
+  const syncedItems = stats.sync_entries.synced + stats.channels.synced;
+  const pendingItems = stats.sync_entries.pending + stats.channels.pending;
   const syncProgress = totalItems > 0 ? Math.round((syncedItems / totalItems) * 100) : 0;
 
   const cards = [
@@ -101,7 +100,6 @@ export function TableBreakdownCards({ stats }: { stats: MigrationStats | null })
   const tables = [
     { name: 'm3u_sync_entries', data: stats.sync_entries, icon: Database },
     { name: 'm3u_channels', data: stats.channels, icon: HardDrive },
-    { name: 'playlist_entries', data: stats.playlist_entries, icon: Zap },
   ];
 
   return (
