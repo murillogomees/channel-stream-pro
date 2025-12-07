@@ -163,16 +163,7 @@ export default function AdminClienteForm() {
             setValue('origemCadastro', cliente.origem_cadastro as any || '');
             setValue('dispositivoContratado', cliente.dispositivo_contratado as any || '');
 
-            // Buscar M3U lists atribuídas ao cliente
-            const { data: m3uAssignments } = await supabase
-              .from('client_m3u_lists')
-              .select('m3u_list_id')
-              .eq('client_id', id)
-              .eq('is_active', true);
-
-            if (m3uAssignments) {
-              setSelectedM3ULists(m3uAssignments.map(a => a.m3u_list_id));
-            }
+            // M3U lists management removed - now using unified m3u_sync_entries
 
             // Verificar se cliente já tem usuário de autenticação
             if (data.user_id) {

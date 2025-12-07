@@ -50,9 +50,6 @@ export { useDebouncedSearch, useDebouncedValue } from './useDebouncedSearch';
 export { useLazyLoadContent } from './useLazyLoadContent';
 export { useNetflixLazyLoad } from './useNetflixLazyLoad';
 
-// Cloudflare Stream Signed URLs
-export { useSignedStreamUrl, clearSignedUrlCache, preloadSignedUrl } from './useSignedStreamUrl';
-
 // Smart Cache
 export { useSmartCache } from './useSmartCache';
 export type { SmartCacheStats, UseSmartCacheOptions } from './useSmartCache';

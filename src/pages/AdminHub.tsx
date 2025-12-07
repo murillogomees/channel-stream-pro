@@ -64,7 +64,7 @@ export default function AdminHub() {
 
       const [clientesRes, m3uRes, securityRes] = await Promise.all([
         supabase.from('clientes').select('situacao, data_vencimento', { count: 'exact' }),
-        supabase.from('m3u_lists').select('id', { count: 'exact' }).eq('status', 'active'),
+        supabase.from('m3u_sync_sources').select('id', { count: 'exact' }).eq('is_active', true),
         supabase.from('security_events').select('id', { count: 'exact' }).eq('resolved', false),
       ]);
 

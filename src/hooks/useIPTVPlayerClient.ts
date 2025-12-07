@@ -828,50 +828,24 @@ export function useIPTVPlayerClient() {
         }
       }
 
-      // Check regular list assignment
-      const { data: regularAssignment, error: regularError } = await supabase
-        .from('client_m3u_lists')
-        .select(`
-          m3u_list_id,
-          is_active,
-          m3u_lists:m3u_list_id (
-            id,
-            name,
-            file_url,
-            status
-          )
-        `)
-        .eq('client_id', profileData.id)
+      // Try to load from the main m3u_sync_sources (published M3U)
+      console.log('[IPTV] Loading from m3u_sync_sources');
+      
+      const { data: mainSource, error: sourceError } = await supabase
+        .from('m3u_sync_sources')
+        .select('id, name, source_url')
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (regularError) {
-        console.error('[IPTV] Regular assignment lookup error:', regularError);
+      if (sourceError) {
+        console.error('[IPTV] Main source lookup error:', sourceError);
       }
 
-      if (regularAssignment?.m3u_lists) {
-        const regularList = regularAssignment.m3u_lists as any;
-        if (regularList.status === 'active' && regularList.file_url) {
-          console.log('[IPTV] Found regular list:', regularList.name);
-          return loadPlaylistFromURL(regularList.file_url, regularList.id, regularList.name);
-        }
-      }
-
-      // Check default list
-      const { data: defaultList, error: defaultError } = await supabase
-        .from('m3u_lists')
-        .select('id, name, file_url')
-        .eq('is_default', true)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (defaultError) {
-        console.error('[IPTV] Default list lookup error:', defaultError);
-      }
-
-      if (defaultList?.file_url) {
-        console.log('[IPTV] Using default list:', defaultList.name);
-        return loadPlaylistFromURL(defaultList.file_url, defaultList.id, defaultList.name);
+      if (mainSource?.source_url) {
+        console.log('[IPTV] Found main M3U source:', mainSource.name);
+        return loadPlaylistFromURL(mainSource.source_url, mainSource.id, mainSource.name);
       }
 
       console.log('[IPTV] No playlist found');

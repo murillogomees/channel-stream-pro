@@ -784,42 +784,6 @@ export type Database = {
           },
         ]
       }
-      archives: {
-        Row: {
-          created_at: string | null
-          id: string
-          metadata: Json | null
-          month: string
-          path: string
-          playlist_count: number | null
-          sha256: string | null
-          size_bytes: number | null
-          verified_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          month: string
-          path: string
-          playlist_count?: number | null
-          sha256?: string | null
-          size_bytes?: number | null
-          verified_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          month?: string
-          path?: string
-          playlist_count?: number | null
-          sha256?: string | null
-          size_bytes?: number | null
-          verified_at?: string | null
-        }
-        Relationships: []
-      }
       auth_sessions_log: {
         Row: {
           created_at: string
@@ -1307,68 +1271,6 @@ export type Database = {
           },
         ]
       }
-      cf_stream_uploads: {
-        Row: {
-          cf_stream_uid: string | null
-          channel_id: string
-          completed_at: string | null
-          created_at: string | null
-          error_message: string | null
-          id: string
-          max_retries: number | null
-          metadata: Json | null
-          original_url: string
-          progress_percent: number | null
-          retry_count: number | null
-          started_at: string | null
-          status: string
-          updated_at: string | null
-          upload_type: string | null
-        }
-        Insert: {
-          cf_stream_uid?: string | null
-          channel_id: string
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          max_retries?: number | null
-          metadata?: Json | null
-          original_url: string
-          progress_percent?: number | null
-          retry_count?: number | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string | null
-          upload_type?: string | null
-        }
-        Update: {
-          cf_stream_uid?: string | null
-          channel_id?: string
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          max_retries?: number | null
-          metadata?: Json | null
-          original_url?: string
-          progress_percent?: number | null
-          retry_count?: number | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string | null
-          upload_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cf_stream_uploads_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_channels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       channel_demand_stats: {
         Row: {
           avg_watch_duration_seconds: number | null
@@ -1592,55 +1494,6 @@ export type Database = {
           },
         ]
       }
-      client_m3u_lists: {
-        Row: {
-          assigned_at: string | null
-          assigned_by: string | null
-          client_id: string
-          id: string
-          is_active: boolean | null
-          m3u_list_id: string
-        }
-        Insert: {
-          assigned_at?: string | null
-          assigned_by?: string | null
-          client_id: string
-          id?: string
-          is_active?: boolean | null
-          m3u_list_id: string
-        }
-        Update: {
-          assigned_at?: string | null
-          assigned_by?: string | null
-          client_id?: string
-          id?: string
-          is_active?: boolean | null
-          m3u_list_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_m3u_lists_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_m3u_lists_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "vw_expiration_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_m3u_lists_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       clientes: {
         Row: {
           cliente_ativo: boolean | null
@@ -1850,70 +1703,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      conversion_metrics: {
-        Row: {
-          client_id: string | null
-          conversion_date: string | null
-          converted: boolean | null
-          converted_to_plan: string | null
-          coupon_used: string | null
-          created_at: string | null
-          days_to_convert: number | null
-          id: string
-          touchpoints: Json | null
-          trial_end_date: string
-          trial_start_date: string
-        }
-        Insert: {
-          client_id?: string | null
-          conversion_date?: string | null
-          converted?: boolean | null
-          converted_to_plan?: string | null
-          coupon_used?: string | null
-          created_at?: string | null
-          days_to_convert?: number | null
-          id?: string
-          touchpoints?: Json | null
-          trial_end_date: string
-          trial_start_date: string
-        }
-        Update: {
-          client_id?: string | null
-          conversion_date?: string | null
-          converted?: boolean | null
-          converted_to_plan?: string | null
-          coupon_used?: string | null
-          created_at?: string | null
-          days_to_convert?: number | null
-          id?: string
-          touchpoints?: Json | null
-          trial_end_date?: string
-          trial_start_date?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversion_metrics_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversion_metrics_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "vw_expiration_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversion_metrics_coupon_used_fkey"
-            columns: ["coupon_used"]
-            isOneToOne: false
-            referencedRelation: "discount_coupons"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       coupon_usage: {
         Row: {
@@ -2740,15 +2529,7 @@ export type Database = {
           response_time_ms?: number | null
           status?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "m3u_health_checks_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       m3u_import_cache: {
         Row: {
@@ -2961,108 +2742,6 @@ export type Database = {
           },
         ]
       }
-      m3u_ingest_jobs: {
-        Row: {
-          bytes_transferred: number | null
-          created_at: string
-          duration_ms: number | null
-          error_message: string | null
-          finished_at: string | null
-          id: string
-          ingest_method: string | null
-          metadata: Json | null
-          object_key: string
-          origin_url: string
-          retry_count: number | null
-          source_id: string | null
-          started_at: string | null
-          status: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          bytes_transferred?: number | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          ingest_method?: string | null
-          metadata?: Json | null
-          object_key: string
-          origin_url: string
-          retry_count?: number | null
-          source_id?: string | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          bytes_transferred?: number | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          ingest_method?: string | null
-          metadata?: Json | null
-          object_key?: string
-          origin_url?: string
-          retry_count?: number | null
-          source_id?: string | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      m3u_ingest_metrics: {
-        Row: {
-          bytes_transferred: number | null
-          created_at: string
-          duration_ms: number | null
-          error_message: string | null
-          id: string
-          ingest_method: string | null
-          object_key: string | null
-          origin_url: string | null
-          retry_count: number | null
-          status: string | null
-          trace_id: string
-          worker_duration_ms: number | null
-        }
-        Insert: {
-          bytes_transferred?: number | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          ingest_method?: string | null
-          object_key?: string | null
-          origin_url?: string | null
-          retry_count?: number | null
-          status?: string | null
-          trace_id: string
-          worker_duration_ms?: number | null
-        }
-        Update: {
-          bytes_transferred?: number | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          ingest_method?: string | null
-          object_key?: string | null
-          origin_url?: string | null
-          retry_count?: number | null
-          status?: string | null
-          trace_id?: string
-          worker_duration_ms?: number | null
-        }
-        Relationships: []
-      }
       m3u_list_favorites: {
         Row: {
           admin_id: string
@@ -3081,59 +2760,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           m3u_list_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "m3u_list_favorites_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      m3u_lists: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          file_url: string
-          health_snoozed_until: string | null
-          id: string
-          is_default: boolean | null
-          name: string
-          plan_type: string[] | null
-          status: string | null
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          file_url: string
-          health_snoozed_until?: string | null
-          id?: string
-          is_default?: boolean | null
-          name: string
-          plan_type?: string[] | null
-          status?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          file_url?: string
-          health_snoozed_until?: string | null
-          id?: string
-          is_default?: boolean | null
-          name?: string
-          plan_type?: string[] | null
-          status?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
         }
         Relationships: []
       }
@@ -3515,15 +3141,7 @@ export type Database = {
           view_type?: string | null
           viewed_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "m3u_view_history_m3u_list_id_fkey"
-            columns: ["m3u_list_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_lists"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       mercado_pago_config: {
         Row: {
@@ -4259,22 +3877,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "playlist_access_logs_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playlist_access_logs_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "vw_playlist_metrics"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       playlist_archives: {
         Row: {
@@ -4314,86 +3917,6 @@ export type Database = {
           verified_at?: string | null
         }
         Relationships: []
-      }
-      playlist_entries: {
-        Row: {
-          created_at: string | null
-          duration: number | null
-          entry_hash: string
-          group_title: string | null
-          id: string
-          is_output_synced: boolean | null
-          is_valid: boolean | null
-          output_migrated_at: string | null
-          playlist_key: string
-          r2_output_etag: string | null
-          r2_output_path: string | null
-          search_vector: unknown
-          sequence: number | null
-          stream_url: string
-          title: string
-          tvg_id: string | null
-          tvg_language: string | null
-          tvg_logo: string | null
-          tvg_name: string | null
-          updated_at: string | null
-          validation_error: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          duration?: number | null
-          entry_hash: string
-          group_title?: string | null
-          id?: string
-          is_output_synced?: boolean | null
-          is_valid?: boolean | null
-          output_migrated_at?: string | null
-          playlist_key: string
-          r2_output_etag?: string | null
-          r2_output_path?: string | null
-          search_vector?: unknown
-          sequence?: number | null
-          stream_url: string
-          title: string
-          tvg_id?: string | null
-          tvg_language?: string | null
-          tvg_logo?: string | null
-          tvg_name?: string | null
-          updated_at?: string | null
-          validation_error?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          duration?: number | null
-          entry_hash?: string
-          group_title?: string | null
-          id?: string
-          is_output_synced?: boolean | null
-          is_valid?: boolean | null
-          output_migrated_at?: string | null
-          playlist_key?: string
-          r2_output_etag?: string | null
-          r2_output_path?: string | null
-          search_vector?: unknown
-          sequence?: number | null
-          stream_url?: string
-          title?: string
-          tvg_id?: string | null
-          tvg_language?: string | null
-          tvg_logo?: string | null
-          tvg_name?: string | null
-          updated_at?: string | null
-          validation_error?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playlist_entries_playlist_key_fkey"
-            columns: ["playlist_key"]
-            isOneToOne: false
-            referencedRelation: "playlist_sources"
-            referencedColumns: ["key"]
-          },
-        ]
       }
       playlist_health_checks: {
         Row: {
@@ -4632,84 +4155,6 @@ export type Database = {
             referencedColumns: ["key"]
           },
         ]
-      }
-      playlists: {
-        Row: {
-          archive_id: string | null
-          archived: boolean | null
-          archived_at: string | null
-          channel_count: number | null
-          content_hash: string | null
-          created_at: string | null
-          expires_at: string | null
-          filename: string
-          id: string
-          ingest_duration_ms: number | null
-          ingest_method: string | null
-          opts: Json | null
-          original_source: string | null
-          probe_summary: Json | null
-          quarantined_count: number | null
-          r2_object_key: string | null
-          sha256: string
-          size_bytes: number | null
-          source_domain: string | null
-          storage_path: string
-          unique_count: number | null
-          user_id: string | null
-          version: number | null
-        }
-        Insert: {
-          archive_id?: string | null
-          archived?: boolean | null
-          archived_at?: string | null
-          channel_count?: number | null
-          content_hash?: string | null
-          created_at?: string | null
-          expires_at?: string | null
-          filename: string
-          id?: string
-          ingest_duration_ms?: number | null
-          ingest_method?: string | null
-          opts?: Json | null
-          original_source?: string | null
-          probe_summary?: Json | null
-          quarantined_count?: number | null
-          r2_object_key?: string | null
-          sha256: string
-          size_bytes?: number | null
-          source_domain?: string | null
-          storage_path: string
-          unique_count?: number | null
-          user_id?: string | null
-          version?: number | null
-        }
-        Update: {
-          archive_id?: string | null
-          archived?: boolean | null
-          archived_at?: string | null
-          channel_count?: number | null
-          content_hash?: string | null
-          created_at?: string | null
-          expires_at?: string | null
-          filename?: string
-          id?: string
-          ingest_duration_ms?: number | null
-          ingest_method?: string | null
-          opts?: Json | null
-          original_source?: string | null
-          probe_summary?: Json | null
-          quarantined_count?: number | null
-          r2_object_key?: string | null
-          sha256?: string
-          size_bytes?: number | null
-          source_domain?: string | null
-          storage_path?: string
-          unique_count?: number | null
-          user_id?: string | null
-          version?: number | null
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -5339,83 +4784,6 @@ export type Database = {
           used_at?: string | null
         }
         Relationships: []
-      }
-      r2_storage_objects: {
-        Row: {
-          access_count: number | null
-          bandwidth_bytes: number | null
-          cache_control: string | null
-          cdn_url: string | null
-          checksum_md5: string | null
-          content_encoding: string | null
-          content_type: string
-          created_at: string | null
-          error_message: string | null
-          expires_at: string | null
-          id: string
-          last_accessed_at: string | null
-          mime_type: string | null
-          r2_bucket: string
-          r2_key: string
-          size_bytes: number | null
-          source_channel_id: string | null
-          source_url: string | null
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          access_count?: number | null
-          bandwidth_bytes?: number | null
-          cache_control?: string | null
-          cdn_url?: string | null
-          checksum_md5?: string | null
-          content_encoding?: string | null
-          content_type: string
-          created_at?: string | null
-          error_message?: string | null
-          expires_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          mime_type?: string | null
-          r2_bucket?: string
-          r2_key: string
-          size_bytes?: number | null
-          source_channel_id?: string | null
-          source_url?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          access_count?: number | null
-          bandwidth_bytes?: number | null
-          cache_control?: string | null
-          cdn_url?: string | null
-          checksum_md5?: string | null
-          content_encoding?: string | null
-          content_type?: string
-          created_at?: string | null
-          error_message?: string | null
-          expires_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          mime_type?: string | null
-          r2_bucket?: string
-          r2_key?: string
-          size_bytes?: number | null
-          source_channel_id?: string | null
-          source_url?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "r2_storage_objects_source_channel_id_fkey"
-            columns: ["source_channel_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_channels"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       rate_limit_tracking: {
         Row: {
@@ -6185,48 +5553,6 @@ export type Database = {
         }
         Relationships: []
       }
-      storage_monthly_stats: {
-        Row: {
-          cf_minutes_delivered: number | null
-          cf_minutes_stored: number | null
-          cf_objects_count: number | null
-          cf_total_bytes: number | null
-          created_at: string
-          estimated_cost_usd: number | null
-          id: string
-          month: string
-          r2_bandwidth_bytes: number | null
-          r2_objects_count: number | null
-          r2_total_bytes: number | null
-        }
-        Insert: {
-          cf_minutes_delivered?: number | null
-          cf_minutes_stored?: number | null
-          cf_objects_count?: number | null
-          cf_total_bytes?: number | null
-          created_at?: string
-          estimated_cost_usd?: number | null
-          id?: string
-          month: string
-          r2_bandwidth_bytes?: number | null
-          r2_objects_count?: number | null
-          r2_total_bytes?: number | null
-        }
-        Update: {
-          cf_minutes_delivered?: number | null
-          cf_minutes_stored?: number | null
-          cf_objects_count?: number | null
-          cf_total_bytes?: number | null
-          created_at?: string
-          estimated_cost_usd?: number | null
-          id?: string
-          month?: string
-          r2_bandwidth_bytes?: number | null
-          r2_objects_count?: number | null
-          r2_total_bytes?: number | null
-        }
-        Relationships: []
-      }
       storage_sync_events: {
         Row: {
           channel_id: string | null
@@ -6622,107 +5948,7 @@ export type Database = {
             | Database["public"]["Enums"]["transcode_job_status"]
             | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "transcode_job_history_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "transcode_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      transcode_jobs: {
-        Row: {
-          cf_stream_uid: string | null
-          cf_upload_id: string | null
-          channel_id: string | null
-          completed_at: string | null
-          created_at: string
-          error_code: string | null
-          error_message: string | null
-          estimated_popularity: number | null
-          historical_views: number | null
-          id: string
-          ladder_config: Json | null
-          ladder_preset: Database["public"]["Enums"]["quality_ladder_preset"]
-          max_retries: number
-          output_manifests: Json | null
-          output_metadata: Json | null
-          output_thumbnails: Json | null
-          priority: number
-          processor_id: string | null
-          retry_after: string | null
-          retry_count: number
-          source_resolution: Json | null
-          source_url: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["transcode_job_status"]
-          updated_at: string
-        }
-        Insert: {
-          cf_stream_uid?: string | null
-          cf_upload_id?: string | null
-          channel_id?: string | null
-          completed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          estimated_popularity?: number | null
-          historical_views?: number | null
-          id?: string
-          ladder_config?: Json | null
-          ladder_preset?: Database["public"]["Enums"]["quality_ladder_preset"]
-          max_retries?: number
-          output_manifests?: Json | null
-          output_metadata?: Json | null
-          output_thumbnails?: Json | null
-          priority?: number
-          processor_id?: string | null
-          retry_after?: string | null
-          retry_count?: number
-          source_resolution?: Json | null
-          source_url: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["transcode_job_status"]
-          updated_at?: string
-        }
-        Update: {
-          cf_stream_uid?: string | null
-          cf_upload_id?: string | null
-          channel_id?: string | null
-          completed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          estimated_popularity?: number | null
-          historical_views?: number | null
-          id?: string
-          ladder_config?: Json | null
-          ladder_preset?: Database["public"]["Enums"]["quality_ladder_preset"]
-          max_retries?: number
-          output_manifests?: Json | null
-          output_metadata?: Json | null
-          output_thumbnails?: Json | null
-          priority?: number
-          processor_id?: string | null
-          retry_after?: string | null
-          retry_count?: number
-          source_resolution?: Json | null
-          source_url?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["transcode_job_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transcode_jobs_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_channels"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       trending_rankings: {
         Row: {
@@ -7097,77 +6323,6 @@ export type Database = {
         }
         Relationships: []
       }
-      vod_downloads: {
-        Row: {
-          channel_id: string | null
-          created_at: string | null
-          download_completed_at: string | null
-          download_started_at: string | null
-          error_message: string | null
-          etag: string | null
-          file_size_bytes: number | null
-          id: string
-          max_retries: number | null
-          metadata: Json | null
-          original_url: string
-          r2_url: string | null
-          retry_count: number | null
-          segment_count: number | null
-          segments_downloaded: number | null
-          sha256: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          channel_id?: string | null
-          created_at?: string | null
-          download_completed_at?: string | null
-          download_started_at?: string | null
-          error_message?: string | null
-          etag?: string | null
-          file_size_bytes?: number | null
-          id?: string
-          max_retries?: number | null
-          metadata?: Json | null
-          original_url: string
-          r2_url?: string | null
-          retry_count?: number | null
-          segment_count?: number | null
-          segments_downloaded?: number | null
-          sha256?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          channel_id?: string | null
-          created_at?: string | null
-          download_completed_at?: string | null
-          download_started_at?: string | null
-          error_message?: string | null
-          etag?: string | null
-          file_size_bytes?: number | null
-          id?: string
-          max_retries?: number | null
-          metadata?: Json | null
-          original_url?: string
-          r2_url?: string | null
-          retry_count?: number | null
-          segment_count?: number | null
-          segments_downloaded?: number | null
-          sha256?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vod_downloads_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
-            referencedRelation: "m3u_channels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       vod_host_status: {
         Row: {
           avg_download_speed_bps: number | null
@@ -7493,76 +6648,6 @@ export type Database = {
           total_successes?: number | null
           updated_at?: string | null
           vod_count?: never
-        }
-        Relationships: []
-      }
-      vw_ingest_metrics_summary: {
-        Row: {
-          avg_bytes: number | null
-          avg_duration_ms: number | null
-          avg_retries: number | null
-          error_rate_pct: number | null
-          failed: number | null
-          fallback_count: number | null
-          hour: string | null
-          signed_url_count: number | null
-          stream_count: number | null
-          successful: number | null
-          total_bytes: number | null
-          total_requests: number | null
-        }
-        Relationships: []
-      }
-      vw_playlist_metrics: {
-        Row: {
-          archived: boolean | null
-          channel_count: number | null
-          created_at: string | null
-          expires_at: string | null
-          filename: string | null
-          id: string | null
-          quarantined_count: number | null
-          size_bytes: number | null
-          status: string | null
-          unique_count: number | null
-          user_id: string | null
-        }
-        Insert: {
-          archived?: boolean | null
-          channel_count?: number | null
-          created_at?: string | null
-          expires_at?: string | null
-          filename?: string | null
-          id?: string | null
-          quarantined_count?: number | null
-          size_bytes?: number | null
-          status?: never
-          unique_count?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          archived?: boolean | null
-          channel_count?: number | null
-          created_at?: string | null
-          expires_at?: string | null
-          filename?: string | null
-          id?: string | null
-          quarantined_count?: number | null
-          size_bytes?: number | null
-          status?: never
-          unique_count?: number | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      vw_storage_consolidated: {
-        Row: {
-          object_count: number | null
-          pending_count: number | null
-          ready_count: number | null
-          storage_type: string | null
-          total_bytes: number | null
-          total_gb: number | null
         }
         Relationships: []
       }

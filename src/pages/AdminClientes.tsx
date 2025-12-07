@@ -218,38 +218,7 @@ export default function AdminClientes() {
     }
   };
 
-  // Buscar listas M3U dos clientes
-  useEffect(() => {
-    const fetchM3ULists = async () => {
-      if (profiles.length === 0) return;
-
-      try {
-        const clienteIds = profiles.map(c => c.id);
-        const { data, error } = await supabase
-          .from('client_m3u_lists')
-          .select(`
-            client_id,
-            m3u_lists (
-              name
-            )
-          `)
-          .in('client_id', clienteIds)
-          .eq('is_active', true);
-
-        if (error) throw error;
-
-        const m3uMap: Record<string, string> = {};
-        data?.forEach((assignment: any) => {
-          m3uMap[assignment.client_id] = assignment.m3u_lists?.name || 'N/A';
-        });
-        setClienteM3ULists(m3uMap);
-      } catch (error) {
-        console.error('Error fetching M3U lists:', error);
-      }
-    };
-
-    fetchM3ULists();
-  }, [profiles]);
+  // M3U lists management removed - now using unified m3u_sync_entries
 
   if (loadingClientes) {
     return (
