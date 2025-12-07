@@ -39,12 +39,28 @@ export class AutomaticNotificationTriggerService {
           let template = null;
           
           if (rule.template_reference) {
-            const { data: templateData, error: templateError } = await supabase
+            // Primeiro tenta busca exata pelo nome
+            let { data: templateData, error: templateError } = await supabase
               .from('whatsapp_templates')
               .select('*')
-              .or(`name.ilike.%${rule.template_reference}%,id.eq.${rule.template_reference}`)
+              .eq('name', rule.template_reference)
               .eq('active', true)
               .maybeSingle();
+
+            // Se não encontrou, tenta busca parcial
+            if (!templateData && !templateError) {
+              const { data: partialData, error: partialError } = await supabase
+                .from('whatsapp_templates')
+                .select('*')
+                .ilike('name', `%${rule.template_reference}%`)
+                .eq('active', true)
+                .limit(1)
+                .maybeSingle();
+              
+              if (!partialError) {
+                templateData = partialData;
+              }
+            }
 
             if (templateError) {
               console.error(`[AutoNotificationTrigger] Erro ao buscar template:`, templateError);
@@ -56,10 +72,12 @@ export class AutomaticNotificationTriggerService {
           }
 
           if (!template) {
-            console.log(`[AutoNotificationTrigger] Template não encontrado para regra: ${rule.name}`);
-            errors.push(`Template não encontrado para regra ${rule.name}`);
+            console.log(`[AutoNotificationTrigger] Template não encontrado para regra: ${rule.name}, ref: ${rule.template_reference}`);
+            errors.push(`Template "${rule.template_reference}" não encontrado para regra ${rule.name}`);
             continue;
           }
+          
+          console.log(`[AutoNotificationTrigger] Template encontrado: ${template.name} para regra ${rule.name}`);
 
           if (!cliente.telefone) {
             errors.push(`Cliente sem telefone cadastrado`);
