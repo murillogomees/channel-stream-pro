@@ -550,8 +550,12 @@ class MigrationWorker {
       .eq('id', this.jobId);
   }
 
-  async run(): Promise<{ success: boolean; processed: number; failed: number }> {
+  async run(): Promise<{ success: boolean; processed: number; failed: number; shouldContinue: boolean }> {
     console.log(`[Migration] Starting job ${this.jobId} for ${this.config.targetTable}`);
+    
+    // Maximum execution time per run (25 seconds to stay within Edge Function limits)
+    const MAX_EXECUTION_TIME_MS = 25000;
+    const runStartTime = Date.now();
 
     // Update job status to running
     await this.supabase
@@ -564,9 +568,31 @@ class MigrationWorker {
 
     let offset = 0;
     let hasMore = true;
+    let shouldContinue = false;
 
     try {
       while (hasMore) {
+        // Check execution time limit
+        if (Date.now() - runStartTime > MAX_EXECUTION_TIME_MS) {
+          console.log(`[Migration] Time limit reached after ${this.processedCount} items, will continue in next run`);
+          shouldContinue = true;
+          
+          // Update job to indicate it needs to continue
+          await this.supabase
+            .from('r2_migration_jobs')
+            .update({
+              status: 'running',
+              last_checkpoint: {
+                processed: this.processedCount,
+                timestamp: new Date().toISOString(),
+                needsContinuation: true,
+              },
+            })
+            .eq('id', this.jobId);
+          
+          break;
+        }
+
         // Check if job should be paused/stopped
         const { data: job } = await this.supabase
           .from('r2_migration_jobs')
@@ -613,24 +639,27 @@ class MigrationWorker {
         offset += this.config.batchSize;
 
         // Small delay to prevent overwhelming
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 50));
       }
 
-      // Mark job as completed
-      await this.supabase
-        .from('r2_migration_jobs')
-        .update({
-          status: 'completed',
-          finished_at: new Date().toISOString(),
-        })
-        .eq('id', this.jobId);
+      // Mark job as completed only if all items processed
+      if (!shouldContinue && !hasMore) {
+        await this.supabase
+          .from('r2_migration_jobs')
+          .update({
+            status: 'completed',
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', this.jobId);
 
-      console.log(`[Migration] Job ${this.jobId} completed: ${this.successCount} success, ${this.failedCount} failed, ${this.skippedCount} skipped`);
+        console.log(`[Migration] Job ${this.jobId} completed: ${this.successCount} success, ${this.failedCount} failed, ${this.skippedCount} skipped`);
+      }
 
       return {
         success: true,
         processed: this.processedCount,
         failed: this.failedCount,
+        shouldContinue,
       };
     } catch (error) {
       console.error(`[Migration] Job ${this.jobId} failed:`, error);
@@ -652,6 +681,7 @@ class MigrationWorker {
         success: false,
         processed: this.processedCount,
         failed: this.failedCount,
+        shouldContinue: false,
       };
     }
   }
@@ -704,15 +734,30 @@ serve(async (req) => {
           .update({ total_items: count || 0 })
           .eq('id', job.id);
 
-        // Start worker (in background via EdgeRuntime.waitUntil if available)
-        const worker = new MigrationWorker(
-          supabase,
-          { targetTable, batchSize, concurrency, maxRetries: 3, dryRun },
-          job.id
-        );
+        // Start worker with auto-continuation
+        const runMigrationWithContinuation = async () => {
+          const worker = new MigrationWorker(
+            supabase,
+            { targetTable, batchSize, concurrency, maxRetries: 3, dryRun },
+            job.id
+          );
+          
+          const result = await worker.run();
+          
+          // If should continue, invoke self to continue processing
+          if (result.shouldContinue) {
+            console.log(`[Migration] Auto-continuing job ${job.id}...`);
+            try {
+              await supabase.functions.invoke('r2-migration-worker', {
+                body: { action: 'continue', jobId: job.id },
+              });
+            } catch (e) {
+              console.error('[Migration] Failed to auto-continue:', e);
+            }
+          }
+        };
 
-        // Run in background
-        EdgeRuntime.waitUntil(worker.run());
+        EdgeRuntime.waitUntil(runMigrationWithContinuation());
 
         return new Response(JSON.stringify({
           success: true,
@@ -752,7 +797,8 @@ serve(async (req) => {
         });
       }
 
-      case 'resume': {
+      case 'resume':
+      case 'continue': {
         const { jobId } = params;
         
         const { data: job } = await supabase
@@ -761,23 +807,39 @@ serve(async (req) => {
           .eq('id', jobId)
           .single();
 
-        if (job) {
-          const worker = new MigrationWorker(
-            supabase,
-            {
-              targetTable: job.target_table as any,
-              batchSize: job.batch_size,
-              concurrency: job.concurrency,
-              maxRetries: 3,
-              dryRun: job.config?.dryRun || false,
-            },
-            job.id
-          );
+        if (job && (job.status === 'running' || job.status === 'paused')) {
+          const runMigrationWithContinuation = async () => {
+            const worker = new MigrationWorker(
+              supabase,
+              {
+                targetTable: job.target_table as any,
+                batchSize: job.batch_size,
+                concurrency: job.concurrency,
+                maxRetries: 3,
+                dryRun: job.config?.dryRun || false,
+              },
+              job.id
+            );
+            
+            const result = await worker.run();
+            
+            // Auto-continue if needed
+            if (result.shouldContinue) {
+              console.log(`[Migration] Auto-continuing job ${job.id}...`);
+              try {
+                await supabase.functions.invoke('r2-migration-worker', {
+                  body: { action: 'continue', jobId: job.id },
+                });
+              } catch (e) {
+                console.error('[Migration] Failed to auto-continue:', e);
+              }
+            }
+          };
 
-          EdgeRuntime.waitUntil(worker.run());
+          EdgeRuntime.waitUntil(runMigrationWithContinuation());
         }
 
-        return new Response(JSON.stringify({ success: true, message: 'Job resumed' }), {
+        return new Response(JSON.stringify({ success: true, message: action === 'resume' ? 'Job resumed' : 'Job continued' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -894,14 +956,29 @@ serve(async (req) => {
           }
         }
 
-        // Start the worker
-        const worker = new MigrationWorker(
-          supabase,
-          { targetTable: table as any, batchSize, concurrency, maxRetries: 3, dryRun: false },
-          newJob.id
-        );
+        // Start the worker with auto-continuation
+        const runMigrationWithContinuation = async () => {
+          const worker = new MigrationWorker(
+            supabase,
+            { targetTable: table as any, batchSize, concurrency, maxRetries: 3, dryRun: false },
+            newJob.id
+          );
+          
+          const result = await worker.run();
+          
+          if (result.shouldContinue) {
+            console.log(`[Migration] Auto-continuing retry job ${newJob.id}...`);
+            try {
+              await supabase.functions.invoke('r2-migration-worker', {
+                body: { action: 'continue', jobId: newJob.id },
+              });
+            } catch (e) {
+              console.error('[Migration] Failed to auto-continue:', e);
+            }
+          }
+        };
 
-        EdgeRuntime.waitUntil(worker.run());
+        EdgeRuntime.waitUntil(runMigrationWithContinuation());
 
         return new Response(JSON.stringify({ 
           success: true, 
