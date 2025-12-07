@@ -7105,7 +7105,7 @@ export type Database = {
         }[]
       }
       execute_sql_as_service_role: {
-        Args: { caller_user_id?: string; sql_query: string }
+        Args: { caller_user_id: string; sql_query: string }
         Returns: undefined
       }
       find_playlist_by_hash: {
