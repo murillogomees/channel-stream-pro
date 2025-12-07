@@ -121,28 +121,38 @@ serve(async (req) => {
       console.log(`[rls-fix] Applying fix for ${schema_name}.${table_name}`);
       
       // 1. Create backup of current policies
-      const { data: currentPolicies } = await serviceClient.rpc('get_table_policies', {
-        schema_name_param: schema_name,
-        table_name_param: table_name
-      }).catch(() => ({ data: null }));
+      let currentPolicies = null;
+      try {
+        const { data } = await serviceClient.rpc('get_table_policies', {
+          schema_name_param: schema_name,
+          table_name_param: table_name
+        });
+        currentPolicies = data;
+      } catch (err: any) {
+        console.log('[rls-fix] get_table_policies not available:', err.message);
+      }
 
       const backupId = crypto.randomUUID();
       
       // Store backup (ignore errors if table doesn't exist)
-      await serviceClient.from('rls_fix_backups').insert({
-        id: backupId,
-        schema_name,
-        table_name,
-        policy_name,
-        policy_definition: JSON.stringify(currentPolicies || []),
-        created_by: user.id,
-        restore_sql: sql_rollback || null,
-        metadata: {
-          issue_id,
-          scan_result_id,
-          severity,
-        },
-      }).catch(err => console.log('[rls-fix] Backup insert skipped:', err.message));
+      try {
+        await serviceClient.from('rls_fix_backups').insert({
+          id: backupId,
+          schema_name,
+          table_name,
+          policy_name,
+          policy_definition: JSON.stringify(currentPolicies || []),
+          created_by: user.id,
+          restore_sql: sql_rollback || null,
+          metadata: {
+            issue_id,
+            scan_result_id,
+            severity,
+          },
+        });
+      } catch (err: any) {
+        console.log('[rls-fix] Backup insert skipped:', err.message);
+      }
 
       // 2. Execute the fix SQL via service role RPC
       try {
@@ -175,16 +185,19 @@ serve(async (req) => {
 
         // Update rls_audit_resolutions if exists
         if (issue_id) {
-          await serviceClient
-            .from('rls_audit_resolutions')
-            .update({
-              status: 'resolved',
-              applied_fix: sql_apply,
-              resolved_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', issue_id)
-            .catch(() => { /* ignore if not found */ });
+          try {
+            await serviceClient
+              .from('rls_audit_resolutions')
+              .update({
+                status: 'resolved',
+                applied_fix: sql_apply,
+                resolved_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', issue_id);
+          } catch {
+            console.log('[rls-fix] Resolution update skipped - issue not found');
+          }
         }
 
         return new Response(
