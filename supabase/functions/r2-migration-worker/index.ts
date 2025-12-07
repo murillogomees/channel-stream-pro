@@ -370,7 +370,23 @@ class MigrationWorker {
         // Download logo
         const downloaded = await this.r2.downloadFromUrl(logoUrl);
         if (!downloaded) {
-          throw new Error('Logo download failed');
+          // Mark as skipped (not failed) to avoid retry loops for inaccessible URLs
+          // This handles 404s, connection failures, blocked domains, etc.
+          result.status = 'skipped';
+          result.error = `Logo download failed (source unavailable): ${logoUrl.substring(0, 100)}`;
+          result.fromUrl = logoUrl;
+          result.durationMs = Date.now() - startTime;
+          
+          // Mark as synced with empty path to avoid retrying
+          await this.supabase
+            .from('m3u_channels')
+            .update({
+              is_logo_synced: true,
+              logo_migrated_at: new Date().toISOString(),
+            })
+            .eq('id', channel.id);
+          
+          return result;
         }
 
         // Determine extension from content type
@@ -418,9 +434,25 @@ class MigrationWorker {
       result.durationMs = Date.now() - startTime;
       return result;
     } catch (error) {
-      result.status = 'failed';
+      // For unexpected errors, still mark as skipped to avoid infinite retries
+      result.status = 'skipped';
       result.error = error instanceof Error ? error.message : 'Unknown error';
+      result.fromUrl = channel.tvg_logo;
       result.durationMs = Date.now() - startTime;
+      
+      // Mark as synced to avoid retrying
+      try {
+        await this.supabase
+          .from('m3u_channels')
+          .update({
+            is_logo_synced: true,
+            logo_migrated_at: new Date().toISOString(),
+          })
+          .eq('id', channel.id);
+      } catch (dbError) {
+        console.error(`[Migration] Failed to mark channel ${channel.id} as synced:`, dbError);
+      }
+      
       return result;
     }
   }
