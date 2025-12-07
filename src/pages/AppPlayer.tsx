@@ -24,6 +24,7 @@ import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
 import { streamService } from '@/modules/player/services/StreamService';
 import { VirtualChannelList } from '@/components/app/VirtualChannelList';
+import { TVLiveCategoryList } from '@/components/iptv/TVLiveCategoryList';
 import { toast } from 'sonner';
 import { useOrientationLock } from '@/hooks/useOrientationLock';
 
@@ -689,12 +690,13 @@ export default function AppPlayer() {
             </div>}
 
           {activeTab === 'live' && <div className="px-4 lg:px-6 py-4 h-[calc(100vh-120px)]">
-              <VirtualChannelList 
-                channels={filteredChannels as any[]} 
+              <TVLiveCategoryList 
+                categories={categorizedContent.live as any[]} 
                 currentChannelId={playerChannel?.id}
                 onChannelSelect={handlePlay}
                 isFavorite={isFavorite}
                 onFavoriteToggle={toggleFavorite}
+                searchQuery={searchQuery}
               />
             </div>}
 
