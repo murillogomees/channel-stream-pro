@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ViewerProfileProvider } from "@/contexts/ViewerProfileContext";
+import { PlaylistProvider } from "@/contexts/PlaylistContext";
 import { webVitalsService } from "@/services/webVitalsService";
 import { useGlobalOrientationLock } from "@/hooks/useGlobalOrientationLock";
 
@@ -146,9 +147,11 @@ const App = () => (
     <ThemeProvider>
       <TooltipProvider>
         <ViewerProfileProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
+          <PlaylistProvider>
+            <Toaster />
+            <Sonner />
+            <AppContent />
+          </PlaylistProvider>
         </ViewerProfileProvider>
       </TooltipProvider>
     </ThemeProvider>
