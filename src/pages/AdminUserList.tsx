@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Search, RefreshCw, Edit, Trash2, Shield, User, Mail, Phone, Calendar, DollarSign, CreditCard, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
@@ -39,6 +40,8 @@ export default function AdminUserList() {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
+  const [enviarNotificacao, setEnviarNotificacao] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Create user dialog state
   const [createDialog, setCreateDialog] = useState(false);
@@ -107,13 +110,20 @@ export default function AdminUserList() {
       totp_enabled: user.totp_enabled ?? false,
       valor_pago: user.valor_pago ?? 0,
     });
+    setEnviarNotificacao(false); // Reset checkbox ao abrir
     setEditDialog(true);
   };
 
   const handleEditSubmit = async () => {
     if (!selectedUser) return;
 
+    setSavingEdit(true);
     try {
+      // Detectar se cliente foi desativado
+      const clienteEraAtivo = selectedUser.cliente_ativo !== false;
+      const clienteAgoraInativo = editFormData.cliente_ativo === false;
+      const clienteDesativado = clienteEraAtivo && clienteAgoraInativo;
+
       // Preparar dados para update (remover campos readonly e undefined)
       const { id, created_at, updated_at, totp_secret, totp_verified_at, 
               roles, ...updateData } = editFormData;
@@ -124,6 +134,61 @@ export default function AdminUserList() {
         .eq('id', selectedUser.id);
 
       if (error) throw error;
+
+      // Enviar notificação se cliente foi desativado e checkbox está marcada
+      if (clienteDesativado && enviarNotificacao) {
+        try {
+          console.log('[AdminUserList] Cliente desativado, disparando notificação...');
+          
+          const { automaticNotificationTriggerService } = await import('@/services/automaticNotificationTriggerService');
+          
+          // Converter para formato Cliente esperado pelo serviço
+          // O telefone pode estar em contact_phone (do form) ou telefone (do profile)
+          const telefoneCliente = editFormData.contact_phone || 
+                                  selectedUser.telefone || 
+                                  (selectedUser as any).contact_phone || '';
+          
+          console.log('[AdminUserList] Telefone do cliente:', telefoneCliente);
+          
+          const clienteData = {
+            id: selectedUser.id,
+            nome: editFormData.nome || selectedUser.nome,
+            email: editFormData.email || selectedUser.email,
+            telefone: telefoneCliente,
+            plano: editFormData.plano || selectedUser.plano,
+            situacao: editFormData.situacao || 'Inativo',
+            dataVencimento: editFormData.data_vencimento || selectedUser.data_vencimento,
+            dataContratacao: editFormData.data_contratacao || selectedUser.data_contratacao,
+            valorPago: editFormData.valor_pago || selectedUser.valor_pago || 0,
+            dataCadastro: selectedUser.created_at,
+            dataUltimaEdicao: new Date().toISOString(),
+            clienteAtivo: false,
+          };
+
+          const result = await automaticNotificationTriggerService.triggerClientDeactivation(clienteData as any);
+          
+          if (result.messagesSent > 0) {
+            toast({
+              title: 'Notificação enviada',
+              description: `Mensagem de desativação enviada para ${editFormData.nome}`,
+            });
+          } else if (result.errors.length > 0) {
+            console.warn('[AdminUserList] Erros ao enviar notificação:', result.errors);
+            toast({
+              title: 'Aviso',
+              description: result.errors[0],
+              variant: 'default',
+            });
+          }
+        } catch (notifError) {
+          console.error('[AdminUserList] Erro ao enviar notificação:', notifError);
+          toast({
+            title: 'Aviso',
+            description: 'Usuário atualizado, mas erro ao enviar notificação',
+            variant: 'default',
+          });
+        }
+      }
 
       toast({
         title: 'Sucesso',
@@ -139,6 +204,8 @@ export default function AdminUserList() {
         description: error.message || 'Erro ao atualizar usuário',
         variant: 'destructive',
       });
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -519,12 +586,38 @@ export default function AdminUserList() {
               isEdit={true}
             />
           </div>
-          <DialogFooter>
+          
+          {/* Checkbox de notificação ao desativar */}
+          {selectedUser?.cliente_ativo !== false && editFormData.cliente_ativo === false && (
+            <div className="px-6 pb-4 pt-2 border-t">
+              <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <Checkbox
+                  id="enviar-notificacao"
+                  checked={enviarNotificacao}
+                  onCheckedChange={(checked) => setEnviarNotificacao(checked === true)}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="enviar-notificacao" className="text-sm font-medium cursor-pointer">
+                    📱 Enviar notificação WhatsApp ao desativar
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Uma mensagem será enviada informando sobre a desativação do cadastro
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="px-6 pb-6">
             <Button variant="outline" onClick={() => setEditDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEditSubmit} className="bg-primary hover:bg-primary/90">
-              Salvar Alterações
+            <Button 
+              onClick={handleEditSubmit} 
+              className="bg-primary hover:bg-primary/90"
+              disabled={savingEdit}
+            >
+              {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>
