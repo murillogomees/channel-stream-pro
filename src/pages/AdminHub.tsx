@@ -62,20 +62,33 @@ export default function AdminHub() {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      const [clientesRes, m3uRes, securityRes] = await Promise.all([
-        supabase.from('clientes').select('situacao, data_vencimento', { count: 'exact' }),
-        supabase.from('m3u_sync_sources').select('id', { count: 'exact' }).eq('is_active', true),
-        supabase.from('security_events').select('id', { count: 'exact' }).eq('resolved', false),
-      ]);
+      // Use fetch direto para evitar problemas de tipo
+      const { data: profilesData } = await (supabase
+        .from('profiles')
+        .select('situacao, data_vencimento') as any);
+      
+      const m3uRes = await (supabase
+        .from('m3u_sync_sources')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true) as any);
+      
+      const securityRes = await (supabase
+        .from('security_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('resolved', false) as any);
+      
+      const m3uCount = m3uRes?.count || 0;
+      const securityCount = securityRes?.count || 0;
 
-      const clientes = clientesRes.data || [];
+      const profiles = profilesData as Array<{ situacao: string | null; data_vencimento: string | null }> || [];
+      
       setStats({
-        totalClientes: clientesRes.count || 0,
-        clientesAtivos: clientes.filter(c => c.situacao === 'Ativo').length,
-        clientesTestando: clientes.filter(c => c.situacao === 'Testando').length,
-        vencendoHoje: clientes.filter(c => c.data_vencimento?.startsWith(today)).length,
-        m3uLists: m3uRes.count || 0,
-        securityEvents: securityRes.count || 0,
+        totalClientes: profiles.length,
+        clientesAtivos: profiles.filter(c => c.situacao === 'Ativo').length,
+        clientesTestando: profiles.filter(c => c.situacao === 'Testando').length,
+        vencendoHoje: profiles.filter(c => c.data_vencimento?.startsWith(today)).length,
+        m3uLists: m3uCount || 0,
+        securityEvents: securityCount || 0,
       });
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
