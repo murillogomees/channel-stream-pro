@@ -784,6 +784,36 @@ export type Database = {
           },
         ]
       }
+      app_feature_flags: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          flag_name: string
+          id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          flag_name: string
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          flag_name?: string
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       auth_sessions_log: {
         Row: {
           created_at: string
@@ -4159,9 +4189,12 @@ export type Database = {
       profiles: {
         Row: {
           cliente_ativo: boolean | null
+          cliente_legacy_id: string | null
           contact_phone: string | null
           created_at: string | null
+          data_cadastro: string | null
           data_contratacao: string | null
+          data_ultima_edicao: string | null
           data_ultimo_pagamento: string | null
           data_vencimento: string | null
           dispositivo_contratado:
@@ -4171,6 +4204,7 @@ export type Database = {
           forma_ultimo_pagamento: string | null
           id: string
           is_recorrente: boolean | null
+          migrated_from_clientes: boolean | null
           nome: string
           origem_cadastro: string | null
           plano: Database["public"]["Enums"]["plano_cliente"] | null
@@ -4188,9 +4222,12 @@ export type Database = {
         }
         Insert: {
           cliente_ativo?: boolean | null
+          cliente_legacy_id?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          data_cadastro?: string | null
           data_contratacao?: string | null
+          data_ultima_edicao?: string | null
           data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
           dispositivo_contratado?:
@@ -4200,6 +4237,7 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id: string
           is_recorrente?: boolean | null
+          migrated_from_clientes?: boolean | null
           nome: string
           origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
@@ -4217,9 +4255,12 @@ export type Database = {
         }
         Update: {
           cliente_ativo?: boolean | null
+          cliente_legacy_id?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          data_cadastro?: string | null
           data_contratacao?: string | null
+          data_ultima_edicao?: string | null
           data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
           dispositivo_contratado?:
@@ -4229,6 +4270,7 @@ export type Database = {
           forma_ultimo_pagamento?: string | null
           id?: string
           is_recorrente?: boolean | null
+          migrated_from_clientes?: boolean | null
           nome?: string
           origem_cadastro?: string | null
           plano?: Database["public"]["Enums"]["plano_cliente"] | null
@@ -4245,6 +4287,89 @@ export type Database = {
           valor_pago?: number | null
         }
         Relationships: []
+      }
+      profiles_migration_jobs: {
+        Row: {
+          batch_size: number | null
+          created_by: string | null
+          error_count: number | null
+          finished_at: string | null
+          job_id: string
+          processed_records: number | null
+          started_at: string | null
+          status: string | null
+          success_count: number | null
+          summary: Json | null
+          total_records: number | null
+        }
+        Insert: {
+          batch_size?: number | null
+          created_by?: string | null
+          error_count?: number | null
+          finished_at?: string | null
+          job_id?: string
+          processed_records?: number | null
+          started_at?: string | null
+          status?: string | null
+          success_count?: number | null
+          summary?: Json | null
+          total_records?: number | null
+        }
+        Update: {
+          batch_size?: number | null
+          created_by?: string | null
+          error_count?: number | null
+          finished_at?: string | null
+          job_id?: string
+          processed_records?: number | null
+          started_at?: string | null
+          status?: string | null
+          success_count?: number | null
+          summary?: Json | null
+          total_records?: number | null
+        }
+        Relationships: []
+      }
+      profiles_migration_logs: {
+        Row: {
+          action: string | null
+          cliente_id: string | null
+          created_at: string | null
+          error: string | null
+          field_mapping: Json | null
+          id: number
+          job_id: string | null
+          profile_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          error?: string | null
+          field_mapping?: Json | null
+          id?: number
+          job_id?: string | null
+          profile_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          error?: string | null
+          field_mapping?: Json | null
+          id?: number
+          job_id?: string | null
+          profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_migration_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_migration_jobs"
+            referencedColumns: ["job_id"]
+          },
+        ]
       }
       pwa_settings: {
         Row: {
@@ -7079,6 +7204,20 @@ export type Database = {
           storage_path: string
         }[]
       }
+      get_profile_or_cliente: {
+        Args: { p_id: string }
+        Returns: {
+          cliente_ativo: boolean
+          data_vencimento: string
+          email: string
+          id: string
+          nome: string
+          plano: string
+          situacao: string
+          source_table: string
+          telefone: string
+        }[]
+      }
       get_r2_config:
         | {
             Args: never
@@ -7332,6 +7471,10 @@ export type Database = {
         Returns: boolean
       }
       run_complete_rls_audit: { Args: never; Returns: Json }
+      run_profiles_migration_batch: {
+        Args: { p_batch_size?: number; p_job_id: string }
+        Returns: Json
+      }
       scan_schema_drift: {
         Args: never
         Returns: {
