@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, RotateCcw, Info, Paperclip, FileIcon, X, Eye, Send, Settings, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import TemplatePreview from '@/components/TemplatePreview';
+import TemplateVariablePicker from '@/components/TemplateVariablePicker';
 import MessageSnippets from '@/components/MessageSnippets';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
@@ -728,16 +729,37 @@ export default function AdminTemplates() {
             )}
 
             <div>
-              <Label htmlFor="message">Mensagem</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="message">Mensagem</Label>
+                <TemplateVariablePicker
+                  onInsertVariable={(variable) => {
+                    const textarea = document.getElementById('message') as HTMLTextAreaElement;
+                    if (textarea) {
+                      const start = textarea.selectionStart;
+                      const end = textarea.selectionEnd;
+                      const text = formData.message;
+                      const newText = text.substring(0, start) + variable + text.substring(end);
+                      setFormData({ ...formData, message: newText });
+                      // Restore cursor position after the inserted text
+                      setTimeout(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(start + variable.length, start + variable.length);
+                      }, 0);
+                    } else {
+                      setFormData({ ...formData, message: formData.message + variable });
+                    }
+                  }}
+                />
+              </div>
               <Textarea
                 id="message"
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                placeholder="Olá {{nome}}! Seu plano vence em {{data_vencimento}}..."
+                placeholder="Olá {nome}! Seu plano vence em {dataVencimento}..."
                 rows={8}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Use variáveis com chaves duplas: {`{{nome}}`}, {`{{data_vencimento}}`}, {`{{valor}}`}, {`{{link_pagamento}}`}
+                Use variáveis com chaves: {`{nome}`}, {`{dataVencimento}`}, {`{valor}`}, {`{linkPagamento}`}
               </p>
             </div>
 
