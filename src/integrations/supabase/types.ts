@@ -4713,6 +4713,7 @@ export type Database = {
           target_table: string
           throughput_per_min: number | null
           total_items: number | null
+          updated_at: string | null
         }
         Insert: {
           avg_duration_ms?: number | null
@@ -4736,6 +4737,7 @@ export type Database = {
           target_table: string
           throughput_per_min?: number | null
           total_items?: number | null
+          updated_at?: string | null
         }
         Update: {
           avg_duration_ms?: number | null
@@ -4759,6 +4761,7 @@ export type Database = {
           target_table?: string
           throughput_per_min?: number | null
           total_items?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
