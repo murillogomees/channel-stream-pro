@@ -7628,6 +7628,12 @@ export type Database = {
           total_trials: number
         }[]
       }
+      get_distinct_m3u_categories: {
+        Args: never
+        Returns: {
+          group_title: string
+        }[]
+      }
       get_import_statistics: {
         Args: never
         Returns: {
