@@ -98,6 +98,13 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
   const keyCounterRef = useRef(0);
   const stableKeysRef = useRef<Map<string, string>>(new Map());
   
+  // APPEND-ONLY: Cache previously shown channels per section to prevent reordering
+  const shownChannelsRef = useRef<{
+    live: string[];
+    movie: string[];
+    series: string[];
+  }>({ live: [], movie: [], series: [] });
+  
   // Get or create stable key for an item
   const getOrCreateStableKey = (id: string, prefix: string): string => {
     const cacheKey = `${prefix}:${id}`;
@@ -239,13 +246,37 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
     // Always show default sections with content
     if (allChannels.length > 0) {
       const validChannels = allChannels.filter(ch => ch.tvg_logo);
+      const channelMap = new Map(validChannels.map(ch => [ch.id, ch]));
       
       const movies: Array<Channel & { _uniqueKey: string }> = [];
       const series: Array<Channel & { _uniqueKey: string }> = [];
       const live: Array<Channel & { _uniqueKey: string }> = [];
       const seenNames = new Set<string>();
       
-      // Stable shuffle for default sections
+      // APPEND-ONLY: First, add previously shown channels in their original order
+      const addPreviouslyShown = (type: 'live' | 'movie' | 'series', targetArray: typeof live) => {
+        const previousIds = shownChannelsRef.current[type];
+        for (const id of previousIds) {
+          const ch = channelMap.get(id);
+          if (!ch || usedIds.has(id)) continue;
+          
+          const nameKey = ch.name.split(/S\d|E\d|\d+x\d+/i)[0].trim().toLowerCase();
+          if (seenNames.has(nameKey)) continue;
+          
+          seenNames.add(nameKey);
+          usedIds.add(ch.id);
+          targetArray.push({
+            ...ch,
+            _uniqueKey: getOrCreateStableKey(ch.id, 'def'),
+          });
+        }
+      };
+      
+      addPreviouslyShown('live', live);
+      addPreviouslyShown('movie', movies);
+      addPreviouslyShown('series', series);
+      
+      // Now add NEW channels at the end (append-only)
       const shuffledChannels = stableShuffleWithSeed(validChannels, `${sessionKey}-def`);
       
       for (const ch of shuffledChannels) {
@@ -270,6 +301,13 @@ export function usePersonalizedContent(input: PersonalizedContentInput) {
             series.length >= MAX_DEFAULT_PER_SECTION && 
             live.length >= MAX_DEFAULT_PER_SECTION) break;
       }
+      
+      // Update the shown channels ref for next render (append-only cache)
+      shownChannelsRef.current = {
+        live: live.map(ch => ch.id),
+        movie: movies.map(ch => ch.id),
+        series: series.map(ch => ch.id),
+      };
       
       if (live.length > 0) {
         defaultSections.push({

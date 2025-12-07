@@ -43,3 +43,7 @@ export { SeriesView } from './SeriesView';
 export type { SeriesSortOption } from './SeriesView';
 export { SeriesCard, SeriesCardSkeleton } from './SeriesCard';
 export { SeriesDetailSheet } from './SeriesDetailSheet';
+export { SeriesGuide } from './SeriesGuide';
+
+// Search components
+export { SearchResultsView } from './SearchResultsView';
