@@ -14,7 +14,8 @@ import {
   Monitor,
   Smartphone,
   Play,
-  Key
+  Key,
+  Globe
 } from "lucide-react";
 import { PlatformBuildsGrid } from "@/components/admin/builds/PlatformBuildsGrid";
 import { BuildConfigPanel } from "@/components/admin/builds/BuildConfigPanel";
@@ -24,6 +25,7 @@ import { CiCdPipelinePanel } from "@/components/admin/builds/CiCdPipelinePanel";
 import { BuildStatsOverview } from "@/components/admin/builds/BuildStatsOverview";
 import { AndroidDeployInstructions } from "@/components/admin/builds/AndroidDeployInstructions";
 import { DeveloperAccountsModal } from "@/components/admin/builds/DeveloperAccountsModal";
+import { PwaConfigPanel } from "@/components/admin/builds/pwa";
 import { Button } from "@/components/ui/button";
 
 export default function AdminBuildsDeploysPage() {
@@ -49,7 +51,7 @@ export default function AdminBuildsDeploysPage() {
       <BuildStatsOverview />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 gap-1 h-auto p-1">
           <TabsTrigger value="platforms" className="flex items-center gap-2 text-xs sm:text-sm">
             <Smartphone className="h-4 w-4" />
             <span className="hidden sm:inline">Plataformas</span>
@@ -59,6 +61,11 @@ export default function AdminBuildsDeploysPage() {
             <Smartphone className="h-4 w-4 text-green-500" />
             <span className="hidden sm:inline">Android</span>
             <span className="sm:hidden">Android</span>
+          </TabsTrigger>
+          <TabsTrigger value="pwa" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Globe className="h-4 w-4 text-blue-500" />
+            <span className="hidden sm:inline">Web PWA</span>
+            <span className="sm:hidden">PWA</span>
           </TabsTrigger>
           <TabsTrigger value="config" className="flex items-center gap-2 text-xs sm:text-sm">
             <Settings className="h-4 w-4" />
@@ -88,6 +95,10 @@ export default function AdminBuildsDeploysPage() {
 
         <TabsContent value="android" className="space-y-4">
           <AndroidDeployInstructions />
+        </TabsContent>
+
+        <TabsContent value="pwa" className="space-y-4">
+          <PwaConfigPanel />
         </TabsContent>
 
         <TabsContent value="config" className="space-y-4">
