@@ -179,17 +179,8 @@ export function useEnhancedPlayer({
       });
     }
 
-    // Try to get fallback URL via CDN routing
-    try {
-      const { cdnRoutingService } = await import('@/services/cdnRoutingService');
-      await cdnRoutingService.reportPlaybackIssue(
-        contentId,
-        error.message,
-        source || 'origin'
-      );
-    } catch (err) {
-      console.error('[EnhancedPlayer] Failed to report error:', err);
-    }
+    // Log error for debugging
+    console.error('[EnhancedPlayer] Playback error:', error.message);
   }, [enableAnalytics, analytics, contentId, streamUrl]);
 
   /**

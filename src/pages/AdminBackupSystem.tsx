@@ -57,16 +57,7 @@ export default function AdminBackupSystem() {
       
       const { data: clientes, error } = await supabase
         .from('clientes')
-        .select(`
-          *,
-          client_m3u_lists (
-            m3u_lists (
-              id,
-              name,
-              file_url
-            )
-          )
-        `);
+        .select('*');
 
       if (error) throw error;
 
@@ -114,14 +105,7 @@ export default function AdminBackupSystem() {
       
       const { data: clientes, error } = await supabase
         .from('clientes')
-        .select(`
-          *,
-          client_m3u_lists (
-            m3u_lists (
-              name
-            )
-          )
-        `);
+        .select('*');
 
       if (error) throw error;
 
@@ -150,7 +134,6 @@ export default function AdminBackupSystem() {
         cliente.data_vencimento || '',
         cliente.cliente_ativo ? 'Sim' : 'Não',
         cliente.origem_cadastro || '',
-        cliente.client_m3u_lists?.map((m: any) => m.m3u_lists?.name).filter(Boolean).join('; ') || '',
       ]);
 
       const csv = [

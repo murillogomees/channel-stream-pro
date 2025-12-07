@@ -289,7 +289,7 @@ class StreamService {
   }
   
   /**
-   * Obtém URL otimizada usando CDN Worker routing (avançado)
+   * Obtém URL otimizada para playback
    */
   async getOptimizedUrl(channel: Channel): Promise<{
     url: string;
@@ -297,19 +297,24 @@ class StreamService {
     requiresToken: boolean;
     fallbackUrl?: string;
   }> {
-    const { cdnRoutingService } = await import('@/services/cdnRoutingService');
-    return await cdnRoutingService.getPlaybackUrl(channel);
+    // Use getPlaybackSource directly
+    const result = this.getPlaybackSource(channel);
+    return {
+      url: result.url,
+      source: 'direct',
+      requiresToken: false,
+      fallbackUrl: channel.stream_url
+    };
   }
 
   /**
-   * Verifica se CDN Worker está disponível
+   * Verifica saúde do CDN (stub - sem CDN Worker)
    */
   async checkCdnWorkerHealth(): Promise<{
     status: 'healthy' | 'degraded' | 'down';
     responseTime?: number;
   }> {
-    const { cdnRoutingService } = await import('@/services/cdnRoutingService');
-    return await cdnRoutingService.checkCdnWorkerHealth();
+    return { status: 'healthy', responseTime: 0 };
   }
 
   // ===========================================================================

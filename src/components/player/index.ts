@@ -3,7 +3,6 @@
  */
 
 export { VideoPlayer, default } from './VideoPlayer';
-export { SignedStreamPlayer } from './SignedStreamPlayer';
 export { PreloadIndicator } from './PreloadIndicator';
 export { PreloadStats } from './PreloadStats';
 export { PlayerControls } from './PlayerControls';
