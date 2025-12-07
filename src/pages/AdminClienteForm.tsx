@@ -22,8 +22,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { M3UListSelector } from '@/components/admin/M3UListSelector';
-import { M3UListPreview } from '@/components/admin/M3UListPreview';
 
 import { ArrowLeft, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -959,30 +957,6 @@ export default function AdminClienteForm() {
                 </div>
 
               </div>
-
-              <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border">
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Listas M3U <span className="text-muted-foreground font-normal text-sm">(Opcional)</span></Label>
-                  <p className="text-sm text-muted-foreground">
-                    Selecione uma ou mais listas M3U que serão atribuídas a este cliente
-                  </p>
-                </div>
-                <M3UListSelector 
-                  selectedLists={selectedM3ULists}
-                  onChange={setSelectedM3ULists}
-                  onListsLoaded={setAllM3ULists}
-                />
-              </div>
-
-              {!id && selectedM3ULists.length > 0 && (
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Preview das Listas Selecionadas</Label>
-                  <M3UListPreview 
-                    selectedLists={selectedM3ULists}
-                    allLists={allM3ULists}
-                  />
-                </div>
-              )}
 
               <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border border-border">
                 <Switch

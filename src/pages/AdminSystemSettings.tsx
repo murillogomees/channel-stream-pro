@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader, AdminLayout } from "@/components/admin";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminSystemHealth from "./AdminSystemHealth";
-import AdminPlaylistHealth from "./AdminPlaylistHealth";
 import AdminBackupSystem from "./AdminBackupSystem";
 import AdminCustomize from "./AdminCustomize";
 import AdminVariables from "./AdminVariables";
@@ -29,9 +28,6 @@ export default function AdminSystemSettings() {
           <TabsList className="inline-flex h-auto min-w-full sm:min-w-0 p-1 bg-muted/50">
             <TabsTrigger value="health" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Saúde
-            </TabsTrigger>
-            <TabsTrigger value="playlist" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              Playlists
             </TabsTrigger>
             <TabsTrigger value="migrations" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Migrações
@@ -60,10 +56,6 @@ export default function AdminSystemSettings() {
 
         <TabsContent value="health" className="space-y-4 mt-4">
           <AdminSystemHealth />
-        </TabsContent>
-
-        <TabsContent value="playlist" className="space-y-4 mt-4">
-          <AdminPlaylistHealth />
         </TabsContent>
 
         <TabsContent value="migrations" className="space-y-4 mt-4">

@@ -1,16 +1,15 @@
 /**
  * AdminAnalyticsPage - Hub de analytics
  * Rota: /admin/analytics
- * Abas: Streaming, Analytics, Conversão, Cupons
+ * Abas: Streaming, Analytics, Cupons
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Video, BarChart3, Target, Ticket } from "lucide-react";
+import { Video, BarChart3, Ticket } from "lucide-react";
 import { StreamingDashboard } from "@/components/admin/streaming";
 import AdminAnalytics from "../AdminAnalytics";
-import AdminConversionDashboard from "../AdminConversionDashboard";
 import AdminCoupons from "../AdminCoupons";
 
 export default function AdminAnalyticsPage() {
@@ -30,12 +29,6 @@ export default function AdminAnalyticsPage() {
       content: <AdminAnalytics />
     },
     {
-      value: "conversion",
-      label: "Conversão",
-      icon: <Target className="h-4 w-4" />,
-      content: <AdminConversionDashboard />
-    },
-    {
       value: "coupons",
       label: "Cupons",
       icon: <Ticket className="h-4 w-4" />,
@@ -46,7 +39,7 @@ export default function AdminAnalyticsPage() {
   return (
     <AdminShell 
       title="Analytics & Performance"
-      description="Métricas, streaming, conversão e cupons"
+      description="Métricas, streaming e cupons"
     >
       <ResponsiveTabs
         defaultValue="streaming"

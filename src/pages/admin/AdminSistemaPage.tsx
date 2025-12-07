@@ -1,15 +1,13 @@
 /**
  * AdminSistemaPage - Hub de configurações do sistema
  * Rota: /admin/sistema
- * Abas: Health, Playlists, Backup, Customize, Variables, Status History, Badges
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, ListMusic, Database, Home, CreditCard, Palette, Settings, History, Tag } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
-import AdminPlaylistHealth from "../AdminPlaylistHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
 import AdminVariables from "../AdminVariables";
@@ -27,12 +25,6 @@ export default function AdminSistemaPage() {
       label: "Health",
       icon: <Heart className="h-4 w-4" />,
       content: <AdminSystemHealth />
-    },
-    {
-      value: "playlists",
-      label: "Playlists",
-      icon: <ListMusic className="h-4 w-4" />,
-      content: <AdminPlaylistHealth />
     },
     {
       value: "backup",
