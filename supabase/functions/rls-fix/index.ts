@@ -159,7 +159,8 @@ serve(async (req) => {
         console.log('[rls-fix] Executing SQL:', sql_apply.substring(0, 200) + '...');
         
         const { error: execError } = await serviceClient.rpc('execute_sql_as_service_role', {
-          sql_query: sql_apply
+          sql_query: sql_apply,
+          caller_user_id: user.id
         });
 
         if (execError) {
