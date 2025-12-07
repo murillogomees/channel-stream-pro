@@ -18,7 +18,7 @@ import { useFocusManagerInit, useBackHandler } from '@/modules/player/hooks/useF
 // Smart features imports
 import { useContinueWatching, useRecommendations } from '@/features/player/hooks';
 import { useSmartCache } from '@/hooks/useSmartCache';
-import { MoviesView, SeriesView, HomeView, parseEpisodeInfo, getFirstEpisode } from '@/features/player/components';
+import { MoviesView, SeriesView, HomeView, parseEpisodeInfo, getFirstEpisode, SearchResultsView, SeriesGuide } from '@/features/player/components';
 import type { MovieSortOption, SeriesSortOption } from '@/features/player/components';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SubscriptionExpiredModal } from '@/components/iptv/SubscriptionExpiredModal';
@@ -677,16 +677,49 @@ export default function AppPlayer() {
         <div className="pt-14 sm:pt-16 pb-20 md:pb-4">
           {/* Content based on active tab */}
           {activeTab === 'home' && <div className="py-4">
-              {/* Search results */}
-              {isBackendSearchActive && filteredChannels.length > 0 ? <div className="px-4 lg:px-6">
-                  <TVContentGrid channels={filteredChannels as any[]} onPlay={handlePlay} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
-                </div> : <HomeView continueWatchingItems={continueWatchingItems} loadingContinueWatching={loadingContinueWatching} onPlayContinue={item => {
-            const channel = allChannels.find(ch => ch.id === item.content_id);
-            if (channel) handlePlay(channel);
-          }} onRemoveContinue={removeContinueWatchingItem} seriesContinuations={seriesContinuations} onPlaySeries={handlePlay} recommendationGroups={recommendationGroups} forYouMix={forYouMix} loadingRecommendations={loadingRecommendations} onPlayRecommendation={item => {
-            const channel = allChannels.find(ch => ch.id === item.content_id);
-            if (channel) handlePlay(channel);
-          }} onPlayChannel={handlePlay} allChannels={allChannels as any[]} />}
+              {/* Search results - use consolidated view */}
+              {isBackendSearchActive ? (
+                <SearchResultsView 
+                  results={backendResults.map(r => ({
+                    id: r.id,
+                    name: r.title,
+                    stream_url: r.stream_url,
+                    tvg_logo: r.tvg_logo || undefined,
+                    group_title: r.group_title || undefined,
+                    content_type: r.content_type || undefined,
+                  }))}
+                  onPlay={(item) => handlePlay({
+                    id: item.id,
+                    name: item.name || item.title || '',
+                    stream_url: item.stream_url || '',
+                    tvg_logo: item.tvg_logo,
+                    category_name: item.group_title,
+                  })}
+                  isSearching={isSearching}
+                  query={searchQuery}
+                />
+              ) : (
+                <HomeView 
+                  continueWatchingItems={continueWatchingItems} 
+                  loadingContinueWatching={loadingContinueWatching} 
+                  onPlayContinue={item => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }} 
+                  onRemoveContinue={removeContinueWatchingItem} 
+                  seriesContinuations={seriesContinuations} 
+                  onPlaySeries={handlePlay} 
+                  recommendationGroups={recommendationGroups} 
+                  forYouMix={forYouMix} 
+                  loadingRecommendations={loadingRecommendations} 
+                  onPlayRecommendation={item => {
+                    const channel = allChannels.find(ch => ch.id === item.content_id);
+                    if (channel) handlePlay(channel);
+                  }} 
+                  onPlayChannel={handlePlay} 
+                  allChannels={allChannels as any[]} 
+                />
+              )}
             </div>}
 
           {activeTab === 'live' && <div className="px-4 lg:px-6 py-4 h-[calc(100vh-120px)]">
@@ -718,47 +751,83 @@ export default function AppPlayer() {
 
       {/* Player Dialog - IptvPlayer Modular - Netflix-style fullscreen */}
       {showPlayerDialog && playerChannel && (
-        <div className="fixed inset-0 z-50 bg-black">
-          {/* Back button overlay */}
-          <button
-            onClick={() => {
-              lockToPortrait();
-              setShowPlayerDialog(false);
-              setPlayerChannel(null);
-              refreshContinueWatching();
-              resumeWarming();
-            }}
-            className="absolute top-4 left-4 z-[60] p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
-            aria-label="Voltar"
-          >
-            <ArrowLeft className="w-6 h-6 text-white" />
-          </button>
-
-          <IptvPlayer 
-            channelId={playerChannel.id} 
-            streamUrl={streamService.getPlayableUrl(playerChannel)} 
-            channelName={playerChannel.name} 
-            channelLogo={playerChannel.tvg_logo} 
-            options={{
-              preferLowLatency: true,
-              maxRetries: 3
-            }} 
-            onEvent={(evt, data) => {
-              if (evt === 'back') {
+        <div className="fixed inset-0 z-50 bg-black flex">
+          {/* Video Player - Main Area */}
+          <div className={isCurrentChannelSeries ? "flex-1 relative" : "w-full h-full relative"}>
+            {/* Back button overlay */}
+            <button
+              onClick={() => {
                 lockToPortrait();
                 setShowPlayerDialog(false);
                 setPlayerChannel(null);
                 refreshContinueWatching();
                 resumeWarming();
-              } else if (evt === 'error') {
-                console.error('Player error:', data);
-              } else if (evt === 'ended' && isCurrentChannelSeries && hasNextEpisode) {
-                // Auto-play next episode when current ends
-                handleNextEpisode();
-              }
-            }} 
-            className="w-full h-full"
-          />
+              }}
+              className="absolute top-4 left-4 z-[60] p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+              aria-label="Voltar"
+            >
+              <ArrowLeft className="w-6 h-6 text-white" />
+            </button>
+
+            <IptvPlayer 
+              channelId={playerChannel.id} 
+              streamUrl={streamService.getPlayableUrl(playerChannel)} 
+              channelName={playerChannel.name} 
+              channelLogo={playerChannel.tvg_logo} 
+              options={{
+                preferLowLatency: true,
+                maxRetries: 3
+              }} 
+              onEvent={(evt, data) => {
+                if (evt === 'back') {
+                  lockToPortrait();
+                  setShowPlayerDialog(false);
+                  setPlayerChannel(null);
+                  refreshContinueWatching();
+                  resumeWarming();
+                } else if (evt === 'error') {
+                  console.error('Player error:', data);
+                } else if (evt === 'ended' && isCurrentChannelSeries && hasNextEpisode) {
+                  // Auto-play next episode when current ends
+                  handleNextEpisode();
+                }
+              }} 
+              className="w-full h-full"
+            />
+          </div>
+
+          {/* Series Guide - Side Panel (only for series) */}
+          {isCurrentChannelSeries && relatedSeriesEpisodes.length > 0 && (
+            <div className="hidden lg:block w-[320px] xl:w-[380px] bg-background/95 backdrop-blur-xl border-l border-border overflow-hidden">
+              <SeriesGuide
+                seriesName={extractSeriesName(playerChannel.name)}
+                episodes={relatedSeriesEpisodes.map(ep => ({
+                  id: ep!.id,
+                  name: ep!.name,
+                  stream_url: ep!.stream_url,
+                  tvg_logo: ep!.tvg_logo,
+                  season: ep!.season,
+                  episode: ep!.episode,
+                }))}
+                currentEpisode={currentEpisodeInfo ? {
+                  id: currentEpisodeInfo.id,
+                  name: currentEpisodeInfo.name,
+                  stream_url: currentEpisodeInfo.stream_url,
+                  tvg_logo: currentEpisodeInfo.tvg_logo,
+                  season: currentEpisodeInfo.season,
+                  episode: currentEpisodeInfo.episode,
+                } : null}
+                onPlayEpisode={(episode) => handlePlay({
+                  id: episode.id,
+                  name: episode.name,
+                  stream_url: episode.stream_url || '',
+                  tvg_logo: episode.tvg_logo,
+                  season: episode.season,
+                  episode: episode.episode,
+                }, true)}
+              />
+            </div>
+          )}
         </div>
       )}
 

@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
   RefreshCw, Loader2, AlertCircle, Wifi, Settings,
-  ChevronUp, ChevronDown, Info, MoreVertical, PictureInPicture,
+  Info, MoreVertical, PictureInPicture,
   SkipForward, Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -624,23 +624,6 @@ export const IptvPlayer = memo(function IptvPlayer({
 
           {/* Control Buttons */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Channel Nav */}
-            <div className="flex flex-col gap-1">
-              <button
-                onClick={() => navigateChannel(-1)}
-                className="p-1 rounded bg-white/10 hover:bg-white/20"
-                title="Canal anterior"
-              >
-                <ChevronUp className="w-4 h-4 text-white" />
-              </button>
-              <button
-                onClick={() => navigateChannel(1)}
-                className="p-1 rounded bg-white/10 hover:bg-white/20"
-                title="Próximo canal"
-              >
-                <ChevronDown className="w-4 h-4 text-white" />
-              </button>
-            </div>
 
             {/* Play/Pause */}
             <button
