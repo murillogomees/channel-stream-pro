@@ -7473,10 +7473,12 @@ export type Database = {
         Returns: boolean
       }
       run_complete_rls_audit: { Args: never; Returns: Json }
-      run_profiles_migration_batch: {
-        Args: { p_batch_size?: number; p_job_id: string }
-        Returns: Json
-      }
+      run_profiles_migration_batch:
+        | {
+            Args: { p_batch_size?: number; p_job_id: string; p_offset?: number }
+            Returns: Json
+          }
+        | { Args: { p_batch_size?: number; p_job_id: string }; Returns: Json }
       scan_schema_drift: {
         Args: never
         Returns: {
