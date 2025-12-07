@@ -8,7 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export function usePaymentRealtime() {
+interface UsePaymentRealtimeOptions {
+  onPaymentApproved?: () => void;
+  onProfileUpdated?: () => void;
+}
+
+export function usePaymentRealtime(options?: UsePaymentRealtimeOptions) {
   const { user, refreshUser } = useAuth();
 
   const handlePaymentUpdate = useCallback(async (payload: any) => {
@@ -21,8 +26,11 @@ export function usePaymentRealtime() {
     if (newPayment?.status === 'approved' && oldPayment?.status !== 'approved') {
       console.log('[PaymentRealtime] Pagamento aprovado detectado:', newPayment.id);
       
-      // Atualizar dados do usuário
+      // Atualizar dados do usuário no AuthContext
       await refreshUser();
+      
+      // Chamar callback opcional
+      options?.onPaymentApproved?.();
       
       // Notificar usuário
       toast.success('Pagamento aprovado! Seu plano foi ativado.', {
@@ -30,10 +38,22 @@ export function usePaymentRealtime() {
         description: 'Aproveite todos os recursos do seu novo plano.',
       });
     }
-  }, [user?.id, refreshUser]);
+  }, [user?.id, refreshUser, options?.onPaymentApproved]);
+
+  const handleProfileUpdate = useCallback(async (payload: any) => {
+    console.log('[PaymentRealtime] Profile atualizado:', payload);
+    
+    // Atualizar dados do usuário no AuthContext
+    await refreshUser();
+    
+    // Chamar callback opcional para permitir atualização de estado local
+    options?.onProfileUpdated?.();
+  }, [refreshUser, options?.onProfileUpdated]);
 
   useEffect(() => {
     if (!user?.id) return;
+
+    console.log('[PaymentRealtime] Iniciando escuta para user:', user.id);
 
     // Criar channel para escutar mudanças na tabela payments
     const channel = supabase
@@ -56,11 +76,7 @@ export function usePaymentRealtime() {
           table: 'profiles',
           filter: `id=eq.${user.id}`,
         },
-        async (payload) => {
-          // Atualizar quando profile mudar (plano, situacao, etc)
-          console.log('[PaymentRealtime] Profile atualizado:', payload);
-          await refreshUser();
-        }
+        handleProfileUpdate
       )
       .on(
         'postgres_changes',
@@ -76,16 +92,20 @@ export function usePaymentRealtime() {
           if (newSub?.status === 'active' && oldSub?.status !== 'active') {
             console.log('[PaymentRealtime] Subscription ativada:', newSub.id);
             await refreshUser();
+            options?.onPaymentApproved?.();
             toast.success('Sua assinatura foi ativada!', { duration: 5000 });
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[PaymentRealtime] Channel status:', status);
+      });
 
     return () => {
+      console.log('[PaymentRealtime] Removendo channel');
       supabase.removeChannel(channel);
     };
-  }, [user?.id, handlePaymentUpdate, refreshUser]);
+  }, [user?.id, handlePaymentUpdate, handleProfileUpdate, refreshUser, options?.onPaymentApproved]);
 }
 
 export default usePaymentRealtime;
