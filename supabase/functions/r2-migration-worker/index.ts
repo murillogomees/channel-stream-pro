@@ -66,7 +66,7 @@ async function signR2Request(
   return signedHeaders;
 }
 
-// R2 Storage Operations
+// R2 Storage Operations - Uses r2-upload-proxy for AWS Sig V4 signed requests
 class R2Storage {
   private supabase: ReturnType<typeof createClient>;
   
@@ -76,20 +76,25 @@ class R2Storage {
 
   async headObject(key: string): Promise<{ etag: string; size: number; lastModified: string } | null> {
     try {
-      const response = await fetch(`${R2_ENDPOINT}/${R2_BUCKET}/${key}`, {
-        method: 'HEAD',
-        headers: {
-          'Authorization': `Bearer ${R2_SECRET_ACCESS_KEY}`,
+      // Use the proxy function for HEAD requests
+      const { data, error } = await this.supabase.functions.invoke('r2-upload-proxy', {
+        body: {
+          action: 'head',
+          key,
         },
       });
       
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`HEAD failed: ${response.status}`);
+      if (error) {
+        console.error(`[R2] HEAD proxy error for ${key}:`, error);
+        return null;
+      }
+      
+      if (!data?.exists) return null;
       
       return {
-        etag: response.headers.get('etag') || '',
-        size: parseInt(response.headers.get('content-length') || '0'),
-        lastModified: response.headers.get('last-modified') || '',
+        etag: data.etag || '',
+        size: data.size || 0,
+        lastModified: data.lastModified || '',
       };
     } catch (error) {
       console.error(`[R2] HEAD error for ${key}:`, error);
