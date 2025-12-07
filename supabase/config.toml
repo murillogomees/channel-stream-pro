@@ -358,3 +358,11 @@ verify_jwt = true
 # Resolve stream URL on-demand when user plays
 [functions.stream-url-resolve]
 verify_jwt = false
+
+# ==========================================
+# R2 MIGRATION SYSTEM
+# ==========================================
+
+# R2 Migration Worker - batch migration processor
+[functions.r2-migration-worker]
+verify_jwt = false
