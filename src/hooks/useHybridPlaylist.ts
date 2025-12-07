@@ -153,7 +153,60 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
     }
   }, [groupChannels]);
 
-  // Fallback: Load directly from database - progressive loading for better UX
+  // Background loader for remaining batches - NO LIMIT, loads everything
+  const loadRemainingBatchesAsync = useCallback(async (
+    initialChannels: LightChannel[], 
+    batches: number, 
+    batchSize: number,
+    total: number
+  ) => {
+    const allChannels = [...initialChannels];
+    
+    for (let i = 1; i < batches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize - 1, total - 1);
+      
+      setLoadingProgress(`Carregando conteúdo (${allChannels.length}/${total})...`);
+      
+      const { data: batch, error } = await supabase
+        .from('m3u_sync_entries')
+        .select('id, title, tvg_logo, group_title')
+        .order('group_title', { ascending: true })
+        .order('title', { ascending: true })
+        .range(start, end);
+      
+      if (error) {
+        console.warn(`[Hybrid] Batch ${i} error:`, error);
+        continue;
+      }
+      
+      if (batch) {
+        const batchChannels = batch.map((ch, idx) => ({
+          id: ch.id,
+          name: ch.title || 'Canal',
+          logo: ch.tvg_logo,
+          cat: ch.group_title || 'Geral',
+          seq: start + idx,
+        }));
+        allChannels.push(...batchChannels);
+        
+        // Update state (append-only)
+        allChannelsRef.current = [...allChannels];
+        setLoadedChannels(allChannels.length);
+        setCategories(groupChannels([...allChannels]));
+        
+        console.log(`[Hybrid] Loaded ${allChannels.length} of ${total}`);
+      }
+      
+      // Very small delay between batches to not block UI
+      await new Promise(r => setTimeout(r, 50));
+    }
+    
+    setLoadingProgress('');
+    console.log(`[Hybrid] DB fully loaded: ${allChannels.length} channels`);
+  }, [groupChannels]);
+
+  // Fallback: Load directly from database - loads ALL content progressively
   const loadFromDatabase = useCallback(async (): Promise<boolean> => {
     try {
       setLoadingProgress('Carregando catálogo...');
@@ -171,12 +224,15 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
         return false;
       }
 
-      // Load ALL channels progressively in batches
-      const BATCH_SIZE = 10000;
+      console.log(`[Hybrid] Total entries: ${total}`);
+
+      // Load ALL channels progressively in larger batches (no limit)
+      const BATCH_SIZE = 20000; // Increased batch size for faster loading
       const batches = Math.ceil(total / BATCH_SIZE);
       const allChannels: LightChannel[] = [];
       
       // Load first batch immediately for fast initial render
+      setLoadingProgress(`Carregando conteúdo (0/${total})...`);
       const { data: firstBatch, error: firstError } = await supabase
         .from('m3u_sync_entries')
         .select('id, title, tvg_logo, group_title')
@@ -219,57 +275,7 @@ export function useHybridPlaylist(): UseHybridPlaylistReturn {
       console.error('[Hybrid] DB load error:', error);
       return false;
     }
-  }, [groupChannels]);
-
-  // Background loader for remaining batches
-  const loadRemainingBatchesAsync = async (
-    initialChannels: LightChannel[], 
-    batches: number, 
-    batchSize: number,
-    total: number
-  ) => {
-    const allChannels = [...initialChannels];
-    
-    for (let i = 1; i < batches; i++) {
-      const start = i * batchSize;
-      const end = Math.min(start + batchSize - 1, total - 1);
-      
-      const { data: batch, error } = await supabase
-        .from('m3u_sync_entries')
-        .select('id, title, tvg_logo, group_title')
-        .order('group_title', { ascending: true })
-        .order('title', { ascending: true })
-        .range(start, end);
-      
-      if (error) {
-        console.warn(`[Hybrid] Batch ${i} error:`, error);
-        continue;
-      }
-      
-      if (batch) {
-        const batchChannels = batch.map((ch, idx) => ({
-          id: ch.id,
-          name: ch.title || 'Canal',
-          logo: ch.tvg_logo,
-          cat: ch.group_title || 'Geral',
-          seq: start + idx,
-        }));
-        allChannels.push(...batchChannels);
-        
-        // Update state (append-only)
-        allChannelsRef.current = [...allChannels];
-        setLoadedChannels(allChannels.length);
-        setCategories(groupChannels([...allChannels]));
-        
-        console.log(`[Hybrid] Loaded ${allChannels.length} of ${total}`);
-      }
-      
-      // Small delay between batches
-      await new Promise(r => setTimeout(r, 100));
-    }
-    
-    console.log(`[Hybrid] DB fully loaded: ${allChannels.length} channels`);
-  };
+  }, [groupChannels, loadRemainingBatchesAsync]);
 
   // Resolve stream URL on-demand (when user clicks to play)
   const resolveChannel = useCallback(async (channelId: string): Promise<ResolvedChannel | null> => {
