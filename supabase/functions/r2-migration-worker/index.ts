@@ -198,9 +198,11 @@ class MigrationWorker {
 
   async processM3uSyncEntry(entry: any): Promise<MigrationResult> {
     const startTime = Date.now();
+    const sourceUrl = entry.stream_url;
     const result: MigrationResult = {
       itemId: entry.id,
       status: 'failed',
+      fromUrl: sourceUrl || undefined,
       durationMs: 0,
     };
 
@@ -212,8 +214,6 @@ class MigrationWorker {
         return result;
       }
 
-      // Get source URL (stream_url or tvg_logo)
-      const sourceUrl = entry.stream_url;
       if (!sourceUrl) {
         result.status = 'skipped';
         result.error = 'No source URL';
@@ -224,15 +224,15 @@ class MigrationWorker {
       // Generate R2 key
       const r2Key = `m3u/entries/${entry.id}`;
 
-      // Check if already exists in R2
+      // Check if already exists in R2 (check with .json extension)
       if (!this.config.dryRun) {
-        const existing = await this.r2.headObject(r2Key);
+        const existing = await this.r2.headObject(`${r2Key}.json`);
         if (existing) {
           // Update DB to mark as synced
           await this.supabase
             .from('m3u_sync_entries')
             .update({
-              r2_path: r2Key,
+              r2_path: `${r2Key}.json`,
               r2_etag: existing.etag,
               is_synced: true,
               migrated_at: new Date().toISOString(),
@@ -240,7 +240,7 @@ class MigrationWorker {
             .eq('id', entry.id);
 
           result.status = 'success';
-          result.toPath = r2Key;
+          result.toPath = `${r2Key}.json`;
           result.etagNew = existing.etag;
           result.durationMs = Date.now() - startTime;
           return result;
@@ -271,11 +271,11 @@ class MigrationWorker {
         );
 
         if (!uploadResult) {
-          throw new Error('Upload failed');
+          throw new Error('Upload to R2 failed - check r2-upload-proxy logs');
         }
 
         // Update DB
-        await this.supabase
+        const { error: updateError } = await this.supabase
           .from('m3u_sync_entries')
           .update({
             r2_path: `${r2Key}.json`,
@@ -285,19 +285,24 @@ class MigrationWorker {
           })
           .eq('id', entry.id);
 
+        if (updateError) {
+          console.error(`[Migration] DB update failed for ${entry.id}:`, updateError);
+          throw new Error(`DB update failed: ${updateError.message}`);
+        }
+
         result.toPath = `${r2Key}.json`;
         result.etagNew = uploadResult.etag;
         result.sizeBytes = metadataJson.length;
       }
 
       result.status = 'success';
-      result.fromUrl = sourceUrl;
       result.durationMs = Date.now() - startTime;
       return result;
     } catch (error) {
       result.status = 'failed';
       result.error = error instanceof Error ? error.message : 'Unknown error';
       result.durationMs = Date.now() - startTime;
+      console.error(`[Migration] Entry ${entry.id} failed:`, result.error);
       return result;
     }
   }
