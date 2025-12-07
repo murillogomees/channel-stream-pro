@@ -7994,7 +7994,17 @@ export type Database = {
           storage_path: string
         }[]
       }
-      get_r2_config: { Args: { p_key: string }; Returns: Json }
+      get_r2_config:
+        | {
+            Args: never
+            Returns: {
+              description: string
+              key: string
+              updated_at: string
+              value: Json
+            }[]
+          }
+        | { Args: { p_key: string }; Returns: Json }
       get_r2_download_candidates: {
         Args: { p_limit?: number }
         Returns: {
@@ -8330,6 +8340,10 @@ export type Database = {
       track_channel_view: {
         Args: { p_channel_id: string; p_watch_seconds?: number }
         Returns: undefined
+      }
+      update_r2_config: {
+        Args: { p_key: string; p_value: Json }
+        Returns: boolean
       }
       update_transcode_job_status: {
         Args: {
