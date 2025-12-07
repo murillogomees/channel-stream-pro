@@ -154,9 +154,9 @@ class SystemHealthService {
     const startTime = Date.now();
     
     try {
-      // Test database connectivity with a real query
+      // Test database connectivity with a real query (using profiles table)
       const { data, error } = await supabase
-        .from('clientes')
+        .from('profiles')
         .select('id')
         .limit(1);
       

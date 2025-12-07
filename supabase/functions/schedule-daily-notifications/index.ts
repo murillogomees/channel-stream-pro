@@ -5,13 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-cron-secret',
 };
 
-interface Cliente {
+interface Profile {
   id: string;
   nome: string;
   telefone: string;
+  contact_phone: string;
   data_vencimento: string;
   situacao: string;
   plano: string;
+  cliente_ativo: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -50,35 +52,35 @@ Deno.serve(async (req) => {
     const daysToNotify = config.days_to_notify || [7, 3, 1, 0, -3];
     console.log(`[ScheduleDaily] Dias configurados: ${daysToNotify.join(', ')}`);
 
-    // Buscar clientes ativos
-    const { data: clientes, error: clientesError } = await supabase
-      .from('clientes')
+    // Buscar profiles ativos (profiles é a source of truth)
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
       .select('*')
       .eq('cliente_ativo', true)
       .not('data_vencimento', 'is', null)
-      .not('telefone', 'is', null);
+      .not('contact_phone', 'is', null);
 
-    if (clientesError) throw clientesError;
+    if (profilesError) throw profilesError;
 
-    console.log(`[ScheduleDaily] Encontrados ${clientes?.length || 0} clientes`);
+    console.log(`[ScheduleDaily] Encontrados ${profiles?.length || 0} profiles`);
 
     let notificationsScheduled = 0;
     const today = new Date();
     today.setHours(config.send_hour || 9, 0, 0, 0);
 
-    for (const cliente of (clientes || [])) {
-      const dataVencimento = new Date(cliente.data_vencimento);
+    for (const profile of (profiles || []) as Profile[]) {
+      const dataVencimento = new Date(profile.data_vencimento);
       const diffDays = Math.floor(
         (dataVencimento.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      // Verificar se deve agendar notificação para este cliente hoje
+      // Verificar se deve agendar notificação para este profile hoje
       if (daysToNotify.includes(diffDays)) {
         // Verificar se já existe notificação agendada para hoje
         const { data: existing } = await supabase
           .from('notification_schedule')
           .select('id')
-          .eq('cliente_id', cliente.id)
+          .eq('cliente_id', profile.id)
           .eq('days_before_due', diffDays)
           .gte('scheduled_for', today.toISOString())
           .lt('scheduled_for', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString())
@@ -88,24 +90,24 @@ Deno.serve(async (req) => {
           const { error: scheduleError } = await supabase
             .from('notification_schedule')
             .insert({
-              cliente_id: cliente.id,
+              cliente_id: profile.id,
               notification_type: 'expiration',
               days_before_due: diffDays,
               scheduled_for: today.toISOString(),
               metadata: {
-                cliente_nome: cliente.nome,
-                telefone: cliente.telefone,
-                data_vencimento: cliente.data_vencimento,
-                plano: cliente.plano,
-                situacao: cliente.situacao
+                cliente_nome: profile.nome,
+                telefone: profile.contact_phone || profile.telefone,
+                data_vencimento: profile.data_vencimento,
+                plano: profile.plano,
+                situacao: profile.situacao
               }
             });
 
           if (!scheduleError) {
             notificationsScheduled++;
-            console.log(`[ScheduleDaily] Agendada notificação para ${cliente.nome} (${diffDays} dias)`);
+            console.log(`[ScheduleDaily] Agendada notificação para ${profile.nome} (${diffDays} dias)`);
           } else {
-            console.error(`[ScheduleDaily] Erro ao agendar para ${cliente.nome}:`, scheduleError);
+            console.error(`[ScheduleDaily] Erro ao agendar para ${profile.nome}:`, scheduleError);
           }
         }
       }

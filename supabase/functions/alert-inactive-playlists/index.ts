@@ -17,10 +17,11 @@ interface PlaylistHealthCheck {
   last_checked_at: string;
 }
 
-interface Cliente {
+interface Profile {
   id: string;
   nome: string;
   telefone: string;
+  contact_phone: string;
   plano: string;
   situacao: string;
 }
@@ -103,26 +104,27 @@ serve(async (req) => {
       .map((p: PlaylistHealthCheck) => p.client_id)
       .filter((id): id is string => id !== null);
 
-    let clientesAfetados: Cliente[] = [];
+    let profilesAfetados: Profile[] = [];
     if (clientIds.length > 0) {
-      const { data: clientes, error: clienteError } = await supabase
-        .from("clientes")
-        .select("id, nome, telefone, plano, situacao")
+      // Use profiles table (source of truth)
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, nome, telefone, contact_phone, plano, situacao")
         .in("id", clientIds);
 
-      if (!clienteError && clientes) {
-        clientesAfetados = clientes;
+      if (!profileError && profiles) {
+        profilesAfetados = profiles;
       }
     }
 
     // Preparar mensagem de alerta
-    const clientesText = clientesAfetados.length > 0
-      ? clientesAfetados.map((c) => `• ${c.nome} (${c.plano})`).join("\n")
+    const profilesText = profilesAfetados.length > 0
+      ? profilesAfetados.map((c) => `• ${c.nome} (${c.plano})`).join("\n")
       : "Nenhum cliente vinculado";
 
     const message = `🚨 *ALERTA: Playlists Inativas*\n\n` +
       `Foram detectadas *${failedPlaylists.length} playlists com erro*.\n\n` +
-      `*Clientes afetados:*\n${clientesText}\n\n` +
+      `*Clientes afetados:*\n${profilesText}\n\n` +
       `⚠️ Verifique o painel de Saúde das Playlists para mais detalhes.\n\n` +
       `_Verificação automática - ${new Date().toLocaleString("pt-BR")}_`;
 
@@ -159,7 +161,7 @@ serve(async (req) => {
             metadata: {
               admin_phone: admin.phone,
               failed_playlists_count: failedPlaylists.length,
-              affected_clients: clientesAfetados.length,
+              affected_profiles: profilesAfetados.length,
             },
           });
         } else {
@@ -178,7 +180,7 @@ serve(async (req) => {
         failed_playlists: failedPlaylists.length,
         alerts_sent: successCount,
         alerts_failed: errorCount,
-        affected_clients: clientesAfetados.length,
+        affected_profiles: profilesAfetados.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

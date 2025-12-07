@@ -13,32 +13,33 @@ export class TrialRetentionService {
 
   async sendStrategicMessage(clientId: string, dayNumber: number, config: WhatsAppConfig) {
     try {
-      const { data: clientData, error } = await supabase
-        .from('clientes')
+      // Use profiles table (source of truth)
+      const { data: profileData, error } = await supabase
+        .from('profiles')
         .select('*')
         .eq('id', clientId)
         .single();
 
-      if (error || !clientData) throw new Error('Cliente não encontrado');
+      if (error || !profileData) throw new Error('Perfil não encontrado');
 
-      // Transform snake_case to camelCase
+      // Transform to client format
       const client = {
-        id: clientData.id,
-        nome: clientData.nome,
-        telefone: clientData.telefone,
-        email: clientData.email || '',
-        situacao: clientData.situacao || 'Testando',
-        dataContratacao: clientData.data_contratacao || '',
-        dataVencimento: clientData.data_vencimento || '',
-        plano: clientData.plano || 'Mensal',
-        valorPago: clientData.valor_pago || 0,
-        dataUltimoPagamento: clientData.data_ultimo_pagamento || '',
-        formaUltimoPagamento: clientData.forma_ultimo_pagamento || '',
-        dataCadastro: clientData.data_cadastro || '',
-        dataUltimaEdicao: clientData.data_ultima_edicao || '',
-        clienteAtivo: clientData.cliente_ativo,
-        origemCadastro: clientData.origem_cadastro
-      };
+        id: profileData.id,
+        nome: profileData.nome,
+        telefone: profileData.contact_phone || profileData.telefone || '',
+        email: profileData.email || '',
+        situacao: profileData.situacao || 'Testando',
+        dataContratacao: profileData.data_contratacao || '',
+        dataVencimento: profileData.data_vencimento || '',
+        plano: profileData.plano || 'Mensal',
+        valorPago: profileData.valor_pago || 0,
+        dataUltimoPagamento: profileData.data_ultimo_pagamento || '',
+        formaUltimoPagamento: profileData.forma_ultimo_pagamento || '',
+        dataCadastro: profileData.created_at || '',
+        dataUltimaEdicao: profileData.updated_at || '',
+        clienteAtivo: profileData.cliente_ativo,
+        origemCadastro: profileData.origem_cadastro || 'Website'
+      } as any;
 
       const messages = this.getStrategicMessages();
       const message = messages[dayNumber];
@@ -134,15 +135,17 @@ Estamos aguardando você! 💙`
 
   async generatePersonalizedCoupon(clientId: string, discountPercentage: number = 15): Promise<string> {
     try {
-      const { data: client } = await supabase
-        .from('clientes')
+      // Use profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
         .select('*')
         .eq('id', clientId)
         .single();
 
-      if (!client) throw new Error('Cliente não encontrado');
+      if (!profile) throw new Error('Perfil não encontrado');
 
-      const code = `TRIAL${discountPercentage}_${client.telefone.slice(-4)}`;
+      const phone = profile.contact_phone || profile.telefone || '';
+      const code = `TRIAL${discountPercentage}_${phone.slice(-4)}`;
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 7); // Válido por 7 dias
 

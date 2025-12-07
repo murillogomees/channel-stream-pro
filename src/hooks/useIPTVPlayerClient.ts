@@ -783,19 +783,19 @@ export function useIPTVPlayerClient() {
         return true;
       }
 
-      // Fallback to database lookup
-      const { data: clientData, error: clientError } = await supabase
-        .from('clientes')
+      // Fallback to database lookup (using profiles table)
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
         .select('id, nome')
-        .eq('user_id', session.session.user.id)
+        .eq('id', session.session.user.id)
         .maybeSingle();
 
-      if (clientError) {
-        console.error('[IPTV] Client lookup error:', clientError);
+      if (profileError) {
+        console.error('[IPTV] Profile lookup error:', profileError);
       }
 
-      if (!clientData) {
-        console.log('[IPTV] No client record found');
+      if (!profileData) {
+        console.log('[IPTV] No profile record found');
         setHasPlaylist(false);
         setIsLoading(false);
         return false;
@@ -813,7 +813,7 @@ export function useIPTVPlayerClient() {
             status
           )
         `)
-        .eq('cliente_id', clientData.id)
+        .eq('cliente_id', profileData.id)
         .maybeSingle();
 
       if (customError) {
@@ -841,7 +841,7 @@ export function useIPTVPlayerClient() {
             status
           )
         `)
-        .eq('client_id', clientData.id)
+        .eq('client_id', profileData.id)
         .eq('is_active', true)
         .maybeSingle();
 

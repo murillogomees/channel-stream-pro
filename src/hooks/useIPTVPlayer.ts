@@ -44,23 +44,23 @@ export function useIPTVPlayer() {
         return;
       }
 
-      // Get client data
-      const { data: cliente } = await supabase
-        .from('clientes')
+      // Get profile data (profiles is the source of truth)
+      const { data: profile } = await supabase
+        .from('profiles')
         .select('id')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single();
 
-      if (!cliente) {
-        toast.error('Cliente não encontrado');
+      if (!profile) {
+        toast.error('Perfil não encontrado');
         return;
       }
 
-      // Get assigned custom list
+      // Get assigned custom list using profile.id
       const { data: assignment } = await supabase
         .from('client_m3u_custom_assignments')
         .select('custom_list_id')
-        .eq('cliente_id', cliente.id)
+        .eq('cliente_id', profile.id)
         .single();
 
       if (!assignment) {

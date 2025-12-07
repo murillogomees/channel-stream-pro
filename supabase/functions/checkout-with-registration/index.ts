@@ -180,14 +180,10 @@ serve(async (req) => {
     const expirationDate = new Date(now);
     expirationDate.setMonth(expirationDate.getMonth() + plan.period_months);
 
-    // 6. Create cliente entry
-    const { data: clienteData, error: clienteError } = await supabase
-      .from("clientes")
-      .insert({
-        user_id: userId,
-        nome: user_data.nome,
-        telefone: user_data.telefone,
-        email: user_data.email,
+    // 6. Update profile with subscription data (profiles is source of truth)
+    const { error: profileUpdateError } = await supabase
+      .from("profiles")
+      .update({
         situacao: "Testando", // Will be updated to "Ativo" after payment
         plano: planoEnum,
         valor_pago: finalPrice,
@@ -195,12 +191,12 @@ serve(async (req) => {
         data_vencimento: expirationDate.toISOString(),
         origem_cadastro: user_data.origem || "Website",
         cliente_ativo: true,
+        contact_phone: user_data.telefone,
       })
-      .select()
-      .single();
+      .eq("id", userId);
 
-    if (clienteError) {
-      console.error("[Checkout] Cliente creation error:", clienteError);
+    if (profileUpdateError) {
+      console.error("[Checkout] Profile update error:", profileUpdateError);
     }
 
     // 7. Create Mercado Pago preference
@@ -251,7 +247,7 @@ serve(async (req) => {
         pending: pending_url || `${baseUrl}/checkout/pending`,
       },
       auto_return: "approved",
-      external_reference: `${userId}:${plan.id}:${clienteData?.id || ""}`,
+      external_reference: `${userId}:${plan.id}:${userId}`,
       notification_url: `${supabaseUrl}/functions/v1/mercado-pago-webhook`,
       statement_descriptor: "IPTVLINK",
       expires: true,
@@ -289,7 +285,7 @@ serve(async (req) => {
       mercado_pago_preference_id: preference.id,
       amount: finalPrice,
       description: `Assinatura ${plan.name}`,
-      external_reference: `${userId}:${plan.id}:${clienteData?.id || ""}`,
+      external_reference: `${userId}:${plan.id}:${userId}`,
       status: "pending",
       payment_method: payment_method || null,
       payer_email: user_data.email,
@@ -297,7 +293,7 @@ serve(async (req) => {
         plan_id: plan.id,
         plan_name: plan.name,
         period_months: plan.period_months,
-        cliente_id: clienteData?.id,
+        profile_id: userId,
         coupon_code: coupon_code || null,
         original_price: plan.price,
         discount: couponData ? plan.price - finalPrice : 0,
@@ -313,7 +309,7 @@ serve(async (req) => {
 
       await supabase.from("coupon_usage").insert({
         coupon_id: couponData.id,
-        client_id: clienteData?.id,
+        client_id: userId, // Using profile id
         order_value: finalPrice,
         discount_applied: plan.price - finalPrice,
       });
@@ -333,7 +329,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       user_id: userId,
-      cliente_id: clienteData?.id,
+      profile_id: userId,
       preference_id: preference.id,
       init_point: preference.init_point,
       sandbox_init_point: preference.sandbox_init_point,
