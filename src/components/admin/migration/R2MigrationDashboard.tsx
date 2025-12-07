@@ -22,8 +22,7 @@ import { format } from 'date-fns';
 interface MigrationStats {
   sync_entries: { total: number; synced: number; pending: number };
   channels: { total: number; synced: number; pending: number };
-  playlist_entries: { total: number; synced: number; pending: number };
-  jobs: { total: number; running: number; completed: number; failed: number };
+  jobs: { total: number; running: number; stale?: number; completed: number; failed: number };
   failed_items: number;
   last_updated: string;
 }
@@ -197,9 +196,24 @@ export function R2MigrationDashboard() {
     }
   };
 
+  // Get the effective total for a job (uses stats pending count if total_items is 0)
+  const getEffectiveTotal = (job: MigrationJob): number => {
+    if (job.total_items > 0) return job.total_items;
+    // Fallback to stats pending count based on target table
+    if (stats) {
+      if (job.target_table === 'm3u_sync_entries') {
+        return stats.sync_entries.total;
+      } else if (job.target_table === 'm3u_channels') {
+        return stats.channels.total;
+      }
+    }
+    return job.processed_items; // Last resort: show processed as total
+  };
+
   const getProgressPercent = (job: MigrationJob) => {
-    if (!job.total_items) return 0;
-    return Math.round((job.processed_items / job.total_items) * 100);
+    const effectiveTotal = getEffectiveTotal(job);
+    if (!effectiveTotal) return 0;
+    return Math.min(100, Math.round((job.processed_items / effectiveTotal) * 100));
   };
 
   return (
@@ -248,13 +262,16 @@ export function R2MigrationDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Zap className="h-4 w-4 text-yellow-400" />
-              Jobs Running
+              Jobs Ativos
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.jobs.running || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {stats?.jobs.completed || 0} completed, {stats?.jobs.failed || 0} failed
+              {stats?.jobs.completed || 0} completos, {stats?.jobs.failed || 0} falhos
+              {stats?.jobs.stale && stats.jobs.stale > 0 && (
+                <span className="text-yellow-400 ml-1">({stats.jobs.stale} parados)</span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -405,7 +422,7 @@ export function R2MigrationDashboard() {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span>Progresso: {job.processed_items.toLocaleString()} / {job.total_items.toLocaleString()}</span>
+                    <span>Progresso: {job.processed_items.toLocaleString()} / {getEffectiveTotal(job).toLocaleString()}</span>
                     <span>{getProgressPercent(job)}%</span>
                   </div>
                   <Progress value={getProgressPercent(job)} />
@@ -466,9 +483,14 @@ export function R2MigrationDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={getProgressPercent(job)} className="w-20 h-2" />
-                            <span className="text-xs">{getProgressPercent(job)}%</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <Progress value={getProgressPercent(job)} className="w-20 h-2" />
+                              <span className="text-xs">{getProgressPercent(job)}%</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {job.processed_items.toLocaleString()} / {getEffectiveTotal(job).toLocaleString()}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
