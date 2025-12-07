@@ -318,7 +318,7 @@ class MigrationWorker {
         return result;
       }
 
-      const logoUrl = channel.logo_url;
+      const logoUrl = channel.tvg_logo;
       if (!logoUrl) {
         result.status = 'skipped';
         result.error = 'No logo URL';
