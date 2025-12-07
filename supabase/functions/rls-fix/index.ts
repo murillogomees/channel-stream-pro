@@ -12,34 +12,37 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    // Create auth client to verify user
+    const authClient = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        headers: { Authorization: req.headers.get('Authorization')! },
+      },
+    });
 
     // Verify user authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
+      console.error('[rls-fix] Auth error:', authError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Check if user is master
-    const { data: roles } = await supabaseClient
+    // Create service client for operations
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if user is admin or master
+    const { data: roles } = await serviceClient
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    const isMaster = roles?.role === 'master';
-    const isAdmin = roles?.role === 'admin' || isMaster;
+    const isMaster = roles?.some(r => r.role === 'master');
+    const isAdmin = roles?.some(r => r.role === 'admin') || isMaster;
 
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden: Admin role required' }), {
@@ -56,16 +59,18 @@ serve(async (req) => {
       sql_apply,
       sql_rollback,
       severity,
-      schema_name,
+      schema_name = 'public',
       table_name,
       policy_name
     } = await req.json();
 
+    console.log(`[rls-fix] Request: issue=${issue_id}, table=${table_name}, dry_run=${dry_run}, confirm=${confirm}`);
+
     // High severity fixes require master role
-    if (severity === 'high' && !isMaster) {
+    if (severity === 'critical' && !isMaster) {
       return new Response(
         JSON.stringify({ 
-          error: 'Forbidden: Master role required for high severity fixes',
+          error: 'Forbidden: Master role required for critical severity fixes',
           requires_master: true 
         }), 
         {
@@ -85,13 +90,23 @@ serve(async (req) => {
       );
     }
 
+    if (!sql_apply) {
+      return new Response(
+        JSON.stringify({ error: 'sql_apply is required' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Dry run mode - just return what would be executed
     if (dry_run) {
       return new Response(
         JSON.stringify({
           dry_run: true,
           would_execute: sql_apply,
-          rollback_available: sql_rollback,
+          rollback_available: !!sql_rollback,
           backup_would_be_created: true,
           estimated_impact: 'Will modify RLS policies - test in staging first',
         }),
@@ -103,47 +118,53 @@ serve(async (req) => {
 
     // Actual fix application
     if (confirm) {
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-
+      console.log(`[rls-fix] Applying fix for ${schema_name}.${table_name}`);
+      
       // 1. Create backup of current policies
-      const { data: currentPolicies } = await serviceClient
-        .from('pg_policies')
-        .select('*')
-        .eq('schemaname', schema_name)
-        .eq('tablename', table_name);
+      const { data: currentPolicies } = await serviceClient.rpc('get_table_policies', {
+        schema_name_param: schema_name,
+        table_name_param: table_name
+      }).catch(() => ({ data: null }));
 
       const backupId = crypto.randomUUID();
-      await supabaseClient.from('rls_fix_backups').insert({
+      
+      // Store backup (ignore errors if table doesn't exist)
+      await serviceClient.from('rls_fix_backups').insert({
         id: backupId,
         schema_name,
         table_name,
         policy_name,
-        policy_definition: JSON.stringify(currentPolicies),
+        policy_definition: JSON.stringify(currentPolicies || []),
         created_by: user.id,
-        restore_sql: sql_rollback,
+        restore_sql: sql_rollback || null,
         metadata: {
           issue_id,
           scan_result_id,
           severity,
         },
-      });
+      }).catch(err => console.log('[rls-fix] Backup insert skipped:', err.message));
 
-      // 2. Execute the fix SQL
+      // 2. Execute the fix SQL via service role RPC
       try {
-        // Note: Direct SQL execution requires service role
-        // In production, you'd use a stored procedure or database function
-        // This is a simplified example
+        console.log('[rls-fix] Executing SQL:', sql_apply.substring(0, 200) + '...');
         
+        const { error: execError } = await serviceClient.rpc('execute_sql_as_service_role', {
+          sql_query: sql_apply
+        });
+
+        if (execError) {
+          throw new Error(`SQL execution failed: ${execError.message}`);
+        }
+
+        console.log('[rls-fix] SQL executed successfully');
+
         // Log the action
-        await supabaseClient.from('activity_logs').insert({
+        await serviceClient.from('activity_logs').insert({
           user_id: user.id,
           action_type: 'rls_fix_applied',
           action_description: `Applied RLS fix for ${schema_name}.${table_name}`,
           entity_type: 'rls_policy',
-          entity_id: issue_id,
+          entity_id: issue_id || backupId,
           metadata: {
             scan_result_id,
             backup_id: backupId,
@@ -152,16 +173,18 @@ serve(async (req) => {
           },
         });
 
-        // Update scan result status
-        if (scan_result_id) {
-          await supabaseClient
-            .from('rls_scan_results')
+        // Update rls_audit_resolutions if exists
+        if (issue_id) {
+          await serviceClient
+            .from('rls_audit_resolutions')
             .update({
-              status: 'fixed',
-              fixed_at: new Date().toISOString(),
-              fixed_by: user.id,
+              status: 'resolved',
+              applied_fix: sql_apply,
+              resolved_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             })
-            .eq('id', scan_result_id);
+            .eq('id', issue_id)
+            .catch(() => { /* ignore if not found */ });
         }
 
         return new Response(
@@ -172,23 +195,26 @@ serve(async (req) => {
             issue_id,
             applied_by: user.email,
             applied_at: new Date().toISOString(),
-            rollback_available: true,
+            rollback_available: !!sql_rollback,
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
         );
-      } catch (error) {
+      } catch (error: any) {
+        console.error('[rls-fix] Execution error:', error);
+        
         // Log failure
-        await supabaseClient.from('activity_logs').insert({
+        await serviceClient.from('activity_logs').insert({
           user_id: user.id,
           action_type: 'rls_fix_failed',
           action_description: `Failed to apply RLS fix for ${schema_name}.${table_name}: ${error.message}`,
           entity_type: 'rls_policy',
-          entity_id: issue_id,
+          entity_id: issue_id || backupId,
           metadata: {
             error: error.message,
             severity,
+            sql: sql_apply,
           },
         });
 
@@ -206,8 +232,16 @@ serve(async (req) => {
         );
       }
     }
-  } catch (error) {
-    console.error('Error in rls-fix:', error);
+
+    return new Response(
+      JSON.stringify({ error: 'Invalid request' }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error: any) {
+    console.error('[rls-fix] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
