@@ -208,11 +208,8 @@ export default function CheckoutAuthenticated() {
 
       const data = response.data;
 
-      // Redirect to Mercado Pago
-      const isDev = window.location.hostname === "localhost" || 
-                    window.location.hostname.includes("lovable");
-      
-      window.location.href = isDev ? data.sandbox_init_point : data.init_point;
+      // Redirect to Mercado Pago - ALWAYS use production mode (init_point)
+      window.location.href = data.init_point;
     } catch (error: any) {
       console.error("[Checkout] Error:", error);
       toast.error(error.message || "Erro ao processar pagamento");
