@@ -51,12 +51,12 @@ export default function AdminDashboardPage() {
                 label="Total de Usuários"
                 value={stats.total}
                 variant="default"
-                trend={{ value: 12, direction: "up", label: "vs mês anterior" }}
+                subtitle={`${stats.emTeste} em teste`}
               />
               <StatCard
                 icon={<Zap className="h-5 w-5" />}
                 label="Usuários Ativos"
-                value={stats.total - stats.ativosVencidos}
+                value={stats.ativos}
                 variant="success"
                 subtitle="Com assinatura em dia"
               />
@@ -69,10 +69,10 @@ export default function AdminDashboardPage() {
               />
               <StatCard
                 icon={<AlertTriangle className="h-5 w-5" />}
-                label="Ativos Vencidos"
-                value={stats.ativosVencidos}
+                label="Vencidos"
+                value={stats.vencidos}
                 variant="danger"
-                subtitle="Necessita renovação"
+                subtitle={`${stats.inativos} inativos`}
               />
             </>
           )}
