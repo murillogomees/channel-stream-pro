@@ -27,8 +27,8 @@ interface Category {
   channels: Channel[];
 }
 
-const INITIAL_BATCH_SIZE = 2000;
-const BATCH_SIZE = 10000;
+const INITIAL_BATCH_SIZE = 20000; // Increased for faster initial load
+const BATCH_SIZE = 20000; // Increased batch size
 
 export function useHomeChannels() {
   const [channels, setChannels] = useState<Channel[]>([]);
