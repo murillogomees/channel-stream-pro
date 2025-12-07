@@ -89,6 +89,7 @@ export default function AdminClienteForm() {
   const { profiles, updateProfile, loading: loadingProfiles } = useProfiles();
   const { addLog } = useNotificationLogs();
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(!id);
+  const [enviarNotificacaoDesativacao, setEnviarNotificacaoDesativacao] = useState(true);
   const [clienteOriginal, setClienteOriginal] = useState<UnifiedProfile | null>(null);
   const isInitialLoad = useRef(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -332,10 +333,23 @@ export default function AdminClienteForm() {
       // M3U list assignment removed - using unified m3u_sync_entries
 
       // Detectar se cliente foi desativado (era ativo e agora está inativo)
-      const clienteDesativado = clienteOriginal?.cliente_ativo === true && clienteData.clienteAtivo === false;
+      // Tratar null/undefined como ativo por padrão
+      const clienteEraAtivo = clienteOriginal?.cliente_ativo !== false;
+      const clienteAgoraInativo = clienteData.clienteAtivo === false;
+      const clienteDesativado = clienteEraAtivo && clienteAgoraInativo;
+
+      console.log('[AdminClienteForm] Verificação de desativação:', {
+        clienteOriginalAtivo: clienteOriginal?.cliente_ativo,
+        clienteDataAtivo: clienteData.clienteAtivo,
+        clienteEraAtivo,
+        clienteAgoraInativo,
+        clienteDesativado,
+        enviarNotificacaoDesativacao
+      });
 
       // Disparar notificação automática ao desativar cliente (usa regras do sistema)
-      if (clienteDesativado && clienteOriginal) {
+      // SOMENTE se o switch de notificação de desativação estiver ativo
+      if (clienteDesativado && clienteOriginal && enviarNotificacaoDesativacao) {
         try {
           console.log('[AdminClienteForm] Cliente desativado, disparando notificação automática...');
           
@@ -359,13 +373,20 @@ export default function AdminClienteForm() {
             console.warn('Erros ao enviar notificações:', result.errors);
             toast({
               title: 'Aviso',
-              description: 'Nenhuma regra de notificação automática configurada para desativação de cliente',
+              description: result.errors.join(', '),
               variant: 'default',
             });
           }
         } catch (error) {
           console.error('Erro ao enviar notificação de desativação:', error);
+          toast({
+            title: 'Erro',
+            description: 'Falha ao enviar notificação de desativação',
+            variant: 'destructive',
+          });
         }
+      } else if (clienteDesativado && !enviarNotificacaoDesativacao) {
+        console.log('[AdminClienteForm] Cliente desativado mas notificação desabilitada pelo usuário');
       }
 
       // Enviar mensagem de atualização se checkbox estiver marcado (ANTES de mostrar modal)
@@ -937,6 +958,36 @@ export default function AdminClienteForm() {
                   </p>
                 </div>
               </div>
+
+              {/* Switch de notificação de desativação - aparece quando desativando cliente */}
+              {id && clienteOriginal?.cliente_ativo !== false && !watch('clienteAtivo') && (
+                <div className="flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200"
+                  style={{
+                    backgroundColor: enviarNotificacaoDesativacao ? 'hsl(var(--warning) / 0.1)' : 'hsl(var(--muted) / 0.3)',
+                    borderColor: enviarNotificacaoDesativacao ? 'hsl(var(--warning) / 0.5)' : 'hsl(var(--border))'
+                  }}
+                >
+                  <Switch
+                    id="enviarNotificacaoDesativacao"
+                    checked={enviarNotificacaoDesativacao}
+                    onCheckedChange={setEnviarNotificacaoDesativacao}
+                  />
+                  <div className="flex-1">
+                    <Label 
+                      htmlFor="enviarNotificacaoDesativacao" 
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Enviar mensagem de oferta (30% OFF) ao desativar
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {enviarNotificacaoDesativacao 
+                        ? '✓ Mensagem automática será enviada com oferta de retorno'
+                        : 'Nenhuma mensagem será enviada ao desativar'
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200"
                 style={{
