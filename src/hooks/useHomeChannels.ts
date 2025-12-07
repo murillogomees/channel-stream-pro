@@ -1,8 +1,8 @@
 /**
  * useHomeChannels - Full playlist loading hook for home page
  * 
- * Loads ALL channels from the playlist progressively.
- * First batch renders immediately, rest loads in background.
+ * Loads ALL channels from database progressively.
+ * First batch renders immediately, rest loads in background without page reload.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,153 +20,156 @@ interface Channel {
   order_position: number;
 }
 
-const INITIAL_BATCH_SIZE = 1000;
-const BATCH_SIZE = 5000;
-const PLAYLIST_SERVE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve';
+interface Category {
+  id: string;
+  name: string;
+  display_name: string;
+  channels: Channel[];
+}
+
+const INITIAL_BATCH_SIZE = 2000;
+const BATCH_SIZE = 10000;
 
 export function useHomeChannels() {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadedCount, setLoadedCount] = useState(0);
+  
   const loadedRef = useRef(false);
+  const allChannelsRef = useRef<Channel[]>([]);
 
-  const loadChannels = useCallback(async () => {
-    if (loadedRef.current) return;
+  // Group channels by category
+  const groupChannels = useCallback((channelList: Channel[]): Category[] => {
+    const categoryMap = new Map<string, Category>();
     
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Get the active playlist key from playlist_sources (not m3u_custom_lists)
-      const { data: sources, error: sourcesError } = await supabase
-        .from('playlist_sources')
-        .select('key')
-        .eq('sync_enabled', true)
-        .limit(1);
-
-      if (sourcesError) {
-        console.error('[HomeChannels] Error fetching sources:', sourcesError);
-      }
-
-      const playlistKey = sources?.[0]?.key;
+    for (const channel of channelList) {
+      const catName = channel.group_title || channel.category_name || 'Geral';
       
-      if (!playlistKey) {
-        console.log('[HomeChannels] No active playlist source found');
-        setError('Nenhuma playlist disponível');
-        setIsLoading(false);
-        return;
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, {
+          id: `cat-${categoryMap.size}`,
+          name: catName,
+          display_name: catName,
+          channels: [],
+        });
       }
-
-      console.log(`[HomeChannels] Using playlist key: ${playlistKey}`);
-      await loadFromPlaylistServe(playlistKey);
-    } catch (err) {
-      console.error('[HomeChannels] Error:', err);
-      setError('Erro ao carregar conteúdo');
-    } finally {
-      setIsLoading(false);
+      
+      categoryMap.get(catName)!.channels.push(channel);
     }
+    
+    // Sort categories alphabetically
+    return Array.from(categoryMap.values()).sort((a, b) => 
+      a.display_name.localeCompare(b.display_name)
+    );
   }, []);
 
-  const loadFromPlaylistServe = async (playlistSlug: string) => {
+  // Map database entry to Channel format
+  const mapEntry = (entry: any, idx: number): Channel => ({
+    id: entry.id,
+    name: entry.title || 'Sem nome',
+    stream_url: entry.stream_url || '',
+    tvg_logo: entry.tvg_logo || null,
+    tvg_id: entry.tvg_id || null,
+    category_id: entry.group_title || 'default',
+    category_name: entry.group_title || 'Geral',
+    group_title: entry.group_title || 'Geral',
+    order_position: idx,
+  });
+
+  // Load all channels progressively from database
+  const loadFromDatabase = useCallback(async () => {
     try {
-      const endpoint = `${PLAYLIST_SERVE_URL}/playlist/${playlistSlug}`;
+      // Get total count first
+      const { count } = await supabase
+        .from('m3u_sync_entries')
+        .select('id', { count: 'exact', head: true });
       
-      // Load first batch immediately for fast render
-      const firstParams = new URLSearchParams({ 
-        offset: '0', 
-        limit: String(INITIAL_BATCH_SIZE) 
-      });
-      
-      const firstResponse = await fetch(`${endpoint}?${firstParams}`);
-      
-      if (!firstResponse.ok) {
-        throw new Error(`HTTP ${firstResponse.status}`);
-      }
-      
-      const firstData = await firstResponse.json();
-      
-      if (!firstData.channels || firstData.channels.length === 0) {
-        setError('Nenhum canal disponível');
+      const total = count || 0;
+      setTotalCount(total);
+      console.log(`[HomeChannels] Total entries in database: ${total}`);
+
+      if (total === 0) {
+        setError('Nenhum conteúdo disponível');
         return;
       }
-      
-      const totalCount = firstData.total || firstData.channels.length;
-      console.log(`[HomeChannels] First batch: ${firstData.channels.length}, total: ${totalCount}`);
-      
-      // Map first batch immediately
-      const allChannels: Channel[] = firstData.channels.map((ch: any, idx: number) => ({
-        id: ch.id || `ch-${idx}`,
-        name: ch.name || ch.title || 'Sem nome',
-        stream_url: ch.stream_url || ch.url || '',
-        tvg_logo: ch.tvg_logo || ch.logo || null,
-        tvg_id: ch.tvg_id || null,
-        category_id: ch.category_id || 'default',
-        category_name: ch.category_name || ch.group_title || 'Geral',
-        group_title: ch.group_title || ch.category_name || 'Geral',
-        order_position: ch.order_position || idx,
-      }));
-      
-      // Show first batch immediately
-      setChannels([...allChannels]);
-      loadedRef.current = true;
-      
-      // Load remaining batches in background
-      if (totalCount > INITIAL_BATCH_SIZE) {
-        loadRemainingBatches(endpoint, allChannels, totalCount);
-      }
-      
-    } catch (err) {
-      console.error('[HomeChannels] Playlist serve error:', err);
-      throw err;
-    }
-  };
 
-  const loadRemainingBatches = async (endpoint: string, currentChannels: Channel[], totalCount: number) => {
+      // Load first batch immediately for fast render
+      const { data: firstBatch, error: firstError } = await supabase
+        .from('m3u_sync_entries')
+        .select('id, title, stream_url, tvg_logo, tvg_id, group_title')
+        .order('group_title', { ascending: true })
+        .order('title', { ascending: true })
+        .range(0, INITIAL_BATCH_SIZE - 1);
+
+      if (firstError) {
+        console.error('[HomeChannels] First batch error:', firstError);
+        throw firstError;
+      }
+
+      if (firstBatch && firstBatch.length > 0) {
+        const firstChannels = firstBatch.map((entry, idx) => mapEntry(entry, idx));
+        
+        allChannelsRef.current = [...firstChannels];
+        setChannels([...firstChannels]);
+        setCategories(groupChannels(firstChannels));
+        setLoadedCount(firstChannels.length);
+        
+        console.log(`[HomeChannels] First batch loaded: ${firstChannels.length} channels`);
+      }
+
+      loadedRef.current = true;
+      setIsLoading(false);
+
+      // Load remaining batches in background
+      if (total > INITIAL_BATCH_SIZE) {
+        loadRemainingBatches(total);
+      }
+
+    } catch (err) {
+      console.error('[HomeChannels] Database error:', err);
+      setError('Erro ao carregar conteúdo');
+    }
+  }, [groupChannels]);
+
+  // Load remaining batches in background (append-only, no reload)
+  const loadRemainingBatches = async (total: number) => {
     let offset = INITIAL_BATCH_SIZE;
-    const allChannels = [...currentChannels];
     
-    while (offset < totalCount) {
+    while (offset < total) {
       try {
-        const params = new URLSearchParams({ 
-          offset: String(offset), 
-          limit: String(BATCH_SIZE) 
-        });
-        
-        const response = await fetch(`${endpoint}?${params}`);
-        
-        if (!response.ok) {
-          console.warn(`[HomeChannels] Batch at ${offset} failed`);
+        const { data: batch, error: batchError } = await supabase
+          .from('m3u_sync_entries')
+          .select('id, title, stream_url, tvg_logo, tvg_id, group_title')
+          .order('group_title', { ascending: true })
+          .order('title', { ascending: true })
+          .range(offset, offset + BATCH_SIZE - 1);
+
+        if (batchError) {
+          console.warn(`[HomeChannels] Batch at ${offset} error:`, batchError);
           break;
         }
-        
-        const data = await response.json();
-        
-        if (!data.channels || data.channels.length === 0) {
+
+        if (!batch || batch.length === 0) {
           break;
         }
+
+        // Append new channels (no reorder, just append)
+        const newChannels = batch.map((entry, idx) => mapEntry(entry, offset + idx));
+        allChannelsRef.current = [...allChannelsRef.current, ...newChannels];
         
-        // Map and append new channels
-        const newChannels = data.channels.map((ch: any, idx: number) => ({
-          id: ch.id || `ch-${offset + idx}`,
-          name: ch.name || ch.title || 'Sem nome',
-          stream_url: ch.stream_url || ch.url || '',
-          tvg_logo: ch.tvg_logo || ch.logo || null,
-          tvg_id: ch.tvg_id || null,
-          category_id: ch.category_id || 'default',
-          category_name: ch.category_name || ch.group_title || 'Geral',
-          group_title: ch.group_title || ch.category_name || 'Geral',
-          order_position: ch.order_position || offset + idx,
-        }));
+        // Update state with appended channels
+        setChannels([...allChannelsRef.current]);
+        setCategories(groupChannels([...allChannelsRef.current]));
+        setLoadedCount(allChannelsRef.current.length);
         
-        allChannels.push(...newChannels);
-        
-        // Update state with appended channels (no reorder, just append)
-        setChannels([...allChannels]);
+        console.log(`[HomeChannels] Loaded ${allChannelsRef.current.length} of ${total}`);
         
         offset += BATCH_SIZE;
-        console.log(`[HomeChannels] Loaded ${allChannels.length} of ${totalCount}`);
         
-        // Small delay to prevent overwhelming the API
+        // Small delay to prevent overwhelming
         await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (err) {
@@ -175,8 +178,22 @@ export function useHomeChannels() {
       }
     }
     
-    console.log(`[HomeChannels] Complete: ${allChannels.length} channels loaded`);
+    console.log(`[HomeChannels] Complete: ${allChannelsRef.current.length} channels loaded`);
   };
+
+  const loadChannels = useCallback(async () => {
+    if (loadedRef.current) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      await loadFromDatabase();
+    } catch (err) {
+      console.error('[HomeChannels] Error:', err);
+      setError('Erro ao carregar conteúdo');
+      setIsLoading(false);
+    }
+  }, [loadFromDatabase]);
 
   useEffect(() => {
     loadChannels();
@@ -184,10 +201,16 @@ export function useHomeChannels() {
 
   return {
     channels,
+    categories,
     isLoading,
     error,
+    totalCount,
+    loadedCount,
     refresh: () => {
       loadedRef.current = false;
+      allChannelsRef.current = [];
+      setChannels([]);
+      setCategories([]);
       loadChannels();
     },
   };

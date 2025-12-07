@@ -11,11 +11,11 @@
 import { useMemo, useRef } from 'react';
 import type { WatchProgress, Channel, RecommendationGroup, RecommendationItem } from '../types';
 
-const MAX_TOTAL_ITEMS = 500;
-const MAX_CONTINUE_WATCHING = 20;
-const MAX_RELATED_PER_CATEGORY = 30;
-const MAX_FOR_YOU = 50;
-const MAX_DEFAULT_PER_SECTION = 40;
+const MAX_TOTAL_ITEMS = 5000; // Increased from 500
+const MAX_CONTINUE_WATCHING = 30;
+const MAX_RELATED_PER_CATEGORY = 50;
+const MAX_FOR_YOU = 100;
+const MAX_DEFAULT_PER_SECTION = 100; // Increased from 40
 
 interface PersonalizedContentInput {
   continueWatchingItems: WatchProgress[];
