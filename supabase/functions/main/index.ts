@@ -2,8 +2,13 @@
  * Main Edge Function Router for Self-Hosted Supabase
  * 
  * Routes requests to appropriate Edge Functions based on URL path.
- * Pattern: /functions/v1/{function-name} -> ../function-name/index.ts
+ * Uses static imports for self-hosted compatibility.
  */
+
+// Static imports for all functions (required for self-hosted)
+import healthCheckHandler from '../health-check/index.ts';
+import mercadoPagoTestHandler from '../mercado-pago-test/index.ts';
+import cacheSchedulePurgeHandler from '../cache-schedule-purge/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,51 +16,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
 };
 
-// Function registry - maps function names to their handlers
-const functionHandlers: Record<string, (req: Request) => Promise<Response>> = {};
-
-// Lazy load function modules
-async function loadFunction(name: string): Promise<((req: Request) => Promise<Response>) | null> {
-  if (functionHandlers[name]) {
-    return functionHandlers[name];
-  }
-
-  try {
-    const module = await import(`../${name}/index.ts`);
-    
-    if (typeof module.default === 'function') {
-      functionHandlers[name] = module.default;
-      return module.default;
-    }
-    
-    if (typeof module.handler === 'function') {
-      functionHandlers[name] = module.handler;
-      return module.handler;
-    }
-    
-    console.error(`[MainRouter] Function ${name} has no default or handler export`);
-    return null;
-  } catch (error) {
-    console.error(`[MainRouter] Failed to load function ${name}:`, error);
-    return null;
-  }
-}
+// Function registry with static handlers
+const functionHandlers: Record<string, (req: Request) => Promise<Response>> = {
+  'health-check': healthCheckHandler,
+  'mercado-pago-test': mercadoPagoTestHandler,
+  'cache-schedule-purge': cacheSchedulePurgeHandler,
+};
 
 // Extract function name from various path formats
 function extractFunctionName(pathname: string): string | null {
-  // Remove leading slash
   let path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
   
-  // Handle /functions/v1/{name} format
   if (path.startsWith('functions/v1/')) {
     path = path.replace('functions/v1/', '');
   }
   
-  // Handle /{name}/... format
   const parts = path.split('/');
   const name = parts[0];
   
-  // Ignore empty or main
   if (!name || name === 'main' || name === 'functions') {
     return null;
   }
@@ -69,7 +47,6 @@ Deno.serve(async (req: Request) => {
   
   console.log(`[MainRouter] ${req.method} ${pathname}`);
 
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -80,8 +57,9 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        router: 'main'
+        version: '2.1.0',
+        router: 'main',
+        functions: Object.keys(functionHandlers)
       }),
       { 
         status: 200, 
@@ -90,7 +68,6 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Extract function name
   const functionName = extractFunctionName(pathname);
   
   if (!functionName) {
@@ -98,7 +75,8 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         error: 'Function not specified', 
         path: pathname,
-        hint: 'Use /functions/v1/{function-name}'
+        hint: 'Use /functions/v1/{function-name}',
+        available: Object.keys(functionHandlers)
       }),
       { 
         status: 404, 
@@ -109,14 +87,14 @@ Deno.serve(async (req: Request) => {
 
   console.log(`[MainRouter] Routing to: ${functionName}`);
 
-  // Load and execute the function
-  const handler = await loadFunction(functionName);
+  const handler = functionHandlers[functionName];
   
   if (!handler) {
     return new Response(
       JSON.stringify({ 
-        error: 'Function not found or has no handler', 
-        function: functionName
+        error: 'Function not found', 
+        function: functionName,
+        available: Object.keys(functionHandlers)
       }),
       { 
         status: 404, 
