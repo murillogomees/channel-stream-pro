@@ -10,3 +10,4 @@ export { default as AdminSistemaPage } from './AdminSistemaPage';
 export { default as AdminAnalyticsPage } from './AdminAnalyticsPage';
 export { default as AdminUsuariosPage } from './AdminUsuariosPage';
 export { default as AdminIntegracaoPage } from './AdminIntegracaoPage';
+export { default as AdminMigrationChecklistPage } from './AdminMigrationChecklistPage';
