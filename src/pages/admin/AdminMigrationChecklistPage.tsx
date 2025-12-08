@@ -13,6 +13,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
+  supabaseMigrationService, 
+  MIGRATION_CONFIG,
+  MigrationVerificationResult 
+} from '@/services/supabaseMigrationService';
+import { 
   CheckCircle2, 
   Circle, 
   AlertTriangle, 
@@ -28,8 +33,12 @@ import {
   Play,
   Copy,
   ExternalLink,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  FileText,
+  Webhook
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface ChecklistItem {
   id: string;
@@ -45,18 +54,7 @@ interface ChecklistItem {
   critical?: boolean;
 }
 
-const MIGRATION_CONFIG = {
-  origin: {
-    url: 'https://sdvyxdghxqmntyoweqbd.supabase.co',
-    projectId: 'sdvyxdghxqmntyoweqbd'
-  },
-  destination: {
-    url: 'https://srv1182856.hstgr.cloud/',
-    host: '169.62.101.166',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY1MTU1MTMzLCJleHAiOjIwODA1MTUxMzN9.QtRyfpYqEw80LbxhETVievqVAlsypmxzL6EeDpF5l7o',
-    serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjUxNTUxMzMsImV4cCI6MjA4MDUxNTEzM30.2cY3Gp2SEOqlBerRNHecrTEm3MYsvGvpPzYS_Ivn304'
-  }
-};
+// MIGRATION_CONFIG is imported from supabaseMigrationService
 
 export default function AdminMigrationChecklistPage() {
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -520,11 +518,18 @@ export default function AdminMigrationChecklistPage() {
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Checklist de Migração</h1>
-          <p className="text-muted-foreground">
-            Supabase Cloud → Self-Hosted (VPS Hostinger)
-          </p>
+        <div className="flex items-center gap-4">
+          <Link to="/admin">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold">Checklist de Migração</h1>
+            <p className="text-muted-foreground">
+              Supabase Cloud → Self-Hosted (VPS Hostinger)
+            </p>
+          </div>
         </div>
         <Button onClick={runAllChecks} disabled={!!runningCheck}>
           <RefreshCw className={`h-4 w-4 mr-2 ${runningCheck ? 'animate-spin' : ''}`} />
@@ -649,6 +654,92 @@ export default function AdminMigrationChecklistPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Webhook Updates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Webhook className="h-5 w-5" />
+            URLs de Webhook (Atualizar Manualmente)
+          </CardTitle>
+          <CardDescription>
+            Atualize estes webhooks nos painéis externos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {supabaseMigrationService.getWebhookUpdates().map((webhook, idx) => (
+              <div key={idx} className="border rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{webhook.service}</span>
+                  <Badge variant="outline">{webhook.configLocation}</Badge>
+                </div>
+                <div className="grid md:grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Antiga:</span>
+                    <code className="block text-xs bg-muted p-2 rounded mt-1 line-through opacity-50">
+                      {webhook.oldUrl}
+                    </code>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Nova:</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 text-xs bg-primary/10 p-2 rounded text-primary">
+                        {webhook.newUrl}
+                      </code>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8"
+                        onClick={() => copyToClipboard(webhook.newUrl)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Deployment Commands */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Comandos de Deploy
+          </CardTitle>
+          <CardDescription>
+            Execute estes comandos no terminal para completar a migração
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {supabaseMigrationService.getDeploymentCommands().map((cmd, idx) => (
+              <div key={idx} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm">{cmd.step}</span>
+                  <span className="text-xs text-muted-foreground">{cmd.description}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm bg-black/90 text-green-400 p-3 rounded font-mono">
+                    {cmd.command}
+                  </code>
+                  <Button 
+                    size="icon" 
+                    variant="outline"
+                    onClick={() => copyToClipboard(cmd.command)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card>
