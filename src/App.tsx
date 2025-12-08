@@ -39,6 +39,7 @@ const AdminCdn = lazy(() => import("./pages/AdminCdn"));
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
 const AdminR2MigrationPage = lazy(() => import("./pages/admin/AdminR2MigrationPage"));
 const AdminProfilesMigration = lazy(() => import("./pages/AdminProfilesMigration"));
+const AdminMigrationChecklistPage = lazy(() => import("./pages/admin/AdminMigrationChecklistPage"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
@@ -136,6 +137,7 @@ function AppContent() {
             <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
             <Route path="/admin/migration/r2" element={<ProtectedRoute requireAdmin><AdminR2MigrationPage /></ProtectedRoute>} />
             <Route path="/admin/migration/profiles" element={<ProtectedRoute requireAdmin><AdminProfilesMigration /></ProtectedRoute>} />
+            <Route path="/admin/migration/checklist" element={<ProtectedRoute requireAdmin><AdminMigrationChecklistPage /></ProtectedRoute>} />
             
             {/* Access denied & 404 */}
             <Route path="/403" element={<Forbidden />} />
