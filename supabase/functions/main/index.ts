@@ -1,11 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
@@ -15,7 +13,7 @@ serve(async (req: Request) => {
   }
 
   // Health check endpoint
-  if (pathname === '/health' || pathname === '/') {
+  if (pathname === '/health' || pathname === '/' || pathname === '/functions/v1/health-check') {
     return new Response(
       JSON.stringify({ 
         status: 'ok', 
