@@ -4,7 +4,7 @@ import type { Database } from "./types";
 
 const SUPABASE_URL = "https://srv1182856.hstgr.cloud";
 const SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY1MTU1MTMzLCJleHAiOjIwODA1MTUxMzN9.QtRyfpYqEw80LbxhETVievqVAlsypmxzL6EeDpF5l7o";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY1MTcxNTA1LCJleHAiOjIwODA1MzE1MDV9.BAYUSQh54HYNqu0FEZmAKRAmfVvq4t0Qt2zqFBdrHBY";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
