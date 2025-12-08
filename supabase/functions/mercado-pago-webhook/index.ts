@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 
@@ -571,7 +570,7 @@ async function processPayment(supabase: any, paymentData: any) {
   return { success: true, payment, status, statusDetail };
 }
 
-serve(async (req) => {
+async function handler(req: Request): Promise<Response> {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -589,7 +588,6 @@ serve(async (req) => {
     // Verify signature (mais permissivo para não bloquear pagamentos)
     if (!verifySignature(body, signature, requestId)) {
       console.error("[MP-Webhook] Signature verification failed but this should not happen");
-      // Não retorna erro - aceita o webhook mesmo assim
     }
     
     const payload: MercadoPagoWebhookPayload = JSON.parse(body);
@@ -637,9 +635,17 @@ serve(async (req) => {
     
   } catch (error) {
     console.error("[MP-Webhook] Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+// Export for dynamic import by main router
+export default handler;
+
+// Also support direct Deno.serve for standalone mode
+if (import.meta.main) {
+  Deno.serve(handler);
+}

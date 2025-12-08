@@ -12,7 +12,7 @@ interface ScheduledPurge {
   recurring?: 'daily' | 'weekly' | 'monthly';
 }
 
-Deno.serve(async (req) => {
+async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,10 +26,7 @@ Deno.serve(async (req) => {
     );
 
     if (schedule) {
-      // Schedule a purge
       const purge: ScheduledPurge = schedule;
-      
-      // Store in database (you'd need a scheduled_purges table)
       console.log('Scheduled purge:', purge);
       
       return new Response(
@@ -43,11 +40,7 @@ Deno.serve(async (req) => {
     }
 
     if (execute) {
-      // Execute scheduled purges that are due
       const now = new Date().toISOString();
-      
-      // This would query scheduled_purges table for due purges
-      // For now, simulate execution
       console.log('Executing scheduled purges for:', now);
       
       return new Response(
@@ -71,4 +64,12 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}
+
+// Export for dynamic import by main router
+export default handler;
+
+// Also support direct Deno.serve for standalone mode
+if (import.meta.main) {
+  Deno.serve(handler);
+}
