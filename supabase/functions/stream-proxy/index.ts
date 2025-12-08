@@ -455,7 +455,7 @@ async function fetchWithRetry(
 // MAIN HANDLER
 // =============================================================================
 
-Deno.serve(async (req) => {
+async function handler(req: Request): Promise<Response> {
   const startTime = Date.now();
   
   // CORS preflight
@@ -531,7 +531,6 @@ Deno.serve(async (req) => {
     const isVod = isVodContent(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
     
-    // Determine content type for logging
     const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : isLiveStream ? 'LIVE' : 'M3U';
     const cacheKey = `proxy:${decodedUrl}`;
     
@@ -550,12 +549,10 @@ Deno.serve(async (req) => {
     
     console.log(`[Proxy] ${req.method} ${reqType}: ${decodedUrl.substring(0, 60)}...`);
 
-    // Build headers - use minimal headers for live streams to avoid 405 errors
     const rangeHeader = req.headers.get('Range');
     const acceptEncoding = req.headers.get('Accept-Encoding');
     const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding, isLiveStream);
 
-    // Fetch upstream with appropriate timeout and retries
     let timeout: number;
     let maxRetries: number;
     
@@ -572,7 +569,6 @@ Deno.serve(async (req) => {
     
     const { response: streamResponse, usedUrl } = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout, maxRetries);
 
-    // Handle errors
     if (!streamResponse.ok && streamResponse.status !== 206) {
       const status = streamResponse.status;
       
@@ -589,7 +585,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine content type
     let contentType = streamResponse.headers.get('Content-Type');
     const isHls = isHlsContent(decodedUrl, contentType);
     
@@ -610,14 +605,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build response headers
     const responseHeaders = new Headers(CORS_HEADERS);
     responseHeaders.set('Content-Type', contentType);
     responseHeaders.set('X-Cache-Status', 'MISS');
     responseHeaders.set('X-RateLimit-Remaining', String(rateLimit.remaining));
     responseHeaders.set('Vary', 'Accept-Encoding');
     
-    // Optimized cache control
     if (isHls) {
       responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.MANIFEST_CACHE_SECONDS}, stale-while-revalidate=2`);
     } else if (isKey) {
@@ -628,7 +621,6 @@ Deno.serve(async (req) => {
       responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.SEGMENT_CACHE_SECONDS}`);
     }
 
-    // HLS Manifest: rewrite URLs and cache
     if (isHls) {
       const manifestContent = await streamResponse.text();
       const baseUrl = getBaseUrl(usedUrl);
@@ -641,24 +633,15 @@ Deno.serve(async (req) => {
       const duration = Date.now() - startTime;
       console.log(`[Proxy] M3U served in ${duration}ms`);
       
-      return new Response(rewrittenManifest, {
-        status: 200,
-        headers: responseHeaders,
-      });
+      return new Response(rewrittenManifest, { status: 200, headers: responseHeaders });
     }
 
-    // Key files: cache and return
     if (isKey) {
       const keyData = await streamResponse.arrayBuffer();
       setCache(cacheKey, keyData, contentType, CONFIG.KEY_CACHE_SECONDS);
-      
-      return new Response(keyData, {
-        status: 200,
-        headers: responseHeaders,
-      });
+      return new Response(keyData, { status: 200, headers: responseHeaders });
     }
 
-    // Video Segment: pass-through with proper headers
     const passHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
     passHeaders.forEach(header => {
       const value = streamResponse.headers.get(header);
@@ -669,29 +652,18 @@ Deno.serve(async (req) => {
       responseHeaders.set('Accept-Ranges', 'bytes');
     }
 
-    // For HEAD requests, don't stream body
     if (req.method === 'HEAD') {
-      return new Response(null, {
-        status: 200,
-        headers: responseHeaders,
-      });
+      return new Response(null, { status: 200, headers: responseHeaders });
     }
 
-    // Stream response body
     if (!streamResponse.body) {
-      return new Response(null, {
-        status: streamResponse.status,
-        headers: responseHeaders,
-      });
+      return new Response(null, { status: streamResponse.status, headers: responseHeaders });
     }
 
     const duration = Date.now() - startTime;
     console.log(`[Proxy] ${reqType} started in ${duration}ms`);
 
-    return new Response(streamResponse.body, {
-      status: streamResponse.status,
-      headers: responseHeaders,
-    });
+    return new Response(streamResponse.body, { status: streamResponse.status, headers: responseHeaders });
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -700,14 +672,16 @@ Deno.serve(async (req) => {
     const isTimeout = message.includes('abort') || message.includes('timeout');
     
     return new Response(
-      JSON.stringify({ 
-        error: isTimeout ? 'Upstream timeout' : 'Proxy error',
-        details: message
-      }),
-      { 
-        status: isTimeout ? 504 : 502, 
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: isTimeout ? 'Upstream timeout' : 'Proxy error', details: message }),
+      { status: isTimeout ? 504 : 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
   }
-});
+}
+
+// Export for dynamic import by main router
+export default handler;
+
+// Also support direct Deno.serve for standalone mode
+if (import.meta.main) {
+  Deno.serve(handler);
+}
