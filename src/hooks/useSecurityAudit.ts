@@ -44,28 +44,16 @@ export function useSecurityAudit() {
     setError(null);
     
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('security-audit', {
-        body: null,
-        headers: {},
+      // Use Supabase client instead of hardcoded URLs/keys
+      const { data: responseData, error: fnError } = await supabase.functions.invoke('security-audit', {
+        body: { type },
       });
       
-      // Handle the URL parameter approach
-      const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/security-audit?type=${type}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Audit failed: ${response.statusText}`);
+      if (fnError) {
+        throw new Error(fnError.message);
       }
       
-      const auditData = await response.json() as SecurityAuditReport;
+      const auditData = responseData as SecurityAuditReport;
       setReport(auditData);
       
       // Show toast based on score

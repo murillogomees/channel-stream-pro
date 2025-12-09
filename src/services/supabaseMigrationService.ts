@@ -33,6 +33,7 @@ export interface MigrationVerificationResult {
   details?: Record<string, unknown>;
 }
 
+// SECURITY: Keys removed - use environment variables or Supabase secrets
 export const MIGRATION_CONFIG: MigrationConfig = {
   origin: {
     url: 'https://sdvyxdghxqmntyoweqbd.supabase.co',
@@ -41,8 +42,8 @@ export const MIGRATION_CONFIG: MigrationConfig = {
   destination: {
     url: 'https://srv1182856.hstgr.cloud/',
     host: '169.62.101.166',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY1MTU1MTMzLCJleHAiOjIwODA1MTUxMzN9.QtRyfpYqEw80LbxhETVievqVAlsypmxzL6EeDpF5l7o',
-    serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjUxNTUxMzMsImV4cCI6MjA4MDUxNTEzM30.2cY3Gp2SEOqlBerRNHecrTEm3MYsvGvpPzYS_Ivn304'
+    anonKey: '[CONFIGURE_VIA_ENV]', // Set via VITE_SUPABASE_PUBLISHABLE_KEY
+    serviceKey: '[CONFIGURE_VIA_SECRETS]' // Set via Supabase Edge Function Secrets
   }
 };
 

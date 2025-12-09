@@ -46,34 +46,28 @@ export function useQAValidation() {
     setError(null);
     
     try {
-      const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/qa-validation?action=${action}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak',
-          },
-        }
-      );
+      // Use Supabase client instead of hardcoded URLs/keys
+      const { data: responseData, error: fnError } = await supabase.functions.invoke('qa-validation', {
+        body: { action },
+      });
       
-      if (!response.ok) {
-        throw new Error(`Validation failed: ${response.statusText}`);
+      if (fnError) {
+        throw new Error(fnError.message);
       }
       
-      const data = await response.json() as QAReport;
-      setReport(data);
+      const qaData = responseData as QAReport;
+      setReport(qaData);
       
       // Show toast based on status
-      if (data.overall_status === 'pass') {
-        toast.success(`QA Validation: ${data.passed}/${data.total_tests} tests passed`);
-      } else if (data.overall_status === 'partial') {
-        toast.warning(`QA Validation: ${data.warnings} warnings`);
+      if (qaData.overall_status === 'pass') {
+        toast.success(`QA Validation: ${qaData.passed}/${qaData.total_tests} tests passed`);
+      } else if (qaData.overall_status === 'partial') {
+        toast.warning(`QA Validation: ${qaData.warnings} warnings`);
       } else {
-        toast.error(`QA Validation: ${data.failed} tests failed`);
+        toast.error(`QA Validation: ${qaData.failed} tests failed`);
       }
       
-      return data;
+      return qaData;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
