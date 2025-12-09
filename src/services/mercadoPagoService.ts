@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 export interface CheckoutResponse {
   preference_id: string;
@@ -29,7 +30,7 @@ export interface Payment {
 }
 
 class MercadoPagoService {
-  private functionUrl = "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1";
+  private functionUrl = SUPABASE_FUNCTIONS_URL;
 
   /**
    * Create a checkout session for a subscription plan
