@@ -36,7 +36,7 @@ iptvlink.com.br"  # ou IP do VPS
 SELFHOST_DB_PORT="5432"
 SELFHOST_DB_NAME="postgres"
 SELFHOST_DB_USER="postgres"
-SELFHOST_DB_PASSWORD="3U7u3FFjKR1LS1b6s2AvwHRIpoIQVv24"
+SELFHOST_DB_PASSWORD="p72qeBb4xpFYLvg8dggpeJW08Q4xgR9A"
 
 # Diretório para dumps
 DUMP_DIR="./migration_dumps"
