@@ -89,12 +89,19 @@ export function useAffiliates() {
     fetchAffiliates();
   }, [fetchAffiliates]);
 
-  const createAffiliate = async (data: Omit<Affiliate, 'id' | 'created_at' | 'updated_at' | 'total_referrals' | 'total_earnings' | 'available_balance'>) => {
+  const createAffiliate = async (affiliateData: Omit<Affiliate, 'id' | 'created_at' | 'updated_at' | 'total_referrals' | 'total_earnings' | 'available_balance'>) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('affiliates')
-        .insert([{ ...data, created_by: user.user?.id }]);
+        .insert({
+          name: affiliateData.name,
+          code: affiliateData.name?.toLowerCase().replace(/\s+/g, '-') || `aff-${Date.now()}`,
+          user_id: affiliateData.user_id || null,
+          status: affiliateData.status || 'active',
+          commission_type: affiliateData.commission_type || 'percentage',
+          commission_value: affiliateData.commission_value || 10,
+          is_active: affiliateData.status === 'active',
+        });
 
       if (error) throw error;
       await fetchAffiliates();

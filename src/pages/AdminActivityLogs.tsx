@@ -18,12 +18,12 @@ import { ptBR } from 'date-fns/locale';
 interface ActivityLog {
   id: string;
   user_id: string | null;
-  action_type: string;
-  action_description: string;
+  action: string;
   entity_type: string | null;
   entity_id: string | null;
-  metadata: any;
+  details: any;
   created_at: string;
+  ip_address?: string | null;
   user_name?: string;
   user_email?: string;
 }
@@ -62,7 +62,14 @@ export default function AdminActivityLogs() {
 
       // Enriquecer logs com informações dos usuários
       const enrichedLogs: ActivityLog[] = logsData?.map(log => ({
-        ...log,
+        id: log.id,
+        user_id: log.user_id,
+        action: log.action,
+        entity_type: log.entity_type,
+        entity_id: log.entity_id,
+        details: log.details,
+        created_at: log.created_at || new Date().toISOString(),
+        ip_address: log.ip_address,
         user_name: log.user_id ? profilesMap.get(log.user_id)?.nome || 'Desconhecido' : 'Sistema',
         user_email: log.user_id ? profilesMap.get(log.user_id)?.email || '' : 'sistema@auto',
       })) || [];
@@ -104,11 +111,11 @@ export default function AdminActivityLogs() {
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
-      log.action_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.user_email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesAction = actionFilter === 'all' || log.action_type === actionFilter;
+    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
     const matchesEntity = entityFilter === 'all' || log.entity_type === entityFilter;
 
     return matchesSearch && matchesAction && matchesEntity;
@@ -248,7 +255,7 @@ export default function AdminActivityLogs() {
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="text-center text-lg">
-                        {getActionIcon(log.action_type)}
+                        {getActionIcon(log.action)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
@@ -260,12 +267,12 @@ export default function AdminActivityLogs() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getActionBadgeVariant(log.action_type)}>
-                          {log.action_type}
+                        <Badge variant={getActionBadgeVariant(log.action)}>
+                          {log.action}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-md">
-                        <p className="text-sm truncate">{log.action_description}</p>
+                        <p className="text-sm truncate">{log.action}</p>
                       </TableCell>
                       <TableCell>
                         {log.entity_type && (

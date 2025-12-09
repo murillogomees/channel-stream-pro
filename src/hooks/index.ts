@@ -32,11 +32,7 @@ export { useNetflixLazyLoad } from './useNetflixLazyLoad';
 export { useSmartCache } from './useSmartCache';
 export type { SmartCacheStats, UseSmartCacheOptions } from './useSmartCache';
 
-// Viewer Profiles & Content
-export { useViewerProfiles } from './useViewerProfiles';
-export type { ViewerProfile, CreateProfileInput, UpdateProfileInput } from './useViewerProfiles';
-export { useWatchHistory } from './useWatchHistory';
-export type { WatchHistoryItem } from './useWatchHistory';
+// Favorites
 export { useFavorites } from './useFavorites';
 export type { FavoriteItem } from './useFavorites';
 

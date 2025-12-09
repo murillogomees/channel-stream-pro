@@ -40,7 +40,17 @@ export function useAffiliateTiers() {
     try {
       const { data, error } = await supabase
         .from('affiliate_tiers')
-        .insert(tier)
+        .insert({
+          name: tier.name,
+          min_referrals: tier.min_referrals || 0,
+          min_revenue: tier.min_revenue || 0,
+          commission_rate: tier.commission_percentage || 10,
+          commission_percentage: tier.commission_percentage || 10,
+          bonus_amount: tier.bonus_amount || 0,
+          icon: tier.icon || null,
+          color: tier.color || '#CD7F32',
+          description: tier.description || null,
+        })
         .select()
         .single();
 

@@ -163,16 +163,20 @@ export function useAffiliateAnalytics(affiliateId?: string) {
     }
   ) => {
     try {
-      const { data, error } = await supabase.rpc('track_affiliate_click', {
-        p_affiliate_id: targetAffiliateId,
-        p_ip_address: metadata.ip_address || null,
-        p_user_agent: metadata.user_agent || null,
-        p_referrer: metadata.referrer || null,
-        p_utm_source: metadata.utm_source || null,
-        p_utm_medium: metadata.utm_medium || null,
-        p_utm_campaign: metadata.utm_campaign || null,
-        p_landing_page: metadata.landing_page || null
-      });
+      const { data, error } = await supabase
+        .from('affiliate_link_clicks')
+        .insert({
+          affiliate_id: targetAffiliateId,
+          ip_address: metadata.ip_address || null,
+          user_agent: metadata.user_agent || null,
+          referrer: metadata.referrer || null,
+          utm_source: metadata.utm_source || null,
+          utm_medium: metadata.utm_medium || null,
+          utm_campaign: metadata.utm_campaign || null,
+          landing_page: metadata.landing_page || null,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
