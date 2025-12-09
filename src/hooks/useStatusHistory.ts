@@ -19,20 +19,24 @@ export function useStatusHistory(serviceName?: string, limit: number = 50) {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('status_change_history')
+      // Use client_status_history table 
+      const { data, error } = await supabase
+        .from('client_status_history')
         .select('*')
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (serviceName) {
-        query = query.eq('service_name', serviceName);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
-      setHistory(data || []);
+      
+      // Map to StatusChangeHistory format
+      setHistory((data || []).map(item => ({
+        id: item.id,
+        service_name: 'client_status',
+        previous_status: item.old_status,
+        new_status: item.new_status,
+        changed_at: item.created_at,
+        metadata: { reason: item.reason, changed_by: item.changed_by, profile_id: item.profile_id },
+      })));
     } catch (error: any) {
       console.error('Erro ao carregar histórico:', error);
       toast({
@@ -46,18 +50,21 @@ export function useStatusHistory(serviceName?: string, limit: number = 50) {
   };
 
   const logStatusChange = async (
-    serviceName: string,
+    svcName: string,
     previousStatus: string | null,
     newStatus: string,
     metadata?: any
   ) => {
     try {
-      const { error } = await supabase.rpc('log_status_change', {
-        p_service_name: serviceName,
-        p_previous_status: previousStatus,
-        p_new_status: newStatus,
-        p_metadata: metadata || null,
-      });
+      const { error } = await supabase
+        .from('client_status_history')
+        .insert({
+          profile_id: metadata?.profile_id || null,
+          old_status: previousStatus,
+          new_status: newStatus,
+          reason: metadata?.reason || null,
+          changed_by: metadata?.changed_by || null,
+        });
 
       if (error) throw error;
       await fetchHistory();

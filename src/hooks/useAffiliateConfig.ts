@@ -48,7 +48,12 @@ export function useAffiliateConfig() {
 
       const parsed = { ...defaultConfig };
       (data || []).forEach(item => {
-        const value = item.config_value as Record<string, any>;
+        let value: Record<string, any> = {};
+        if (typeof item.config_value === 'string') {
+          try { value = JSON.parse(item.config_value); } catch { value = { value: item.config_value }; }
+        } else if (item.config_value && typeof item.config_value === 'object') {
+          value = item.config_value as Record<string, any>;
+        }
         switch (item.config_key) {
           case 'min_withdrawal_amount':
             parsed.min_withdrawal_amount = value?.value || 50;

@@ -8,23 +8,23 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface NotificationSchedule {
+interface NotificationQueueItem {
   id: string;
-  cliente_id: string;
-  notification_type: string;
-  scheduled_for: string;
-  days_before_due: number;
+  recipient_phone: string;
+  recipient_name?: string;
+  message_content: string;
   status: string;
   attempts: number;
-  last_attempt_at: string;
-  sent_at: string;
-  error_message: string;
-  metadata: any;
+  scheduled_at?: string;
+  sent_at?: string;
+  last_attempt_at?: string;
+  error_message?: string;
+  metadata?: any;
   created_at: string;
 }
 
 export default function AdminNotificationQueue() {
-  const [notifications, setNotifications] = useState<NotificationSchedule[]>([]);
+  const [notifications, setNotifications] = useState<NotificationQueueItem[]>([]);
   const [stats, setStats] = useState({
     pending: 0,
     sent: 0,
@@ -37,31 +37,25 @@ export default function AdminNotificationQueue() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Buscar notificações do dia
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
+      // Use notification_queue table
       const { data, error } = await supabase
-        .from('notification_schedule')
+        .from('notification_queue')
         .select('*')
-        .gte('scheduled_for', today.toISOString())
-        .lt('scheduled_for', tomorrow.toISOString())
-        .order('scheduled_for', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
       setNotifications(data || []);
 
       // Calcular estatísticas
-      const stats = {
+      const statsData = {
         pending: data?.filter(n => n.status === 'pending').length || 0,
         sent: data?.filter(n => n.status === 'sent').length || 0,
         failed: data?.filter(n => n.status === 'failed').length || 0,
         total: data?.length || 0
       };
-      setStats(stats);
+      setStats(statsData);
 
     } catch (error) {
       console.error('Erro ao carregar fila:', error);
@@ -78,10 +72,9 @@ export default function AdminNotificationQueue() {
   const retryFailed = async () => {
     try {
       const { error } = await supabase
-        .from('notification_schedule')
+        .from('notification_queue')
         .update({ status: 'pending', attempts: 0 })
-        .eq('status', 'failed')
-        .gte('scheduled_for', new Date().toISOString());
+        .eq('status', 'failed');
 
       if (error) throw error;
 
@@ -144,57 +137,57 @@ export default function AdminNotificationQueue() {
 
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <Card variant="stat">
+        <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total</p>
                 <h3 className="text-2xl font-bold text-foreground">{stats.total}</h3>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-stat-primary/10 flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-stat-primary" />
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card variant="stat-warning">
+        <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
                 <h3 className="text-2xl font-bold text-foreground">{stats.pending}</h3>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-stat-warning/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-stat-warning" />
+              <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-yellow-500" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card variant="stat-success">
+        <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Enviados</p>
                 <h3 className="text-2xl font-bold text-foreground">{stats.sent}</h3>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-stat-success/10 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-stat-success" />
+              <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-green-500" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card variant="stat-danger">
+        <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Falharam</p>
                 <h3 className="text-2xl font-bold text-foreground">{stats.failed}</h3>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-stat-danger/10 flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-stat-danger" />
+              <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <XCircle className="h-5 w-5 text-red-500" />
               </div>
             </div>
           </CardContent>
@@ -220,12 +213,12 @@ export default function AdminNotificationQueue() {
 
       {/* Lista de Notificações */}
       <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Notificações de Hoje</h2>
+        <h2 className="text-xl font-semibold mb-4">Fila de Notificações</h2>
         
         <div className="space-y-3">
           {notifications.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma notificação agendada para hoje
+              Nenhuma notificação na fila
             </p>
           ) : (
             notifications.map((notif) => (
@@ -235,16 +228,16 @@ export default function AdminNotificationQueue() {
               >
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium">{notif.metadata?.cliente_nome || 'Cliente'}</p>
+                    <p className="font-medium">{notif.recipient_name || 'Cliente'}</p>
                     {getStatusBadge(notif.status)}
-                    {notif.attempts > 1 && (
+                    {(notif.attempts || 0) > 1 && (
                       <Badge variant="outline">
                         {notif.attempts} tentativas
                       </Badge>
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {notif.metadata?.telefone} • {notif.days_before_due} dias antes
+                    {notif.recipient_phone}
                   </p>
                   {notif.error_message && (
                     <p className="text-sm text-destructive">
@@ -258,8 +251,10 @@ export default function AdminNotificationQueue() {
                     <span>Enviado {format(new Date(notif.sent_at), 'HH:mm', { locale: ptBR })}</span>
                   ) : notif.last_attempt_at ? (
                     <span>Última tentativa {format(new Date(notif.last_attempt_at), 'HH:mm', { locale: ptBR })}</span>
+                  ) : notif.scheduled_at ? (
+                    <span>Agendado para {format(new Date(notif.scheduled_at), 'HH:mm', { locale: ptBR })}</span>
                   ) : (
-                    <span>Agendado para {format(new Date(notif.scheduled_for), 'HH:mm', { locale: ptBR })}</span>
+                    <span>Criado {format(new Date(notif.created_at), 'HH:mm', { locale: ptBR })}</span>
                   )}
                 </div>
               </div>

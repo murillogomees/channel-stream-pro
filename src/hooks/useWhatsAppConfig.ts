@@ -24,7 +24,7 @@ export function useWhatsAppConfig() {
 
   const loadConfig = async () => {
     try {
-      // Load WhatsApp credentials
+      // Load WhatsApp credentials from whatsapp_config table
       const { data: whatsappData, error: whatsappError } = await supabase
         .from('whatsapp_config')
         .select('*')
@@ -34,33 +34,26 @@ export function useWhatsAppConfig() {
 
       if (whatsappError) throw whatsappError;
 
-      // Load auto notification config
+      // Load auto notification config from auto_notifications table
       const { data: autoData, error: autoError } = await supabase
-        .from('auto_notification_config')
+        .from('auto_notifications')
         .select('*')
+        .eq('is_active', true)
         .limit(1)
         .maybeSingle();
 
       if (autoError) throw autoError;
 
-      // Load admin phones
-      const { data: adminPhonesData, error: adminPhonesError } = await supabase
-        .from('admin_phones')
-        .select('phone')
-        .eq('active', true);
-
-      if (adminPhonesError) throw adminPhonesError;
-
       setConfig({
-        appkey: whatsappData?.appkey || '',
-        authkey: whatsappData?.authkey || '',
-        enabled: !!whatsappData?.appkey && !!whatsappData?.authkey,
-        autoSendEnabled: autoData?.enabled || false,
-        sendHour: autoData?.send_hour || 10,
-        daysToNotify: autoData?.days_to_notify || DEFAULT_CONFIG.daysToNotify,
-        testPhoneNumber: autoData?.test_phone_number || '',
+        appkey: whatsappData?.app_key || '',
+        authkey: whatsappData?.auth_key || '',
+        enabled: !!whatsappData?.app_key && !!whatsappData?.auth_key,
+        autoSendEnabled: autoData?.is_active || false,
+        sendHour: autoData?.delay_hours || 10,
+        daysToNotify: DEFAULT_CONFIG.daysToNotify,
+        testPhoneNumber: '',
         testContacts: [],
-        adminPhones: adminPhonesData?.map(p => p.phone) || [],
+        adminPhones: [],
       });
     } catch (error) {
       console.error('Erro ao carregar configuração do WhatsApp:', error);
@@ -74,8 +67,8 @@ export function useWhatsAppConfig() {
       // Save WhatsApp credentials if provided
       if (newConfig.appkey !== undefined || newConfig.authkey !== undefined) {
         const whatsappUpdate = {
-          appkey: typeof newConfig.appkey === 'string' ? newConfig.appkey : config.appkey,
-          authkey: typeof newConfig.authkey === 'string' ? newConfig.authkey : config.authkey,
+          app_key: typeof newConfig.appkey === 'string' ? newConfig.appkey : config.appkey,
+          auth_key: typeof newConfig.authkey === 'string' ? newConfig.authkey : config.authkey,
         };
 
         const { data: existing } = await supabase
@@ -87,34 +80,7 @@ export function useWhatsAppConfig() {
         if (existing) {
           await supabase.from('whatsapp_config').update(whatsappUpdate).eq('id', existing.id);
         } else {
-          await supabase.from('whatsapp_config').insert(whatsappUpdate);
-        }
-      }
-
-      // Save auto notification config if provided
-      if (
-        newConfig.autoSendEnabled !== undefined || 
-        newConfig.sendHour !== undefined || 
-        newConfig.testPhoneNumber !== undefined ||
-        newConfig.daysToNotify !== undefined
-      ) {
-        const autoUpdate: any = {
-          enabled: newConfig.autoSendEnabled !== undefined ? newConfig.autoSendEnabled : config.autoSendEnabled,
-          send_hour: newConfig.sendHour !== undefined ? newConfig.sendHour : config.sendHour,
-          test_phone_number: newConfig.testPhoneNumber !== undefined ? newConfig.testPhoneNumber : config.testPhoneNumber,
-          days_to_notify: newConfig.daysToNotify !== undefined ? newConfig.daysToNotify : config.daysToNotify,
-        };
-
-        const { data: existing } = await supabase
-          .from('auto_notification_config')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from('auto_notification_config').update(autoUpdate).eq('id', existing.id);
-        } else {
-          await supabase.from('auto_notification_config').insert(autoUpdate);
+          await supabase.from('whatsapp_config').insert([whatsappUpdate]);
         }
       }
 

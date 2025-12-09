@@ -92,8 +92,8 @@ export function MigrationDashboard() {
       const { data: cleanupData, error: cleanupError } = await supabase
         .rpc('cleanup_fase8_old_data', { p_dry_run: true });
 
-      if (!cleanupError && cleanupData) {
-        setCleanupPreview(cleanupData);
+      if (!cleanupError && cleanupData && Array.isArray(cleanupData)) {
+        setCleanupPreview(cleanupData as unknown as CleanupPreview[]);
       }
     } catch (error) {
       console.error('Error loading migration data:', error);
@@ -106,11 +106,14 @@ export function MigrationDashboard() {
   const toggleFlag = async (flagName: string, enabled: boolean, percentage?: number) => {
     setUpdatingFlag(flagName);
     try {
-      const { error } = await supabase.rpc('toggle_feature_flag', {
-        p_flag_name: flagName,
-        p_enabled: enabled,
-        p_percentage: percentage ?? (enabled ? 100 : 0),
-      });
+      const { error } = await supabase
+        .from('feature_flag_config')
+        .update({ 
+          enabled, 
+          percentage: percentage ?? (enabled ? 100 : 0),
+          updated_at: new Date().toISOString() 
+        })
+        .eq('flag_name', flagName);
 
       if (error) throw error;
 
@@ -168,7 +171,7 @@ export function MigrationDashboard() {
       if (error) throw error;
 
       if (dryRun) {
-        setCleanupPreview(data || []);
+        setCleanupPreview(Array.isArray(data) ? data as unknown as CleanupPreview[] : []);
         toast.info('Preview de limpeza atualizado');
       } else {
         toast.success('Limpeza executada com sucesso!');

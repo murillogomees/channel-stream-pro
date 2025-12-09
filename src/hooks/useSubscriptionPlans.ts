@@ -42,7 +42,10 @@ export function useSubscriptionPlans() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setPlans(data || []);
+      setPlans((data || []).map(p => ({
+        ...p,
+        features: (p.features as string[] | null) || [],
+      })));
     } catch (error) {
       console.error('Erro ao buscar planos:', error);
       toast({

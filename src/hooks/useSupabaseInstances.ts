@@ -197,12 +197,12 @@ export function useSupabaseInstances() {
   const logAudit = async (instanceId: string | null, action: string, details: Record<string, unknown>) => {
     try {
       const { data: user } = await supabase.auth.getUser();
-      await supabase.from('supabase_instance_audit').insert({
+      await supabase.from('supabase_instance_audit').insert([{
         instance_id: instanceId,
         action,
-        details,
+        details: details as any,
         performed_by: user.user?.id || null,
-      });
+      }]);
     } catch (err) {
       console.error('Audit log failed:', err);
     }

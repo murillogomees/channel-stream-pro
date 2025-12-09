@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
-import { NotificationHistoryState, ClientNotificationHistory } from '@/types/notificationHistory';
 import { supabase } from '@/integrations/supabase/client';
+
+export interface NotificationRecord {
+  daysBeforeDue: number;
+  sentAt: string;
+  templateId: string;
+  success: boolean;
+}
+
+export interface ClientNotificationHistory {
+  clienteId: string;
+  dataVencimentoAtual: string;
+  notificacoesEnviadas: NotificationRecord[];
+  ultimoPagamentoDetectado?: string;
+}
+
+export interface NotificationHistoryState {
+  [clienteId: string]: ClientNotificationHistory;
+}
 
 export function useNotificationHistory() {
   const [history, setHistory] = useState<NotificationHistoryState>({});
@@ -12,29 +29,32 @@ export function useNotificationHistory() {
 
   const loadHistory = async () => {
     try {
+      // Use sent_notifications table instead of notification_history
       const { data, error } = await supabase
-        .from('notification_history')
+        .from('sent_notifications')
         .select('*')
-        .order('sent_at', { ascending: false });
+        .order('sent_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
 
       const historyMap: NotificationHistoryState = {};
       
       data?.forEach(record => {
-        if (!historyMap[record.cliente_id]) {
-          historyMap[record.cliente_id] = {
-            clienteId: record.cliente_id,
-            dataVencimentoAtual: new Date(record.data_vencimento_atual).toISOString(),
+        const recipientId = record.recipient_id || 'unknown';
+        if (!historyMap[recipientId]) {
+          historyMap[recipientId] = {
+            clienteId: recipientId,
+            dataVencimentoAtual: new Date().toISOString(),
             notificacoesEnviadas: [],
           };
         }
         
-        historyMap[record.cliente_id].notificacoesEnviadas.push({
-          daysBeforeDue: record.days_before_due,
-          sentAt: record.sent_at,
-          templateId: record.template_id || '',
-          success: record.success,
+        historyMap[recipientId].notificacoesEnviadas.push({
+          daysBeforeDue: 0,
+          sentAt: record.sent_at || new Date().toISOString(),
+          templateId: record.template_key || '',
+          success: record.status === 'sent',
         });
       });
 
@@ -54,14 +74,21 @@ export function useNotificationHistory() {
     success: boolean
   ) => {
     try {
+      // Get profile phone
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('contact_phone')
+        .eq('id', clienteId)
+        .single();
+
       const { error } = await supabase
-        .from('notification_history')
+        .from('sent_notifications')
         .insert({
-          cliente_id: clienteId,
-          data_vencimento_atual: dataVencimento,
-          days_before_due: daysBeforeDue,
-          template_id: templateId,
-          success,
+          recipient_id: clienteId,
+          recipient_phone: profile?.contact_phone || '',
+          template_key: templateId,
+          status: success ? 'sent' : 'failed',
+          message_content: `Notification for ${daysBeforeDue} days before due`,
         });
 
       if (error) throw error;
@@ -98,9 +125,9 @@ export function useNotificationHistory() {
   const clearClientHistory = async (clienteId: string) => {
     try {
       const { error } = await supabase
-        .from('notification_history')
+        .from('sent_notifications')
         .delete()
-        .eq('cliente_id', clienteId);
+        .eq('recipient_id', clienteId);
 
       if (error) throw error;
 

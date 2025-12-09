@@ -25,10 +25,20 @@ export function useCustomStatusBadges() {
       const { data, error } = await supabase
         .from('custom_status_badges')
         .select('*')
-        .order('name');
+        .order('label');
 
       if (error) throw error;
-      setBadges(data || []);
+      setBadges((data || []).map(b => ({
+        id: b.id,
+        name: b.label,
+        label: b.label,
+        description: b.description,
+        color: b.color,
+        icon_name: b.icon,
+        is_critical: false,
+        created_at: b.created_at,
+        updated_at: b.created_at,
+      })));
     } catch (error: any) {
       console.error('Erro ao carregar badges:', error);
       toast({
@@ -45,7 +55,14 @@ export function useCustomStatusBadges() {
     try {
       const { error } = await supabase
         .from('custom_status_badges')
-        .insert([badge]);
+        .insert({
+          status_key: badge.name.toLowerCase().replace(/\s+/g, '_'),
+          label: badge.label || badge.name,
+          description: badge.description,
+          color: badge.color,
+          icon: badge.icon_name,
+          is_active: true,
+        });
 
       if (error) throw error;
 

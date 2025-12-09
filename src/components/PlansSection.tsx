@@ -52,7 +52,10 @@ const PlansSection = () => {
           .order('display_order', { ascending: true });
 
         if (plansData && plansData.length > 0) {
-          setPlans(plansData);
+          setPlans(plansData.map(p => ({
+            ...p,
+            features: (p.features as string[] | null) || []
+          })));
         }
 
         // Buscar conteúdo da seção

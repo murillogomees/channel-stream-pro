@@ -36,12 +36,15 @@ export function useBadgeNotifications(adminId: string | null) {
         .from('admin_badge_notifications')
         .select('*')
         .eq('admin_id', adminId)
-        .order('earned_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      setNotifications((data || []).map(n => ({
+        ...n,
+        earned_at: n.created_at,
+      })));
       setUnreadCount((data || []).filter(n => !n.read_at).length);
     } catch (error) {
       console.error('Error loading badge notifications:', error);
