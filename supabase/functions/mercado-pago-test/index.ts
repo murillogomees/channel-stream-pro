@@ -9,14 +9,29 @@ async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { accessToken } = await req.json();
+    // Use environment variable first, fallback to request body
+    const envToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
+    
+    let accessToken = envToken;
+    
+    // Allow override from request body for testing specific tokens
+    try {
+      const body = await req.json();
+      if (body.accessToken && body.accessToken !== 'test' && body.accessToken !== 'will-use-env') {
+        accessToken = body.accessToken;
+      }
+    } catch {
+      // No body or invalid JSON - use env token
+    }
     
     if (!accessToken) {
       return new Response(
-        JSON.stringify({ error: 'Access token é obrigatório' }),
+        JSON.stringify({ error: 'Access token não configurado. Configure MERCADO_PAGO_ACCESS_TOKEN nas secrets.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[MercadoPago Test] Testing token (last 4 chars):', accessToken.slice(-4));
 
     // Call Mercado Pago API from server-side to avoid CORS
     const response = await fetch('https://api.mercadopago.com/users/me', {
@@ -28,22 +43,26 @@ async function handler(req: Request): Promise<Response> {
 
     if (response.ok) {
       const data = await response.json();
+      console.log('[MercadoPago Test] Success - User ID:', data.id);
       return new Response(
         JSON.stringify({ 
           success: true, 
           email: data.email, 
           id: data.id,
-          nickname: data.nickname 
+          nickname: data.nickname,
+          using_env: accessToken === envToken
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[MercadoPago Test] Auth failed:', errorData);
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Falha na autenticação',
-          details: errorData 
+          details: errorData,
+          token_hint: accessToken.slice(-4)
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
