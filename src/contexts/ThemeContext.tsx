@@ -16,7 +16,7 @@ interface ThemeContextType {
   isSyncing: boolean;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // Armazenar userId globalmente para evitar loop com AuthContext
 let cachedUserId: string | null = null;
