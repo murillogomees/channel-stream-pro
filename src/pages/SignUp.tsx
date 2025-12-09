@@ -95,7 +95,6 @@ export default function SignUp() {
       const validatedData = signUpSchema.parse(formData);
       
       // Criar usuário no Supabase Auth
-      // O trigger handle_new_user_complete vai criar profile, cliente, role e subscription
       const { data, error } = await supabase.auth.signUp({
         email: validatedData.email,
         password: validatedData.password,
@@ -112,6 +111,9 @@ export default function SignUp() {
       if (error) {
         if (error.message.includes("already registered")) {
           toast.error("Este email já está cadastrado. Tente fazer login.");
+        } else if (error.message.includes("Database error")) {
+          // Trigger removido - criar profile manualmente
+          toast.error("Erro no cadastro. Tente novamente.");
         } else {
           toast.error(error.message);
         }
@@ -119,6 +121,36 @@ export default function SignUp() {
       }
 
       if (data.user) {
+        // Criar profile manualmente (trigger foi removido)
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          email: validatedData.email,
+          nome: validatedData.nome,
+          contact_phone: validatedData.telefone.replace(/\D/g, ''),
+          origem_cadastro: validatedData.origem || 'Website',
+          cliente_ativo: true,
+          situacao: 'Testando',
+          data_vencimento: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          // Continua mesmo com erro - o perfil pode já existir
+        }
+
+        // Atribuir role de client
+        const { error: roleError } = await supabase.from('user_roles').insert({
+          user_id: data.user.id,
+          role: 'client'
+        });
+
+        if (roleError) {
+          console.error("Role assignment error:", roleError);
+          // Continua mesmo com erro - a role pode já existir
+        }
+
         toast.success(
           "Conta criada com sucesso! Complete seu perfil e escolha um plano.",
           { duration: 5000 }
