@@ -96,18 +96,31 @@ export default function Login() {
     setIsLoading(true);
     try {
       const validatedData = loginSchema.parse({ email, password });
+      
+      console.log('[Login] Tentando login com:', validatedData.email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
         password: validatedData.password
       });
+      
+      console.log('[Login] Resposta:', { data: !!data?.user, error });
+      
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
+        console.error('[Login] Erro completo:', JSON.stringify(error, null, 2));
+        
+        const errorMessage = error.message || JSON.stringify(error);
+        
+        if (errorMessage.includes("Invalid login credentials")) {
           toast.error("Email ou senha incorretos");
           setTimeout(() => logFailedLogin(validatedData.email), 0);
-        } else if (error.message.includes("Email not confirmed")) {
+        } else if (errorMessage.includes("Email not confirmed")) {
           toast.error("Por favor, confirme seu email antes de fazer login");
+        } else if (errorMessage.includes("fetch") || errorMessage.includes("network") || !errorMessage || errorMessage === '{}') {
+          toast.error("Erro de conexão com o servidor. Verifique sua internet.");
+          console.error('[Login] Possível erro de rede/CORS');
         } else {
-          toast.error(error.message);
+          toast.error(errorMessage || "Erro desconhecido ao fazer login");
         }
         return;
       }
@@ -124,11 +137,15 @@ export default function Login() {
         await refreshUser();
         await new Promise(resolve => setTimeout(resolve, 300));
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Login] Erro capturado:', error);
+      
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
+      } else if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
+        toast.error("Não foi possível conectar ao servidor de autenticação.");
       } else {
-        toast.error("Erro ao fazer login. Tente novamente.");
+        toast.error(error?.message || "Erro ao fazer login. Tente novamente.");
       }
     } finally {
       setIsLoading(false);
