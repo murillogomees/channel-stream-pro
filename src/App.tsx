@@ -1,6 +1,6 @@
 /**
  * Main App Component
- * @version 4.0.0 - Legacy Redirects Removed (Phase 2 Complete)
+ * @version 5.0.0 - Cleaned after M3U/Streaming removal
  */
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,8 +10,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ViewerProfileProvider } from "@/contexts/ViewerProfileContext";
-import { PlaylistProvider } from "@/contexts/PlaylistContext";
 import { webVitalsService } from "@/services/webVitalsService";
 import { useGlobalOrientationLock } from "@/hooks/useGlobalOrientationLock";
 
@@ -26,7 +24,6 @@ const SignUp = lazy(() => import("./pages/SignUp"));
 // ADMIN PAGES - Consolidated Hub Structure
 // ========================================
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
-const AdminM3UPage = lazy(() => import("./pages/admin/AdminM3UPage"));
 const AdminNotificacoesPage = lazy(() => import("./pages/admin/AdminNotificacoesPage"));
 const AdminSegurancaPage = lazy(() => import("./pages/admin/AdminSegurancaPage"));
 const AdminSistemaPage = lazy(() => import("./pages/admin/AdminSistemaPage"));
@@ -35,11 +32,7 @@ const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage"));
 const AdminRLSCoverage = lazy(() => import("./pages/AdminRLSCoverage"));
-const AdminCdn = lazy(() => import("./pages/AdminCdn"));
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
-const AdminR2MigrationPage = lazy(() => import("./pages/admin/AdminR2MigrationPage"));
-const AdminProfilesMigration = lazy(() => import("./pages/AdminProfilesMigration"));
-const AdminMigrationChecklistPage = lazy(() => import("./pages/admin/AdminMigrationChecklistPage"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
@@ -55,12 +48,9 @@ const CheckoutPending = lazy(() => import("./pages/CheckoutPending"));
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const AdminAffiliates = lazy(() => import("./pages/AdminAffiliates"));
 
-// IPTV App pages
-const AppEntry = lazy(() => import("./pages/AppEntry"));
-const AppPlayer = lazy(() => import("./pages/AppPlayer"));
+// Profile
 const UnifiedProfile = lazy(() => import("./pages/UnifiedProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
-const MyList = lazy(() => import("./pages/MyList"));
 
 // Initialize Web Vitals
 if (typeof window !== 'undefined') {
@@ -107,21 +97,18 @@ function AppContent() {
             <Route path="/afiliado" element={<ProtectedRoute><AffiliateDashboard /></ProtectedRoute>} />
             
             {/* ========================================
-                IPTV APP ROUTES
+                APP ROUTES
             ======================================== */}
-            <Route path="/app" element={<AppEntry />} />
+            <Route path="/app" element={<Navigate to="/login" replace />} />
             <Route path="/app/install" element={<AppInstall />} />
-            <Route path="/app/player" element={<ProtectedRoute requireValidAccess><AppPlayer /></ProtectedRoute>} />
             <Route path="/app/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
-            <Route path="/app/mylist" element={<ProtectedRoute requireValidAccess><MyList /></ProtectedRoute>} />
-            {/* tv-player removed - unified with /app/player */}
+            <Route path="/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
             
             {/* ========================================
                 ADMIN ROUTES - Consolidated Hubs
             ======================================== */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
-            <Route path="/admin/m3u" element={<ProtectedRoute requireAdmin><AdminM3UPage /></ProtectedRoute>} />
             <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoesPage /></ProtectedRoute>} />
             <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><AdminSegurancaPage /></ProtectedRoute>} />
             <Route path="/admin/sistema" element={<ProtectedRoute requireAdmin><AdminSistemaPage /></ProtectedRoute>} />
@@ -131,13 +118,9 @@ function AppContent() {
             <Route path="/admin/integracao" element={<ProtectedRoute requireAdmin><AdminIntegracaoPage /></ProtectedRoute>} />
             <Route path="/admin/migrations" element={<ProtectedRoute requireAdmin><AdminMigracoesPage /></ProtectedRoute>} />
             <Route path="/admin/rls-coverage" element={<ProtectedRoute requireAdmin><AdminRLSCoverage /></ProtectedRoute>} />
-            <Route path="/admin/cdn" element={<ProtectedRoute requireAdmin><AdminCdn /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
             <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
-            <Route path="/admin/migration/r2" element={<ProtectedRoute requireAdmin><AdminR2MigrationPage /></ProtectedRoute>} />
-            <Route path="/admin/migration/profiles" element={<ProtectedRoute requireAdmin><AdminProfilesMigration /></ProtectedRoute>} />
-            <Route path="/admin/migration/checklist" element={<ProtectedRoute requireAdmin><AdminMigrationChecklistPage /></ProtectedRoute>} />
             
             {/* Access denied & 404 */}
             <Route path="/403" element={<Forbidden />} />
@@ -152,13 +135,9 @@ const App = () => (
   <AuthProvider>
     <ThemeProvider>
       <TooltipProvider>
-        <ViewerProfileProvider>
-          <PlaylistProvider>
-            <Toaster />
-            <Sonner />
-            <AppContent />
-          </PlaylistProvider>
-        </ViewerProfileProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
       </TooltipProvider>
     </ThemeProvider>
   </AuthProvider>

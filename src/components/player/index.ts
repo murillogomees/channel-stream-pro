@@ -39,7 +39,6 @@ export { usePictureInPicture } from '@/hooks/usePictureInPicture';
 export { usePlayerKeyboardShortcuts } from '@/hooks/usePlayerKeyboardShortcuts';
 export { useResumePlayback } from '@/hooks/useResumePlayback';
 export { useChannelPreload } from '@/hooks/useChannelPreload';
-export { useChannelPreloadEffect } from '@/hooks/useChannelPreloadEffect';
 
 // Re-export pro player hooks
 export { useAudioTrackSelector } from '@/hooks/useAudioTrackSelector';
