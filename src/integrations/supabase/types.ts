@@ -4452,12 +4452,6 @@ export type Database = {
         Returns: undefined
       }
       run_complete_rls_audit: { Args: never; Returns: Json }
-      run_profiles_migration_batch:
-        | {
-            Args: { p_batch_size?: number; p_job_id: string; p_offset?: number }
-            Returns: Json
-          }
-        | { Args: { p_batch_size?: number; p_job_id: string }; Returns: Json }
       scan_schema_drift: {
         Args: never
         Returns: {
@@ -4500,23 +4494,10 @@ export type Database = {
           tvg_logo: string
         }[]
       }
-      toggle_feature_flag:
-        | {
-            Args: {
-              p_enabled: boolean
-              p_flag_name: string
-              p_percentage?: number
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              p_enabled: boolean
-              p_flag_name: string
-              p_percentage?: number
-            }
-            Returns: undefined
-          }
+      toggle_feature_flag: {
+        Args: { p_enabled: boolean; p_flag_name: string; p_percentage?: number }
+        Returns: undefined
+      }
       track_affiliate_click: {
         Args: {
           p_affiliate_id: string
