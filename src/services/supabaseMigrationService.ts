@@ -36,12 +36,12 @@ export interface MigrationVerificationResult {
 // SECURITY: Keys removed - use environment variables or Supabase secrets
 export const MIGRATION_CONFIG: MigrationConfig = {
   origin: {
-    url: 'https://sdvyxdghxqmntyoweqbd.supabase.co',
-    projectId: 'sdvyxdghxqmntyoweqbd'
+    url: 'https://supabase.iptvlink.com.br', // Self-hosted (current)
+    projectId: 'self-hosted'
   },
   destination: {
-    url: 'https://srv1182856.hstgr.cloud/',
-    host: '169.62.101.166',
+    url: 'https://supabase.iptvlink.com.br',
+    host: 'supabase.iptvlink.com.br',
     anonKey: '[CONFIGURE_VIA_ENV]', // Set via VITE_SUPABASE_PUBLISHABLE_KEY
     serviceKey: '[CONFIGURE_VIA_SECRETS]' // Set via Supabase Edge Function Secrets
   }

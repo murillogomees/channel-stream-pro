@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 interface ApiConfig {
   sandboxAccessToken: string;
@@ -206,7 +207,7 @@ export function MercadoPagoIntegration() {
 
     setCreatingUser(true);
     try {
-      const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/mercado-pago-test-users", {
+      const response = await fetch(`${SUPABASE_FUNCTIONS_URL}/mercado-pago-test-users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -250,7 +251,7 @@ export function MercadoPagoIntegration() {
 
     try {
       // Use edge function proxy to avoid CORS
-      const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/mercado-pago-test", {
+      const response = await fetch(`${SUPABASE_FUNCTIONS_URL}/mercado-pago-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessToken: token })

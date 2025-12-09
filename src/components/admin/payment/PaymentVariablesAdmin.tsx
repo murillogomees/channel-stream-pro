@@ -702,7 +702,7 @@ export function PaymentVariablesAdmin() {
                   </p>
                   <Input 
                     type="text" 
-                    value="https://sdvyxdghxqmntyoweqbd.supabase.co" 
+                    value="https://supabase.iptvlink.com.br" 
                     disabled 
                     className="font-mono text-xs"
                   />
@@ -731,15 +731,9 @@ export function PaymentVariablesAdmin() {
                 <p className="text-sm text-muted-foreground">
                   Gerenciar secrets no painel do Supabase
                 </p>
-                <Button variant="outline" size="sm" asChild>
-                  <a 
-                    href="https://supabase.com/dashboard/project/sdvyxdghxqmntyoweqbd/settings/functions" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Abrir Secrets
-                  </a>
+                <Button variant="outline" size="sm" disabled>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Self-Hosted (VPS)
                 </Button>
               </div>
             </CardContent>
