@@ -98,18 +98,35 @@ export default function Login() {
       const validatedData = loginSchema.parse({ email, password });
       
       console.log('[Login] Tentando login com:', validatedData.email);
+      console.log('[Login] Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'usando client.ts');
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
         password: validatedData.password
       });
       
-      console.log('[Login] Resposta:', { data: !!data?.user, error });
+      console.log('[Login] Resposta completa:', JSON.stringify({ 
+        hasUser: !!data?.user, 
+        hasSession: !!data?.session,
+        error: error ? { message: error.message, status: error.status, name: error.name } : null 
+      }, null, 2));
       
       if (error) {
-        console.error('[Login] Erro completo:', JSON.stringify(error, null, 2));
+        console.error('[Login] Erro detalhado:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         
-        const errorMessage = error.message || JSON.stringify(error);
+        const errorMessage = error.message || '';
+        const errorStatus = error.status;
+        
+        // Erro vazio ou status 0 indica problema de conexão/CORS
+        if (!errorMessage || errorMessage === '{}' || errorStatus === 0) {
+          toast.error("Erro de conexão com o servidor de autenticação. Verifique se o servidor está acessível.");
+          console.error('[Login] Possível problema de CORS ou servidor Auth inacessível');
+          return;
+        }
         
         if (errorMessage.includes("Invalid login credentials")) {
           toast.error("Email ou senha incorretos");
