@@ -2,9 +2,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const SUPABASE_URL = "https://srv1182856.hstgr.cloud";
+const SUPABASE_URL = "https://supabase.iptvlink.com.br";
 const SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY1MTcxNTA1LCJleHAiOjIwODA1MzE1MDV9.BAYUSQh54HYNqu0FEZmAKRAmfVvq4t0Qt2zqFBdrHBY";
+  "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0Dz";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
