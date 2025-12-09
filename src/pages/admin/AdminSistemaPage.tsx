@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag, RefreshCw, Cloud, Shield } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag, RefreshCw, Shield } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
@@ -20,7 +20,6 @@ import { MigrationStats } from "@/components/migrations/MigrationStats";
 import { MigrationScanner } from "@/components/admin/MigrationScanner";
 import { DriftFindingsTable } from "@/components/migrations/DriftFindingsTable";
 import { MigrationHistory } from "@/components/migrations/MigrationHistory";
-import { R2MigrationDashboard } from "@/components/admin/migration/R2MigrationDashboard";
 import { InteractiveRLSAuditPanel } from "@/components/admin/security/InteractiveRLSAuditPanel";
 
 export default function AdminSistemaPage() {
@@ -52,12 +51,6 @@ export default function AdminSistemaPage() {
       label: "RLS Audit",
       icon: <Shield className="h-4 w-4" />,
       content: <InteractiveRLSAuditPanel />
-    },
-    {
-      value: "r2",
-      label: "CDN R2",
-      icon: <Cloud className="h-4 w-4" />,
-      content: <R2MigrationDashboard />
     },
     {
       value: "backup",

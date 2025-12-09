@@ -1,34 +1,12 @@
 /**
- * Hooks Export
+ * Hooks Export - Cleaned after M3U/Streaming removal
  */
-
-// Streaming & Preloading
-export { useIntelligentPreload } from './useIntelligentPreload';
-export { useChannelPreloader } from './useChannelPreloader';
-export { useStreamAnalytics } from './useStreamAnalytics';
-export { useSegmentPrefetch } from './useSegmentPrefetch';
-
-// ABR (Adaptive Bitrate)
-export { useABR } from './useABR';
-
-// Player Analytics & Resume
-export { usePlayerAnalytics } from './usePlayerAnalytics';
-export { useResume } from './useResume';
-
-// Performance hooks (V2 is canonical)
-export { usePlayerPerformanceV2 } from './usePlayerPerformanceV2';
-export { useFastStartupV2 } from './useFastStartupV2';
-
-// Enhanced Player (unified hook)
-export { useEnhancedPlayer } from './useEnhancedPlayer';
 
 // Feature Flags
 export { 
   useFeatureFlags, 
   useEnhancedABR, 
-  useSegmentPrefetch as useSegmentPrefetchFlag,
   useResumeSupport,
-  usePlayerAnalytics as usePlayerAnalyticsFlag,
   useWebVitalsTracking,
   useTVOptimizations,
 } from './useFeatureFlags';
@@ -63,15 +41,9 @@ export { useFavorites } from './useFavorites';
 export type { FavoriteItem } from './useFavorites';
 
 // Re-export types
-export type { PreloadCandidate, PreloadReason } from '@/services/intelligentPreloadService';
-export type { QualityLevel, ABRStats, ABRMode, ABRConfig } from '@/services/abrService';
 export type { ConnectionInfo, ConnectionQuality } from '@/services/connectionService';
 export type { RecoveryStats, RecoveryConfig } from '@/services/errorRecoveryService';
 export type { WebVitalMetric, WebVitalsReport, MetricName } from '@/services/webVitalsService';
-export type { PredictionScore, PredictionReason, WarmingStats, CacheStats } from '@/services/cache';
-export type { ABRTuningConfig, ABRMetrics } from '@/services/enhancedABRService';
-export type { ResumeProgress } from '@/services/resumeService';
-export type { PlayerEventType, PlayerEvent } from '@/services/playerEventsService';
 export type { FeatureFlag } from '@/services/featureFlagsService';
 
 // Quality Levels
