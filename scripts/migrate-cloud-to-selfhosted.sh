@@ -35,7 +35,7 @@ SELFHOST_DB_HOST="supabase
 iptvlink.com.br"  # ou IP do VPS
 SELFHOST_DB_PORT="5432"
 SELFHOST_DB_NAME="postgres"
-SELFHOST_DB_USER="postgres"
+SELFHOST_DB_USER="supabase"
 SELFHOST_DB_PASSWORD="p72qeBb4xpFYLvg8dggpeJW08Q4xgR9A"
 
 # Diretório para dumps
