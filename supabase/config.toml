@@ -1,1 +1,372 @@
-project_id = "waxgowafohlrfoefwhsf"
+project_id = "sdvyxdghxqmntyoweqbd"
+
+[functions.get-r2-config]
+verify_jwt = false
+
+# CDN Router - Intelligent content routing for optimal performance
+[functions.cdn-router]
+verify_jwt = false
+
+[functions.playlist-sync]
+verify_jwt = false
+
+[functions.playlist-serve]
+verify_jwt = false
+
+# Admin-only function for listing users - requires authentication
+[functions.list-users]
+verify_jwt = true
+
+# Public endpoint for prospect registration - kept public with validation
+[functions.notify-prospect]
+verify_jwt = false
+
+# Public endpoint for secure signup with HIBP validation
+[functions.validate-password-signup]
+verify_jwt = false
+
+# Cron job for escalating security alerts - public for cron access with secret verification
+[functions.escalate-security-alerts]
+verify_jwt = false
+
+# Webhook endpoint - kept public with HMAC signature verification
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+# Admin-only function for M3U generation - JWT verificação feita dentro da função
+[functions.generate-m3u-file]
+verify_jwt = false
+
+[functions.fetch-m3u-url]
+verify_jwt = false
+
+# VOD download - public for internal calls with auth verification inside
+[functions.download-vod]
+verify_jwt = false
+
+[functions.schedule-vod-downloads]
+verify_jwt = false
+
+[functions.cleanup-old-vod]
+verify_jwt = false
+
+# Public endpoint for stream proxy - kept public with token verification
+[functions.stream-proxy]
+verify_jwt = false
+
+# Cron job for daily M3U regeneration - public for cron access with secret verification
+[functions.daily-m3u-regeneration]
+verify_jwt = false
+
+# Webhook endpoint - kept public with signature verification
+[functions.confirm-security-alert]
+verify_jwt = false
+
+# Admin-only function for checking playlist health - requires authentication
+[functions.check-playlist-health]
+verify_jwt = true
+
+# Cron job for alerting about inactive playlists - public for cron access with secret verification
+[functions.alert-inactive-playlists]
+verify_jwt = false
+
+# Cron job for daily expiration summary - public for cron access with secret verification
+[functions.daily-expiration-summary]
+verify_jwt = false
+
+# Cron job for weekly expiration summary - public for cron access with secret verification
+[functions.weekly-expiration-summary]
+verify_jwt = false
+
+# 2FA functions - require authentication
+[functions.generate-totp-secret]
+verify_jwt = true
+
+[functions.verify-totp-token]
+verify_jwt = true
+
+# Background processor for M3U imports - requires authentication
+[functions.process-m3u-import]
+verify_jwt = true
+
+# Cron job for calculating trending content - public for cron access
+[functions.calculate-trending]
+verify_jwt = false
+
+# TMDB metadata fetching - public for client access
+[functions.fetch-tmdb]
+verify_jwt = false
+
+# Admin-only function for creating admin users
+[functions.create-admin-user]
+verify_jwt = true
+
+# Admin-only function for updating user passwords
+[functions.update-user-password]
+verify_jwt = true
+
+# Admin-only function for batch creating client auth accounts
+[functions.create-client-auth-batch]
+verify_jwt = true
+
+# Backup clients cron job
+[functions.backup-clients]
+verify_jwt = false
+
+# Check M3U health cron job
+[functions.check-m3u-health]
+verify_jwt = false
+
+# Notification queue processing
+[functions.process-notification-queue]
+verify_jwt = false
+
+[functions.process-notification-retry-queue]
+verify_jwt = false
+
+[functions.schedule-daily-notifications]
+verify_jwt = false
+
+# ==========================================
+# M3U SYNC SYSTEM
+# ==========================================
+
+# M3U Sync API - public for cron access with internal secret verification
+[functions.m3u-sync]
+verify_jwt = false
+
+# M3U Playlist serving - public for client access
+[functions.m3u-playlist]
+verify_jwt = false
+
+# M3U Cron sync - public for cron access with secret verification
+[functions.m3u-cron-sync]
+verify_jwt = false
+
+# Generate M3U from sync entries and upload to CDN - auth verified inside
+[functions.generate-m3u-from-sync]
+verify_jwt = false
+
+# ==========================================
+# CLOUDFLARE STREAM INTEGRATION
+# ==========================================
+
+# Upload VODs to Cloudflare Stream - admin auth verified inside
+[functions.cf-stream-upload]
+verify_jwt = false
+
+# Webhook for Cloudflare Stream status updates
+[functions.cf-stream-webhook]
+verify_jwt = false
+
+# Scheduler for batch Stream uploads - cron/admin access
+[functions.cf-stream-scheduler]
+verify_jwt = false
+
+# ==========================================
+# TRANSCODE JOB QUEUE SYSTEM
+# ==========================================
+
+# Transcode processor - consumes jobs from queue
+[functions.transcode-processor]
+verify_jwt = false
+
+# Transcode webhook - receives Cloudflare callbacks
+[functions.transcode-webhook]
+verify_jwt = false
+
+# ==========================================
+# R2 CDN INFRASTRUCTURE
+# ==========================================
+
+# CDN Token generation and verification
+[functions.cdn-token]
+verify_jwt = false
+
+# Cache Invalidation - admin-only endpoint for purging cache
+[functions.cache-invalidate]
+verify_jwt = true
+
+# CDN Prewarm - nightly edge cache warming
+[functions.cdn-prewarm]
+verify_jwt = false
+
+# R2 Upload - content upload to R2
+[functions.r2-upload]
+verify_jwt = false
+
+# R2 Scheduler - intelligent content routing scheduler
+[functions.r2-scheduler]
+verify_jwt = false
+
+# ==========================================
+# MERCADO PAGO PAYMENT INTEGRATION
+# ==========================================
+
+# Mercado Pago webhook - public with signature verification
+[functions.mercado-pago-webhook]
+verify_jwt = false
+
+# Mercado Pago checkout - requires user authentication
+[functions.mercado-pago-checkout]
+verify_jwt = false
+
+# Mercado Pago API test - public endpoint for testing connection
+[functions.mercado-pago-test]
+verify_jwt = false
+
+# Mercado Pago test users - public endpoint
+[functions.mercado-pago-test-users]
+verify_jwt = false
+
+# ==========================================
+# PLAYBACK ACCESS CONTROL
+# ==========================================
+
+# Playback token generation and validation
+[functions.playback-token]
+verify_jwt = false
+
+# Player events analytics
+[functions.player-events]
+verify_jwt = false
+
+# ==========================================
+# QA, PERFORMANCE & SECURITY (Phase 7)
+# ==========================================
+
+# QA Validation - comprehensive system checks
+[functions.qa-validation]
+verify_jwt = false
+
+# Security Audit - pentest and security analysis
+[functions.security-audit]
+verify_jwt = false
+
+# ==========================================
+# CHECKOUT WITH REGISTRATION
+# ==========================================
+
+# Checkout with user registration - public for new users
+[functions.checkout-with-registration]
+verify_jwt = false
+
+# ==========================================
+# SECRET VERIFICATION
+# ==========================================
+
+# Check secrets configuration - requires admin JWT
+[functions.check-secrets]
+verify_jwt = true
+
+# ==========================================
+# CDN BULK DOWNLOAD SYSTEM
+# ==========================================
+
+# Bulk content downloader
+[functions.cdn-bulk-downloader]
+verify_jwt = false
+
+# Content downloader individual
+[functions.cdn-content-downloader]
+verify_jwt = false
+
+# Scheduled download cron job
+[functions.cdn-scheduled-download]
+verify_jwt = false
+
+# R2 connection test
+[functions.test-r2-connection]
+verify_jwt = false
+
+# R2 list objects test - dedicated debugging endpoint
+[functions.list-objects-test]
+verify_jwt = false
+
+# ==========================================
+# M3U CLEANING & PLAYLIST MANAGEMENT
+# ==========================================
+
+# Clean and sanitize M3U playlists - public with optional auth
+[functions.clean-m3u]
+verify_jwt = false
+
+# Playlists REST API - CRUD operations with RBAC
+[functions.playlists]
+verify_jwt = false
+
+# Archive playlists - monthly cron job for tar.gz compression
+[functions.archive-playlists]
+verify_jwt = false
+
+# Clean sync entries - analyze and remove duplicates/invalid from synced sources
+[functions.clean-sync-entries]
+verify_jwt = false
+
+# M3U Clean Advanced - analyze, preview and clean with configurable rules
+[functions.m3u-clean-advanced]
+verify_jwt = false
+
+# ==========================================
+# STORAGE INTEGRATION (R2 ↔ CF Stream)
+# ==========================================
+
+# R2 to CF Stream auto-sync trigger
+[functions.r2-to-cfstream-trigger]
+verify_jwt = false
+
+# Consolidated storage report
+[functions.get-storage-report]
+verify_jwt = false
+
+# ==========================================
+# M3U INGEST STREAM-SAFE SYSTEM
+# ==========================================
+
+# R2 Signed Upload URL generator - requires admin auth
+[functions.r2-signed-upload]
+verify_jwt = false
+
+# M3U Ingest orchestrator - streaming with fallback
+[functions.m3u-ingest]
+verify_jwt = false
+
+# ==========================================
+# IPTV PLAYER API
+# ==========================================
+
+# IPTV Play - returns signed URL with CDN list
+[functions.iptv-play]
+verify_jwt = true
+
+# IPTV Playlist - returns M3U/JSON playlist
+[functions.iptv-playlist]
+verify_jwt = true
+
+# IPTV EPG - returns program guide data
+[functions.iptv-epg]
+verify_jwt = false
+
+# ==========================================
+# HYBRID CDN ARCHITECTURE
+# ==========================================
+
+# Generate lightweight playlist JSON for CDN
+[functions.playlist-cdn-generate]
+verify_jwt = true
+
+# Resolve stream URL on-demand when user plays
+[functions.stream-url-resolve]
+verify_jwt = false
+
+# ==========================================
+# R2 MIGRATION SYSTEM
+# ==========================================
+
+# R2 Migration Worker - batch migration processor
+[functions.r2-migration-worker]
+verify_jwt = false
+
+# R2 Upload Proxy - handles signed uploads to R2
+[functions.r2-upload-proxy]
+verify_jwt = false
