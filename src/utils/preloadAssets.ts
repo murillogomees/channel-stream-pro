@@ -11,7 +11,7 @@ export function preloadCriticalAssets() {
   
   // Preconnect to external resources that will be needed
   const connections = [
-    'https://sdvyxdghxqmntyoweqbd.supabase.co'
+    'https://supabase.iptvlink.com.br'
   ];
   
   connections.forEach((url) => {

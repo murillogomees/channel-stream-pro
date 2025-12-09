@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppRole } from "@/types/auth";
+import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 interface AdminUser {
   id: string;
@@ -100,7 +101,7 @@ const AdminCreateUser = () => {
       if (!session) return;
 
       const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/list-users`,
+        `${SUPABASE_FUNCTIONS_URL}/list-users`,
         {
           method: "GET",
           headers: {
@@ -179,7 +180,7 @@ const AdminCreateUser = () => {
       }
 
       const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/create-admin-user`,
+        `${SUPABASE_FUNCTIONS_URL}/create-admin-user`,
         {
           method: "POST",
           headers: {
@@ -311,7 +312,7 @@ const AdminCreateUser = () => {
       // Update password if provided (via edge function)
       if (editFormData.newPassword && editFormData.newPassword.length >= 8) {
         const response = await fetch(
-          `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/update-user-password`,
+          `${SUPABASE_FUNCTIONS_URL}/update-user-password`,
           {
             method: "POST",
             headers: {

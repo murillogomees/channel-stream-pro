@@ -20,6 +20,7 @@ import { Search, RefreshCw, Edit, Trash2, Shield, User, Mail, Phone, Calendar, D
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AdminUserForm } from '@/components/admin/AdminUserForm';
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 
 interface UserWithRole extends UnifiedProfile {
   roles: string[];
@@ -268,7 +269,7 @@ export default function AdminUserList() {
 
       // Always create user with 'client' role
       const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/create-admin-user`,
+        `${SUPABASE_FUNCTIONS_URL}/create-admin-user`,
         {
           method: 'POST',
           headers: {

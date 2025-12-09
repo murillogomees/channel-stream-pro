@@ -59,7 +59,7 @@ export async function resolveStream(
     const token = session.data.session?.access_token || '';
     
     // Fetch single channel stream from server
-    const response = await fetch('https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/fetch-m3u-url', {
+    const response = await fetch('https://supabase.iptvlink.com.br/functions/v1/fetch-m3u-url', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

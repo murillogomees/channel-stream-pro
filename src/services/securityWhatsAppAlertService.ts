@@ -216,8 +216,7 @@ class SecurityWhatsAppAlertService {
    * Formata mensagem com botões de ação interativos
    */
   private formatMessageWithActions(message: string, eventId: string, adminId: string): string {
-    const projectId = 'sdvyxdghxqmntyoweqbd';
-    const webhookUrl = `https://${projectId}.supabase.co/functions/v1/whatsapp-webhook`;
+    const webhookUrl = 'https://supabase.iptvlink.com.br/functions/v1/whatsapp-webhook';
     
     // Adicionar instruções de ação
     const actionsText = `
@@ -244,9 +243,8 @@ ${this.generateConfirmationLink(eventId, adminId)}
    * Gera link de confirmação para o alerta
    */
   private generateConfirmationLink(eventId: string, adminId: string): string {
-    // Usar o edge function em vez de link local
-    const projectId = 'sdvyxdghxqmntyoweqbd';
-    return `https://${projectId}.supabase.co/functions/v1/confirm-security-alert?deliveryId=${eventId}&adminId=${adminId}`;
+    // Usar o edge function
+    return `https://supabase.iptvlink.com.br/functions/v1/confirm-security-alert?deliveryId=${eventId}&adminId=${adminId}`;
   }
 
   /**

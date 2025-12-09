@@ -27,7 +27,7 @@ This function accepts M3U playlists in multiple formats, processes them through 
 curl -X POST \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -F "file=@playlist.m3u" \
-  "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/clean-m3u"
+  "https://supabase.iptvlink.com.br/functions/v1/clean-m3u"
 ```
 
 **2. URL Fetch (JSON)**
@@ -37,7 +37,7 @@ curl -X POST \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/playlist.m3u"}' \
-  "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/clean-m3u"
+  "https://supabase.iptvlink.com.br/functions/v1/clean-m3u"
 ```
 
 **3. Raw Content (JSON)**
@@ -47,7 +47,7 @@ curl -X POST \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{"m3u": "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://example.com/stream.m3u8"}' \
-  "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/clean-m3u"
+  "https://supabase.iptvlink.com.br/functions/v1/clean-m3u"
 ```
 
 #### Query Parameters
@@ -67,7 +67,7 @@ curl -X POST \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/playlist.m3u"}' \
-  "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/clean-m3u?skipProbe=true&maxChannels=500"
+  "https://supabase.iptvlink.com.br/functions/v1/clean-m3u?skipProbe=true&maxChannels=500"
 ```
 
 #### Response (JSON mode)
