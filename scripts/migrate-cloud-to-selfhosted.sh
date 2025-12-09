@@ -31,7 +31,7 @@ CLOUD_DB_USER="postgres"
 CLOUD_DB_PASSWORD="w84qlQZGTfadDI4M"  # Obtenha em: https://supabase.com/dashboard/project/sdvyxdghxqmntyoweqbd/settings/database
 
 # Self-Hosted (destino)
-SELFHOST_DB_HOST="https://supabase
+SELFHOST_DB_HOST="supabase
 iptvlink.com.br"  # ou IP do VPS
 SELFHOST_DB_PORT="5432"
 SELFHOST_DB_NAME="postgres"
