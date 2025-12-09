@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 
 interface SearchResult {
   id: string;
@@ -76,7 +77,7 @@ export function useBackendSearch(options: UseBackendSearchOptions = {}) {
       }
 
       const response = await fetch(
-        `https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/playlist-serve/search?${params}`,
+        `${SUPABASE_FUNCTIONS_URL}/playlist-serve/search?${params}`,
         {
           headers: { 'Authorization': `Bearer ${token}` },
           signal: controller.signal,

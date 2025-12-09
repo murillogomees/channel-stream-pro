@@ -10,7 +10,7 @@
  * - Métricas de performance
  */
 
-const SUPABASE_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
+import { SUPABASE_URL } from "@/config/supabase";
 
 interface OptimizedStreamResult {
   url: string;

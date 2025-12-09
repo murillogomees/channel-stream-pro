@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 export interface PlaybackToken {
   token: string;
@@ -27,7 +28,7 @@ export interface TokenValidation {
 }
 
 class PlaybackTokenService {
-  private functionUrl = "https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1";
+  private functionUrl = SUPABASE_FUNCTIONS_URL;
   private tokenCache: Map<string, { token: PlaybackToken; expiresAt: number }> = new Map();
   private refreshThreshold = 5 * 60 * 1000; // Refresh 5 min before expiry
 

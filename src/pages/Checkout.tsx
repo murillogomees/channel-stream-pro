@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import logoWhite from "@/assets/logo-white.png";
+import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 // Opções de origem do cadastro
 const DISCOVERY_OPTIONS = [
@@ -282,7 +283,7 @@ export default function Checkout() {
 
     setIsProcessing(true);
     try {
-      const response = await fetch("https://sdvyxdghxqmntyoweqbd.supabase.co/functions/v1/checkout-with-registration", {
+      const response = await fetch(`${SUPABASE_FUNCTIONS_URL}/checkout-with-registration`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
