@@ -1,10 +1,13 @@
 import { Toaster as Sonner, toast } from "sonner";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useContext } from "react";
+import { ThemeContext } from "@/contexts/ThemeContext";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme } = useTheme();
+  // Use context directly with fallback to avoid crash when outside ThemeProvider
+  const themeContext = useContext(ThemeContext);
+  const theme = themeContext?.theme || 'dark';
   
   // Map our themes to sonner's expected values
   const sonnerTheme = theme === 'dark' || theme === 'high-contrast' ? 'dark' : 'light';
