@@ -28,10 +28,11 @@ CLOUD_DB_HOST="db.sdvyxdghxqmntyoweqbd.supabase.co"
 CLOUD_DB_PORT="5432"
 CLOUD_DB_NAME="postgres"
 CLOUD_DB_USER="postgres"
-CLOUD_DB_PASSWORD="SUA_SENHA_DO_CLOUD"  # Obtenha em: https://supabase.com/dashboard/project/sdvyxdghxqmntyoweqbd/settings/database
+CLOUD_DB_PASSWORD="w84qlQZGTfadDI4M"  # Obtenha em: https://supabase.com/dashboard/project/sdvyxdghxqmntyoweqbd/settings/database
 
 # Self-Hosted (destino)
-SELFHOST_DB_HOST="localhost"  # ou IP do VPS
+SELFHOST_DB_HOST="https://supabase
+iptvlink.com.br"  # ou IP do VPS
 SELFHOST_DB_PORT="5432"
 SELFHOST_DB_NAME="postgres"
 SELFHOST_DB_USER="postgres"
