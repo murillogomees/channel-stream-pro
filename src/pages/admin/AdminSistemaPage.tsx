@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, History, Tag, RefreshCw, Shield } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, History, Tag, Shield } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
@@ -14,11 +14,6 @@ import AdminStatusHistory from "../AdminStatusHistory";
 import AdminCustomStatusBadges from "../AdminCustomStatusBadges";
 import AdminHomepageEditor from "../AdminHomepageEditor";
 import AdminPlansManager from "../AdminPlansManager";
-import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
-import { MigrationStats } from "@/components/migrations/MigrationStats";
-import { MigrationScanner } from "@/components/admin/MigrationScanner";
-import { DriftFindingsTable } from "@/components/migrations/DriftFindingsTable";
-import { MigrationHistory } from "@/components/migrations/MigrationHistory";
 import { InteractiveRLSAuditPanel } from "@/components/admin/security/InteractiveRLSAuditPanel";
 
 export default function AdminSistemaPage() {
@@ -30,20 +25,6 @@ export default function AdminSistemaPage() {
       label: "Health",
       icon: <Heart className="h-4 w-4" />,
       content: <AdminSystemHealth />
-    },
-    {
-      value: "migrations",
-      label: "Migrações",
-      icon: <RefreshCw className="h-4 w-4" />,
-      content: (
-        <div className="space-y-6">
-          <MigrationStats />
-          <MigrationDashboard />
-          <MigrationScanner />
-          <DriftFindingsTable />
-          <MigrationHistory />
-        </div>
-      )
     },
     {
       value: "rls-audit",
@@ -92,7 +73,7 @@ export default function AdminSistemaPage() {
   return (
     <AdminShell 
       title="Configurações do Sistema"
-      description="Saúde, migrações, backup, customização e variáveis"
+      description="Saúde, backup, customização e configurações"
     >
       <ResponsiveTabs
         defaultValue="health"
