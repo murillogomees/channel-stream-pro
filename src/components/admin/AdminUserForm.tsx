@@ -86,15 +86,15 @@ const SectionHeader = ({ icon, title, description, variant = 'primary', badge }:
 
   return (
     <div className={cn(
-      "flex items-center gap-4 p-4 rounded-lg border bg-gradient-to-r",
+      "flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border bg-gradient-to-r",
       variants[variant]
     )}>
       <div className={cn("flex-shrink-0", iconColors[variant])}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm sm:text-base font-semibold tracking-tight">{title}</h3>
           {badge && (
             <Badge variant="secondary" className="text-xs">
               {badge}
@@ -102,7 +102,7 @@ const SectionHeader = ({ icon, title, description, variant = 'primary', badge }:
           )}
         </div>
         {description && (
-          <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">{description}</p>
         )}
       </div>
     </div>
@@ -117,7 +117,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
   const canEditRole = currentUserRole === 'master';
 
   return (
-    <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
+    <div className="space-y-4 sm:space-y-6 py-2">
       {/* ID do Usuário (apenas em modo edição) */}
       {isEdit && formData.id && (
         <div className="bg-muted/30 border border-border rounded-lg p-4">
@@ -142,7 +142,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           variant="primary"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="nome" className="text-sm font-medium flex items-center gap-2">
               Nome Completo
@@ -153,7 +153,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               value={formData.nome || ''}
               onChange={(e) => updateField('nome', e.target.value)}
               placeholder="Digite o nome completo"
-              className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
+              className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12"
             />
           </div>
 
@@ -170,7 +170,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
                 value={formData.email || ''}
                 onChange={(e) => updateField('email', e.target.value)}
                 placeholder="email@exemplo.com"
-                className="transition-all focus:ring-2 focus:ring-primary/20 h-12"
+                className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12"
               />
             </div>
           )}
@@ -186,7 +186,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               onChange={(value) => updateField('contact_phone', value)}
               mask="brazilian"
               placeholder="(11) 99999-9999"
-              className="transition-all focus:ring-2 focus:ring-success/20 h-12"
+              className="transition-all focus:ring-2 focus:ring-success/20 h-11 sm:h-12"
             />
             <p className="text-xs text-muted-foreground mt-1">
               💡 Número principal para contato e notificações WhatsApp
@@ -199,7 +199,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               Como Conheceu?
             </Label>
             <Select value={formData.origem_cadastro || ''} onValueChange={(value) => updateField('origem_cadastro', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-12">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12">
                 <SelectValue placeholder="Selecione a origem" />
               </SelectTrigger>
               <SelectContent>
@@ -227,12 +227,12 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           variant="success"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="cliente_ativo" className="text-sm font-medium">
               Cliente Ativo
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-12">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-11 sm:h-12">
               <Switch
                 id="cliente_ativo"
                 checked={formData.cliente_ativo || false}
@@ -252,7 +252,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               Situação
             </Label>
             <Select value={formData.situacao || ''} onValueChange={(value) => updateField('situacao', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-success/20 h-12">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-success/20 h-11 sm:h-12">
                 <SelectValue placeholder="Selecione a situação" />
               </SelectTrigger>
               <SelectContent>
@@ -279,13 +279,13 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           variant="info"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="plano" className="text-sm font-medium">
               Plano de Assinatura
             </Label>
             <Select value={formData.plano || ''} onValueChange={(value) => updateField('plano', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-12">
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-11 sm:h-12">
                 <SelectValue placeholder="Selecione o plano" />
               </SelectTrigger>
               <SelectContent>
@@ -305,15 +305,16 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                 R$
               </span>
-              <Input
-                id="valor_pago"
-                type="number"
-                step="0.01"
-                min="0"
+                <Input
+                  id="valor_pago"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
                 value={formData.valor_pago || ''}
                 onChange={(e) => updateField('valor_pago', parseFloat(e.target.value) || 0)}
                 placeholder="0,00"
-                className="pl-10 transition-all focus:ring-2 focus:ring-blue-500/20 h-12"
+                className="pl-10 transition-all focus:ring-2 focus:ring-blue-500/20 h-11 sm:h-12"
               />
             </div>
           </div>
@@ -323,8 +324,8 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               Forma de Pagamento
             </Label>
             <Select value={formData.forma_ultimo_pagamento || ''} onValueChange={(value) => updateField('forma_ultimo_pagamento', value)}>
-              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-12">
-                <SelectValue placeholder="Selecione a forma de pagamento" />
+              <SelectTrigger className="transition-all focus:ring-2 focus:ring-blue-500/20 h-11 sm:h-12">
+                <SelectValue placeholder="Forma de pagamento" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PIX">💳 PIX</SelectItem>
@@ -339,9 +340,9 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
 
           <div className="space-y-2">
             <Label htmlFor="is_recorrente" className="text-sm font-medium">
-              Pagamento Recorrente
+              Recorrente
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-12">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card h-11 sm:h-12">
               <Switch
                 id="is_recorrente"
                 checked={formData.is_recorrente || false}
@@ -351,7 +352,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
                 "text-sm font-medium transition-colors",
                 formData.is_recorrente ? "text-success" : "text-muted-foreground"
               )}>
-                {formData.is_recorrente ? '✅ Sim' : '❌ Não'}
+                {formData.is_recorrente ? 'Sim' : 'Não'}
               </span>
             </div>
           </div>
@@ -369,7 +370,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           variant="warning"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pl-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium">Data de Contratação</Label>
             <DatePicker
@@ -413,7 +414,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
           variant="secondary"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {canEditRole && (
             <div className="space-y-2">
               <Label htmlFor="user_role" className="text-sm font-medium flex items-center gap-2">
@@ -422,7 +423,7 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
                 <Badge variant="outline" className="text-xs">Somente Master</Badge>
               </Label>
               <Select value={formData.user_role || 'client'} onValueChange={(value: any) => updateField('user_role', value)}>
-                <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-12">
+                <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12">
                   <SelectValue placeholder="Selecione a função" />
                 </SelectTrigger>
                 <SelectContent>
