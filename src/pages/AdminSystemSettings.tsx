@@ -4,7 +4,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminSystemHealth from "./AdminSystemHealth";
 import AdminBackupSystem from "./AdminBackupSystem";
 import AdminCustomize from "./AdminCustomize";
-import AdminVariables from "./AdminVariables";
 import AdminStatusHistory from "./AdminStatusHistory";
 import AdminCustomStatusBadges from "./AdminCustomStatusBadges";
 import { MigrationDashboard } from "@/components/admin/MigrationDashboard";
@@ -41,9 +40,6 @@ export default function AdminSystemSettings() {
             <TabsTrigger value="customize" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Customizar
             </TabsTrigger>
-            <TabsTrigger value="variables" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-              Variáveis
-            </TabsTrigger>
             <TabsTrigger value="history" className="flex-shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
               Histórico
             </TabsTrigger>
@@ -78,10 +74,6 @@ export default function AdminSystemSettings() {
 
         <TabsContent value="customize" className="space-y-4 mt-4">
           <AdminCustomize />
-        </TabsContent>
-
-        <TabsContent value="variables" className="space-y-4 mt-4">
-          <AdminVariables />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4 mt-4">
