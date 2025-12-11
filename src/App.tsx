@@ -35,6 +35,10 @@ const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage")
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
 const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupabaseIntegrationPage"));
 
+// IPTV Management Pages
+const AdminIPTVChannels = lazy(() => import("./pages/admin/AdminIPTVChannels"));
+const AdminIPTVPlaylists = lazy(() => import("./pages/admin/AdminIPTVPlaylists"));
+
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
@@ -123,6 +127,10 @@ function AppContent() {
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
 <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
             <Route path="/admin/supabase-integration" element={<ProtectedRoute requireAdmin><AdminSupabaseIntegrationPage /></ProtectedRoute>} />
+            
+            {/* IPTV Management */}
+            <Route path="/admin/iptv/channels" element={<ProtectedRoute requireAdmin><AdminIPTVChannels /></ProtectedRoute>} />
+            <Route path="/admin/iptv/playlists" element={<ProtectedRoute requireAdmin><AdminIPTVPlaylists /></ProtectedRoute>} />
             
             {/* Access denied & 404 */}
             <Route path="/403" element={<Forbidden />} />
