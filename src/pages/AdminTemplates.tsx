@@ -94,6 +94,16 @@ export default function AdminTemplates() {
     error?: string;
     formatted?: string;
   }>({ isValid: true });
+  
+  // Template Variables State
+  const [templateVars, setTemplateVars] = useState<Record<string, string>>(() => {
+    const stored = localStorage.getItem('notification_template_vars');
+    return stored ? JSON.parse(stored) : {
+      linkPagamento: '',
+      empresaNome: 'IPTV LINK',
+      suporte: '',
+    };
+  });
 
   // Setup realtime
   useEffect(() => {
@@ -520,89 +530,107 @@ export default function AdminTemplates() {
           </CardContent>
         </Card>
 
+        {/* Variáveis de Template */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Variáveis Disponíveis</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Variáveis de Template
+            </CardTitle>
             <CardDescription>
-              Use estas variáveis nas mensagens com chaves duplas, ex: {`{{nome}}`}
+              Configure os valores padrão das variáveis usadas nos templates de notificação
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{nome}}`}</code>
+            {/* Variáveis Dinâmicas (do cliente) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Variáveis Automáticas (dados do cliente)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {[
+                  { var: '{nome}', desc: 'Nome do cliente' },
+                  { var: '{plano}', desc: 'Plano contratado' },
+                  { var: '{valor}', desc: 'Valor pago' },
+                  { var: '{dataVencimento}', desc: 'Data de vencimento' },
+                  { var: '{email}', desc: 'E-mail do cliente' },
+                  { var: '{telefone}', desc: 'Telefone do cliente' },
+                  { var: '{diasRestantes}', desc: 'Dias até vencer' },
+                  { var: '{dataContratacao}', desc: 'Data contratação' },
+                ].map((item) => (
+                  <div
+                    key={item.var}
+                    className="p-2 border rounded-lg bg-muted/30 flex items-center justify-between"
+                  >
+                    <div>
+                      <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{item.var}</code>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{email}}`}</code>
+              <p className="text-xs text-muted-foreground">
+                Estas variáveis são preenchidas automaticamente com os dados de cada cliente.
+              </p>
+            </div>
+
+            {/* Variáveis Configuráveis */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-medium">Variáveis Configuráveis</Label>
+              
+              {/* Link de Pagamento */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{linkPagamento}'}</code>
+                  <span className="text-sm text-muted-foreground">Link PIX/Pagamento</span>
+                </div>
+                <Input
+                  value={templateVars.linkPagamento}
+                  onChange={(e) => {
+                    const updated = { ...templateVars, linkPagamento: e.target.value };
+                    setTemplateVars(updated);
+                    localStorage.setItem('notification_template_vars', JSON.stringify(updated));
+                  }}
+                  placeholder="Ex: pix@iptvlink.com.br ou link do mercado pago"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{celular}}`}</code>
+
+              {/* Nome da Empresa */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{empresaNome}'}</code>
+                  <span className="text-sm text-muted-foreground">Nome da empresa</span>
+                </div>
+                <Input
+                  value={templateVars.empresaNome}
+                  onChange={(e) => {
+                    const updated = { ...templateVars, empresaNome: e.target.value };
+                    setTemplateVars(updated);
+                    localStorage.setItem('notification_template_vars', JSON.stringify(updated));
+                  }}
+                  placeholder="Ex: IPTV LINK"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{plano}}`}</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{valor}}`}</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{data_vencimento}}`}</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{dias_restantes}}`}</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{chave_pix}}`}</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-primary flex-shrink-0" />
-                <code className="bg-muted px-2 py-1 rounded text-xs sm:text-sm">{`{{link_pagamento}}`}</code>
+
+              {/* Suporte */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{suporte}'}</code>
+                  <span className="text-sm text-muted-foreground">Contato do suporte</span>
+                </div>
+                <Input
+                  value={templateVars.suporte}
+                  onChange={(e) => {
+                    const updated = { ...templateVars, suporte: e.target.value };
+                    setTemplateVars(updated);
+                    localStorage.setItem('notification_template_vars', JSON.stringify(updated));
+                  }}
+                  placeholder="Ex: (61) 99999-9999 ou suporte@iptvlink.com.br"
+                />
               </div>
             </div>
 
-            {testPhoneNumber && (
-              <div className={`border p-3 rounded-lg ${
-                testPhoneValidation.isValid 
-                  ? 'bg-blue-500/10 border-blue-500/20' 
-                  : 'bg-red-500/10 border-red-500/20'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className={`flex items-center gap-2 ${
-                    testPhoneValidation.isValid 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : 'text-red-600 dark:text-red-400'
-                  }`}>
-                    {testPhoneValidation.isValid ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {testPhoneValidation.isValid ? (
-                        <>Teste: <span className="font-mono">{testPhoneValidation.formatted}</span></>
-                      ) : (
-                        <>Número inválido: {testPhoneValidation.error}</>
-                      )}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/admin/notificacoes')}
-                    className="text-xs"
-                  >
-                    {testPhoneValidation.isValid ? 'Alterar' : 'Corrigir'}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground pt-2 border-t">
+              💡 Dica: Use as variáveis com chaves simples nos seus templates, ex: {'{nome}'}, {'{dataVencimento}'}
+            </p>
           </CardContent>
         </Card>
 
