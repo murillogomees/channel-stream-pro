@@ -3,7 +3,7 @@
  * Uses whatsapp_config and admin_phones tables
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { WhatsAppCredentials } from './WhatsAppClient';
 
 export interface NotificationConfig {

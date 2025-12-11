@@ -33,7 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2, Plus, ArrowLeft, MessageSquare, Clock, Paperclip, X, FileIcon, Filter, Download, Users, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
 import { getDaysUntilDue } from '@/services/notificationScheduler';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,

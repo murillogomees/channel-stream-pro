@@ -11,7 +11,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, UnifiedUser, AppRole, SubscriptionStatusType } from '@/types/auth';
 import { authLoggingService } from '@/services/authLoggingService';
 import { authCache } from '@/services/authCacheService';

@@ -8,7 +8,7 @@ import { WhatsappTemplate } from '@/types/whatsapp';
 import { DEFAULT_TEMPLATES } from '@/constants/defaultTemplates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export class TemplateEngine {
   private templatesCache: WhatsappTemplate[] | null = null;

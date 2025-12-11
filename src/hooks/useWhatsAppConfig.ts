@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { WhatsAppConfig, TestContact } from '@/types/whatsapp';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 const DEFAULT_CONFIG: WhatsAppConfig = {
   appkey: '',

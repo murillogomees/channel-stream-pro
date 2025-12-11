@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useEffect, useState, type FC, type ReactNode } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export type Theme = 'dark' | 'light' | 'sepia' | 'high-contrast';
 

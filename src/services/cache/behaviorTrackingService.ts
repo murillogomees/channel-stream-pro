@@ -7,7 +7,7 @@
  * Collects patterns like viewing times, channel sequences, and session context.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 // =============================================================================
 // TYPES

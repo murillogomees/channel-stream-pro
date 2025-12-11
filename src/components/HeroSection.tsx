@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import logoWhite from "@/assets/logo-white.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { trackEvent } from "@/services/metaPixelService";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HeroContent {
   description: string;

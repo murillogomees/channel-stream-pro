@@ -3,7 +3,7 @@
  * Handles checkout and subscription management
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 export interface CheckoutResponse {

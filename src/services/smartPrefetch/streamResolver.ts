@@ -3,7 +3,7 @@
  * Resolves stream URLs on-demand when user presses play
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import type { StreamResolution } from './types';
 
 // In-memory cache for resolved streams (short TTL)

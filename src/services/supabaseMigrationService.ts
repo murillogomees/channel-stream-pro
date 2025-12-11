@@ -3,7 +3,7 @@
  * Handles Cloud to Self-Hosted migration verification and configuration
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MigrationConfig {
   origin: {

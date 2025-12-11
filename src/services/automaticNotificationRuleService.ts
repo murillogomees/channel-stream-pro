@@ -3,7 +3,7 @@
  * Uses auto_notifications table - aligned with types/automaticNotification.ts
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import type { AutomaticNotificationRule, CreateNotificationRuleInput, UpdateNotificationRuleInput } from '@/types/automaticNotification';
 
 export class AutomaticNotificationRuleService {

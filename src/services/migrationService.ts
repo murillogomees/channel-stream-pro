@@ -3,7 +3,7 @@
  * Basic migration tracking using migration_audit table
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MigrationAuditEntry {
   id: string;

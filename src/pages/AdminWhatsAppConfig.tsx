@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { WhatsAppService } from '@/services/whatsapp';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, CheckCircle2, Loader2, Key, Shield, MessageSquare, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';

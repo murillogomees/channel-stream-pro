@@ -3,7 +3,7 @@
  * Uses ip_blacklist table (existing schema only)
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface IPBlock {
   id: string;

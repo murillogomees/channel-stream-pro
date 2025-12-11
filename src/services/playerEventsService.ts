@@ -3,7 +3,7 @@
  * Logs player events to player_events table
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { authCache } from '@/services/authCacheService';
 
 export type PlayerEventType = 

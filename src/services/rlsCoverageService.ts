@@ -3,7 +3,7 @@
  * Uses rls_scan_results and rls_fix_backups tables
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface RLSIssue {
   id: string;

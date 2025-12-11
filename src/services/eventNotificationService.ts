@@ -3,7 +3,7 @@
  * Triggers automatic notifications based on system events
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export type NotificationEventType = 
   | 'client_registration'
