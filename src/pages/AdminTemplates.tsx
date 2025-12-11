@@ -39,7 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTemplates } from '@/hooks/useTemplates';
-import { WhatsappTemplate } from '@/types/whatsapp';
+import { WhatsappTemplate, TemplateEventType } from '@/types/whatsapp';
 import { toast } from 'sonner';
 import {
   Select,
@@ -71,12 +71,18 @@ export default function AdminTemplates() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState(true);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    message: string;
+    daysBeforeDue: number;
+    type: 'local' | 'botbot';
+    eventType: TemplateEventType;
+  }>({
     name: '',
     message: '',
     daysBeforeDue: 0,
-    type: 'local' as 'local' | 'botbot',
-    eventType: 'expiration' as 'expiration' | 'welcome_trial' | 'welcome_plan' | 'renewal' | 'payment_reminder' | 'payment_approved' | 'payment_pending' | 'payment_in_process' | 'payment_rejected' | 'payment_refunded' | 'payment_cancelled' | 'manual',
+    type: 'local',
+    eventType: 'expiration',
   });
   
   const [isSendingTest, setIsSendingTest] = useState(false);
