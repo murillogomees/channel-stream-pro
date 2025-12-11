@@ -1469,6 +1469,390 @@ export type Database = {
         }
         Relationships: []
       }
+      iptv_cdn_cache: {
+        Row: {
+          cache_key: string
+          cdn_provider: string | null
+          channel_id: number | null
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          is_warm: boolean | null
+          last_access_at: string | null
+          manifest_url: string | null
+          segment_prefix: string | null
+        }
+        Insert: {
+          cache_key: string
+          cdn_provider?: string | null
+          channel_id?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: number
+          is_warm?: boolean | null
+          last_access_at?: string | null
+          manifest_url?: string | null
+          segment_prefix?: string | null
+        }
+        Update: {
+          cache_key?: string
+          cdn_provider?: string | null
+          channel_id?: number | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: number
+          is_warm?: boolean | null
+          last_access_at?: string | null
+          manifest_url?: string | null
+          segment_prefix?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_cdn_cache_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_channel_metrics: {
+        Row: {
+          channel_id: number | null
+          id: number
+          metric_type: string
+          recorded_at: string | null
+          value: number
+        }
+        Insert: {
+          channel_id?: number | null
+          id?: number
+          metric_type: string
+          recorded_at?: string | null
+          value: number
+        }
+        Update: {
+          channel_id?: number | null
+          id?: number
+          metric_type?: string
+          recorded_at?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_channel_metrics_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_channels: {
+        Row: {
+          bitrate_estimate: number | null
+          category: string | null
+          codec_hint: string | null
+          content_type: string | null
+          created_at: string | null
+          fallback_channel_id: number | null
+          health_score: number | null
+          id: number
+          is_healthy: boolean | null
+          last_probe_at: string | null
+          logo_url: string | null
+          metadata: Json | null
+          name: string
+          original_url: string
+          priority: number | null
+          probe_error: string | null
+          resolution: string | null
+          shard_id: number
+          slug: string
+          transcode_manifest_url: string | null
+          transcode_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bitrate_estimate?: number | null
+          category?: string | null
+          codec_hint?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          fallback_channel_id?: number | null
+          health_score?: number | null
+          id?: number
+          is_healthy?: boolean | null
+          last_probe_at?: string | null
+          logo_url?: string | null
+          metadata?: Json | null
+          name: string
+          original_url: string
+          priority?: number | null
+          probe_error?: string | null
+          resolution?: string | null
+          shard_id?: number
+          slug: string
+          transcode_manifest_url?: string | null
+          transcode_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bitrate_estimate?: number | null
+          category?: string | null
+          codec_hint?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          fallback_channel_id?: number | null
+          health_score?: number | null
+          id?: number
+          is_healthy?: boolean | null
+          last_probe_at?: string | null
+          logo_url?: string | null
+          metadata?: Json | null
+          name?: string
+          original_url?: string
+          priority?: number | null
+          probe_error?: string | null
+          resolution?: string | null
+          shard_id?: number
+          slug?: string
+          transcode_manifest_url?: string | null
+          transcode_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_channels_fallback_channel_id_fkey"
+            columns: ["fallback_channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_playlist_channels: {
+        Row: {
+          added_at: string | null
+          channel_id: number
+          custom_logo: string | null
+          custom_name: string | null
+          is_hidden: boolean | null
+          playlist_id: number
+          position: number
+        }
+        Insert: {
+          added_at?: string | null
+          channel_id: number
+          custom_logo?: string | null
+          custom_name?: string | null
+          is_hidden?: boolean | null
+          playlist_id: number
+          position?: number
+        }
+        Update: {
+          added_at?: string | null
+          channel_id?: number
+          custom_logo?: string | null
+          custom_name?: string | null
+          is_hidden?: boolean | null
+          playlist_id?: number
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_playlist_channels_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_playlist_channels_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_playlists: {
+        Row: {
+          channel_count: number | null
+          created_at: string | null
+          description: string | null
+          id: number
+          is_public: boolean | null
+          name: string
+          settings: Json | null
+          slug: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          channel_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          is_public?: boolean | null
+          name: string
+          settings?: Json | null
+          slug: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          channel_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          is_public?: boolean | null
+          name?: string
+          settings?: Json | null
+          slug?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      iptv_probe_jobs: {
+        Row: {
+          channel_id: number | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: number
+          result: Json | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          channel_id?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          result?: Json | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          channel_id?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          result?: Json | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_probe_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_stream_tokens: {
+        Row: {
+          channel_id: number | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          token: string
+          used_at: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          channel_id?: number | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          token: string
+          used_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          channel_id?: number | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          token?: string
+          used_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_stream_tokens_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_transcode_jobs: {
+        Row: {
+          channel_id: number | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: number
+          mode: string | null
+          output_urls: Json | null
+          progress: number | null
+          started_at: string | null
+          status: string | null
+          target_resolutions: string[] | null
+          worker_id: string | null
+        }
+        Insert: {
+          channel_id?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          mode?: string | null
+          output_urls?: Json | null
+          progress?: number | null
+          started_at?: string | null
+          status?: string | null
+          target_resolutions?: string[] | null
+          worker_id?: string | null
+        }
+        Update: {
+          channel_id?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          mode?: string | null
+          output_urls?: Json | null
+          progress?: number | null
+          started_at?: string | null
+          status?: string | null
+          target_resolutions?: string[] | null
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_transcode_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mercado_pago_config: {
         Row: {
           created_at: string | null
@@ -2750,6 +3134,14 @@ export type Database = {
       cleanup_fase8_old_data:
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
+      generate_stream_token: {
+        Args: {
+          p_channel_id: number
+          p_ttl_seconds?: number
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_active_sessions: {
         Args: never
         Returns: {
@@ -2759,6 +3151,7 @@ export type Database = {
         }[]
       }
       get_auth_statistics: { Args: { days?: number }; Returns: Json }
+      get_channel_shard: { Args: { channel_id: number }; Returns: number }
       has_role: {
         Args: {
           check_role: Database["public"]["Enums"]["app_role"]
@@ -2779,6 +3172,23 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: Json
+      }
+      update_channel_health: {
+        Args: {
+          p_channel_id: number
+          p_health_score?: number
+          p_is_healthy: boolean
+          p_probe_error?: string
+        }
+        Returns: undefined
+      }
+      validate_stream_token: {
+        Args: { p_token: string }
+        Returns: {
+          channel_id: number
+          is_valid: boolean
+          user_id: string
+        }[]
       }
     }
     Enums: {

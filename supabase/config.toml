@@ -370,3 +370,15 @@ verify_jwt = false
 # R2 Upload Proxy - handles signed uploads to R2
 [functions.r2-upload-proxy]
 verify_jwt = false
+
+# ==========================================
+# IPTV SCALABLE ARCHITECTURE (209k+ channels)
+# ==========================================
+
+# IPTV M3U Generator - tokenized, paginated playlist generation
+[functions.iptv-m3u-generator]
+verify_jwt = false
+
+# IPTV Channel Health - webhook for probe/transcode updates from external workers
+[functions.iptv-channel-health]
+verify_jwt = false
