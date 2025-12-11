@@ -8,7 +8,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { ResponsivePageHeader } from '@/components/admin/ResponsivePageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tv, ListVideo, Calendar, Zap, Database } from 'lucide-react';
+import { Tv, ListVideo, Calendar, Zap, Database, FlaskConical } from 'lucide-react';
 
 // Tab Components
 import { IPTVChannelsTab } from '@/components/admin/iptv/tabs/IPTVChannelsTab';
@@ -16,6 +16,7 @@ import { IPTVPlaylistsTab } from '@/components/admin/iptv/tabs/IPTVPlaylistsTab'
 import { IPTVEPGTab } from '@/components/admin/iptv/tabs/IPTVEPGTab';
 import { IPTVTranscodeTab } from '@/components/admin/iptv/tabs/IPTVTranscodeTab';
 import { IPTVCacheTab } from '@/components/admin/iptv/tabs/IPTVCacheTab';
+import { IPTVLoadTestTab } from '@/components/admin/iptv/tabs/IPTVLoadTestTab';
 
 const TABS = [
   { id: 'channels', label: 'Canais', icon: Tv },
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'epg', label: 'EPG', icon: Calendar },
   { id: 'transcode', label: 'Transcode', icon: Zap },
   { id: 'cache', label: 'Cache', icon: Database },
+  { id: 'loadtest', label: 'Load Test', icon: FlaskConical },
 ] as const;
 
 export default function AdminIPTVPage() {
@@ -74,6 +76,10 @@ export default function AdminIPTVPage() {
 
             <TabsContent value="cache" className="m-0">
               <IPTVCacheTab />
+            </TabsContent>
+
+            <TabsContent value="loadtest" className="m-0">
+              <IPTVLoadTestTab />
             </TabsContent>
           </div>
         </Tabs>
