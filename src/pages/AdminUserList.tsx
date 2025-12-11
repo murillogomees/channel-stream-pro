@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfiles, UnifiedProfile } from '@/hooks/useProfiles';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,8 +32,12 @@ interface UserWithRole extends UnifiedProfile {
 
 export default function AdminUserList() {
   const { profiles, loading: profilesLoading, refresh } = useProfiles();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  
+  // Get current user's role
+  const currentUserRole = (currentUser?.roles?.[0] || 'client') as 'client' | 'admin' | 'master';
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -588,6 +593,7 @@ export default function AdminUserList() {
               formData={editFormData}
               onChange={setEditFormData}
               isEdit={true}
+              currentUserRole={currentUserRole}
             />
           </div>
           
@@ -716,6 +722,7 @@ export default function AdminUserList() {
                 onChange={setCreateFormData}
                 isEdit={false}
                 hideEmail={true}
+                currentUserRole={currentUserRole}
               />
             </div>
           </div>
