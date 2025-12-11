@@ -62,7 +62,7 @@ async function handler(req: Request): Promise<Response> {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const { data: isAdmin } = await supabase.rpc('is_admin_or_master', { 
-      _user_id: user.id 
+      check_user_id: user.id 
     });
     
     if (!isAdmin) {
