@@ -1,7 +1,7 @@
 /**
  * IPTV Playlist Endpoint
  * 
- * Returns dynamic M3U playlist for user.
+ * Returns dynamic M3U playlist for user from iptv_channels table.
  * Endpoint: /api/iptv/playlist?type=m3u|json
  */
 
@@ -24,6 +24,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const type = url.searchParams.get('type') || 'm3u';
     const category = url.searchParams.get('category');
+    const playlistId = url.searchParams.get('playlistId');
 
     // Verify authentication
     const authHeader = req.headers.get('Authorization');
@@ -40,7 +41,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user's assigned playlists
+    // Check user subscription
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, plano, cliente_ativo')
@@ -54,53 +55,68 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get custom list assignments
-    const { data: assignments } = await supabase
-      .from('client_m3u_custom_assignments')
-      .select('custom_list_id')
-      .eq('cliente_id', user.id);
+    let channels: any[] = [];
 
-    const customListIds = assignments?.map(a => a.custom_list_id) || [];
+    // If playlistId provided, get channels from that playlist
+    if (playlistId) {
+      const { data: playlistChannels, error: playlistError } = await supabase
+        .from('iptv_playlist_channels')
+        .select(`
+          position,
+          custom_name,
+          custom_logo,
+          channel:iptv_channels(id, name, slug, original_url, logo_url, category, content_type)
+        `)
+        .eq('playlist_id', playlistId)
+        .eq('is_hidden', false)
+        .order('position');
 
-    // Build channel query
-    let query = supabase
-      .from('m3u_channels')
-      .select('id, name, url, logo_url, category, tvg_id, tvg_name')
-      .eq('is_active', true);
+      if (playlistError) throw playlistError;
 
-    if (customListIds.length > 0) {
-      query = query.in('custom_list_id', customListIds);
-    }
+      channels = (playlistChannels || []).map(pc => ({
+        id: pc.channel.id,
+        name: pc.custom_name || pc.channel.name,
+        slug: pc.channel.slug,
+        original_url: pc.channel.original_url,
+        logo_url: pc.custom_logo || pc.channel.logo_url,
+        category: pc.channel.category,
+        content_type: pc.channel.content_type,
+      }));
+    } else {
+      // Get all healthy channels
+      let query = supabase
+        .from('iptv_channels')
+        .select('id, name, slug, original_url, logo_url, category, content_type')
+        .eq('is_healthy', true)
+        .order('category')
+        .order('name');
 
-    if (category) {
-      query = query.eq('category', category);
-    }
+      if (category) {
+        query = query.eq('category', category);
+      }
 
-    const { data: channels, error: channelsError } = await query
-      .order('category')
-      .order('name');
-
-    if (channelsError) {
-      throw channelsError;
+      const { data, error: channelsError } = await query;
+      if (channelsError) throw channelsError;
+      channels = data || [];
     }
 
     // Return based on format
     if (type === 'json') {
-      const groups = [...new Set(channels?.map(c => c.category) || [])];
+      const groups = [...new Set(channels.map(c => c.category) || [])];
       
       return new Response(
         JSON.stringify({
-          channels: channels?.map(c => ({
+          channels: channels.map(c => ({
             id: c.id,
             name: c.name,
             url: `${SUPABASE_URL}/functions/v1/iptv-play?channelId=${c.id}`,
             logo: c.logo_url,
             group: c.category,
-            tvgId: c.tvg_id,
-            tvgName: c.tvg_name,
+            slug: c.slug,
+            type: c.content_type,
           })),
           groups,
-          count: channels?.length || 0,
+          count: channels.length,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -109,10 +125,10 @@ Deno.serve(async (req) => {
     // Generate M3U format
     let m3u = '#EXTM3U\n';
     
-    for (const channel of channels || []) {
+    for (const channel of channels) {
       const attrs = [
-        channel.tvg_id ? `tvg-id="${channel.tvg_id}"` : '',
-        channel.tvg_name ? `tvg-name="${channel.tvg_name}"` : '',
+        `tvg-id="${channel.slug}"`,
+        `tvg-name="${channel.name}"`,
         channel.logo_url ? `tvg-logo="${channel.logo_url}"` : '',
         channel.category ? `group-title="${channel.category}"` : '',
       ].filter(Boolean).join(' ');
@@ -121,7 +137,7 @@ Deno.serve(async (req) => {
       m3u += `${SUPABASE_URL}/functions/v1/iptv-play?channelId=${channel.id}\n`;
     }
 
-    console.log(`[iptv-playlist] Generated ${channels?.length || 0} channels for user ${user.id}`);
+    console.log(`[iptv-playlist] Generated ${channels.length} channels for user ${user.id}`);
 
     return new Response(m3u, {
       headers: {
