@@ -8,15 +8,13 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
 import { 
   CreditCard, 
-  FileText, 
   MessageCircle, 
   TestTube,
   Tv
 } from "lucide-react";
 import AdminWhatsAppConfig from "../AdminWhatsAppConfig";
 import AdminQADashboard from "../AdminQADashboard";
-import MercadoPagoIntegration from "@/components/admin/mercadopago/MercadoPagoIntegration";
-import PaymentVariablesAdmin from "@/components/admin/payment/PaymentVariablesAdmin";
+import { MercadoPagoUnifiedIntegration } from "@/components/admin/mercadopago/MercadoPagoUnifiedIntegration";
 import { IPTVIntegrationStatus } from "@/components/admin/iptv/IPTVIntegrationStatus";
 
 export default function AdminIntegracaoPage() {
@@ -27,13 +25,7 @@ export default function AdminIntegracaoPage() {
       value: "mercadopago",
       label: "Mercado Pago",
       icon: <CreditCard className="h-4 w-4" />,
-      content: <MercadoPagoIntegration />
-    },
-    {
-      value: "payment-vars",
-      label: "Variáveis API",
-      icon: <FileText className="h-4 w-4" />,
-      content: <PaymentVariablesAdmin />
+      content: <MercadoPagoUnifiedIntegration />
     },
     {
       value: "whatsapp",

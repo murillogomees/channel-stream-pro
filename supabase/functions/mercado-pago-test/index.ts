@@ -11,12 +11,17 @@ async function handler(req: Request): Promise<Response> {
   try {
     // Use environment variable first, fallback to request body
     const envToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
+    const webhookSecret = Deno.env.get('MERCADO_PAGO_WEBHOOK_SECRET');
     
     let accessToken = envToken;
+    let checkSecretsOnly = false;
     
     // Allow override from request body for testing specific tokens
     try {
       const body = await req.json();
+      if (body.checkSecrets) {
+        checkSecretsOnly = true;
+      }
       if (body.accessToken && body.accessToken !== 'test' && body.accessToken !== 'will-use-env') {
         accessToken = body.accessToken;
       }
@@ -24,9 +29,23 @@ async function handler(req: Request): Promise<Response> {
       // No body or invalid JSON - use env token
     }
     
+    // Just check if secrets are configured
+    if (checkSecretsOnly) {
+      return new Response(
+        JSON.stringify({ 
+          secretsConfigured: !!envToken,
+          webhookSecretConfigured: !!webhookSecret,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     if (!accessToken) {
       return new Response(
-        JSON.stringify({ error: 'Access token não configurado. Configure MERCADO_PAGO_ACCESS_TOKEN nas secrets.' }),
+        JSON.stringify({ 
+          error: 'Access token não configurado. Configure MERCADO_PAGO_ACCESS_TOKEN nas secrets.',
+          secretsConfigured: false
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -50,7 +69,9 @@ async function handler(req: Request): Promise<Response> {
           email: data.email, 
           id: data.id,
           nickname: data.nickname,
-          using_env: accessToken === envToken
+          using_env: accessToken === envToken,
+          secretsConfigured: true,
+          webhookSecretConfigured: !!webhookSecret,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -62,7 +83,8 @@ async function handler(req: Request): Promise<Response> {
           success: false, 
           error: 'Falha na autenticação',
           details: errorData,
-          token_hint: accessToken.slice(-4)
+          token_hint: accessToken.slice(-4),
+          secretsConfigured: true,
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

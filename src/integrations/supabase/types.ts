@@ -1886,6 +1886,39 @@ export type Database = {
         }
         Relationships: []
       }
+      mercado_pago_webhooks: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          data_id: string | null
+          event_id: string | null
+          event_type: string | null
+          id: string
+          processed: boolean | null
+          raw_payload: Json | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          data_id?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          processed?: boolean | null
+          raw_payload?: Json | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          data_id?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          processed?: boolean | null
+          raw_payload?: Json | null
+        }
+        Relationships: []
+      }
       migration_audit: {
         Row: {
           details: Json | null
