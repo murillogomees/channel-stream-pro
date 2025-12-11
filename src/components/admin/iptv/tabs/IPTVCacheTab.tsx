@@ -212,8 +212,6 @@ export function IPTVCacheTab() {
                 }}
                 disabled={clearCacheMutation.isPending}
               >
-                disabled={clearCacheMutation.isPending}
-              >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Limpar Cache
               </Button>
