@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useProfiles } from '@/hooks/useProfiles';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
@@ -7,21 +6,12 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { useTestContacts } from '@/hooks/useTestContacts';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -33,14 +23,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Send, MessageSquare, Download, Trash2, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle, Plus, User, Variable, Save, Copy, Check, Settings } from 'lucide-react';
-import { LOCAL_TEMPLATES, getDaysUntilDue, sendNotification } from '@/services/notificationScheduler';
+import { Send, MessageSquare, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle, Variable, Save, Copy, Check } from 'lucide-react';
+import { LOCAL_TEMPLATES, sendNotification } from '@/services/notificationScheduler';
 import { Cliente } from '@/types/cliente';
 import { formatPhoneForDisplay } from '@/utils/phoneFormatter';
 import { getWhatsAppService } from '@/services/whatsapp';
 
 export default function AdminNotificacoes() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { profiles } = useProfiles();
   const { config, loading: configLoading, saveConfig } = useWhatsAppConfig();
@@ -300,18 +289,6 @@ export default function AdminNotificacoes() {
     }
   };
 
-  const clientesComVencimento = profiles
-    .filter(c => c.data_vencimento)
-    .map(c => ({
-      ...c,
-      daysUntil: getDaysUntilDue(c.data_vencimento || ''),
-    }))
-    .sort((a, b) => a.daysUntil - b.daysUntil);
-
-  // Usar logs do hook
-  const recentLogs = logs;
-  const exportToCSV = () => {};
-  const clearLogs = () => {};
 
   const handleForceRun = async () => {
     setRunningManual(true);
@@ -966,171 +943,6 @@ export default function AdminNotificacoes() {
           </CardContent>
         </Card>
 
-        {/* Próximas Notificações */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Próximas Notificações</CardTitle>
-            <CardDescription>
-              Clientes que receberão notificações nos próximos dias
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Dias até vencer</TableHead>
-                    <TableHead>Próxima Notificação</TableHead>
-                    <TableHead>Tipo da Notificação</TableHead>
-                    <TableHead>Situação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clientesComVencimento.slice(0, 10).map((cliente) => {
-                    // Determinar qual será a próxima notificação baseado nos dias até vencer
-                    let nextNotificationDate = new Date();
-                     let nextNotificationType = '';
-                    const vencimento = new Date(cliente.data_vencimento || '');
-                    
-                    if (cliente.daysUntil > 5) {
-                      // Próxima notificação: quando faltarem 5 dias
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() - 5);
-                      nextNotificationType = 'Faltam 5 dias';
-                    } else if (cliente.daysUntil > 3) {
-                      // Próxima notificação: quando faltarem 3 dias
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() - 3);
-                      nextNotificationType = 'Faltam 3 dias';
-                    } else if (cliente.daysUntil > 1) {
-                      // Próxima notificação: quando faltar 1 dia
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() - 1);
-                      nextNotificationType = 'Falta 1 dia';
-                    } else if (cliente.daysUntil === 1) {
-                      // Próxima notificação: no dia do vencimento
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationType = 'Vence hoje';
-                    } else if (cliente.daysUntil === 0) {
-                      // Próxima notificação: 1 dia após vencer
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() + 1);
-                      nextNotificationType = 'Vencido há 1 dia';
-                    } else if (cliente.daysUntil >= -2) {
-                      // Próxima notificação: 3 dias após vencer
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() + 3);
-                      nextNotificationType = 'Vencido há 3 dias';
-                    } else if (cliente.daysUntil >= -4) {
-                      // Próxima notificação: 5 dias após vencer (bloqueio)
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() + 5);
-                      nextNotificationType = 'Vencido há 5 dias';
-                    } else {
-                      // Já passou de todas as notificações
-                      nextNotificationDate = new Date(vencimento);
-                      nextNotificationDate.setDate(vencimento.getDate() + 5);
-                      nextNotificationType = 'Bloqueado';
-                    }
-                    
-                    return (
-                      <TableRow key={cliente.id}>
-                        <TableCell className="font-medium">{cliente.nome}</TableCell>
-                        <TableCell>{formatPhoneForDisplay(cliente.telefone)}</TableCell>
-                        <TableCell>
-                          {new Date(cliente.data_vencimento || '').toLocaleDateString('pt-BR')}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={cliente.daysUntil < 0 ? 'destructive' : cliente.daysUntil <= 2 ? 'default' : 'secondary'}>
-                            {cliente.daysUntil > 0 ? `${cliente.daysUntil} dias` : cliente.daysUntil === 0 ? 'Hoje' : `${Math.abs(cliente.daysUntil)} dias vencido`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {nextNotificationDate.toLocaleDateString('pt-BR')}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{nextNotificationType}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge>{cliente.situacao}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-
-        {/* Histórico de Envios */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Histórico de Envios</CardTitle>
-                <CardDescription>
-                  Últimas 20 notificações enviadas
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data/Hora</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Template</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="text-sm">
-                        {new Date(log.sent_at).toLocaleString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {log.clientes?.nome || 'N/A'}
-                      </TableCell>
-                      <TableCell>{formatPhoneForDisplay(log.phone)}</TableCell>
-                      <TableCell className="text-sm">{log.template_name}</TableCell>
-                      <TableCell>
-                        {log.status === 'success' ? (
-                          <Badge variant="default" className="bg-green-500">
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            Enviado
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive">
-                            <XCircle className="mr-1 h-3 w-3" />
-                            Erro
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {recentLogs.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        Nenhum envio registrado ainda
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
