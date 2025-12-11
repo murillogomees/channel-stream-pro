@@ -1,11 +1,10 @@
-// Self-hosted Supabase client - DO NOT use environment variables
+// Supabase client - Using Lovable Cloud
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-// CRITICAL: These values are hardcoded for self-hosted Supabase
-// DO NOT use import.meta.env - this ensures we always connect to self-hosted
-const SUPABASE_URL = "https://supabase.iptvlink.com.br";
-const SUPABASE_PUBLISHABLE_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU";
+// Lovable Cloud Supabase configuration
+const SUPABASE_URL = "https://waxgowafohlrfoefwhsf.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";
 
 // Debug log to verify correct URL is being used
 console.log('[Supabase Client] Using URL:', SUPABASE_URL);
