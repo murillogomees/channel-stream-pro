@@ -52,6 +52,8 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
   const [parsedChannels, setParsedChannels] = useState<ParsedChannel[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [isParsing, setIsParsing] = useState(false);
+  const [urlFetchError, setUrlFetchError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('url');
 
   // Parse M3U content
   const parseM3U = (content: string): ParsedChannel[] => {
@@ -92,6 +94,7 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
     }
 
     setIsParsing(true);
+    setUrlFetchError(null);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-m3u', {
         body: { url: m3uUrl },
@@ -115,7 +118,11 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
         }
       }
     } catch (error) {
-      toast.error(`Erro: ${error instanceof Error ? error.message : 'Falha ao buscar M3U'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Falha ao buscar M3U';
+      setUrlFetchError(errorMsg);
+      toast.error(`O servidor bloqueou a requisição. Use a aba "Colar M3U" para importar o conteúdo manualmente.`);
+      // Auto switch to paste tab
+      setActiveTab('paste');
     } finally {
       setIsParsing(false);
     }
@@ -306,7 +313,7 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
         <div className="border-t pt-4 space-y-3">
           <Label className="text-base font-medium">Importar Canais (Opcional)</Label>
           
-          <Tabs defaultValue="url" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="url" className="text-xs">
                 <Link className="h-3 w-3 mr-1" />
@@ -322,7 +329,7 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
               <div className="flex gap-2">
                 <Input
                   value={m3uUrl}
-                  onChange={(e) => setM3uUrl(e.target.value)}
+                  onChange={(e) => { setM3uUrl(e.target.value); setUrlFetchError(null); }}
                   placeholder="https://exemplo.com/playlist.m3u"
                   className="text-sm"
                 />
@@ -336,15 +343,23 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
                   {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar'}
                 </Button>
               </div>
+              {urlFetchError && (
+                <p className="text-xs text-destructive">
+                  Servidor bloqueou requisição. Abra a URL no navegador, copie o conteúdo e cole na aba "Colar M3U".
+                </p>
+              )}
             </TabsContent>
 
             <TabsContent value="paste" className="space-y-2 mt-2">
+              <p className="text-xs text-muted-foreground mb-2">
+                Abra a URL M3U no navegador, copie todo o conteúdo e cole abaixo:
+              </p>
               <Textarea
                 value={m3uContent}
                 onChange={(e) => setM3uContent(e.target.value)}
                 placeholder="#EXTM3U&#10;#EXTINF:-1,Canal 1&#10;http://..."
                 rows={4}
-                className="text-xs"
+                className="text-xs font-mono"
               />
               <Button type="button" variant="outline" size="sm" onClick={handleParseContent} disabled={!m3uContent}>
                 Analisar
