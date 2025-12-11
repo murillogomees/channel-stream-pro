@@ -1,6 +1,6 @@
 /**
- * Motor de Templates Centralizado - Versão Unificada
- * Gerencia preenchimento de variáveis em templates de mensagem
+ * Template Engine - Simplified
+ * Uses notification_templates table (existing) or defaults
  */
 
 import { Cliente } from '@/types/cliente';
@@ -27,10 +27,11 @@ export class TemplateEngine {
     }
 
     try {
+      // Use notification_templates table (which exists)
       const { data, error } = await supabase
-        .from('whatsapp_templates')
+        .from('notification_templates')
         .select('*')
-        .eq('active', true)
+        .eq('is_active', true)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -38,14 +39,11 @@ export class TemplateEngine {
       if (data && data.length > 0) {
         const mappedTemplates: WhatsappTemplate[] = data.map(t => ({
           id: t.id,
-          name: t.name,
-          message: t.message,
-          variables: t.variables || [],
-          type: t.type as 'local' | 'botbot',
-          eventType: t.event_type as any,
-          daysBeforeDue: t.days_before_due,
-          botbotTemplateId: t.botbot_template_id,
-          arquivo: t.arquivo as any,
+          name: t.template_name,
+          message: t.template_content,
+          variables: (t.variables as string[]) || [],
+          type: 'local' as const,
+          eventType: t.template_key as any,
         }));
 
         this.templatesCache = mappedTemplates;
@@ -64,14 +62,12 @@ export class TemplateEngine {
 
   /**
    * Carrega templates de forma síncrona (para compatibilidade)
-   * Retorna cache se disponível, senão retorna templates padrão
    */
   loadTemplates(): WhatsappTemplate[] {
     if (this.templatesCache) {
       return this.templatesCache;
     }
     
-    // Se não tem cache, disparar load assíncrono mas retornar padrões
     this.loadTemplatesAsync().catch(console.error);
     return DEFAULT_TEMPLATES;
   }
@@ -93,7 +89,6 @@ export class TemplateEngine {
   ): string {
     let message = typeof template === 'string' ? template : template.message;
     
-    // Suporta tanto {variavel} quanto {{variavel}} para compatibilidade
     const replaceVar = (varName: string, value: string) => {
       message = message.replace(new RegExp(`\\{\\{${varName}\\}\\}`, 'g'), value);
       message = message.replace(new RegExp(`\\{${varName}\\}`, 'g'), value);
@@ -121,7 +116,6 @@ export class TemplateEngine {
       const diasAteVencimento = this.getDaysUntilDue(cliente.dataVencimento);
       replaceVar('diasAteVencimento', Math.abs(diasAteVencimento).toString());
       replaceVar('dias_restantes', Math.abs(diasAteVencimento).toString());
-      replaceVar('diasRestantes', Math.abs(diasAteVencimento).toString());
     }
     
     if (extraVars) {
@@ -134,7 +128,7 @@ export class TemplateEngine {
   }
 
   /**
-   * Busca template por tipo de evento (versão assíncrona)
+   * Busca template por tipo de evento
    */
   async findTemplateByEventAsync(eventType: string, daysBeforeDue?: number): Promise<WhatsappTemplate | undefined> {
     const templates = await this.loadTemplatesAsync();
@@ -147,7 +141,7 @@ export class TemplateEngine {
   }
 
   /**
-   * Busca template por tipo de evento (versão síncrona para compatibilidade)
+   * Busca template por tipo de evento (versão síncrona)
    */
   findTemplateByEvent(eventType: string, daysBeforeDue?: number): WhatsappTemplate | undefined {
     const templates = this.loadTemplates();
@@ -203,11 +197,6 @@ export class TemplateEngine {
       ? format(new Date(cliente.dataVencimento), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
       : 'não definida';
 
-    const periodoPlano = cliente.plano === 'Mensal' ? 'mensal'
-      : cliente.plano === 'Trimestral' ? 'trimestral'
-      : cliente.plano === 'Semestral' ? 'semestral'
-      : 'anual';
-
     return `🎉 *Bem-vindo à IPTV LINK!*
 
 Olá *${cliente.nome}*! 
@@ -215,26 +204,9 @@ Olá *${cliente.nome}*!
 Seu acesso foi ativado com sucesso! 🚀
 
 📊 *Detalhes do Seu Plano:*
-• Plano: *${cliente.plano}* (${periodoPlano})
+• Plano: *${cliente.plano}*
 • Valor: *R$ ${cliente.valorPago?.toFixed(2) || '0.00'}*
 • Data de Vencimento: *${dataVencimento}*
-
-💡 *Dicas Importantes:*
-
-1️⃣ *Primeiro Acesso*
-Seu aplicativo IPTV já está configurado e pronto para usar!
-
-2️⃣ *Explore os Canais*
-Temos mais de 10.000 canais em Full HD e 4K.
-
-3️⃣ *Qualidade de Imagem*
-Para melhor experiência, conexão de 10 Mbps recomendada.
-
-4️⃣ *Suporte Técnico*
-Estamos disponíveis neste WhatsApp para ajudar você!
-
-🎁 *Programa de Indicação*
-Indique um amigo e ganhe 1 mês grátis!
 
 Aproveite sua experiência IPTV LINK! 🎬📺`;
   }

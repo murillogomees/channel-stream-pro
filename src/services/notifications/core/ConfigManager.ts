@@ -1,6 +1,6 @@
 /**
  * Gerenciador de Configuração Centralizado
- * Migra configurações de localStorage para Supabase
+ * Uses whatsapp_config table (existing schema)
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -22,11 +22,13 @@ export interface AdminPhone {
 export class ConfigManager {
   /**
    * Busca credenciais WhatsApp do Supabase
+   * whatsapp_config table has: app_key, auth_key
    */
   async getWhatsAppCredentials(): Promise<WhatsAppCredentials | null> {
     const { data, error } = await supabase
       .from('whatsapp_config')
-      .select('appkey, authkey')
+      .select('app_key, auth_key, is_active')
+      .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -36,52 +38,57 @@ export class ConfigManager {
       return null;
     }
 
-    if (!data.appkey || !data.authkey) return null;
+    if (!data.app_key || !data.auth_key) return null;
     
     return {
-      appkey: data.appkey,
-      authkey: data.authkey,
+      appkey: data.app_key,
+      authkey: data.auth_key,
     };
   }
 
   /**
-   * Busca telefones de administradores ativos do Supabase
+   * Busca telefones de administradores ativos
+   * Uses profiles table with admin role
    */
   async getActiveAdminPhones(): Promise<AdminPhone[]> {
     const { data, error } = await supabase
-      .from('admin_phones')
-      .select('id, phone, name, active')
-      .eq('active', true);
+      .from('user_roles')
+      .select(`
+        user_id,
+        profiles:user_id (
+          id,
+          contact_phone,
+          nome
+        )
+      `)
+      .in('role', ['admin', 'master']);
 
     if (error || !data) {
       console.error('[ConfigManager] Erro ao buscar admin phones:', error);
       return [];
     }
 
-    return data;
+    return data
+      .filter((r: any) => r.profiles?.contact_phone)
+      .map((r: any) => ({
+        id: r.profiles.id,
+        phone: r.profiles.contact_phone,
+        name: r.profiles.nome || 'Admin',
+        active: true,
+      }));
   }
 
   /**
-   * Busca configuração completa de notificações do Supabase
+   * Busca configuração completa de notificações
    */
   async getNotificationConfig(): Promise<NotificationConfig | null> {
     const whatsapp = await this.getWhatsAppCredentials();
     if (!whatsapp) return null;
 
-    const { data: autoConfig, error } = await supabase
-      .from('auto_notification_config')
-      .select('enabled, send_hour')
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('[ConfigManager] Erro ao buscar auto config:', error);
-    }
-
     return {
       whatsapp,
-      autoSendEnabled: autoConfig?.enabled || false,
-      sendHour: autoConfig?.send_hour || 10,
+      autoSendEnabled: true,
+      sendHour: 10,
     };
   }
 

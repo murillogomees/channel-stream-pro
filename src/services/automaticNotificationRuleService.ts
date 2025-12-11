@@ -1,22 +1,10 @@
 /**
- * Automatic Notification Rule Service - Simplified
- * Uses auto_notifications table
+ * Automatic Notification Rule Service
+ * Uses auto_notifications table - aligned with types/automaticNotification.ts
  */
 
 import { supabase } from '@/integrations/supabase/client';
-
-export interface AutomaticNotificationRule {
-  id: string;
-  name: string | null;
-  description: string | null;
-  trigger_type: string;
-  is_active: boolean | null;
-  template_key: string | null;
-  delay_hours: number | null;
-  conditions: any;
-  created_at: string | null;
-  updated_at: string | null;
-}
+import type { AutomaticNotificationRule, CreateNotificationRuleInput, UpdateNotificationRuleInput } from '@/types/automaticNotification';
 
 export class AutomaticNotificationRuleService {
   async getAll(): Promise<AutomaticNotificationRule[]> {
@@ -30,7 +18,8 @@ export class AutomaticNotificationRuleService {
       return [];
     }
 
-    return (data || []) as AutomaticNotificationRule[];
+    // Map database fields to expected interface
+    return (data || []).map(row => this.mapToRule(row));
   }
 
   async getById(id: string): Promise<AutomaticNotificationRule | null> {
@@ -45,49 +34,79 @@ export class AutomaticNotificationRuleService {
       return null;
     }
 
-    return data as AutomaticNotificationRule | null;
+    return data ? this.mapToRule(data) : null;
   }
 
-  async create(input: Partial<AutomaticNotificationRule>): Promise<AutomaticNotificationRule | null> {
+  async create(input: CreateNotificationRuleInput): Promise<AutomaticNotificationRule | null> {
     const { data, error } = await supabase
       .from('auto_notifications')
       .insert({
-        name: input.name || null,
+        name: input.name,
         description: input.description || null,
-        trigger_type: input.trigger_type || 'manual',
-        is_active: input.is_active ?? true,
-        template_key: input.template_key || null,
-        delay_hours: input.delay_hours || 0,
-        conditions: input.conditions || null,
+        trigger_type: input.event_type,
+        is_active: input.active ?? true,
+        template_key: input.template_reference || null,
+        delay_hours: input.days_before || 0,
+        conditions: {
+          trigger_condition: input.trigger_condition,
+          target_audience: input.target_audience,
+          priority: input.priority || 0,
+        },
       })
       .select()
       .single();
 
     if (error) {
       console.error('Erro ao criar regra de notificação:', error);
-      return null;
+      throw error;
     }
 
-    return data as AutomaticNotificationRule;
+    return data ? this.mapToRule(data) : null;
   }
 
-  async update(id: string, input: Partial<AutomaticNotificationRule>): Promise<AutomaticNotificationRule | null> {
+  async update(input: UpdateNotificationRuleInput): Promise<AutomaticNotificationRule | null> {
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.description !== undefined) updateData.description = input.description;
+    if (input.event_type !== undefined) updateData.trigger_type = input.event_type;
+    if (input.active !== undefined) updateData.is_active = input.active;
+    if (input.template_reference !== undefined) updateData.template_key = input.template_reference;
+    if (input.days_before !== undefined) updateData.delay_hours = input.days_before;
+    
+    // Get current conditions and merge
+    const current = await this.getById(input.id);
+    const conditions: Record<string, any> = {};
+    if (input.trigger_condition !== undefined) conditions.trigger_condition = input.trigger_condition;
+    if (input.target_audience !== undefined) conditions.target_audience = input.target_audience;
+    if (input.priority !== undefined) conditions.priority = input.priority;
+    
+    if (Object.keys(conditions).length > 0) {
+      updateData.conditions = {
+        ...(current ? {
+          trigger_condition: current.trigger_condition,
+          target_audience: current.target_audience,
+          priority: current.priority,
+        } : {}),
+        ...conditions,
+      };
+    }
+
     const { data, error } = await supabase
       .from('auto_notifications')
-      .update({
-        ...input,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
+      .update(updateData)
+      .eq('id', input.id)
       .select()
       .single();
 
     if (error) {
       console.error('Erro ao atualizar regra de notificação:', error);
-      return null;
+      throw error;
     }
 
-    return data as AutomaticNotificationRule;
+    return data ? this.mapToRule(data) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -98,17 +117,29 @@ export class AutomaticNotificationRuleService {
 
     if (error) {
       console.error('Erro ao deletar regra de notificação:', error);
-      return false;
+      throw error;
     }
 
     return true;
   }
 
-  async toggleActive(id: string): Promise<AutomaticNotificationRule | null> {
-    const current = await this.getById(id);
-    if (!current) return null;
+  async toggleActive(id: string, active: boolean): Promise<AutomaticNotificationRule | null> {
+    const { data, error } = await supabase
+      .from('auto_notifications')
+      .update({ 
+        is_active: active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    return this.update(id, { is_active: !current.is_active });
+    if (error) {
+      console.error('Erro ao alternar status da regra:', error);
+      throw error;
+    }
+
+    return data ? this.mapToRule(data) : null;
   }
 
   async getActiveRulesByEventType(eventType: string): Promise<AutomaticNotificationRule[]> {
@@ -123,7 +154,26 @@ export class AutomaticNotificationRuleService {
       return [];
     }
 
-    return (data || []) as AutomaticNotificationRule[];
+    return (data || []).map(row => this.mapToRule(row));
+  }
+
+  // Map database row to AutomaticNotificationRule interface
+  private mapToRule(row: any): AutomaticNotificationRule {
+    const conditions = row.conditions || {};
+    return {
+      id: row.id,
+      name: row.name || '',
+      description: row.description,
+      event_type: row.trigger_type || 'manual',
+      trigger_condition: conditions.trigger_condition || 'on_registration',
+      days_before: row.delay_hours || null,
+      target_audience: conditions.target_audience || 'client',
+      template_reference: row.template_key,
+      active: row.is_active ?? true,
+      priority: conditions.priority || 0,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
   }
 }
 

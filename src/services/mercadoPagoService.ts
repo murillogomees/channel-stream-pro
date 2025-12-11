@@ -1,5 +1,5 @@
 /**
- * Mercado Pago Integration Service
+ * Mercado Pago Integration Service - Simplified
  * Handles checkout and subscription management
  */
 
@@ -23,9 +23,9 @@ export interface SubscriptionStatus {
 export interface Payment {
   id: string;
   amount: number;
-  status: string;
-  payment_method: string;
-  created_at: string;
+  status: string | null;
+  payment_method: string | null;
+  created_at: string | null;
   paid_at: string | null;
 }
 
@@ -34,8 +34,6 @@ class MercadoPagoService {
 
   /**
    * Create a checkout session for a subscription plan
-   * @param planId - The subscription plan ID
-   * @param options - Checkout options including coupon code and redirect URLs
    */
   async createCheckout(planId: string, options?: {
     couponCode?: string;
@@ -73,7 +71,7 @@ class MercadoPagoService {
   }
 
   /**
-   * Get current user's subscription status
+   * Get current user's subscription status from profiles table
    */
   async getSubscriptionStatus(): Promise<SubscriptionStatus | null> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -81,14 +79,29 @@ class MercadoPagoService {
     if (!user) return null;
 
     const { data, error } = await supabase
-      .rpc("get_subscription_status", { p_user_id: user.id });
+      .from('profiles')
+      .select('plano, situacao, data_vencimento')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       console.error("[MercadoPago] Error getting subscription status:", error);
       return null;
     }
 
-    return data?.[0] || null;
+    const now = new Date();
+    const expiresAt = data.data_vencimento ? new Date(data.data_vencimento) : null;
+    const isExpired = expiresAt ? expiresAt < now : true;
+
+    return {
+      has_subscription: !!data.plano && !isExpired,
+      status: data.situacao === 'Testando' ? 'trial' : 
+              data.situacao === 'Ativo' ? 'active' : 
+              data.situacao === 'Inadimplente' ? 'expired' : null,
+      plan_name: data.plano,
+      expires_at: data.data_vencimento,
+      can_play: !isExpired && (data.situacao === 'Ativo' || data.situacao === 'Testando'),
+    };
   }
 
   /**
@@ -106,9 +119,9 @@ class MercadoPagoService {
         plan:subscription_plans(*)
       `)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== "PGRST116") {
+    if (error) {
       console.error("[MercadoPago] Error getting subscription:", error);
       return null;
     }
@@ -126,7 +139,7 @@ class MercadoPagoService {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("*")
+      .select("id, amount, status, payment_method, created_at, paid_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -136,7 +149,7 @@ class MercadoPagoService {
       return [];
     }
 
-    return data || [];
+    return (data || []) as Payment[];
   }
 
   /**
@@ -151,7 +164,6 @@ class MercadoPagoService {
       .from("user_subscriptions")
       .update({
         cancel_at_period_end: true,
-        canceled_at: new Date().toISOString(),
       })
       .eq("user_id", user.id);
 
@@ -175,7 +187,6 @@ class MercadoPagoService {
       .from("user_subscriptions")
       .update({
         cancel_at_period_end: false,
-        canceled_at: null,
       })
       .eq("user_id", user.id);
 

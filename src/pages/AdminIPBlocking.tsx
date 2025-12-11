@@ -1,3 +1,8 @@
+/**
+ * Admin IP Blocking Page - Simplified
+ * Uses simplified IPBlock interface matching ip_blacklist table
+ */
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,72 +10,40 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, Ban, CheckCircle2, AlertTriangle, Plus, ArrowLeft } from "lucide-react";
+import { Shield, Ban, CheckCircle2, Plus, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ipBlockingService, IPBlock } from "@/services/ipBlockingService";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
 
 export default function AdminIPBlocking() {
   const navigate = useNavigate();
   const [blockedIPs, setBlockedIPs] = useState<IPBlock[]>([]);
   const [stats, setStats] = useState({
     totalBlocked: 0,
-    autoBlocked: 0,
-    manualBlocked: 0,
-    activeBlocks: 0,
-    expiredBlocks: 0
+    permanentBlocks: 0,
+    temporaryBlocks: 0,
   });
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newBlock, setNewBlock] = useState({
     ip: '',
     reason: '',
-    severity: 'medium' as 'low' | 'medium' | 'high',
-    expiresInHours: '24',
-    notes: ''
+    isPermanent: false,
+    blockedUntil: '',
   });
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
-    
-    // Real-time updates via Supabase
-    const channel = supabase
-      .channel('ip-blocking-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ip_blacklist'
-        },
-        () => {
-          console.log('[IPBlocking] Mudança detectada, recarregando dados');
-          loadData();
-        }
-      )
-      .subscribe();
-    
-    // Atualização periódica a cada 30 segundos
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-    
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
   }, []);
 
   const loadData = async () => {
     setLoading(true);
     const [ips, statistics] = await Promise.all([
-      ipBlockingService.getBlockedIPs(true),
+      ipBlockingService.getBlockedIPs(),
       ipBlockingService.getBlockingStats()
     ]);
     setBlockedIPs(ips);
@@ -91,9 +64,8 @@ export default function AdminIPBlocking() {
     const success = await ipBlockingService.blockIP(
       newBlock.ip,
       newBlock.reason,
-      newBlock.severity,
-      parseInt(newBlock.expiresInHours),
-      newBlock.notes
+      newBlock.isPermanent,
+      newBlock.blockedUntil || undefined
     );
 
     if (success) {
@@ -105,9 +77,8 @@ export default function AdminIPBlocking() {
       setNewBlock({
         ip: '',
         reason: '',
-        severity: 'medium',
-        expiresInHours: '24',
-        notes: ''
+        isPermanent: false,
+        blockedUntil: '',
       });
       loadData();
     } else {
@@ -125,7 +96,7 @@ export default function AdminIPBlocking() {
     if (success) {
       toast({
         title: "IP desbloqueado",
-        description: `O IP ${ip} foi desbloqueado com sucesso`
+        description: `O IP ${ip} foi removido da lista de bloqueio`
       });
       loadData();
     } else {
@@ -137,18 +108,9 @@ export default function AdminIPBlocking() {
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high': return 'destructive';
-      case 'medium': return 'default';
-      case 'low': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
-  const isExpired = (expiresAt?: string) => {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) <= new Date();
+  const isExpired = (blockedUntil?: string | null) => {
+    if (!blockedUntil) return false;
+    return new Date(blockedUntil) <= new Date();
   };
 
   return (
@@ -164,7 +126,7 @@ export default function AdminIPBlocking() {
               <span className="truncate">Bloqueio de IPs</span>
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-              Gerenciar lista de IPs bloqueados e ameaças
+              Gerenciar lista de IPs bloqueados
             </p>
           </div>
         </div>
@@ -179,7 +141,7 @@ export default function AdminIPBlocking() {
             <DialogHeader>
               <DialogTitle>Bloquear Novo IP</DialogTitle>
               <DialogDescription>
-                Adicione um IP à lista de bloqueio manualmente
+                Adicione um IP à lista de bloqueio
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -193,42 +155,31 @@ export default function AdminIPBlocking() {
               </div>
               <div>
                 <Label>Motivo</Label>
-                <Input
+                <Textarea
                   value={newBlock.reason}
                   onChange={(e) => setNewBlock({ ...newBlock, reason: e.target.value })}
                   placeholder="Múltiplas tentativas de login"
                 />
               </div>
-              <div>
-                <Label>Severidade</Label>
-                <Select value={newBlock.severity} onValueChange={(v: any) => setNewBlock({ ...newBlock, severity: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Expiração (horas)</Label>
-                <Input
-                  type="number"
-                  value={newBlock.expiresInHours}
-                  onChange={(e) => setNewBlock({ ...newBlock, expiresInHours: e.target.value })}
-                  placeholder="24"
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isPermanent"
+                  checked={newBlock.isPermanent}
+                  onChange={(e) => setNewBlock({ ...newBlock, isPermanent: e.target.checked })}
                 />
+                <Label htmlFor="isPermanent">Bloqueio permanente</Label>
               </div>
-              <div>
-                <Label>Notas (opcional)</Label>
-                <Textarea
-                  value={newBlock.notes}
-                  onChange={(e) => setNewBlock({ ...newBlock, notes: e.target.value })}
-                  placeholder="Informações adicionais"
-                />
-              </div>
+              {!newBlock.isPermanent && (
+                <div>
+                  <Label>Bloquear até</Label>
+                  <Input
+                    type="datetime-local"
+                    value={newBlock.blockedUntil}
+                    onChange={(e) => setNewBlock({ ...newBlock, blockedUntil: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
@@ -243,7 +194,7 @@ export default function AdminIPBlocking() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Bloqueados</CardTitle>
@@ -256,41 +207,21 @@ export default function AdminIPBlocking() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Auto-Bloqueados</CardTitle>
+            <CardTitle className="text-sm font-medium">Permanentes</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.autoBlocked}</div>
+            <div className="text-2xl font-bold">{stats.permanentBlocks}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Manuais</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.manualBlocked}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ativos</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.activeBlocks}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expirados</CardTitle>
+            <CardTitle className="text-sm font-medium">Temporários</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expiredBlocks}</div>
+            <div className="text-2xl font-bold">{stats.temporaryBlocks}</div>
           </CardContent>
         </Card>
       </div>
@@ -313,43 +244,29 @@ export default function AdminIPBlocking() {
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold">{block.ip_address}</span>
-                      <Badge variant={getSeverityColor(block.severity)}>
-                        {block.severity}
-                      </Badge>
-                      {block.auto_blocked && (
-                        <Badge variant="secondary">Auto-bloqueado</Badge>
+                      {block.is_permanent && (
+                        <Badge variant="destructive">Permanente</Badge>
                       )}
-                      {isExpired(block.expires_at) && (
+                      {!block.is_permanent && isExpired(block.blocked_until) && (
                         <Badge variant="outline">Expirado</Badge>
-                      )}
-                      {block.unblocked_at && (
-                        <Badge variant="secondary">Desbloqueado</Badge>
                       )}
                     </div>
                     <p className="text-sm">{block.reason}</p>
-                    {block.notes && (
-                      <p className="text-sm text-muted-foreground">{block.notes}</p>
-                    )}
                     <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span>Bloqueado: {format(new Date(block.blocked_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                      {block.expires_at && (
-                        <span>Expira: {format(new Date(block.expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                      )}
-                      {block.failed_attempts > 0 && (
-                        <span>{block.failed_attempts} tentativas falhas</span>
+                      <span>Criado: {block.created_at ? format(new Date(block.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '-'}</span>
+                      {block.blocked_until && (
+                        <span>Expira: {format(new Date(block.blocked_until), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
                       )}
                     </div>
                   </div>
-                  {!block.unblocked_at && !isExpired(block.expires_at) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleUnblockIP(block.ip_address)}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Desbloquear
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleUnblockIP(block.ip_address)}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Desbloquear
+                  </Button>
                 </div>
               ))}
             </div>

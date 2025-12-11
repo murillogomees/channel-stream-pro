@@ -60,15 +60,14 @@ interface ClienteData {
 interface Payment {
   id: string;
   amount: number;
-  currency: string;
-  status: string;
+  currency: string | null;
+  status: string | null;
   payment_method: string | null;
-  payment_type: string | null;
   description: string | null;
-  payer_email: string | null;
   paid_at: string | null;
-  created_at: string;
-  mercado_pago_payment_id: string | null;
+  created_at: string | null;
+  external_id: string | null;
+  external_provider: string | null;
   metadata: any;
 }
 
@@ -295,19 +294,14 @@ export default function UnifiedProfile() {
       y += lineHeight;
     };
     
-    addLine('ID da Transação:', payment.mercado_pago_payment_id || payment.id);
+    addLine('ID da Transação:', payment.external_id || payment.id);
     addLine('Data:', formatDate(payment.paid_at || payment.created_at));
     addLine('Valor:', formatCurrency(payment.amount));
-    addLine('Status:', getStatusLabel(payment.status));
+    addLine('Status:', getStatusLabel(payment.status || 'pending'));
     addLine('Método:', payment.payment_method || 'Não especificado');
-    addLine('Tipo:', payment.payment_type || 'Não especificado');
     
     if (payment.description) {
       addLine('Descrição:', payment.description);
-    }
-    
-    if (payment.payer_email) {
-      addLine('Email do Pagador:', payment.payer_email);
     }
     
     doc.setDrawColor(200, 200, 200);
@@ -317,8 +311,7 @@ export default function UnifiedProfile() {
     doc.setTextColor(120, 120, 120);
     doc.text('Este documento é um comprovante de pagamento gerado automaticamente.', 105, 260, { align: 'center' });
     doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 267, { align: 'center' });
-    
-    const fileName = `comprovante-${payment.mercado_pago_payment_id || payment.id}.pdf`;
+    const fileName = `comprovante-${payment.external_id || payment.id}.pdf`;
     doc.save(fileName);
     
     toast.success('Comprovante baixado com sucesso!');
@@ -721,12 +714,12 @@ export default function UnifiedProfile() {
                             <p>{payment.payment_method || '-'}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-xs">Tipo</p>
-                            <p>{payment.payment_type || '-'}</p>
+                            <p className="text-muted-foreground text-xs">Provedor</p>
+                            <p>{payment.external_provider || '-'}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-xs">ID Mercado Pago</p>
-                            <p className="truncate text-xs">{payment.mercado_pago_payment_id || '-'}</p>
+                            <p className="text-muted-foreground text-xs">ID Externo</p>
+                            <p className="truncate text-xs">{payment.external_id || '-'}</p>
                           </div>
                         </div>
 
