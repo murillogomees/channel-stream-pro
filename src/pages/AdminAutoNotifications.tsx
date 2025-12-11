@@ -10,12 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Edit, Trash2, Bell, BellOff, Users, UserCog, Calendar, ArrowLeft, Heart, CreditCard, Activity, Megaphone, Settings, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Bell, BellOff, Users, UserCog, Calendar, ArrowLeft, Heart, CreditCard, Activity, Megaphone, Settings, Search, FileText, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { automaticNotificationRuleService } from '@/services/automaticNotificationRuleService';
 import type { AutomaticNotificationRule, CreateNotificationRuleInput } from '@/types/automaticNotification';
+import { useTemplates } from '@/hooks/useTemplates';
 import { toast } from 'sonner';
-
 // Categorias de eventos
 const EVENT_CATEGORIES = {
   lifecycle: {
@@ -118,6 +118,7 @@ const TRIGGER_CONDITIONS: Record<string, string> = {
 
 export default function AdminAutoNotifications() {
   const navigate = useNavigate();
+  const { templates, loading: templatesLoading } = useTemplates();
   const [rules, setRules] = useState<AutomaticNotificationRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -194,6 +195,13 @@ export default function AdminAutoNotifications() {
       }
     }
     return null;
+  };
+
+  // Get template name by ID
+  const getTemplateName = (templateId: string | null | undefined) => {
+    if (!templateId) return null;
+    const template = templates.find(t => t.id === templateId);
+    return template?.name || templateId;
   };
 
   const handleCreate = async () => {
@@ -463,15 +471,37 @@ export default function AdminAutoNotifications() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="template_reference">Referência do Template</Label>
-                  <Input
-                    id="template_reference"
+                  <Label htmlFor="template_reference">Template de Notificação</Label>
+                  <Select
                     value={formData.template_reference ?? ''}
-                    onChange={(e) => setFormData({ ...formData, template_reference: e.target.value })}
-                    placeholder="Nome exato do template em Templates WhatsApp"
-                  />
+                    onValueChange={(value) => setFormData({ ...formData, template_reference: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um template..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {templatesLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
+                      ) : templates.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Nenhum template cadastrado. Crie templates na aba "Templates".
+                        </div>
+                      ) : (
+                        templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span>{template.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
-                    Digite o nome exato do template cadastrado em Templates de Mensagem
+                    Selecione o template que será usado para esta notificação automática
                   </p>
                 </div>
 
@@ -611,8 +641,9 @@ export default function AdminAutoNotifications() {
                       </Badge>
                     )}
                     {rule.template_reference && (
-                      <Badge variant="secondary" className="max-w-32 truncate">
-                        📝 {rule.template_reference}
+                      <Badge variant="secondary" className="max-w-48 truncate">
+                        <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
+                        {getTemplateName(rule.template_reference)}
                       </Badge>
                     )}
                   </div>

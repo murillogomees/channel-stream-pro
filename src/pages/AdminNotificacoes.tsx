@@ -5,6 +5,7 @@ import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
+import { useTestContacts } from '@/hooks/useTestContacts';
 import { validateBrazilianPhone } from '@/utils/phoneValidator';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,8 @@ export default function AdminNotificacoes() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profiles } = useProfiles();
-  const { config, loading: configLoading, saveConfig, addTestContact, removeTestContact } = useWhatsAppConfig();
+  const { config, loading: configLoading, saveConfig } = useWhatsAppConfig();
+  const { contacts: testContacts } = useTestContacts();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
   const { addLog, stats, logs, loading: statsLoading } = useNotificationLogs();
   const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
@@ -57,14 +59,6 @@ export default function AdminNotificacoes() {
     error?: string;
     formatted?: string;
   }>({ isValid: true });
-  const [isAddingContact, setIsAddingContact] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
-  const [newContactValidation, setNewContactValidation] = useState<{
-    isValid: boolean;
-    error?: string;
-    formatted?: string;
-  }>({ isValid: false });
   const [testingCredentials, setTestingCredentials] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
   
@@ -91,54 +85,6 @@ export default function AdminNotificacoes() {
       setPhoneValidation({ isValid: true });
     }
   }, [config.testPhoneNumber]);
-
-  // Validar novo contato quando mudar
-  useEffect(() => {
-    if (newContactPhone) {
-      const validation = validateBrazilianPhone(newContactPhone);
-      setNewContactValidation(validation);
-    } else {
-      setNewContactValidation({ isValid: false });
-    }
-  }, [newContactPhone]);
-
-  const handleAddContact = () => {
-    if (!newContactName.trim()) {
-      toast({
-        title: 'Erro',
-        description: 'Digite um nome para o contato',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const validation = validateBrazilianPhone(newContactPhone);
-    if (!validation.isValid) {
-      toast({
-        title: 'Erro',
-        description: validation.error || 'Número inválido',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    addTestContact(newContactName.trim(), newContactPhone);
-    toast({
-      title: 'Sucesso!',
-      description: 'Contato adicionado com sucesso',
-    });
-    setNewContactName('');
-    setNewContactPhone('');
-    setIsAddingContact(false);
-  };
-
-  const handleRemoveContact = (id: string, name: string) => {
-    removeTestContact(id);
-    toast({
-      title: 'Sucesso!',
-      description: `Contato "${name}" removido`,
-    });
-  };
 
   const handleTestCredentials = async () => {
     setTestingCredentials(true);
@@ -259,16 +205,16 @@ export default function AdminNotificacoes() {
   // Combinar profiles reais com contatos de teste para envio
   const allContactsForSending = [
     ...profiles,
-    ...(config.testContacts || []).map(contact => ({
+    ...testContacts.map(contact => ({
       id: contact.id,
       nome: `${contact.name} (Teste)`,
       telefone: contact.phone,
       email: '',
       situacao: 'Testando',
-      created_at: contact.addedAt,
-      updated_at: contact.addedAt,
-      data_contratacao: contact.addedAt,
-      data_vencimento: contact.addedAt,
+      created_at: contact.created_at,
+      updated_at: contact.updated_at,
+      data_contratacao: contact.created_at,
+      data_vencimento: contact.created_at,
       plano: 'Mensal',
       valor_pago: 0,
     }))
@@ -806,112 +752,12 @@ export default function AdminNotificacoes() {
           </CardContent>
         </Card>
 
-        {/* Lista de Contatos de Teste */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Contatos de Teste
-            </CardTitle>
-            <CardDescription>
-              Gerencie uma lista de contatos para envio rápido de testes
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Dialog open={isAddingContact} onOpenChange={setIsAddingContact}>
-              <DialogTrigger asChild>
-                <Button className="w-full" disabled={!isConfigured}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar Contato
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Contato de Teste</DialogTitle>
-                  <DialogDescription>
-                    Adicione um novo contato à lista de números para envio de testes
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-name">Nome do Contato</Label>
-                    <Input
-                      id="contact-name"
-                      placeholder="Ex: João Silva"
-                      value={newContactName}
-                      onChange={(e) => setNewContactName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-phone">Telefone</Label>
-                    <Input
-                      id="contact-phone"
-                      placeholder="Ex: 5561996975924"
-                      value={newContactPhone}
-                      onChange={(e) => setNewContactPhone(e.target.value.replace(/\D/g, ''))}
-                      className={!newContactValidation.isValid && newContactPhone ? 'border-red-500' : ''}
-                    />
-                    {newContactPhone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        {newContactValidation.isValid ? (
-                          <>
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-green-600 dark:text-green-400">{newContactValidation.formatted}</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                            <span className="text-red-600 dark:text-red-400">{newContactValidation.error}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <Button 
-                    onClick={handleAddContact}
-                    disabled={!newContactValidation.isValid || !newContactName.trim()}
-                    className="w-full"
-                  >
-                    Adicionar
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {config.testContacts && config.testContacts.length > 0 ? (
-              <div className="space-y-2">
-                {config.testContacts.map((contact) => {
-                  const validation = validateBrazilianPhone(contact.phone);
-                  return (
-                    <div
-                      key={contact.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium">{contact.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {validation.formatted || contact.phone}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveContact(contact.id, contact.name)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <User className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                <p>Nenhum contato salvo</p>
-                <p className="text-sm">Adicione contatos para envio rápido de testes</p>
-              </div>
-            )}
+        {/* Nota sobre contatos de teste */}
+        <Card className="bg-muted/50">
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground text-center">
+              💡 Gerencie os contatos de teste na aba "Contatos de Teste" para usar nos envios manuais.
+            </p>
           </CardContent>
         </Card>
 
