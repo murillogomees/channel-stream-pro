@@ -430,9 +430,16 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
                   <Badge variant="outline" className="text-xs">Master</Badge>
                 )}
               </Label>
+              {(() => {
+                console.log('[AdminUserForm] Rendering role select - formData.user_role:', formData.user_role);
+                return null;
+              })()}
               <Select 
                 value={formData.user_role || 'client'} 
-                onValueChange={(value: any) => updateField('user_role', value)}
+                onValueChange={(value: 'client' | 'admin' | 'master') => {
+                  console.log('[AdminUserForm] Role changed to:', value);
+                  updateField('user_role', value);
+                }}
               >
                 <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12">
                   <SelectValue placeholder="Selecione a função" />
