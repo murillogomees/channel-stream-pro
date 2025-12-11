@@ -10,6 +10,23 @@ export type TemplateEventType =
   | 'payment_rejected' // Pagamento recusado
   | 'payment_refunded' // Pagamento reembolsado
   | 'payment_cancelled' // Pagamento cancelado
+  | 'trial_ending' // Teste terminando em breve
+  | 'trial_expiring' // Teste expirando amanhã
+  | 'trial_expired' // Teste expirou
+  | 'plan_upgrade' // Upgrade de plano
+  | 'plan_downgrade' // Downgrade de plano
+  | 'user_inactive' // Usuário inativo
+  | 'affiliate_referral' // Nova indicação de afiliado
+  | 'affiliate_commission' // Comissão de afiliado creditada
+  | 'loyalty_reward' // Recompensa de fidelidade
+  | 'client_anniversary' // Aniversário como cliente
+  | 'promotional_campaign' // Campanha promocional
+  | 'seasonal_greeting' // Mensagem sazonal
+  | 'new_content' // Novo conteúdo adicionado
+  | 'maintenance' // Manutenção programada/concluída
+  | 'churn_risk' // Risco de cancelamento
+  | 'client_reactivation' // Cliente reativado
+  | 'client_deactivation' // Cliente desativado
   | 'manual'; // Template manual para uso em automações
 
 export interface WhatsappTemplate {
