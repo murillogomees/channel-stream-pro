@@ -3,7 +3,7 @@
  * Uses security_alert_deliveries table
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface AlertPerformanceStats {
   total_alerts: number;

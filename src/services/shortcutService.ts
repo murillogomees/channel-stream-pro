@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type { AdminShortcut } from '@/types/activity';
 
 export class ShortcutService {

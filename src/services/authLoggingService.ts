@@ -2,7 +2,7 @@
  * Auth Logging Service - Simplified
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export type AuthEventType = 'login' | 'logout' | 'session_refresh' | 'access_denied';
 

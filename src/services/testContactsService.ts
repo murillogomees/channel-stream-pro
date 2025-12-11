@@ -3,7 +3,7 @@
  * CRUD operations for test contacts stored in database
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface TestContact {
   id: string;

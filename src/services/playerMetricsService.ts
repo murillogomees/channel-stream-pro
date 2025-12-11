@@ -8,7 +8,7 @@
  * - Error rates
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface PlayerMetric {
   timestamp: number;

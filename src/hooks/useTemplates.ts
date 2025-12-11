@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { WhatsappTemplate } from '@/types/whatsapp';
 import { DEFAULT_TEMPLATES } from '@/constants/defaultTemplates';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export const useTemplates = () => {
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
