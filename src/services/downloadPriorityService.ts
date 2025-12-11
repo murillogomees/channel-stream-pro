@@ -3,7 +3,7 @@
  * Pausa downloads de VOD quando o player está ativo para priorizar performance
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 let playerActiveCount = 0;
 let isPaused = false;
