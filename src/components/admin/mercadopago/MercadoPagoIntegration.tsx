@@ -127,6 +127,8 @@ export function MercadoPagoIntegration() {
   const [testUsers, setTestUsers] = useState<TestUser[]>([]);
   const [creatingUser, setCreatingUser] = useState(false);
 
+  const [configuredViaSecrets, setConfiguredViaSecrets] = useState(false);
+
   // Load config on mount
   useEffect(() => {
     loadConfig();
@@ -137,18 +139,23 @@ export function MercadoPagoIntegration() {
       const { data, error } = await supabase
         .from('mercado_pago_config')
         .select('*')
-        .eq('id', '00000000-0000-0000-0000-000000000001');
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) throw error;
       
-      const row = data?.[0];
-      if (row) {
+      if (data) {
+        // Check if configured via Supabase Secrets
+        const isViaSecrets = data.production_access_token === 'CONFIGURED_VIA_SECRETS';
+        setConfiguredViaSecrets(isViaSecrets);
+        
         setConfig({
-          sandboxAccessToken: row.sandbox_access_token || "",
-          productionAccessToken: row.production_access_token || "",
-          publicKey: row.public_key || "",
-          webhookSecret: row.webhook_secret || "",
-          useSandbox: row.use_sandbox ?? true
+          sandboxAccessToken: isViaSecrets ? "" : (data.sandbox_access_token || ""),
+          productionAccessToken: isViaSecrets ? "" : (data.production_access_token || ""),
+          publicKey: data.public_key || "",
+          webhookSecret: isViaSecrets ? "" : (data.webhook_secret || ""),
+          useSandbox: data.use_sandbox ?? true
         });
       }
     } catch (error) {
@@ -300,6 +307,21 @@ export function MercadoPagoIntegration() {
 
         {/* CONFIGURAÇÃO */}
         <TabsContent value="config" className="space-y-4">
+          {configuredViaSecrets && (
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-700">Credenciais Configuradas via Supabase Secrets</p>
+                  <p className="text-sm text-green-600">
+                    O Access Token e Webhook Secret estão configurados com segurança nos Secrets do projeto.
+                    As edge functions usam automaticamente esses valores.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -307,7 +329,10 @@ export function MercadoPagoIntegration() {
                 Chaves de API
               </CardTitle>
               <CardDescription>
-                Configure as credenciais do Mercado Pago para sandbox e produção
+                {configuredViaSecrets 
+                  ? "Credenciais gerenciadas via Supabase Secrets (MERCADO_PAGO_ACCESS_TOKEN)" 
+                  : "Configure as credenciais do Mercado Pago para sandbox e produção"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
