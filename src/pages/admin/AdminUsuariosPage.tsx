@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, AdminLayout } from "@/components/admin";
-import { Users, CreditCard, Activity, Shield } from "lucide-react";
+import { Users, CreditCard, Activity } from "lucide-react";
 import AdminUserPayments from "./AdminUserPayments";
 import AdminUserList from "@/pages/AdminUserList";
 
@@ -10,7 +10,7 @@ export default function AdminUsuariosPage() {
     <AdminLayout>
       <PageHeader
         title="Usuários & Permissões"
-        description="Gerencie usuários, roles e permissões"
+        description="Gerencie usuários e permissões"
         backTo="/admin/dashboard"
       />
 
@@ -27,10 +27,6 @@ export default function AdminUsuariosPage() {
           <TabsTrigger value="activity" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Atividades
-          </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Roles
           </TabsTrigger>
         </TabsList>
 
@@ -53,22 +49,6 @@ export default function AdminUsuariosPage() {
             <CardContent>
               <p className="text-muted-foreground">
                 Registro de atividades em desenvolvimento.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="roles" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerenciamento de Roles</CardTitle>
-              <CardDescription>
-                Configure permissões e roles dos usuários
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Gerenciamento de roles em desenvolvimento.
               </p>
             </CardContent>
           </Card>

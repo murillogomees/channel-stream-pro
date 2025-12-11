@@ -114,7 +114,10 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
     onChange({ ...formData, [field]: value });
   };
 
-  const canEditRole = currentUserRole === 'master';
+  // Master pode atribuir qualquer role, admin só pode atribuir client
+  const canEditRole = currentUserRole === 'master' || currentUserRole === 'admin';
+  const canAssignAdmin = currentUserRole === 'master';
+  const canAssignMaster = currentUserRole === 'master';
 
   return (
     <div className="space-y-4 sm:space-y-6 py-2">
@@ -420,16 +423,25 @@ export function AdminUserForm({ formData, onChange, isEdit = false, currentUserR
               <Label htmlFor="user_role" className="text-sm font-medium flex items-center gap-2">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
                 Função do Usuário
-                <Badge variant="outline" className="text-xs">Somente Master</Badge>
+                {canAssignMaster && (
+                  <Badge variant="outline" className="text-xs">Master</Badge>
+                )}
               </Label>
-              <Select value={formData.user_role || 'client'} onValueChange={(value: any) => updateField('user_role', value)}>
+              <Select 
+                value={formData.user_role || 'client'} 
+                onValueChange={(value: any) => updateField('user_role', value)}
+              >
                 <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/20 h-11 sm:h-12">
                   <SelectValue placeholder="Selecione a função" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="client">👤 Cliente</SelectItem>
-                  <SelectItem value="admin">🔧 Administrador</SelectItem>
-                  <SelectItem value="master">👑 Master</SelectItem>
+                  {canAssignAdmin && (
+                    <SelectItem value="admin">🔧 Administrador</SelectItem>
+                  )}
+                  {canAssignMaster && (
+                    <SelectItem value="master">👑 Master</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
