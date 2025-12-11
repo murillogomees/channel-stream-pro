@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageHeader, AdminLayout } from "@/components/admin";
 import { Users, CreditCard, Activity, Shield } from "lucide-react";
 import AdminUserPayments from "./AdminUserPayments";
+import AdminUserList from "@/pages/AdminUserList";
 
 export default function AdminUsuariosPage() {
   return (
@@ -34,22 +35,7 @@ export default function AdminUsuariosPage() {
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Lista de Usuários
-              </CardTitle>
-              <CardDescription>
-                Gerencie os usuários do sistema
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Listagem de usuários em desenvolvimento.
-              </p>
-            </CardContent>
-          </Card>
+          <AdminUserList />
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4">
