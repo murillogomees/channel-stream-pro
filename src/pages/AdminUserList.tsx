@@ -383,57 +383,57 @@ export default function AdminUserList() {
   return (
     <div className="space-y-6">
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total de Usuários</p>
-                <p className="text-2xl font-bold">{users.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+                <p className="text-xl sm:text-2xl font-bold">{users.length}</p>
               </div>
-              <User className="h-8 w-8 text-muted-foreground opacity-50" />
+              <User className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Administradores</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs sm:text-sm text-muted-foreground">Admins</p>
+                <p className="text-xl sm:text-2xl font-bold">
                   {users.filter(u => u.roles.includes('admin') || u.roles.includes('master')).length}
                 </p>
               </div>
-              <Shield className="h-8 w-8 text-blue-500 opacity-50" />
+              <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Clientes Ativos</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs sm:text-sm text-muted-foreground">Ativos</p>
+                <p className="text-xl sm:text-2xl font-bold">
                   {users.filter(u => u.situacao === 'Ativo').length}
                 </p>
               </div>
-              <CreditCard className="h-8 w-8 text-green-500 opacity-50" />
+              <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Em Teste</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs sm:text-sm text-muted-foreground">Testando</p>
+                <p className="text-xl sm:text-2xl font-bold">
                   {users.filter(u => u.situacao === 'Testando').length}
                 </p>
               </div>
-              <Calendar className="h-8 w-8 text-yellow-500 opacity-50" />
+              <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -441,69 +441,70 @@ export default function AdminUserList() {
 
       {/* Filtros e Ações */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle>Lista de Usuários</CardTitle>
-              <CardDescription>Gerenciamento completo de todos os usuários do sistema</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Lista de Usuários</CardTitle>
+              <CardDescription className="text-sm hidden sm:block">Gerenciamento completo de todos os usuários</CardDescription>
             </div>
-            <Button onClick={() => setCreateDialog(true)}>
+            <Button onClick={() => setCreateDialog(true)} className="w-full sm:w-auto">
               <UserPlus className="h-4 w-4 mr-2" />
               Criar Usuário
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <div className="flex flex-col gap-3 mb-4 sm:mb-6">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome, email ou telefone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-11"
               />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue placeholder="Filtrar role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Roles</SelectItem>
-                <SelectItem value="master">Master</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="client">Cliente</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue placeholder="Filtrar status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="Ativo">Ativo</SelectItem>
-                <SelectItem value="Testando">Testando</SelectItem>
-                <SelectItem value="Inativo">Inativo</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={() => { refresh(); loadUsersWithRoles(); }}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="flex-1 min-w-[120px] h-10">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Roles</SelectItem>
+                  <SelectItem value="master">Master</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="client">Cliente</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="flex-1 min-w-[120px] h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Testando">Testando</SelectItem>
+                  <SelectItem value="Inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={() => { refresh(); loadUsersWithRoles(); }} className="h-10 px-3">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          {/* Tabela de Usuários */}
-          <div className="rounded-md border">
+          {/* Tabela de Usuários - Responsiva */}
+          <div className="rounded-md border overflow-x-auto -mx-4 sm:mx-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Cadastro</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="min-w-[180px]">Usuário</TableHead>
+                  <TableHead className="min-w-[120px] hidden sm:table-cell">Contato</TableHead>
+                  <TableHead className="min-w-[80px]">Role</TableHead>
+                  <TableHead className="min-w-[80px]">Status</TableHead>
+                  <TableHead className="min-w-[100px] hidden md:table-cell">Plano</TableHead>
+                  <TableHead className="min-w-[100px] hidden lg:table-cell">Cadastro</TableHead>
+                  <TableHead className="text-right min-w-[80px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -518,37 +519,38 @@ export default function AdminUserList() {
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div>
-                            <p className="font-medium">{user.nome}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{user.nome}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">{user.email}</p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <div className="text-sm">
                           {user.telefone && (
                             <div className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {user.telefone}
+                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{user.telefone}</span>
                             </div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>{getRoleBadge(user.roles)}</TableCell>
                       <TableCell>{getStatusBadge(user.situacao)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm">{user.plano || 'Não definido'}</span>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="text-sm">{user.plano || '-'}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <span className="text-sm text-muted-foreground">
-                          {format(new Date(user.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                          {format(new Date(user.created_at), 'dd/MM/yy', { locale: ptBR })}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleEdit(user)}
                           >
                             <Edit className="h-4 w-4" />
@@ -556,6 +558,7 @@ export default function AdminUserList() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleDelete(user)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -573,14 +576,14 @@ export default function AdminUserList() {
 
       {/* Dialog de Edição */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="max-w-5xl max-h-[90vh] p-0">
-          <DialogHeader>
-            <DialogTitle>Editar Usuário</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+            <DialogTitle className="text-lg sm:text-xl">Editar Usuário</DialogTitle>
+            <DialogDescription className="text-sm">
               Altere as informações do usuário {selectedUser?.nome}
             </DialogDescription>
           </DialogHeader>
-          <div className="px-6">
+          <div className="px-4 sm:px-6 overflow-y-auto max-h-[calc(90vh-200px)]">
             <AdminUserForm
               formData={editFormData}
               onChange={setEditFormData}
@@ -590,7 +593,7 @@ export default function AdminUserList() {
           
           {/* Checkbox de notificação ao desativar */}
           {selectedUser?.cliente_ativo !== false && editFormData.cliente_ativo === false && (
-            <div className="px-6 pb-4 pt-2 border-t">
+            <div className="px-4 sm:px-6 pb-4 pt-2 border-t">
               <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <Checkbox
                   id="enviar-notificacao"
@@ -599,23 +602,23 @@ export default function AdminUserList() {
                 />
                 <div className="flex-1">
                   <Label htmlFor="enviar-notificacao" className="text-sm font-medium cursor-pointer">
-                    📱 Enviar notificação WhatsApp ao desativar
+                    📱 Enviar notificação WhatsApp
                   </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Uma mensagem será enviada informando sobre a desativação do cadastro
+                  <p className="text-xs text-muted-foreground hidden sm:block">
+                    Uma mensagem será enviada informando sobre a desativação
                   </p>
                 </div>
               </div>
             </div>
           )}
           
-          <DialogFooter className="px-6 pb-6">
-            <Button variant="outline" onClick={() => setEditDialog(false)}>
+          <DialogFooter className="px-4 sm:px-6 pb-4 sm:pb-6 flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setEditDialog(false)} className="w-full sm:w-auto">
               Cancelar
             </Button>
             <Button 
               onClick={handleEditSubmit} 
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
               disabled={savingEdit}
             >
               {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
@@ -647,79 +650,81 @@ export default function AdminUserList() {
 
       {/* Dialog de Criar Usuário */}
       <Dialog open={createDialog} onOpenChange={setCreateDialog}>
-        <DialogContent className="max-w-5xl max-h-[90vh] p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Criar Novo Usuário</DialogTitle>
-            <DialogDescription>
-              Preencha os dados para criar um novo usuário no sistema (sempre como Cliente)
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+            <DialogTitle className="text-lg sm:text-xl">Criar Novo Usuário</DialogTitle>
+            <DialogDescription className="text-sm">
+              Preencha os dados para criar um novo usuário
             </DialogDescription>
           </DialogHeader>
           
-          {/* Campos de Autenticação */}
-          <div className="px-6 space-y-4 border-b pb-4">
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Dados de Acesso
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="create-email" className="text-sm font-medium flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    Email <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="create-email"
-                    type="email"
-                    placeholder="usuario@exemplo.com"
-                    value={createFormData.email || ''}
-                    onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
-                    className="h-12"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-password" className="text-sm font-medium flex items-center gap-2">
-                    Senha <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="relative">
+          <div className="overflow-y-auto max-h-[calc(90vh-180px)]">
+            {/* Campos de Autenticação */}
+            <div className="px-4 sm:px-6 space-y-4 border-b pb-4">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 sm:p-4">
+                <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Dados de Acesso
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-email" className="text-sm font-medium flex items-center gap-2">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      Email <span className="text-destructive">*</span>
+                    </Label>
                     <Input
-                      id="create-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Mínimo 8 caracteres"
-                      value={createFormData.password || ''}
-                      onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
-                      className="h-12 pr-10"
+                      id="create-email"
+                      type="email"
+                      placeholder="usuario@exemplo.com"
+                      value={createFormData.email || ''}
+                      onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+                      className="h-11 sm:h-12"
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-12"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-password" className="text-sm font-medium flex items-center gap-2">
+                      Senha <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="create-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Mínimo 8 caracteres"
+                        value={createFormData.password || ''}
+                        onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                        className="h-11 sm:h-12 pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-11 sm:h-12"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+            
+            {/* Form completo usando AdminUserForm */}
+            <div className="px-4 sm:px-6">
+              <AdminUserForm
+                formData={createFormData}
+                onChange={setCreateFormData}
+                isEdit={false}
+                hideEmail={true}
+              />
+            </div>
           </div>
           
-          {/* Form completo usando AdminUserForm */}
-          <div className="px-6">
-            <AdminUserForm
-              formData={createFormData}
-              onChange={setCreateFormData}
-              isEdit={false}
-              hideEmail={true}
-            />
-          </div>
-          
-          <DialogFooter className="px-6 pb-6 border-t pt-4">
-            <Button variant="outline" onClick={() => setCreateDialog(false)} disabled={createLoading}>
+          <DialogFooter className="px-4 sm:px-6 pb-4 sm:pb-6 border-t pt-4 flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setCreateDialog(false)} disabled={createLoading} className="w-full sm:w-auto">
               Cancelar
             </Button>
-            <Button onClick={handleCreateUser} disabled={createLoading} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleCreateUser} disabled={createLoading} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
               {createLoading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
