@@ -109,12 +109,22 @@ export default function AdminDashboardPage() {
             isHighlighted
           />
           <NavCard
-            title="M3U"
-            description="Playlists e conteúdo VOD"
-            icon={<ListVideo className="h-5 w-5" />}
-            path="/admin/m3u"
-            badge="Hub"
+            title="Canais IPTV"
+            description="Gerenciar 209k+ canais"
+            icon={<Tv className="h-5 w-5" />}
+            path="/admin/iptv/channels"
+            badge="Novo"
+            isNew
             variant="accent"
+          />
+          <NavCard
+            title="Playlists"
+            description="M3U personalizadas"
+            icon={<ListVideo className="h-5 w-5" />}
+            path="/admin/iptv/playlists"
+            badge="Novo"
+            isNew
+            variant="info"
           />
           <NavCard
             title="Usuários & Permissões"
