@@ -1,6 +1,6 @@
 /**
  * Gerenciador de Configuração Centralizado
- * Uses whatsapp_config table (existing schema)
+ * Uses whatsapp_config and admin_phones tables
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,7 @@ export interface AdminPhone {
   phone: string;
   name: string;
   active: boolean;
+  priority?: number;
 }
 
 export class ConfigManager {
@@ -48,9 +49,36 @@ export class ConfigManager {
 
   /**
    * Busca telefones de administradores ativos
-   * Uses profiles table with admin role
+   * First checks admin_phones table, then falls back to profiles
    */
   async getActiveAdminPhones(): Promise<AdminPhone[]> {
+    // Try admin_phones table first
+    const { data: adminPhones, error: phonesError } = await supabase
+      .from('admin_phones')
+      .select('id, admin_id, phone, priority, is_active')
+      .eq('is_active', true)
+      .order('priority', { ascending: true });
+
+    if (!phonesError && adminPhones?.length) {
+      // Get admin names from profiles
+      const adminIds = adminPhones.map(p => p.admin_id).filter(Boolean);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .in('id', adminIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p.nome]) || []);
+
+      return adminPhones.map(p => ({
+        id: p.id,
+        phone: p.phone,
+        name: profileMap.get(p.admin_id) || 'Admin',
+        active: p.is_active || false,
+        priority: p.priority || 0,
+      }));
+    }
+
+    // Fallback to profiles table with admin role
     const { data, error } = await supabase
       .from('user_roles')
       .select(`
@@ -117,5 +145,43 @@ export class ConfigManager {
       valid: true,
       message: 'Configuração válida'
     };
+  }
+
+  /**
+   * Add admin phone
+   */
+  async addAdminPhone(adminId: string, phone: string, priority: number = 0): Promise<boolean> {
+    const { error } = await supabase
+      .from('admin_phones')
+      .insert({
+        admin_id: adminId,
+        phone,
+        priority,
+        is_active: true,
+      });
+
+    if (error) {
+      console.error('[ConfigManager] Error adding admin phone:', error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Remove admin phone
+   */
+  async removeAdminPhone(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('admin_phones')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[ConfigManager] Error removing admin phone:', error);
+      return false;
+    }
+
+    return true;
   }
 }
