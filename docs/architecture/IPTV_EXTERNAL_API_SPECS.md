@@ -246,20 +246,20 @@ interface ProbeJobData {
 
 const worker = new Worker('probe', async (job: Job<ProbeJobData>) => {
   const { channelId, url, timeout } = job.data;
-  
+
   const startTime = Date.now();
-  
+
   try {
     // Use ffprobe for detailed analysis
     const result = execSync(
       `ffprobe -v quiet -print_format json -show_format -show_streams -timeout ${timeout} "${url}"`,
       { timeout: timeout * 1000, encoding: 'utf-8' }
     );
-    
+
     const parsed = JSON.parse(result);
     const videoStream = parsed.streams.find(s => s.codec_type === 'video');
     const audioStream = parsed.streams.find(s => s.codec_type === 'audio');
-    
+
     return {
       success: true,
       latencyMs: Date.now() - startTime,
@@ -308,15 +308,15 @@ const ABR_PRESETS = {
 
 const worker = new Worker('transcode', async (job: Job<TranscodeJobData>) => {
   const { channelId, inputUrl, outputPrefix, resolutions, llhls } = job.data;
-  
+
   const outputs = [];
-  
+
   for (const res of resolutions) {
     const preset = ABR_PRESETS[res];
     if (!preset) continue;
-    
+
     const outputPath = `/tmp/${outputPrefix}_${res}`;
-    
+
     // FFmpeg command for LL-HLS
     const ffmpegArgs = [
       '-i', inputUrl,
@@ -337,30 +337,30 @@ const worker = new Worker('transcode', async (job: Job<TranscodeJobData>) => {
       '-hls_segment_filename', `${outputPath}_%03d.ts`,
       `${outputPath}.m3u8`,
     ];
-    
+
     await new Promise((resolve, reject) => {
       const proc = spawn('ffmpeg', ffmpegArgs);
       proc.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`FFmpeg exited with ${code}`)));
       proc.on('error', reject);
     });
-    
+
     // Upload to R2
     const manifestUrl = await uploadToR2(outputPath, outputPrefix, res);
-    
+
     outputs.push({
       resolution: res,
       manifestUrl,
       segmentPrefix: `${outputPrefix}_${res}`,
     });
-    
+
     // Update progress
     await job.updateProgress((resolutions.indexOf(res) + 1) / resolutions.length * 100);
   }
-  
+
   // Generate master playlist
   const masterManifest = generateMasterPlaylist(outputs);
   const masterUrl = await uploadMasterPlaylist(masterManifest, outputPrefix);
-  
+
   return { outputs, masterUrl };
 }, {
   connection: { host: 'redis', port: 6379 },
@@ -522,47 +522,47 @@ import { Counter, Histogram, Gauge, Registry } from 'prom-client';
 @Injectable()
 export class PrometheusService {
   public readonly registry: Registry;
-  
+
   // Probe metrics
   public readonly probeSuccessTotal: Counter;
   public readonly probeFailureTotal: Counter;
   public readonly probeLatencySeconds: Histogram;
-  
+
   // Transcode metrics
   public readonly transcodeJobsRunning: Gauge;
   public readonly transcodeJobsWaiting: Gauge;
   public readonly transcodeDurationSeconds: Histogram;
-  
+
   // Cache metrics
   public readonly cacheHitRatio: Gauge;
   public readonly cacheSize: Gauge;
-  
+
   // API metrics
   public readonly apiRequestDuration: Histogram;
   public readonly apiRequestTotal: Counter;
-  
+
   constructor() {
     this.registry = new Registry();
-    
+
     this.probeSuccessTotal = new Counter({
       name: 'probe_success_total',
       help: 'Total successful probes',
       registers: [this.registry],
     });
-    
+
     this.probeFailureTotal = new Counter({
       name: 'probe_failure_total',
       help: 'Total failed probes',
       registers: [this.registry],
     });
-    
+
     this.probeLatencySeconds = new Histogram({
       name: 'probe_latency_seconds',
       help: 'Probe latency in seconds',
       buckets: [0.1, 0.5, 1, 2, 5, 10],
       registers: [this.registry],
     });
-    
+
     // ... more metrics
   }
 }
@@ -602,7 +602,7 @@ TRANSCODE_CONCURRENCY=2
 PROBE_TIMEOUT_SECONDS=10
 
 # CDN
-CDN_BASE_URL=https://cdn.yourdomain.com
+CDN_BASE_URL=https://streaming.iptvlink.com.br
 ```
 
 ---
