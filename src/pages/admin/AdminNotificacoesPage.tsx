@@ -1,17 +1,17 @@
 /**
  * AdminNotificacoesPage - Hub de notificações
  * Rota: /admin/notificacoes
- * Abas: Notificações, Config, Automáticas, Fila, Templates
+ * Abas: Notificações, Configurações, Automáticas, Registro de Envios, Templates
  */
 
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Bell, Settings, Bot, Send, FileText } from "lucide-react";
+import { Bell, Settings, Bot, FileText, History } from "lucide-react";
 import AdminNotificacoes from "../AdminNotificacoes";
 import AdminNotificationSettings from "../AdminNotificationSettings";
 import AdminAutoNotifications from "../AdminAutoNotifications";
-import AdminNotificationQueue from "../AdminNotificationQueue";
+import AdminNotificationLogs from "../AdminNotificationLogs";
 import AdminTemplates from "../AdminTemplates";
 
 export default function AdminNotificacoesPage() {
@@ -37,10 +37,10 @@ export default function AdminNotificacoesPage() {
       content: <AdminAutoNotifications />
     },
     {
-      value: "fila",
-      label: "Fila",
-      icon: <Send className="h-4 w-4" />,
-      content: <AdminNotificationQueue />
+      value: "registro",
+      label: "Registro de Envios",
+      icon: <History className="h-4 w-4" />,
+      content: <AdminNotificationLogs />
     },
     {
       value: "templates",

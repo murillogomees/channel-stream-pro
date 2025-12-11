@@ -61,9 +61,11 @@ export default function TemplateVariablePicker({ onInsertVariable, onInsertQuote
   const [quoteSearch, setQuoteSearch] = useState('');
 
   const handleInsertVariable = (variable: TemplateVariable) => {
-    onInsertVariable(`{${variable.key}}`);
+    // Usar formato {variavel} - chave simples (padrão do sistema)
+    const varFormat = `{${variable.key}}`;
+    onInsertVariable(varFormat);
     setCopiedVariable(variable.key);
-    toast.success(`Variável {${variable.key}} inserida!`);
+    toast.success(`Variável ${varFormat} inserida!`);
     setTimeout(() => setCopiedVariable(null), 2000);
   };
 

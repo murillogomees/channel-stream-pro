@@ -1,16 +1,21 @@
 import { WhatsappTemplate } from '@/types/whatsapp';
 
+/**
+ * Templates padrão de notificação WhatsApp
+ * Formato de variáveis: {variavel} - chave simples
+ * O TemplateEngine suporta tanto {var} quanto {{var}}, mas o padrão é {var}
+ */
 export const DEFAULT_TEMPLATES: WhatsappTemplate[] = [
   // === BOAS-VINDAS ===
   {
     id: 'welcome_trial',
     name: 'Boas-vindas - Período de Teste',
-    message: `Olá {{nome}}! 👋🔥
+    message: `Olá {nome}! 👋🔥
 Bem-vindo à IPTV LINK!
 
 Seu período de teste foi ativado com sucesso. Aproveite à vontade — canais, filmes, séries e tudo mais sem limites.
 
-📅 Seu teste termina em: {{dataFimTeste}}
+📅 Seu teste termina em: {dataFimTeste}
 
 Se curtir a experiência (e você vai), é só escolher um plano quando desejar. Estamos por aqui pra qualquer dúvida.
 
@@ -25,16 +30,16 @@ IPTV LINK
   {
     id: 'welcome_plan',
     name: 'Boas-vindas - Plano Contratado',
-    message: `Olá {{nome}}! 🚀💙
-Seu acesso foi ativado com sucesso no plano: {{plano}}.
+    message: `Olá {nome}! 🚀💙
+Seu acesso foi ativado com sucesso no plano: {plano}.
 
 Agora é só aproveitar o melhor do entretenimento sem travar.
 
-📋 Plano: {{plano}}
-💰 Valor: R$ {{valor}}
-📅 Vencimento: {{dataVencimento}}
+📋 Plano: {plano}
+💰 Valor: R$ {valor}
+📅 Vencimento: {dataVencimento}
 
-Qualquer dúvida é só chamar aqui no WhatsApp: {{whatsappSuporte}}
+Qualquer dúvida é só chamar aqui no WhatsApp: {whatsappSuporte}
 
 Atenciosamente,
 IPTV LINK
@@ -49,11 +54,11 @@ IPTV LINK
   {
     id: 'renewal_confirmed',
     name: 'Renovação Confirmada',
-    message: `Olá {{nome}}! 🙌
+    message: `Olá {nome}! 🙌
 Seu plano foi renovado com sucesso!
 
-📋 Plano: {{plano}}
-📅 Próxima cobrança: {{dataVencimento}}
+📋 Plano: {plano}
+📅 Próxima cobrança: {dataVencimento}
 
 Tudo liberado para continuar assistindo sem dor de cabeça.
 
@@ -73,14 +78,14 @@ Indique um amigo → Ele assina → Você ganha 1 mês grátis automaticamente.`
   {
     id: 'expiration_minus_7',
     name: 'Faltam 7 dias para vencer',
-    message: `Olá {{nome}}! 📅
+    message: `Olá {nome}! 📅
 
-Seu plano vence em 7 dias ({{dataVencimento}}).
+Seu plano vence em 7 dias ({dataVencimento}).
 
 Que tal renovar antecipadamente e garantir entretenimento sem interrupção?
 
-💰 Valor: R$ {{valor}}
-🔗 Renove aqui: {{linkPagamento}}
+💰 Valor: R$ {valor}
+🔗 Renove aqui: {linkPagamento}
 
 Estamos à disposição!
 
@@ -93,7 +98,7 @@ IPTV LINK`,
   {
     id: 'expiration_minus_5',
     name: 'Faltam 5 dias para vencer',
-    message: 'Olá {{nome}}! Seu plano vence em 5 dias ({{dataVencimento}}). Valor: R$ {{valor}}. Renove agora: {{linkPagamento}}',
+    message: 'Olá {nome}! Seu plano vence em 5 dias ({dataVencimento}). Valor: R$ {valor}. Renove agora: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -102,7 +107,7 @@ IPTV LINK`,
   {
     id: 'expiration_minus_3',
     name: 'Faltam 3 dias para vencer',
-    message: '⚠️ {{nome}}, seu plano vence em 3 dias ({{dataVencimento}}). Garanta seu acesso renovando agora! Valor: R$ {{valor}}. Link: {{linkPagamento}}',
+    message: '⚠️ {nome}, seu plano vence em 3 dias ({dataVencimento}). Garanta seu acesso renovando agora! Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -111,7 +116,7 @@ IPTV LINK`,
   {
     id: 'expiration_minus_1',
     name: 'Falta 1 dia para vencer',
-    message: '🚨 {{nome}}, AMANHÃ seu plano vence! Data: {{dataVencimento}}. Renove hoje para não perder acesso! Valor: R$ {{valor}}. Link: {{linkPagamento}}',
+    message: '🚨 {nome}, AMANHÃ seu plano vence! Data: {dataVencimento}. Renove hoje para não perder acesso! Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'dataVencimento', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -120,12 +125,12 @@ IPTV LINK`,
   {
     id: 'expiration_zero',
     name: 'Vence hoje',
-    message: `Olá {{nome}}! 👋
-Passando para avisar que seu plano no valor de R$ {{valor}} vence hoje.
+    message: `Olá {nome}! 👋
+Passando para avisar que seu plano no valor de R$ {valor} vence hoje.
 
 Vamos renovar para manter o acesso liberado?
 
-🔗 PIX para renovação: {{linkPagamento}}
+🔗 PIX para renovação: {linkPagamento}
 
 Qualquer dúvida, estou à disposição.
 
@@ -139,7 +144,7 @@ IPTV LINK`,
   {
     id: 'expiration_plus_1',
     name: 'Vencido há 1 dia',
-    message: '❌ {{nome}}, seu plano venceu ontem. Regularize para reativar seu acesso. Valor: R$ {{valor}}. Link: {{linkPagamento}}',
+    message: '❌ {nome}, seu plano venceu ontem. Regularize para reativar seu acesso. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -148,7 +153,7 @@ IPTV LINK`,
   {
     id: 'expiration_plus_3',
     name: 'Vencido há 3 dias',
-    message: '🔴 {{nome}}, seu plano está vencido há 3 dias. Última chance para reativar antes do bloqueio permanente. Valor: R$ {{valor}}. Link: {{linkPagamento}}',
+    message: '🔴 {nome}, seu plano está vencido há 3 dias. Última chance para reativar antes do bloqueio permanente. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -157,7 +162,7 @@ IPTV LINK`,
   {
     id: 'expiration_plus_5',
     name: 'Vencido há 5 dias (Bloqueio)',
-    message: '❌ {{nome}}, seu acesso foi bloqueado por falta de pagamento. Para reativar, regularize seu plano. Valor: R$ {{valor}}. Link: {{linkPagamento}}',
+    message: '❌ {nome}, seu acesso foi bloqueado por falta de pagamento. Para reativar, regularize seu plano. Valor: R$ {valor}. Link: {linkPagamento}',
     variables: ['nome', 'valor', 'linkPagamento'],
     type: 'local',
     eventType: 'expiration',
@@ -166,13 +171,13 @@ IPTV LINK`,
   {
     id: 'expiration_plus_7',
     name: 'Vencido há 7 dias (Última Chance)',
-    message: `⛔ {{nome}}, seu acesso será EXCLUÍDO em 48 horas!
+    message: `⛔ {nome}, seu acesso será EXCLUÍDO em 48 horas!
 
 Sua conta está vencida há 7 dias e será removida do sistema.
 
 Para evitar perder todo seu histórico e configurações:
-💰 Valor: R$ {{valor}}
-🔗 Regularize agora: {{linkPagamento}}
+💰 Valor: R$ {valor}
+🔗 Regularize agora: {linkPagamento}
 
 Esta é sua última notificação.
 
@@ -187,7 +192,7 @@ IPTV LINK`,
   {
     id: 'payment_reminder_generic',
     name: 'Lembrete Genérico de Pagamento',
-    message: `Olá {{nome}}! 💬
+    message: `Olá {nome}! 💬
 Passando para lembrar: seu plano vence em breve.
 
 Fique tranquilo, você pode renovar quando quiser através do PIX.
@@ -207,14 +212,14 @@ IPTV LINK`,
     name: 'Pagamento Aprovado',
     message: `🎉 *Pagamento Aprovado!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Seu pagamento foi confirmado com sucesso!
 
-✅ *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
-💳 *Forma:* {{formaPagamento}}
-📅 *Válido até:* {{dataVencimento}}
+✅ *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+📅 *Válido até:* {dataVencimento}
 
 Seu acesso já está 100% liberado! 
 Pode entrar agora e aproveitar todo o conteúdo. 🎬
@@ -232,15 +237,15 @@ IPTV LINK`,
     name: 'Pagamento Pendente',
     message: `⏳ *Pagamento Pendente*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Recebemos seu pedido de pagamento e ele está aguardando confirmação.
 
-📋 *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
-💳 *Forma:* {{formaPagamento}}
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
 
-{{statusInfo}}
+{statusInfo}
 
 Assim que o pagamento for confirmado, você será notificado e seu acesso será liberado automaticamente!
 
@@ -257,13 +262,13 @@ IPTV LINK`,
     name: 'Pagamento em Processamento',
     message: `⏳ *Pagamento em Análise*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Seu pagamento está sendo processado pela operadora.
 
-📋 *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
-💳 *Forma:* {{formaPagamento}}
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
 
 Geralmente a confirmação ocorre em poucos minutos. Você receberá uma mensagem assim que for aprovado!
 
@@ -278,14 +283,14 @@ IPTV LINK`,
     name: 'Pagamento Recusado',
     message: `❌ *Pagamento Não Aprovado*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Infelizmente seu pagamento não foi processado.
 
-📋 *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
-💳 *Forma:* {{formaPagamento}}
-📝 *Motivo:* {{motivoErro}}
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
+💳 *Forma:* {formaPagamento}
+📝 *Motivo:* {motivoErro}
 
 Por favor, verifique os dados e tente novamente, ou escolha outra forma de pagamento.
 
@@ -302,12 +307,12 @@ IPTV LINK`,
     name: 'Pagamento Reembolsado',
     message: `💰 *Pagamento Reembolsado*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Seu pagamento foi reembolsado conforme solicitação.
 
-📋 *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
 
 O valor será devolvido na mesma forma de pagamento utilizada.
 
@@ -324,12 +329,12 @@ IPTV LINK`,
     name: 'Pagamento Cancelado',
     message: `🚫 *Pagamento Cancelado*
 
-Olá {{nome}}!
+Olá {nome}!
 
 O pagamento do seu plano foi cancelado.
 
-📋 *Plano:* {{plano}}
-💰 *Valor:* R$ {{valor}}
+📋 *Plano:* {plano}
+💰 *Valor:* R$ {valor}
 
 Se não foi você quem cancelou, entre em contato conosco para verificar o que aconteceu.
 
@@ -344,7 +349,7 @@ IPTV LINK`,
   {
     id: 'trial_ending_2days',
     name: 'Teste Termina em 2 Dias',
-    message: `Olá {{nome}}! 👋
+    message: `Olá {nome}! 👋
 
 Seu período de teste termina em 2 dias!
 
@@ -356,7 +361,7 @@ Escolha um plano e continue aproveitando:
 • Semestral: R$ 149,90 (economize R$ 30!)
 • Anual: R$ 279,90 (economize R$ 80!)
 
-🔗 Assine agora: {{linkPagamento}}
+🔗 Assine agora: {linkPagamento}
 
 Qualquer dúvida, estamos aqui!
 
@@ -368,11 +373,11 @@ IPTV LINK`,
   {
     id: 'trial_ending_1day',
     name: 'Teste Termina Amanhã',
-    message: `⚠️ {{nome}}, seu teste termina AMANHÃ!
+    message: `⚠️ {nome}, seu teste termina AMANHÃ!
 
 Não perca acesso ao melhor conteúdo!
 
-Escolha seu plano agora: {{linkPagamento}}
+Escolha seu plano agora: {linkPagamento}
 
 🎁 Primeira assinatura com 10% de desconto usando o cupom: PRIMEIRO10
 
@@ -384,7 +389,7 @@ IPTV LINK`,
   {
     id: 'trial_expired',
     name: 'Teste Expirou',
-    message: `Olá {{nome}}! 😢
+    message: `Olá {nome}! 😢
 
 Seu período de teste expirou.
 
@@ -392,7 +397,7 @@ Sentimos sua falta! Volte agora e ganhe condições especiais:
 
 🎁 Use o cupom VOLTE20 para 20% de desconto na primeira assinatura!
 
-🔗 Assine aqui: {{linkPagamento}}
+🔗 Assine aqui: {linkPagamento}
 
 Esperamos você de volta!
 
@@ -408,14 +413,14 @@ IPTV LINK`,
     name: 'Upgrade de Plano',
     message: `🎉 *Parabéns pelo Upgrade!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Seu plano foi atualizado com sucesso!
 
-⬆️ *De:* {{planoAnterior}}
-⬆️ *Para:* {{novoPlano}}
-💰 *Novo valor:* R$ {{valor}}
-📅 *Válido até:* {{dataVencimento}}
+⬆️ *De:* {planoAnterior}
+⬆️ *Para:* {novoPlano}
+💰 *Novo valor:* R$ {valor}
+📅 *Válido até:* {dataVencimento}
 
 Aproveite todos os novos benefícios! 🚀
 
@@ -430,13 +435,13 @@ IPTV LINK`,
     name: 'Downgrade de Plano',
     message: `📋 *Plano Atualizado*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Seu plano foi alterado conforme solicitação.
 
-⬇️ *De:* {{planoAnterior}}
-⬇️ *Para:* {{novoPlano}}
-💰 *Novo valor:* R$ {{valor}}
+⬇️ *De:* {planoAnterior}
+⬇️ *Para:* {novoPlano}
+💰 *Novo valor:* R$ {valor}
 
 As alterações entram em vigor no próximo ciclo de cobrança.
 
@@ -452,15 +457,15 @@ IPTV LINK`,
   {
     id: 'user_inactive_7days',
     name: 'Inativo há 7 Dias',
-    message: `Olá {{nome}}! 👋
+    message: `Olá {nome}! 👋
 
 Sentimos sua falta! Faz uma semana que você não acessa a plataforma.
 
 🎬 Novidades esperando por você:
-• {{novosConteudos}}
-• {{conteudoEmDestaque}}
+• {novosConteudos}
+• {conteudoEmDestaque}
 
-Volte e aproveite! {{linkApp}}
+Volte e aproveite! {linkApp}
 
 IPTV LINK`,
     variables: ['nome', 'novosConteudos', 'conteudoEmDestaque', 'linkApp'],
@@ -470,7 +475,7 @@ IPTV LINK`,
   {
     id: 'user_inactive_15days',
     name: 'Inativo há 15 Dias',
-    message: `{{nome}}, estamos com saudades! 😢
+    message: `{nome}, estamos com saudades! 😢
 
 Você não acessa há 15 dias. Está tudo bem?
 
@@ -479,9 +484,9 @@ Você não acessa há 15 dias. Está tudo bem?
 • Séries exclusivas
 • Canais ao vivo em HD
 
-🔗 Acesse agora: {{linkApp}}
+🔗 Acesse agora: {linkApp}
 
-Se tiver qualquer problema, nos avise! {{whatsappSuporte}}
+Se tiver qualquer problema, nos avise! {whatsappSuporte}
 
 IPTV LINK`,
     variables: ['nome', 'linkApp', 'whatsappSuporte'],
@@ -491,15 +496,15 @@ IPTV LINK`,
   {
     id: 'user_inactive_30days',
     name: 'Inativo há 30 Dias',
-    message: `{{nome}}, faz 30 dias! 😟
+    message: `{nome}, faz 30 dias! 😟
 
 Você sumiu! Está com algum problema técnico?
 
 🎁 Oferta especial para você voltar:
 Cupom SAUDADE30 = 30% de desconto na próxima renovação!
 
-📞 Precisa de ajuda? {{whatsappSuporte}}
-🔗 Acesse: {{linkApp}}
+📞 Precisa de ajuda? {whatsappSuporte}
+🔗 Acesse: {linkApp}
 
 Queremos você de volta!
 
@@ -515,21 +520,21 @@ IPTV LINK`,
     name: 'Nova Indicação (Afiliado)',
     message: `🎉 *Nova Indicação!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Alguém usou seu código de indicação!
 
-👤 *Indicado:* {{nomeIndicado}}
+👤 *Indicado:* {nomeIndicado}
 📋 *Status:* Aguardando assinatura
 
 Quando ele assinar, você ganha automaticamente!
 
 📊 Suas estatísticas:
-• Total indicados: {{totalIndicacoes}}
-• Convertidos: {{indicacoesConvertidas}}
-• Comissão acumulada: {{comissaoTotal}}
+• Total indicados: {totalIndicacoes}
+• Convertidos: {indicacoesConvertidas}
+• Comissão acumulada: {comissaoTotal}
 
-Continue compartilhando: {{linkIndicacao}}
+Continue compartilhando: {linkIndicacao}
 
 IPTV LINK`,
     variables: ['nome', 'nomeIndicado', 'totalIndicacoes', 'indicacoesConvertidas', 'comissaoTotal', 'linkIndicacao'],
@@ -541,18 +546,18 @@ IPTV LINK`,
     name: 'Comissão Creditada (Afiliado)',
     message: `💰 *Comissão Creditada!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Parabéns! Você ganhou uma nova comissão!
 
-👤 *Indicado:* {{nomeIndicado}}
-📋 *Plano assinado:* {{planoIndicado}}
-💵 *Sua comissão:* R$ {{comissaoTotal}}
+👤 *Indicado:* {nomeIndicado}
+📋 *Plano assinado:* {planoIndicado}
+💵 *Sua comissão:* R$ {comissaoTotal}
 
-📊 Saldo disponível para saque: {{comissaoPendente}}
+📊 Saldo disponível para saque: {comissaoPendente}
 
 Continue indicando e ganhe mais!
-🔗 {{linkIndicacao}}
+🔗 {linkIndicacao}
 
 IPTV LINK`,
     variables: ['nome', 'nomeIndicado', 'planoIndicado', 'comissaoTotal', 'comissaoPendente', 'linkIndicacao'],
@@ -564,14 +569,14 @@ IPTV LINK`,
   {
     id: 'loyalty_milestone',
     name: 'Marco de Fidelidade',
-    message: `🏆 *Parabéns, {{nome}}!*
+    message: `🏆 *Parabéns, {nome}!*
 
-Você completou {{mesesComoCliente}} meses como nosso cliente!
+Você completou {mesesComoCliente} meses como nosso cliente!
 
 🎁 Como agradecimento, você ganhou:
-• {{pontosFidelidade}} pontos de fidelidade
-• Nível atual: {{nivelFidelidade}}
-• Próxima recompensa: {{proximaRecompensa}}
+• {pontosFidelidade} pontos de fidelidade
+• Nível atual: {nivelFidelidade}
+• Próxima recompensa: {proximaRecompensa}
 
 Obrigado por fazer parte da família IPTV LINK! 💙
 
@@ -585,7 +590,7 @@ IPTV LINK`,
     name: 'Aniversário de Cliente',
     message: `🎂 *Feliz Aniversário de Cliente!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Hoje faz 1 ano que você está conosco! 🎉
 
@@ -593,7 +598,7 @@ Como presente especial:
 🎁 30% de desconto na próxima renovação
 📌 Cupom: ANIVER30
 
-Sua economia total neste ano: {{economiaTotal}}
+Sua economia total neste ano: {economiaTotal}
 
 Obrigado por confiar na IPTV LINK!
 
@@ -609,14 +614,14 @@ IPTV LINK`,
     name: 'Campanha Promocional',
     message: `🔥 *PROMOÇÃO ESPECIAL!*
 
-Olá {{nome}}!
+Olá {nome}!
 
-Só hoje: {{descontoCupom}} de desconto!
+Só hoje: {descontoCupom} de desconto!
 
-🎁 Cupom: {{codigoCupom}}
-⏰ Válido até: {{validadeCupom}}
+🎁 Cupom: {codigoCupom}
+⏰ Válido até: {validadeCupom}
 
-Aproveite agora: {{linkPagamento}}
+Aproveite agora: {linkPagamento}
 
 Não perca esta oportunidade!
 
@@ -628,9 +633,9 @@ IPTV LINK`,
   {
     id: 'seasonal_greeting',
     name: 'Mensagem Sazonal',
-    message: `🎄 *{{mensagemEspecial}}*
+    message: `🎄 *{mensagemEspecial}*
 
-Olá {{nome}}!
+Olá {nome}!
 
 A equipe IPTV LINK deseja a você e sua família muita paz, amor e alegria!
 
@@ -650,18 +655,18 @@ IPTV LINK`,
     name: 'Novo Conteúdo Adicionado',
     message: `🎬 *Novidade na Plataforma!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Acabamos de adicionar novos conteúdos que você vai adorar:
 
-🆕 {{conteudoEmDestaque}}
+🆕 {conteudoEmDestaque}
 
 📊 Agora temos:
-• {{totalCanais}} canais
-• {{totalFilmes}} filmes
-• {{totalSeries}} séries
+• {totalCanais} canais
+• {totalFilmes} filmes
+• {totalSeries} séries
 
-Acesse agora: {{linkApp}}
+Acesse agora: {linkApp}
 
 IPTV LINK`,
     variables: ['nome', 'conteudoEmDestaque', 'totalCanais', 'totalFilmes', 'totalSeries', 'linkApp'],
@@ -675,12 +680,12 @@ IPTV LINK`,
     name: 'Manutenção Programada',
     message: `🔧 *Aviso de Manutenção*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Informamos que haverá manutenção programada em nossa plataforma.
 
-📅 Data: {{dataPersonalizada}}
-⏰ Horário: {{horaAtual}}
+📅 Data: {dataPersonalizada}
+⏰ Horário: {horaAtual}
 ⏱️ Duração estimada: 2 horas
 
 Durante este período, o serviço pode apresentar instabilidades.
@@ -697,7 +702,7 @@ IPTV LINK`,
     name: 'Manutenção Concluída',
     message: `✅ *Manutenção Concluída!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Nossa manutenção foi concluída com sucesso!
 
@@ -705,7 +710,7 @@ O sistema está 100% operacional.
 
 Pode voltar a aproveitar o melhor conteúdo! 🎬
 
-Qualquer problema, nos avise: {{whatsappSuporte}}
+Qualquer problema, nos avise: {whatsappSuporte}
 
 IPTV LINK`,
     variables: ['nome', 'whatsappSuporte'],
@@ -717,7 +722,7 @@ IPTV LINK`,
   {
     id: 'churn_risk_detected',
     name: 'Risco de Cancelamento Detectado',
-    message: `Olá {{nome}}! 💬
+    message: `Olá {nome}! 💬
 
 Notamos que você tem acessado menos a plataforma ultimamente.
 
@@ -726,7 +731,7 @@ Está tudo bem? Podemos ajudar com algo?
 🎁 Que tal um cupom especial?
 Código: VOLTE15 = 15% de desconto na renovação
 
-📞 Fale conosco: {{whatsappSuporte}}
+📞 Fale conosco: {whatsappSuporte}
 
 Queremos te manter conosco!
 
@@ -740,14 +745,14 @@ IPTV LINK`,
     name: 'Cliente Reativado',
     message: `🎉 *Bem-vindo de Volta!*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Ficamos muito felizes com seu retorno!
 
 Seu acesso foi reativado com sucesso.
 
-📋 Plano: {{plano}}
-📅 Válido até: {{dataVencimento}}
+📋 Plano: {plano}
+📅 Válido até: {dataVencimento}
 
 Bom entretenimento! 🎬
 
@@ -761,12 +766,12 @@ IPTV LINK`,
     name: 'Cliente Desativado',
     message: `😢 *Conta Desativada*
 
-Olá {{nome}}!
+Olá {nome}!
 
 Sua conta foi desativada por falta de pagamento.
 
 Para reativar, basta regularizar:
-🔗 {{linkPagamento}}
+🔗 {linkPagamento}
 
 Sentiremos sua falta! Esperamos te ver em breve.
 
@@ -780,11 +785,11 @@ IPTV LINK`,
   {
     id: 'manual_generic',
     name: 'Mensagem Manual',
-    message: `Olá {{nome}}!
+    message: `Olá {nome}!
 
-{{textoPersonalizado1}}
+{textoPersonalizado1}
 
-{{textoPersonalizado2}}
+{textoPersonalizado2}
 
 Qualquer dúvida, estamos à disposição!
 
