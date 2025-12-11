@@ -164,8 +164,24 @@ export default function AdminWhatsAppConfig() {
     );
   }
 
+  const isConfiguredViaSecrets = config.appkey === 'CONFIGURED_VIA_SECRETS' || 
+    (!config.appkey && config.enabled);
+
   return (
     <div className="space-y-6">
+      {/* Secrets Status Alert */}
+      {isConfiguredViaSecrets && (
+        <Alert className="bg-green-500/10 border-green-500/30">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-700">
+            <strong>Credenciais Configuradas via Supabase Secrets</strong>
+            <br />
+            As chaves WHATSAPP_APPKEY e WHATSAPP_AUTHKEY estão configuradas com segurança nos Secrets do projeto.
+            As edge functions usam automaticamente esses valores.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Credentials Card */}
       <Card className="border-integration-messaging/30">
           <CardHeader className="pb-4">
@@ -176,14 +192,17 @@ export default function AdminWhatsAppConfig() {
                 </div>
                 Credenciais WhatsApp API
               </CardTitle>
-              {config.enabled ? (
+              {config.enabled || isConfiguredViaSecrets ? (
                 <Badge className="bg-success/20 text-success border-success/30">Configurado</Badge>
               ) : (
                 <Badge variant="outline" className="text-muted-foreground">Não Configurado</Badge>
               )}
             </div>
             <CardDescription className="mt-2">
-              Configure suas credenciais da API WhatsApp para envio automático de mensagens
+              {isConfiguredViaSecrets 
+                ? "Credenciais gerenciadas via Supabase Secrets (WHATSAPP_APPKEY, WHATSAPP_AUTHKEY)"
+                : "Configure suas credenciais da API WhatsApp para envio automático de mensagens"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
