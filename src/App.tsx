@@ -39,6 +39,10 @@ const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupab
 const AdminIPTVChannels = lazy(() => import("./pages/admin/AdminIPTVChannels"));
 const AdminIPTVPlaylists = lazy(() => import("./pages/admin/AdminIPTVPlaylists"));
 
+// IPTV App Pages
+const IPTVHome = lazy(() => import("./pages/iptv/IPTVHome"));
+const IPTVPlayer = lazy(() => import("./pages/iptv/IPTVPlayer"));
+
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
 
@@ -102,9 +106,11 @@ function AppContent() {
             <Route path="/afiliado" element={<ProtectedRoute><AffiliateDashboard /></ProtectedRoute>} />
             
             {/* ========================================
-                APP ROUTES
+                APP ROUTES - IPTV
             ======================================== */}
-            <Route path="/app" element={<Navigate to="/login" replace />} />
+            <Route path="/app" element={<ProtectedRoute><IPTVHome /></ProtectedRoute>} />
+            <Route path="/app/home" element={<ProtectedRoute><IPTVHome /></ProtectedRoute>} />
+            <Route path="/app/player/:channelId" element={<ProtectedRoute><IPTVPlayer /></ProtectedRoute>} />
             <Route path="/app/install" element={<AppInstall />} />
             <Route path="/app/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UnifiedProfile /></ProtectedRoute>} />
