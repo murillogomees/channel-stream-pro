@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWhatsAppConfig } from '@/hooks/useWhatsAppConfig';
 import { WhatsAppService } from '@/services/whatsapp';
+import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, CheckCircle2, Loader2, Key, Shield, MessageSquare, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -122,23 +123,24 @@ export default function AdminWhatsAppConfig() {
       return;
     }
 
-    if (!config.appkey || !config.authkey) {
-      toast({
-        title: 'Configure primeiro',
-        description: 'Salve as credenciais antes de testar',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsTesting(true);
 
     try {
-      const service = new WhatsAppService(config.appkey, config.authkey);
-      await service.sendTextMessage(
-        testPhone,
-        '🎉 *Teste de Configuração WhatsApp*\n\nSua integração WhatsApp está funcionando perfeitamente!\n\nVocê pode começar a enviar notificações automáticas para seus clientes.'
-      );
+      // Use Edge Function to send test message (uses secrets from Supabase)
+      const { data, error } = await supabase.functions.invoke('whatsapp-test', {
+        body: {
+          phone: testPhone,
+          message: '🎉 *Teste de Configuração WhatsApp*\n\nSua integração WhatsApp está funcionando perfeitamente!\n\nVocê pode começar a enviar notificações automáticas para seus clientes.'
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao enviar mensagem');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro ao enviar mensagem');
+      }
 
       toast({
         title: '✅ Mensagem enviada!',
@@ -332,7 +334,7 @@ export default function AdminWhatsAppConfig() {
               <Button
                 onClick={handleTestMessage}
                 variant="secondary"
-                disabled={isTesting || isLoading || !testPhone || !config.enabled}
+                disabled={isTesting || isLoading || !testPhone}
                 className="flex-1"
               >
                 {isTesting ? (
@@ -342,7 +344,7 @@ export default function AdminWhatsAppConfig() {
                   </>
                 ) : (
                   <>
-                    <MessageSquare className="mr-2 h-4 w-4" />
+                    <Send className="mr-2 h-4 w-4" />
                     Enviar Teste
                   </>
                 )}
