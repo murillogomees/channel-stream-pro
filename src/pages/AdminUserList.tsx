@@ -114,6 +114,11 @@ export default function AdminUserList() {
   };
 
   const handleEdit = (user: UserWithRole) => {
+    // Determinar a role do usuário sendo editado
+    const userRole = user.roles && user.roles.length > 0 ? user.roles[0] : 'client';
+    
+    console.log('[AdminUserList] handleEdit - user:', user.email, 'roles array:', user.roles, 'selected role:', userRole);
+    
     setSelectedUser(user);
     setEditFormData({
       ...user,
@@ -121,9 +126,9 @@ export default function AdminUserList() {
       is_recorrente: user.is_recorrente ?? false,
       totp_enabled: user.totp_enabled ?? false,
       valor_pago: user.valor_pago ?? 0,
-      user_role: user.roles[0] || 'client', // Mapear role para o formulário
+      user_role: userRole as 'client' | 'admin' | 'master',
     });
-    setEnviarNotificacao(false); // Reset checkbox ao abrir
+    setEnviarNotificacao(false);
     setEditDialog(true);
   };
 
