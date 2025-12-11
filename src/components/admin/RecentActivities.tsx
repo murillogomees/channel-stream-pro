@@ -2,13 +2,19 @@ import { useEffect, useState, memo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Activity, Users, Bell, Smartphone, CheckCircle, XCircle, Settings } from 'lucide-react';
-import { activityLogService } from '@/services/activityLogService';
-import type { ActivityLog } from '@/types/activity';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Memoized icon and color lookup functions
+interface ActivityLog {
+  id: string;
+  action: string;
+  entity_type: string | null;
+  created_at: string;
+  details: any;
+}
+
 const activityIcons: Record<string, React.ReactNode> = {
   client_created: <Users className="h-4 w-4" />,
   client_updated: <Users className="h-4 w-4" />,
@@ -19,27 +25,26 @@ const activityIcons: Record<string, React.ReactNode> = {
   payment_detected: <CheckCircle className="h-4 w-4" />,
 };
 
-const getActivityIcon = (actionType: string) => activityIcons[actionType] || <Activity className="h-4 w-4" />;
+const getActivityIcon = (action: string) => activityIcons[action] || <Activity className="h-4 w-4" />;
 
-const getActivityColor = (actionType: string) => {
-  if (actionType.includes('failed') || actionType.includes('error')) return 'destructive';
-  if (actionType.includes('created') || actionType.includes('success')) return 'default';
+const getActivityColor = (action: string) => {
+  if (action.includes('failed') || action.includes('error')) return 'destructive';
+  if (action.includes('created') || action.includes('success')) return 'default';
   return 'secondary';
 };
 
-// Memoized activity item component
 const ActivityItem = memo(({ activity }: { activity: ActivityLog }) => (
   <div className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
     <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-      {getActivityIcon(activity.action_type)}
+      {getActivityIcon(activity.action)}
     </div>
     <div className="flex-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium leading-none mb-1">
-          {activity.action_description}
+          {activity.action.replace(/_/g, ' ')}
         </p>
-        <Badge variant={getActivityColor(activity.action_type)} className="shrink-0">
-          {activity.action_type.replace(/_/g, ' ')}
+        <Badge variant={getActivityColor(activity.action)} className="shrink-0">
+          {activity.action.replace(/_/g, ' ')}
         </Badge>
       </div>
       {activity.entity_type && (
@@ -60,8 +65,14 @@ export const RecentActivities = memo(function RecentActivities() {
 
   const loadActivities = useCallback(async () => {
     try {
-      const data = await activityLogService.getRecentActivities(10);
-      setActivities(data);
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('id, action, entity_type, created_at, details')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setActivities(data || []);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Erro ao carregar atividades:', error);
@@ -73,13 +84,25 @@ export const RecentActivities = memo(function RecentActivities() {
   useEffect(() => {
     loadActivities();
 
-    // Subscribe to real-time updates
-    const unsubscribe = activityLogService.subscribeToActivities((newActivity) => {
-      setActivities((prev) => [newActivity, ...prev].slice(0, 10));
-      setLastUpdate(new Date());
-    });
+    const channel = supabase
+      .channel('activity-logs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'activity_logs'
+        },
+        (payload) => {
+          setActivities((prev) => [payload.new as ActivityLog, ...prev].slice(0, 10));
+          setLastUpdate(new Date());
+        }
+      )
+      .subscribe();
 
-    return unsubscribe;
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadActivities]);
 
   return (

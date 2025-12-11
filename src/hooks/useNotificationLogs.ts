@@ -90,11 +90,18 @@ export function useNotificationLogs() {
 
   const addLog = async (log: {
     clienteId: string;
+    clienteNome?: string;
     telefone: string;
     template: string;
     tipo: string;
     status: string;
     erro?: string;
+    resposta?: any;
+    arquivoEnviado?: {
+      nome: string;
+      tipo: string;
+      tamanho: number;
+    };
   }) => {
     try {
       await supabase.from('sent_notifications').insert({

@@ -1,73 +1,81 @@
+/**
+ * Automatic Notification Rule Service - Simplified
+ * Uses auto_notifications table
+ */
+
 import { supabase } from '@/integrations/supabase/client';
-import type { 
-  AutomaticNotificationRule, 
-  CreateNotificationRuleInput, 
-  UpdateNotificationRuleInput 
-} from '@/types/automaticNotification';
+
+export interface AutomaticNotificationRule {
+  id: string;
+  name: string | null;
+  description: string | null;
+  trigger_type: string;
+  is_active: boolean | null;
+  template_key: string | null;
+  delay_hours: number | null;
+  conditions: any;
+  created_at: string | null;
+  updated_at: string | null;
+}
 
 export class AutomaticNotificationRuleService {
   async getAll(): Promise<AutomaticNotificationRule[]> {
     const { data, error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .select('*')
-      .order('priority', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar regras de notificação:', error);
-      throw error;
+      return [];
     }
 
-    return data as AutomaticNotificationRule[];
+    return (data || []) as AutomaticNotificationRule[];
   }
 
   async getById(id: string): Promise<AutomaticNotificationRule | null> {
     const { data, error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .select('*')
       .eq('id', id)
       .maybeSingle();
 
     if (error) {
       console.error('Erro ao buscar regra de notificação:', error);
-      throw error;
+      return null;
     }
 
     return data as AutomaticNotificationRule | null;
   }
 
-  async create(input: CreateNotificationRuleInput): Promise<AutomaticNotificationRule> {
+  async create(input: Partial<AutomaticNotificationRule>): Promise<AutomaticNotificationRule | null> {
     const { data, error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .insert({
-        name: input.name,
+        name: input.name || null,
         description: input.description || null,
-        event_type: input.event_type,
-        trigger_condition: input.trigger_condition,
-        days_before: input.days_before || null,
-        target_audience: input.target_audience,
-        template_reference: input.template_reference || null,
-        active: input.active ?? true,
-        priority: input.priority ?? 0,
+        trigger_type: input.trigger_type || 'manual',
+        is_active: input.is_active ?? true,
+        template_key: input.template_key || null,
+        delay_hours: input.delay_hours || 0,
+        conditions: input.conditions || null,
       })
       .select()
       .single();
 
     if (error) {
       console.error('Erro ao criar regra de notificação:', error);
-      throw error;
+      return null;
     }
 
     return data as AutomaticNotificationRule;
   }
 
-  async update(input: UpdateNotificationRuleInput): Promise<AutomaticNotificationRule> {
-    const { id, ...updates } = input;
-    
+  async update(id: string, input: Partial<AutomaticNotificationRule>): Promise<AutomaticNotificationRule | null> {
     const { data, error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .update({
-        ...updates,
+        ...input,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -76,50 +84,46 @@ export class AutomaticNotificationRuleService {
 
     if (error) {
       console.error('Erro ao atualizar regra de notificação:', error);
-      throw error;
+      return null;
     }
 
     return data as AutomaticNotificationRule;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string): Promise<boolean> {
     const { error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .delete()
       .eq('id', id);
 
     if (error) {
       console.error('Erro ao deletar regra de notificação:', error);
-      throw error;
+      return false;
     }
+
+    return true;
   }
 
-  async toggleActive(id: string, active: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('automatic_notification_rules')
-      .update({ active, updated_at: new Date().toISOString() })
-      .eq('id', id);
+  async toggleActive(id: string): Promise<AutomaticNotificationRule | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
 
-    if (error) {
-      console.error('Erro ao alternar status da regra:', error);
-      throw error;
-    }
+    return this.update(id, { is_active: !current.is_active });
   }
 
   async getActiveRulesByEventType(eventType: string): Promise<AutomaticNotificationRule[]> {
     const { data, error } = await supabase
-      .from('automatic_notification_rules')
+      .from('auto_notifications')
       .select('*')
-      .eq('event_type', eventType)
-      .eq('active', true)
-      .order('priority', { ascending: false });
+      .eq('trigger_type', eventType)
+      .eq('is_active', true);
 
     if (error) {
       console.error('Erro ao buscar regras ativas por tipo:', error);
-      throw error;
+      return [];
     }
 
-    return data as AutomaticNotificationRule[];
+    return (data || []) as AutomaticNotificationRule[];
   }
 }
 

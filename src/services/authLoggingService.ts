@@ -1,26 +1,12 @@
 /**
- * SERVIÇO DE LOGGING DE AUTENTICAÇÃO
- * 
- * Registra eventos de autenticação para monitoramento e auditoria
+ * Auth Logging Service - Simplified
  */
 
 import { supabase } from '@/integrations/supabase/client';
 
 export type AuthEventType = 'login' | 'logout' | 'session_refresh' | 'access_denied';
 
-interface LogAuthEventParams {
-  userId: string;
-  userEmail: string;
-  eventType: AuthEventType;
-  ipAddress?: string;
-  userAgent?: string;
-  metadata?: Record<string, any>;
-}
-
 export const authLoggingService = {
-  /**
-   * Registra evento de autenticação
-   */
   async logEvent({
     userId,
     userEmail,
@@ -28,9 +14,16 @@ export const authLoggingService = {
     ipAddress,
     userAgent,
     metadata = {}
-  }: LogAuthEventParams) {
+  }: {
+    userId: string;
+    userEmail: string;
+    eventType: AuthEventType;
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: Record<string, any>;
+  }) {
     try {
-      const { error } = await supabase
+      await supabase
         .from('auth_sessions_log')
         .insert({
           user_id: userId,
@@ -40,20 +33,13 @@ export const authLoggingService = {
           user_agent: userAgent,
           metadata
         });
-
-      if (error) {
-        console.error('[AuthLogging] Erro ao registrar evento:', error);
-      }
     } catch (error) {
       console.error('[AuthLogging] Erro ao registrar evento:', error);
     }
   },
 
-  /**
-   * Registra login bem-sucedido
-   */
   async logLogin(userId: string, userEmail: string, metadata?: Record<string, any>) {
-    const userAgent = navigator.userAgent;
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     
     await this.logEvent({
       userId,
@@ -64,9 +50,6 @@ export const authLoggingService = {
     });
   },
 
-  /**
-   * Registra logout
-   */
   async logLogout(userId: string, userEmail: string) {
     await this.logEvent({
       userId,
@@ -75,9 +58,6 @@ export const authLoggingService = {
     });
   },
 
-  /**
-   * Registra acesso negado
-   */
   async logAccessDenied(userId: string, userEmail: string, reason: string, path: string) {
     await this.logEvent({
       userId,
@@ -87,39 +67,28 @@ export const authLoggingService = {
     });
   },
 
-  /**
-   * Busca estatísticas de autenticação
-   */
   async getStatistics(days: number = 7) {
-    const { data, error } = await supabase
-      .rpc('get_auth_statistics', { _days: days });
-
-    if (error) {
+    try {
+      const { data, error } = await supabase.rpc('get_auth_statistics', { days });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
       console.error('[AuthLogging] Erro ao buscar estatísticas:', error);
       return [];
     }
-
-    return data || [];
   },
 
-  /**
-   * Busca sessões ativas
-   */
   async getActiveSessions() {
-    const { data, error } = await supabase
-      .rpc('get_active_sessions');
-
-    if (error) {
+    try {
+      const { data, error } = await supabase.rpc('get_active_sessions');
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
       console.error('[AuthLogging] Erro ao buscar sessões ativas:', error);
       return [];
     }
-
-    return data || [];
   },
 
-  /**
-   * Busca histórico de logins recentes
-   */
   async getRecentLogins(limit: number = 50) {
     const { data, error } = await supabase
       .from('auth_sessions_log')
@@ -135,23 +104,4 @@ export const authLoggingService = {
 
     return data || [];
   },
-
-  /**
-   * Busca tentativas de acesso negado
-   */
-  async getAccessDeniedAttempts(limit: number = 50) {
-    const { data, error } = await supabase
-      .from('auth_sessions_log')
-      .select('*')
-      .eq('event_type', 'access_denied')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('[AuthLogging] Erro ao buscar acessos negados:', error);
-      return [];
-    }
-
-    return data || [];
-  }
 };

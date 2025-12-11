@@ -1,11 +1,11 @@
 export interface ActivityLog {
   id: string;
   user_id: string | null;
-  action_type: string;
-  action_description: string;
+  action: string;
   entity_type: string | null;
   entity_id: string | null;
-  metadata: Record<string, any> | null;
+  details: Record<string, any> | null;
+  ip_address: string | null;
   created_at: string;
 }
 
