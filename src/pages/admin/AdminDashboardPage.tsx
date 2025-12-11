@@ -110,21 +110,12 @@ export default function AdminDashboardPage() {
           />
           <NavCard
             title="Canais IPTV"
-            description="Gerenciar 209k+ canais"
+            description="Canais, playlists, EPG, transcode"
             icon={<Tv className="h-5 w-5" />}
-            path="/admin/iptv/channels"
-            badge="Novo"
+            path="/admin/iptv"
+            badge="Hub"
             isNew
             variant="accent"
-          />
-          <NavCard
-            title="Playlists"
-            description="M3U personalizadas"
-            icon={<ListVideo className="h-5 w-5" />}
-            path="/admin/iptv/playlists"
-            badge="Novo"
-            isNew
-            variant="info"
           />
           <NavCard
             title="Usuários & Permissões"
