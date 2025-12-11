@@ -22,18 +22,48 @@ serve(async (req) => {
 
     console.log("[fetch-m3u] Fetching M3U from:", url);
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
+    // Try to fetch with multiple strategies
+    let content: string | null = null;
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch M3U: ${response.status} ${response.statusText}`);
+    // List of URLs to try (original, and protocol swap if applicable)
+    const urlsToTry: string[] = [url];
+    
+    // If URL has unusual port (like 8880), try HTTP version too
+    if (url.startsWith("https://")) {
+      urlsToTry.push(url.replace("https://", "http://"));
+    } else if (url.startsWith("http://")) {
+      urlsToTry.push(url.replace("http://", "https://"));
     }
 
-    const content = await response.text();
-    console.log("[fetch-m3u] Fetched content length:", content.length);
+    for (const tryUrl of urlsToTry) {
+      try {
+        console.log("[fetch-m3u] Trying URL:", tryUrl);
+        
+        const response = await fetch(tryUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        }
+
+        content = await response.text();
+        console.log("[fetch-m3u] Success with URL:", tryUrl, "Content length:", content.length);
+        break;
+      } catch (err) {
+        console.log("[fetch-m3u] Failed with URL:", tryUrl, "Error:", err.message);
+        lastError = err;
+      }
+    }
+
+    if (!content) {
+      throw lastError || new Error("Failed to fetch M3U from all URLs");
+    }
 
     return new Response(
       JSON.stringify({ content }),
