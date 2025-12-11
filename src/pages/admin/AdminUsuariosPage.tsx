@@ -1,106 +1,93 @@
-/**
- * AdminUsuariosPage - Hub de usuários e permissões
- * Rota: /admin/usuarios
- */
-
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { AdminShell } from "@/components/admin/AdminShell";
-import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Users, Shield, History, Activity, CreditCard, UserCheck } from "lucide-react";
-import AdminUserList from "../AdminUserList";
-import AdminUserRoles from "../AdminUserRoles";
-import AdminRoleAudit from "../AdminRoleAudit";
-import AdminActivityLogs from "../AdminActivityLogs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, AdminLayout } from "@/components/admin";
+import { Users, CreditCard, Activity, Shield } from "lucide-react";
 import AdminUserPayments from "./AdminUserPayments";
-import AdminAffiliatesTab from "./AdminAffiliatesTab";
-
-const TAB_MAP: Record<string, string> = {
-  list: "list",
-  usuarios: "list",
-  payments: "payments",
-  pagamentos: "payments",
-  activity: "activity",
-  atividades: "activity",
-  affiliates: "affiliates",
-  afiliados: "affiliates",
-  roles: "roles",
-  audit: "audit",
-  auditoria: "audit",
-};
 
 export default function AdminUsuariosPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState(() => {
-    if (tabParam && TAB_MAP[tabParam]) {
-      return TAB_MAP[tabParam];
-    }
-    return "list";
-  });
-
-  useEffect(() => {
-    if (tabParam && TAB_MAP[tabParam]) {
-      setActiveTab(TAB_MAP[tabParam]);
-    }
-  }, [tabParam]);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    if (value !== "list") {
-      setSearchParams({ tab: value });
-    } else {
-      setSearchParams({});
-    }
-  };
-
-  const tabs = [
-    {
-      value: "list",
-      label: "Usuários",
-      icon: <Users className="h-4 w-4" />,
-      content: <AdminUserList />
-    },
-    {
-      value: "payments",
-      label: "Pagamentos",
-      icon: <CreditCard className="h-4 w-4" />,
-      content: <AdminUserPayments />
-    },
-    {
-      value: "activity",
-      label: "Atividades",
-      icon: <Activity className="h-4 w-4" />,
-      content: <AdminActivityLogs />
-    },
-    {
-      value: "affiliates",
-      label: "Afiliados",
-      icon: <UserCheck className="h-4 w-4" />,
-      content: <AdminAffiliatesTab />
-    },
-    {
-      value: "roles",
-      label: "Roles",
-      icon: <Shield className="h-4 w-4" />,
-      content: <AdminUserRoles />
-    },
-    {
-      value: "audit",
-      label: "Auditoria",
-      icon: <History className="h-4 w-4" />,
-      content: <AdminRoleAudit />
-    }
-  ];
-
   return (
-    <AdminShell>
-      <ResponsiveTabs
-        defaultValue="list"
-        value={activeTab}
-        onValueChange={handleTabChange}
-        tabs={tabs}
+    <AdminLayout>
+      <PageHeader
+        title="Usuários & Permissões"
+        description="Gerencie usuários, roles e permissões"
+        backTo="/admin/dashboard"
       />
-    </AdminShell>
+
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Usuários
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Pagamentos
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Atividades
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Roles
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Lista de Usuários
+              </CardTitle>
+              <CardDescription>
+                Gerencie os usuários do sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Listagem de usuários em desenvolvimento.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-4">
+          <AdminUserPayments />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registro de Atividades</CardTitle>
+              <CardDescription>
+                Histórico de ações dos usuários no sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Registro de atividades em desenvolvimento.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gerenciamento de Roles</CardTitle>
+              <CardDescription>
+                Configure permissões e roles dos usuários
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Gerenciamento de roles em desenvolvimento.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </AdminLayout>
   );
 }

@@ -1,5 +1,15 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { ActivityLog } from '@/types/activity';
+
+export interface ActivityLog {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  details: any;
+  ip_address: string | null;
+  created_at: string;
+}
 
 export class ActivityLogService {
   async getRecentActivities(limit = 10): Promise<ActivityLog[]> {
@@ -11,33 +21,30 @@ export class ActivityLogService {
 
     if (error) {
       console.error('Erro ao buscar atividades:', error);
-      throw error;
+      return [];
     }
 
-    return data as ActivityLog[];
+    return (data || []) as ActivityLog[];
   }
 
   async logActivity(
-    actionType: string,
-    description: string,
+    action: string,
+    description?: string,
     entityType?: string,
     entityId?: string,
     metadata?: Record<string, any>
   ): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { error } = await supabase
-      .from('activity_logs')
-      .insert({
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase.from('activity_logs').insert({
         user_id: user?.id || null,
-        action_type: actionType,
-        action_description: description,
+        action: action,
         entity_type: entityType || null,
         entity_id: entityId || null,
-        metadata: metadata || null,
+        details: metadata || null,
       });
-
-    if (error) {
+    } catch (error) {
       console.error('Erro ao registrar atividade:', error);
     }
   }
