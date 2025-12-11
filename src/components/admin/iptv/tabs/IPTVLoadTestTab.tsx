@@ -180,10 +180,10 @@ export function IPTVLoadTestTab() {
     toast.loading('Populando cache e transcode com dados de teste...');
     
     try {
-      // Insert test cache entries
+      // Insert test cache entries (without channel_id to avoid FK constraint)
       const cacheEntries = Array.from({ length: 50 }, (_, i) => ({
         cache_key: `test_channel_${i + 1}_${Date.now()}`,
-        channel_id: i + 1,
+        channel_id: null,
         cdn_provider: ['cloudflare', 'r2', 'origin'][i % 3],
         manifest_url: `https://cdn.example.com/channel_${i + 1}/manifest.m3u8`,
         is_warm: Math.random() > 0.3,
@@ -195,9 +195,9 @@ export function IPTVLoadTestTab() {
       
       addLog(`💾 ${cacheEntries.length} entradas de cache criadas`);
 
-      // Insert test transcode jobs
+      // Insert test transcode jobs (without channel_id to avoid FK constraint)
       const transcodeJobs = Array.from({ length: 20 }, (_, i) => ({
-        channel_id: i + 1,
+        channel_id: null,
         status: ['pending', 'processing', 'completed', 'failed'][i % 4],
         mode: 'hls',
         target_resolutions: ['720p', '480p', '360p'],
