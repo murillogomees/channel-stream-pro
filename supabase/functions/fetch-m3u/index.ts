@@ -5,6 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Max content size: 10MB (to stay within memory limits)
+const MAX_CONTENT_SIZE = 10 * 1024 * 1024;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -35,7 +38,7 @@ serve(async (req) => {
       console.log("[fetch-m3u] URL parse warning:", e.message);
     }
 
-    // Single attempt with VLC user agent (most compatible)
+    // Single attempt with VLC user agent
     const response = await fetch(fetchUrl, {
       method: 'GET',
       headers: {
@@ -47,14 +50,50 @@ serve(async (req) => {
     console.log("[fetch-m3u] Response status:", response.status);
 
     if (!response.ok) {
-      // If blocked (404/403), return specific error
       if (response.status === 404 || response.status === 403) {
         throw new Error("Servidor bloqueou a requisição. Use 'Colar M3U' para importar.");
       }
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const content = await response.text();
+    // Check content-length header if available
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_CONTENT_SIZE) {
+      const sizeMB = Math.round(parseInt(contentLength) / 1024 / 1024);
+      throw new Error(`Arquivo muito grande (${sizeMB}MB). Use 'Colar M3U' para playlists grandes.`);
+    }
+
+    // Stream response and check size
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Não foi possível ler a resposta");
+    }
+
+    const chunks: Uint8Array[] = [];
+    let totalSize = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      totalSize += value.length;
+      if (totalSize > MAX_CONTENT_SIZE) {
+        reader.cancel();
+        const sizeMB = Math.round(totalSize / 1024 / 1024);
+        throw new Error(`Arquivo muito grande (>${sizeMB}MB). Use 'Colar M3U' para playlists grandes.`);
+      }
+      
+      chunks.push(value);
+    }
+
+    const allChunks = new Uint8Array(totalSize);
+    let position = 0;
+    for (const chunk of chunks) {
+      allChunks.set(chunk, position);
+      position += chunk.length;
+    }
+
+    const content = new TextDecoder().decode(allChunks);
     console.log("[fetch-m3u] Content length:", content.length);
 
     // Basic validation
