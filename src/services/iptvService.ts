@@ -3,7 +3,7 @@
  * Centralized service for IPTV channel management and playback
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface IPTVChannel {
   id: number;

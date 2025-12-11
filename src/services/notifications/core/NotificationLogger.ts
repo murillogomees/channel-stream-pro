@@ -3,7 +3,7 @@
  * Logs notifications using sent_notifications table
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface NotificationLogEntry {
   recipient_id?: string;

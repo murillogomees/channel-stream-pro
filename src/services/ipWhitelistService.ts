@@ -3,7 +3,7 @@
  * Uses ip_whitelist table (existing schema only)
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface IPWhitelist {
   id: string;

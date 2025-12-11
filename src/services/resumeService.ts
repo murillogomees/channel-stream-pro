@@ -4,7 +4,7 @@
  */
 
 import { authCache } from '@/services/authCacheService';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 const LOCAL_STORAGE_KEY = 'iptv_resume_progress';
 const MAX_LOCAL_ENTRIES = 100;

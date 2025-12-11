@@ -1,5 +1,5 @@
 // Simplified Suspicious Login Service
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface SuspiciousLoginCheck {
   suspicious: boolean;
