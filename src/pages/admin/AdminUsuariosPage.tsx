@@ -1,9 +1,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, AdminLayout } from "@/components/admin";
 import { Users, CreditCard, Activity } from "lucide-react";
 import AdminUserPayments from "./AdminUserPayments";
 import AdminUserList from "@/pages/AdminUserList";
+import { RecentActivities } from "@/components/admin/RecentActivities";
 
 export default function AdminUsuariosPage() {
   return (
@@ -39,19 +39,7 @@ export default function AdminUsuariosPage() {
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Registro de Atividades</CardTitle>
-              <CardDescription>
-                Histórico de ações dos usuários no sistema
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Registro de atividades em desenvolvimento.
-              </p>
-            </CardContent>
-          </Card>
+          <RecentActivities />
         </TabsContent>
       </Tabs>
     </AdminLayout>
