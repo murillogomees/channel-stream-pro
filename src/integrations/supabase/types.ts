@@ -184,6 +184,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_phones: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          phone: string
+          priority: number | null
+          updated_at: string
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          phone: string
+          priority?: number | null
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string
+          priority?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_shortcuts: {
         Row: {
           created_at: string | null
@@ -1508,6 +1538,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          external_id: string | null
+          id: string
+          message_content: string | null
+          recipient_id: string | null
+          recipient_phone: string | null
+          sent_at: string | null
+          status: string | null
+          template_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          message_content?: string | null
+          recipient_id?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          status?: string | null
+          template_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          message_content?: string | null
+          recipient_id?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          status?: string | null
+          template_key?: string | null
+        }
+        Relationships: []
+      }
       notification_queue: {
         Row: {
           attempts: number | null
@@ -1686,6 +1755,69 @@ export type Database = {
           },
         ]
       }
+      playback_tokens: {
+        Row: {
+          content_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      player_events: {
+        Row: {
+          content_id: string | null
+          content_type: string | null
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cliente_ativo: boolean | null
@@ -1827,6 +1959,105 @@ export type Database = {
         }
         Relationships: []
       }
+      rls_fix_backups: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          fix_type: string | null
+          id: string
+          original_sql: string | null
+          restore_sql: string | null
+          table_name: string
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          fix_type?: string | null
+          id?: string
+          original_sql?: string | null
+          restore_sql?: string | null
+          table_name: string
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          fix_type?: string | null
+          id?: string
+          original_sql?: string | null
+          restore_sql?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      rls_scan_results: {
+        Row: {
+          created_at: string
+          has_rls: boolean | null
+          id: string
+          issues: Json | null
+          policy_count: number | null
+          scanned_at: string | null
+          table_name: string
+        }
+        Insert: {
+          created_at?: string
+          has_rls?: boolean | null
+          id?: string
+          issues?: Json | null
+          policy_count?: number | null
+          scanned_at?: string | null
+          table_name: string
+        }
+        Update: {
+          created_at?: string
+          has_rls?: boolean | null
+          id?: string
+          issues?: Json | null
+          policy_count?: number | null
+          scanned_at?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      security_alert_deliveries: {
+        Row: {
+          action_taken: string | null
+          admin_id: string | null
+          admin_phone: string | null
+          alert_id: string | null
+          confirmed_at: string | null
+          created_at: string
+          escalated: boolean | null
+          id: string
+          response_time_ms: number | null
+          sent_at: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          admin_id?: string | null
+          admin_phone?: string | null
+          alert_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          escalated?: boolean | null
+          id?: string
+          response_time_ms?: number | null
+          sent_at?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          admin_id?: string | null
+          admin_phone?: string | null
+          alert_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          escalated?: boolean | null
+          id?: string
+          response_time_ms?: number | null
+          sent_at?: string | null
+        }
+        Relationships: []
+      }
       security_alerts: {
         Row: {
           alert_type: string
@@ -1948,6 +2179,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      status_change_history: {
+        Row: {
+          changed_at: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          new_status: string
+          previous_status: string | null
+          service_name: string
+        }
+        Insert: {
+          changed_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_status: string
+          previous_status?: string | null
+          service_name: string
+        }
+        Update: {
+          changed_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_status?: string
+          previous_status?: string | null
+          service_name?: string
+        }
+        Relationships: []
       }
       streaming_metrics: {
         Row: {
@@ -2268,6 +2529,69 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_rankings: {
+        Row: {
+          content_id: string
+          content_type: string | null
+          created_at: string
+          id: string
+          rank_position: number | null
+          score: number | null
+          updated_at: string
+        }
+        Insert: {
+          content_id: string
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          rank_position?: number | null
+          score?: number | null
+          updated_at?: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          rank_position?: number | null
+          score?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      two_factor_auth: {
+        Row: {
+          backup_codes: Json | null
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          secret: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          backup_codes?: Json | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          secret: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          backup_codes?: Json | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          secret?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2344,6 +2668,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      watch_progress: {
+        Row: {
+          completed: boolean | null
+          content_id: string
+          content_type: string | null
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          last_watched_at: string | null
+          progress_seconds: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          completed?: boolean | null
+          content_id: string
+          content_type?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          last_watched_at?: string | null
+          progress_seconds?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          completed?: boolean | null
+          content_id?: string
+          content_type?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          last_watched_at?: string | null
+          progress_seconds?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       whatsapp_config: {
         Row: {

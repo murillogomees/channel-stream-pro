@@ -1,8 +1,9 @@
 /**
- * Player Events Service - Simplified
- * Logs player events without non-existent tables
+ * Player Events Service
+ * Logs player events to player_events table
  */
 
+import { supabase } from '@/integrations/supabase/client';
 import { authCache } from '@/services/authCacheService';
 
 export type PlayerEventType = 
@@ -124,8 +125,30 @@ class PlayerEventsService {
     const events = [...this.eventQueue];
     this.eventQueue = [];
 
-    // Just log events - no database storage
-    console.log('[PlayerEvents] Flushed', events.length, 'events');
+    try {
+      const userId = authCache.getUserId();
+      
+      const inserts = events.map(e => ({
+        user_id: userId,
+        session_id: e.sessionId,
+        event_type: e.event,
+        content_id: e.contentId,
+        content_type: e.contentType,
+        event_data: e.data,
+      }));
+
+      const { error } = await supabase
+        .from('player_events')
+        .insert(inserts);
+
+      if (error) {
+        console.warn('[PlayerEvents] Failed to save events:', error.message);
+      } else {
+        console.log('[PlayerEvents] Flushed', events.length, 'events');
+      }
+    } catch (error) {
+      console.warn('[PlayerEvents] Error flushing events:', error);
+    }
   }
 
   trackPlay(data?: { position?: number; quality?: string }): void {

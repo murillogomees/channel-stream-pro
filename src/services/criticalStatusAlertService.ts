@@ -1,7 +1,10 @@
 /**
- * Critical Status Alert Service - Simplified
+ * Critical Status Alert Service
  * Monitors critical status changes and sends alerts
+ * Uses status_change_history table
  */
+
+import { supabase } from '@/integrations/supabase/client';
 
 interface CriticalStatusChange {
   serviceName: string;
@@ -56,23 +59,53 @@ export class CriticalStatusAlertService {
   }
 
   /**
-   * Verifica mudanças para status críticos (simplified - logs only)
+   * Verifica mudanças para status críticos
    */
   private async checkCriticalStatuses() {
-    // Simplified: just log that we're checking
-    console.log('[CriticalStatusAlert] Checking critical statuses...');
+    try {
+      // Check recent status changes from database
+      const { data, error } = await supabase
+        .from('status_change_history')
+        .select('*')
+        .gte('changed_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .order('changed_at', { ascending: false });
+
+      if (error) {
+        console.error('[CriticalStatusAlert] Error checking statuses:', error);
+        return;
+      }
+
+      // Process recent critical changes
+      for (const change of data || []) {
+        if (CRITICAL_STATUSES.includes(change.new_status?.toLowerCase())) {
+          const wasNotCritical = !change.previous_status || 
+            !CRITICAL_STATUSES.includes(change.previous_status.toLowerCase());
+
+          if (wasNotCritical) {
+            await this.sendCriticalStatusAlert({
+              serviceName: change.service_name,
+              previousStatus: change.previous_status,
+              newStatus: change.new_status,
+              timestamp: new Date(change.changed_at),
+              metadata: change.metadata,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[CriticalStatusAlert] Error in checkCriticalStatuses:', error);
+    }
   }
 
   /**
-   * Envia alerta de status crítico (simplified - logs only)
+   * Envia alerta de status crítico
    */
   private async sendCriticalStatusAlert(change: CriticalStatusChange) {
-    console.log('[CriticalStatusAlert] Alert:', {
-      service: change.serviceName,
-      previous: change.previousStatus,
-      new: change.newStatus,
-      time: change.timestamp.toISOString(),
-    });
+    const message = this.buildAlertMessage(change);
+    console.log('[CriticalStatusAlert] Alert:', message);
+
+    // Here you could send via WhatsApp or other channels
+    // For now, just log it
   }
 
   /**
@@ -110,25 +143,61 @@ export class CriticalStatusAlertService {
     newStatus: string,
     metadata?: any
   ): Promise<void> {
-    console.log('[CriticalStatusAlert] Status change:', {
-      service: serviceName,
-      previous: previousStatus,
-      new: newStatus,
-    });
-
-    if (CRITICAL_STATUSES.includes(newStatus.toLowerCase())) {
-      const wasNotCritical = !previousStatus || 
-        !CRITICAL_STATUSES.includes(previousStatus.toLowerCase());
-
-      if (wasNotCritical) {
-        await this.sendCriticalStatusAlert({
-          serviceName,
-          previousStatus,
-          newStatus,
-          timestamp: new Date(),
+    try {
+      const { error } = await supabase
+        .from('status_change_history')
+        .insert({
+          service_name: serviceName,
+          previous_status: previousStatus,
+          new_status: newStatus,
+          changed_at: new Date().toISOString(),
           metadata,
         });
+
+      if (error) {
+        console.error('[CriticalStatusAlert] Error logging status change:', error);
       }
+
+      // Check if this is a critical change
+      if (CRITICAL_STATUSES.includes(newStatus.toLowerCase())) {
+        const wasNotCritical = !previousStatus || 
+          !CRITICAL_STATUSES.includes(previousStatus.toLowerCase());
+
+        if (wasNotCritical) {
+          await this.sendCriticalStatusAlert({
+            serviceName,
+            previousStatus,
+            newStatus,
+            timestamp: new Date(),
+            metadata,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[CriticalStatusAlert] Error in logStatusChange:', error);
+    }
+  }
+
+  /**
+   * Get recent status history
+   */
+  public async getRecentHistory(limit: number = 50): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('status_change_history')
+        .select('*')
+        .order('changed_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('[CriticalStatusAlert] Error getting history:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('[CriticalStatusAlert] Error in getRecentHistory:', error);
+      return [];
     }
   }
 }
