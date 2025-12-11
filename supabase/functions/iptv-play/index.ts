@@ -47,10 +47,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get channel info
+    // Get channel info from iptv_channels table
     const { data: channel, error: channelError } = await supabase
-      .from('m3u_channels')
-      .select('id, name, url, r2_url, r2_uploaded, cf_stream_uid')
+      .from('iptv_channels')
+      .select('id, name, slug, original_url, transcode_manifest_url, transcode_status, content_type')
       .eq('id', channelId)
       .single();
 
@@ -61,56 +61,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check R2 storage for cached content
-    const { data: r2Object } = await supabase
-      .from('r2_storage_objects')
-      .select('r2_key, status')
-      .eq('channel_id', channelId)
-      .eq('status', 'completed')
-      .maybeSingle();
-
     // Build CDN list with priorities
     const cdnList: Array<{ url: string; priority: number; type: string; region?: string }> = [];
 
-    // 1. R2 CDN (highest priority for cached content)
-    if (r2Object?.r2_key) {
+    // 1. Transcoded manifest (highest priority if available)
+    if (channel.transcode_status === 'ready' && channel.transcode_manifest_url) {
       cdnList.push({
-        url: `${R2_CDN_URL}/${r2Object.r2_key}`,
+        url: channel.transcode_manifest_url,
         priority: 1,
-        type: 'r2',
-        region: 'global',
-      });
-    } else if (channel.r2_uploaded && channel.r2_url) {
-      cdnList.push({
-        url: channel.r2_url,
-        priority: 1,
-        type: 'r2',
+        type: 'transcode',
         region: 'global',
       });
     }
 
-    // 2. Cloudflare Stream (for live content)
-    if (channel.cf_stream_uid) {
+    // 2. Stream proxy (for HTTP content on HTTPS page)
+    if (channel.original_url.startsWith('http://')) {
       cdnList.push({
-        url: `https://customer-streams.cloudflarestream.com/${channel.cf_stream_uid}/manifest/video.m3u8`,
+        url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.original_url)}`,
         priority: 2,
-        type: 'cf-stream',
-      });
-    }
-
-    // 3. Stream proxy (for HTTP content on HTTPS)
-    if (channel.url.startsWith('http://')) {
-      cdnList.push({
-        url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.url)}`,
-        priority: 3,
         type: 'proxy',
       });
     }
 
-    // 4. Origin (direct URL)
+    // 3. Origin (direct URL - works for HTTPS sources)
     cdnList.push({
-      url: channel.url,
-      priority: 4,
+      url: channel.original_url,
+      priority: 3,
       type: 'origin',
     });
 
@@ -120,15 +96,12 @@ Deno.serve(async (req) => {
     // Token expires in 4 hours
     const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
-    // Log access
-    await supabase.from('channel_usage_stats').upsert({
-      profile_id: user.id,
-      channel_id: channelId,
-      last_watched_at: new Date().toISOString(),
-      view_count: 1,
-    }, {
-      onConflict: 'profile_id,channel_id',
-    });
+    // Log access to metrics
+    await supabase.from('iptv_channel_metrics').insert({
+      channel_id: parseInt(channelId),
+      metric_type: 'view',
+      value: 1,
+    }).catch(() => {}); // Non-blocking
 
     console.log(`[iptv-play] Channel ${channelId} requested by ${user.id}, using ${primaryCdn.type}`);
 
