@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, MessageSquare, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle, Variable, Save, Copy, Check } from 'lucide-react';
+import { Send, MessageSquare, CheckCircle, XCircle, Paperclip, X, FileIcon, Play, Clock, AlertCircle } from 'lucide-react';
 import { LOCAL_TEMPLATES, sendNotification } from '@/services/notificationScheduler';
 import { Cliente } from '@/types/cliente';
 import { formatPhoneForDisplay } from '@/utils/phoneFormatter';
@@ -35,11 +35,10 @@ export default function AdminNotificacoes() {
   const { config, loading: configLoading, saveConfig } = useWhatsAppConfig();
   const { contacts: testContacts } = useTestContacts();
   const isConfigured = config.appkey.length > 0 && config.authkey.length > 0;
-  const { addLog, stats, logs, loading: statsLoading } = useNotificationLogs();
-  const { isRunning, lastRunState, forceRun, getNextRunTime } = useAutoNotifications();
+  const { addLog, stats, loading: statsLoading } = useNotificationLogs();
+  const { forceRun, getNextRunTime } = useAutoNotifications();
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [customMessage, setCustomMessage] = useState('');
   const [fileMessage, setFileMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [runningManual, setRunningManual] = useState(false);
@@ -50,18 +49,6 @@ export default function AdminNotificacoes() {
   }>({ isValid: true });
   const [testingCredentials, setTestingCredentials] = useState(false);
   const { file, preview, error: fileError, handleFileSelect, clearFile, getFileInfo } = useFileUpload();
-  
-  // Template Variables State
-  const [templateVars, setTemplateVars] = useState<Record<string, string>>(() => {
-    const stored = localStorage.getItem('notification_template_vars');
-    return stored ? JSON.parse(stored) : {
-      linkPagamento: '',
-      empresaNome: 'IPTV LINK',
-      suporte: '',
-    };
-  });
-  const [editingVar, setEditingVar] = useState<string | null>(null);
-  const [copiedVar, setCopiedVar] = useState<string | null>(null);
 
   const nextRunTime = getNextRunTime();
 
@@ -113,22 +100,6 @@ export default function AdminNotificacoes() {
     }
   };
 
-  const saveTemplateVar = (key: string, value: string) => {
-    const updated = { ...templateVars, [key]: value };
-    setTemplateVars(updated);
-    localStorage.setItem('notification_template_vars', JSON.stringify(updated));
-    setEditingVar(null);
-    toast({
-      title: 'Variável salva!',
-      description: `${key} foi atualizada com sucesso`,
-    });
-  };
-
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedVar(id);
-    setTimeout(() => setCopiedVar(null), 2000);
-  };
 
   if (configLoading) {
     return (
@@ -179,7 +150,6 @@ export default function AdminNotificacoes() {
 
       setSelectedCliente(null);
       setSelectedTemplate('');
-      setCustomMessage('');
     } catch (error: any) {
       toast({
         title: 'Erro ao enviar',
@@ -521,211 +491,6 @@ export default function AdminNotificacoes() {
                 </p>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Variáveis de Template */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Variable className="h-5 w-5" />
-              Variáveis de Template
-            </CardTitle>
-            <CardDescription>
-              Configure os valores padrão das variáveis usadas nos templates de notificação
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Variáveis Dinâmicas (do cliente) */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Variáveis Automáticas (dados do cliente)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {[
-                  { var: '{nome}', desc: 'Nome do cliente' },
-                  { var: '{plano}', desc: 'Plano contratado' },
-                  { var: '{valor}', desc: 'Valor pago' },
-                  { var: '{dataVencimento}', desc: 'Data de vencimento' },
-                ].map((item) => (
-                  <div
-                    key={item.var}
-                    className="p-2 border rounded-lg bg-muted/30 flex items-center justify-between"
-                  >
-                    <div>
-                      <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{item.var}</code>
-                      <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(item.var, item.var)}
-                    >
-                      {copiedVar === item.var ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Estas variáveis são preenchidas automaticamente com os dados de cada cliente.
-              </p>
-            </div>
-
-            {/* Variáveis Configuráveis */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-medium">Variáveis Configuráveis</Label>
-              
-              {/* Link de Pagamento */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{linkPagamento}'}</code>
-                    <span className="text-sm text-muted-foreground">Link PIX/Pagamento</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => copyToClipboard('{linkPagamento}', 'linkPagamento')}
-                  >
-                    {copiedVar === 'linkPagamento' ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
-                </div>
-                {editingVar === 'linkPagamento' ? (
-                  <div className="flex gap-2">
-                    <Input
-                      value={templateVars.linkPagamento}
-                      onChange={(e) => setTemplateVars({ ...templateVars, linkPagamento: e.target.value })}
-                      placeholder="Ex: pix@iptvlink.com.br ou link do mercado pago"
-                      className="flex-1"
-                    />
-                    <Button size="sm" onClick={() => saveTemplateVar('linkPagamento', templateVars.linkPagamento)}>
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingVar(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div 
-                    className="flex items-center justify-between p-2 border rounded-lg bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors"
-                    onClick={() => setEditingVar('linkPagamento')}
-                  >
-                    <span className="text-sm">
-                      {templateVars.linkPagamento || <span className="text-muted-foreground italic">Clique para configurar...</span>}
-                    </span>
-                    <Button variant="ghost" size="sm" className="h-6">Editar</Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Nome da Empresa */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{empresaNome}'}</code>
-                    <span className="text-sm text-muted-foreground">Nome da empresa</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => copyToClipboard('{empresaNome}', 'empresaNome')}
-                  >
-                    {copiedVar === 'empresaNome' ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
-                </div>
-                {editingVar === 'empresaNome' ? (
-                  <div className="flex gap-2">
-                    <Input
-                      value={templateVars.empresaNome}
-                      onChange={(e) => setTemplateVars({ ...templateVars, empresaNome: e.target.value })}
-                      placeholder="Ex: IPTV LINK"
-                      className="flex-1"
-                    />
-                    <Button size="sm" onClick={() => saveTemplateVar('empresaNome', templateVars.empresaNome)}>
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingVar(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div 
-                    className="flex items-center justify-between p-2 border rounded-lg bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors"
-                    onClick={() => setEditingVar('empresaNome')}
-                  >
-                    <span className="text-sm">
-                      {templateVars.empresaNome || <span className="text-muted-foreground italic">Clique para configurar...</span>}
-                    </span>
-                    <Button variant="ghost" size="sm" className="h-6">Editar</Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Suporte */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">{'{suporte}'}</code>
-                    <span className="text-sm text-muted-foreground">Contato do suporte</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => copyToClipboard('{suporte}', 'suporte')}
-                  >
-                    {copiedVar === 'suporte' ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
-                </div>
-                {editingVar === 'suporte' ? (
-                  <div className="flex gap-2">
-                    <Input
-                      value={templateVars.suporte}
-                      onChange={(e) => setTemplateVars({ ...templateVars, suporte: e.target.value })}
-                      placeholder="Ex: (61) 99999-9999 ou suporte@iptvlink.com.br"
-                      className="flex-1"
-                    />
-                    <Button size="sm" onClick={() => saveTemplateVar('suporte', templateVars.suporte)}>
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingVar(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div 
-                    className="flex items-center justify-between p-2 border rounded-lg bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors"
-                    onClick={() => setEditingVar('suporte')}
-                  >
-                    <span className="text-sm">
-                      {templateVars.suporte || <span className="text-muted-foreground italic">Clique para configurar...</span>}
-                    </span>
-                    <Button variant="ghost" size="sm" className="h-6">Editar</Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground pt-2 border-t">
-              💡 Dica: Use as variáveis configuráveis nos seus templates para personalizar as mensagens automaticamente.
-            </p>
           </CardContent>
         </Card>
 
