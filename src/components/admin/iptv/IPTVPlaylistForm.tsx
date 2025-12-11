@@ -84,7 +84,7 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
     return channels;
   };
 
-  // Fetch M3U from URL
+  // Fetch M3U from URL via Edge Function (to avoid CORS)
   const fetchM3U = async () => {
     if (!m3uUrl.trim()) {
       toast.error('Insira uma URL M3U');
@@ -93,18 +93,26 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
 
     setIsParsing(true);
     try {
-      const response = await fetch(m3uUrl);
-      if (!response.ok) throw new Error('Falha ao buscar M3U');
-      const content = await response.text();
-      const channels = parseM3U(content);
+      const { data, error } = await supabase.functions.invoke('fetch-m3u', {
+        body: { url: m3uUrl },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      
+      const channels = parseM3U(data.content);
       setParsedChannels(channels);
       toast.success(`${channels.length} canais encontrados`);
       
       // Auto-fill name if empty
       if (!formData.name && channels.length > 0) {
-        const urlObj = new URL(m3uUrl);
-        const suggestedName = urlObj.pathname.split('/').pop()?.replace(/\.(m3u8?|txt)$/i, '') || 'Playlist Importada';
-        setFormData(prev => ({ ...prev, name: suggestedName }));
+        try {
+          const urlObj = new URL(m3uUrl);
+          const suggestedName = urlObj.pathname.split('/').pop()?.replace(/\.(m3u8?|txt)$/i, '') || 'Playlist Importada';
+          setFormData(prev => ({ ...prev, name: suggestedName }));
+        } catch {
+          setFormData(prev => ({ ...prev, name: 'Playlist Importada' }));
+        }
       }
     } catch (error) {
       toast.error(`Erro: ${error instanceof Error ? error.message : 'Falha ao buscar M3U'}`);
