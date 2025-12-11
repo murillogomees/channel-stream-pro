@@ -3,6 +3,7 @@
  */
 
 export { VideoPlayer, default } from './VideoPlayer';
+export { LLHLSPlayer } from './LLHLSPlayer';
 export { PreloadIndicator } from './PreloadIndicator';
 export { PreloadStats } from './PreloadStats';
 export { PlayerControls } from './PlayerControls';
