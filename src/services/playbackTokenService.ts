@@ -3,7 +3,7 @@
  * Uses profiles table for subscription check
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
 
 export interface PlaybackToken {

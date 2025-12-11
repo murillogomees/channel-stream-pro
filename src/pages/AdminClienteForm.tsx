@@ -8,7 +8,7 @@ import { useProfiles, UnifiedProfile } from '@/hooks/useProfiles';
 import { useNotificationLogs } from '@/hooks/useNotificationLogs';
 import { Cliente, SituacaoCliente, PlanoCliente } from '@/types/cliente';
 import { UpdateNotificationHandler, EventNotificationHandler } from '@/services/notifications';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 // Helper para evitar erros de tipo excessivamente profundos
 const db = supabase as unknown as {

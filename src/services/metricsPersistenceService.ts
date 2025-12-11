@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { WebSocketMetrics } from './websocketMetricsService';
 import { SystemHealthStatus } from './systemHealthService';
 
