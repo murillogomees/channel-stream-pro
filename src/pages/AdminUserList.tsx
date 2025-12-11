@@ -63,6 +63,7 @@ export default function AdminUserList() {
     plano: 'Mensal',
     valor_pago: 0,
     is_recorrente: false,
+    user_role: 'client', // Default role para novos usuários
   });
 
   useEffect(() => {
@@ -115,6 +116,7 @@ export default function AdminUserList() {
       is_recorrente: user.is_recorrente ?? false,
       totp_enabled: user.totp_enabled ?? false,
       valor_pago: user.valor_pago ?? 0,
+      user_role: user.roles[0] || 'client', // Mapear role para o formulário
     });
     setEnviarNotificacao(false); // Reset checkbox ao abrir
     setEditDialog(true);
@@ -130,9 +132,9 @@ export default function AdminUserList() {
       const clienteAgoraInativo = editFormData.cliente_ativo === false;
       const clienteDesativado = clienteEraAtivo && clienteAgoraInativo;
 
-      // Preparar dados para update (remover campos readonly e undefined)
+      // Preparar dados para update (remover campos readonly e que não existem em profiles)
       const { id, created_at, updated_at, totp_secret, totp_verified_at, 
-              roles, ...updateData } = editFormData;
+              roles, user_role, ...updateData } = editFormData;
 
       const { error } = await supabase
         .from('profiles')
@@ -141,6 +143,32 @@ export default function AdminUserList() {
 
       if (error) throw error;
 
+      // Atualizar role se foi alterada
+      const oldRole = selectedUser.roles[0] || 'client';
+      const newRole = user_role || 'client';
+      
+      if (oldRole !== newRole) {
+        // Deletar role antiga
+        await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', selectedUser.id);
+        
+        // Inserir nova role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: selectedUser.id, role: newRole });
+        
+        if (roleError) {
+          console.error('Erro ao atualizar role:', roleError);
+          toast({
+            title: 'Aviso',
+            description: 'Usuário atualizado, mas erro ao alterar função',
+            variant: 'default',
+          });
+        }
+      }
+
       // Enviar notificação se cliente foi desativado e checkbox está marcada
       if (clienteDesativado && enviarNotificacao) {
         try {
@@ -148,13 +176,9 @@ export default function AdminUserList() {
           
           const { automaticNotificationTriggerService } = await import('@/services/automaticNotificationTriggerService');
           
-          // Converter para formato Cliente esperado pelo serviço
-          // O telefone pode estar em contact_phone (do form) ou telefone (do profile)
           const telefoneCliente = editFormData.contact_phone || 
                                   selectedUser.telefone || 
                                   (selectedUser as any).contact_phone || '';
-          
-          console.log('[AdminUserList] Telefone do cliente:', telefoneCliente);
           
           const clienteData = {
             id: selectedUser.id,
@@ -272,7 +296,18 @@ export default function AdminUserList() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão não encontrada');
 
-      // Always create user with 'client' role
+      // Determinar role a ser atribuída com base nas permissões
+      let roleToAssign = createFormData.user_role || 'client';
+      
+      // Validar permissões: admin só pode criar client
+      if (currentUserRole === 'admin' && roleToAssign !== 'client') {
+        roleToAssign = 'client';
+      }
+      // Apenas master pode criar admin ou master
+      if (currentUserRole !== 'master' && (roleToAssign === 'admin' || roleToAssign === 'master')) {
+        roleToAssign = 'client';
+      }
+
       const response = await fetch(
         `${SUPABASE_FUNCTIONS_URL}/create-admin-user`,
         {
@@ -286,7 +321,7 @@ export default function AdminUserList() {
             password: createFormData.password,
             name: createFormData.nome,
             phone: createFormData.contact_phone || '',
-            role: 'client', // Always client
+            role: roleToAssign,
           }),
         }
       );
@@ -331,6 +366,7 @@ export default function AdminUserList() {
         plano: 'Mensal',
         valor_pago: 0,
         is_recorrente: false,
+        user_role: 'client',
       });
       refresh();
       loadUsersWithRoles();
