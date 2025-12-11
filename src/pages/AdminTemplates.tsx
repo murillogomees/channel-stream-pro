@@ -644,8 +644,6 @@ export default function AdminTemplates() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Nome</TableHead>
-                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Evento</TableHead>
-                    <TableHead className="whitespace-nowrap hidden md:table-cell">Dias</TableHead>
                     <TableHead className="whitespace-nowrap hidden lg:table-cell">Mensagem</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                   </TableRow>
@@ -653,7 +651,7 @@ export default function AdminTemplates() {
                 <TableBody>
                   {templates.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                       Nenhum template cadastrado
                     </TableCell>
                   </TableRow>
@@ -661,10 +659,6 @@ export default function AdminTemplates() {
                     templates.map((template) => (
                       <TableRow key={template.id}>
                         <TableCell className="font-medium whitespace-nowrap">{template.name}</TableCell>
-                        <TableCell className="hidden sm:table-cell whitespace-nowrap">
-                          <span className="text-xs bg-muted px-2 py-1 rounded">{getEventLabel(template.eventType)}</span>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell whitespace-nowrap">{getDaysLabel(template.daysBeforeDue)}</TableCell>
                         <TableCell className="hidden lg:table-cell max-w-xs truncate">{template.message}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 sm:gap-2">
@@ -719,48 +713,11 @@ export default function AdminTemplates() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="eventType">Tipo de Evento</Label>
-              <Select 
-                value={formData.eventType} 
-                onValueChange={(value: any) => setFormData({ ...formData, eventType: value })}
-              >
-                <SelectTrigger id="eventType">
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual / Para Automações</SelectItem>
-                  <SelectItem value="expiration">Vencimento de Plano</SelectItem>
-                  <SelectItem value="welcome_trial">Boas-vindas - Período de Teste</SelectItem>
-                  <SelectItem value="welcome_plan">Boas-vindas - Plano Contratado</SelectItem>
-                  <SelectItem value="renewal">Renovação Confirmada</SelectItem>
-                  <SelectItem value="payment_reminder">Lembrete de Pagamento</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {formData.eventType === 'manual' 
-                  ? 'Templates manuais são usados em regras de automação ou envio manual'
-                  : 'Quando este template será enviado automaticamente'}
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+              <p className="text-sm text-muted-foreground">
+                💡 O evento de disparo deste template é configurado na aba <strong>Automáticas</strong> em Notificações.
               </p>
             </div>
-
-            {formData.eventType === 'expiration' && (
-              <div>
-                <Label htmlFor="daysBeforeDue">Dias em relação ao vencimento</Label>
-                <Input
-                  id="daysBeforeDue"
-                  type="number"
-                  value={formData.daysBeforeDue}
-                  onChange={(e) =>
-                    setFormData({ ...formData, daysBeforeDue: parseInt(e.target.value) })
-                  }
-                  placeholder="0 = dia do vencimento, -3 = 3 dias antes, 5 = 5 dias depois"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Valores negativos: antes do vencimento | 0: dia do vencimento | Positivos: após vencimento
-                </p>
-              </div>
-            )}
 
             <div>
               <div className="flex items-center justify-between mb-2">

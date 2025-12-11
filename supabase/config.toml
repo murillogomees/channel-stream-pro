@@ -382,3 +382,15 @@ verify_jwt = false
 # IPTV Channel Health - webhook for probe/transcode updates from external workers
 [functions.iptv-channel-health]
 verify_jwt = false
+
+# ==========================================
+# AUTOMATIC NOTIFICATIONS SYSTEM
+# ==========================================
+
+# Process automatic notifications - cron job for scheduled notifications
+[functions.process-auto-notifications]
+verify_jwt = false
+
+# Trigger event-based notifications - called by system events
+[functions.trigger-event-notification]
+verify_jwt = false
