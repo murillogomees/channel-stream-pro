@@ -36,9 +36,7 @@ const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeplo
 const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupabaseIntegrationPage"));
 
 // IPTV Management Pages
-const AdminIPTVChannels = lazy(() => import("./pages/admin/AdminIPTVChannels"));
-const AdminIPTVPlaylists = lazy(() => import("./pages/admin/AdminIPTVPlaylists"));
-const AdminEPGPage = lazy(() => import("./pages/admin/AdminEPGPage"));
+const AdminIPTVPage = lazy(() => import("./pages/admin/AdminIPTVPage"));
 
 // IPTV App Pages
 const IPTVHome = lazy(() => import("./pages/iptv/IPTVHome"));
@@ -135,10 +133,11 @@ function AppContent() {
 <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
             <Route path="/admin/supabase-integration" element={<ProtectedRoute requireAdmin><AdminSupabaseIntegrationPage /></ProtectedRoute>} />
             
-            {/* IPTV Management */}
-            <Route path="/admin/iptv/channels" element={<ProtectedRoute requireAdmin><AdminIPTVChannels /></ProtectedRoute>} />
-            <Route path="/admin/iptv/playlists" element={<ProtectedRoute requireAdmin><AdminIPTVPlaylists /></ProtectedRoute>} />
-            <Route path="/admin/iptv/epg" element={<ProtectedRoute requireAdmin><AdminEPGPage /></ProtectedRoute>} />
+            {/* IPTV Management - Unified */}
+            <Route path="/admin/iptv" element={<ProtectedRoute requireAdmin><AdminIPTVPage /></ProtectedRoute>} />
+            <Route path="/admin/iptv/channels" element={<Navigate to="/admin/iptv?tab=channels" replace />} />
+            <Route path="/admin/iptv/playlists" element={<Navigate to="/admin/iptv?tab=playlists" replace />} />
+            <Route path="/admin/iptv/epg" element={<Navigate to="/admin/iptv?tab=epg" replace />} />
             
             {/* Access denied & 404 */}
             <Route path="/403" element={<Forbidden />} />
