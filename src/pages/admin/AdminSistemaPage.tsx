@@ -6,11 +6,10 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, Settings, History, Tag, RefreshCw, Shield } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, History, Tag, RefreshCw, Shield } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
-import AdminVariables from "../AdminVariables";
 import AdminStatusHistory from "../AdminStatusHistory";
 import AdminCustomStatusBadges from "../AdminCustomStatusBadges";
 import AdminHomepageEditor from "../AdminHomepageEditor";
@@ -75,12 +74,6 @@ export default function AdminSistemaPage() {
       label: "Customize",
       icon: <Palette className="h-4 w-4" />,
       content: <AdminCustomize />
-    },
-    {
-      value: "variables",
-      label: "Variáveis",
-      icon: <Settings className="h-4 w-4" />,
-      content: <AdminVariables />
     },
     {
       value: "history",
