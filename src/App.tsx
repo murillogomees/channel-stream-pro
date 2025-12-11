@@ -38,6 +38,7 @@ const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupab
 // IPTV Management Pages
 const AdminIPTVChannels = lazy(() => import("./pages/admin/AdminIPTVChannels"));
 const AdminIPTVPlaylists = lazy(() => import("./pages/admin/AdminIPTVPlaylists"));
+const AdminEPGPage = lazy(() => import("./pages/admin/AdminEPGPage"));
 
 // IPTV App Pages
 const IPTVHome = lazy(() => import("./pages/iptv/IPTVHome"));
@@ -137,6 +138,7 @@ function AppContent() {
             {/* IPTV Management */}
             <Route path="/admin/iptv/channels" element={<ProtectedRoute requireAdmin><AdminIPTVChannels /></ProtectedRoute>} />
             <Route path="/admin/iptv/playlists" element={<ProtectedRoute requireAdmin><AdminIPTVPlaylists /></ProtectedRoute>} />
+            <Route path="/admin/iptv/epg" element={<ProtectedRoute requireAdmin><AdminEPGPage /></ProtectedRoute>} />
             
             {/* Access denied & 404 */}
             <Route path="/403" element={<Forbidden />} />

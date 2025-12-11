@@ -1304,6 +1304,51 @@ export type Database = {
         }
         Relationships: []
       }
+      epg_programs: {
+        Row: {
+          category: string | null
+          channel_id: string
+          created_at: string
+          description: string | null
+          end_time: string
+          episode_info: string | null
+          icon_url: string | null
+          id: string
+          rating: string | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          channel_id: string
+          created_at?: string
+          description?: string | null
+          end_time: string
+          episode_info?: string | null
+          icon_url?: string | null
+          id?: string
+          rating?: string | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          channel_id?: string
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          episode_info?: string | null
+          icon_url?: string | null
+          id?: string
+          rating?: string | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       feature_flag_config: {
         Row: {
           created_at: string | null
