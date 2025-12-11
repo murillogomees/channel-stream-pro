@@ -1,9 +1,4 @@
-/**
- * SERVIÇO DE DETECÇÃO DE LOGINS SUSPEITOS
- * 
- * Detecta e alerta sobre tentativas de login suspeitas
- */
-
+// Simplified Suspicious Login Service
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SuspiciousLoginCheck {
@@ -14,14 +9,11 @@ export interface SuspiciousLoginCheck {
 }
 
 export const suspiciousLoginService = {
-  /**
-   * Verifica se uma tentativa de login é suspeita
-   */
   async checkLogin(ipAddress: string, email?: string): Promise<SuspiciousLoginCheck | null> {
     try {
       const { data, error } = await supabase.rpc('check_suspicious_login', {
         _ip_address: ipAddress,
-        _email: email
+        _email: email || ''
       });
 
       if (error) {
@@ -36,74 +28,21 @@ export const suspiciousLoginService = {
     }
   },
 
-  /**
-   * Busca tentativas suspeitas recentes
-   */
-  async getRecentAttempts(limit: number = 50) {
-    try {
-      const { data, error } = await supabase
-        .from('suspicious_login_attempts')
-        .select('*')
-        .order('last_attempt_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('[SuspiciousLogin] Erro ao buscar tentativas:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('[SuspiciousLogin] Erro ao buscar tentativas:', error);
-      return [];
-    }
+  async getRecentAttempts(limit: number = 50): Promise<any[]> {
+    // Table 'suspicious_login_attempts' doesn't exist
+    console.log('[SuspiciousLogin] getRecentAttempts - placeholder');
+    return [];
   },
 
-  /**
-   * Busca tentativas bloqueadas
-   */
-  async getBlockedAttempts(limit: number = 50) {
-    try {
-      const { data, error } = await supabase
-        .from('suspicious_login_attempts')
-        .select('*')
-        .eq('blocked', true)
-        .order('last_attempt_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('[SuspiciousLogin] Erro ao buscar bloqueados:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('[SuspiciousLogin] Erro ao buscar bloqueados:', error);
-      return [];
-    }
+  async getBlockedAttempts(limit: number = 50): Promise<any[]> {
+    // Table 'suspicious_login_attempts' doesn't exist
+    console.log('[SuspiciousLogin] getBlockedAttempts - placeholder');
+    return [];
   },
 
-  /**
-   * Busca tentativas que requerem alerta
-   */
-  async getAttemptsRequiringAlert() {
-    try {
-      const { data, error } = await supabase
-        .from('suspicious_login_attempts')
-        .select('*')
-        .eq('alert_sent', false)
-        .gte('attempt_count', 3)
-        .order('last_attempt_at', { ascending: false });
-
-      if (error) {
-        console.error('[SuspiciousLogin] Erro ao buscar alertas pendentes:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('[SuspiciousLogin] Erro ao buscar alertas pendentes:', error);
-      return [];
-    }
+  async getAttemptsRequiringAlert(): Promise<any[]> {
+    // Table 'suspicious_login_attempts' doesn't exist
+    console.log('[SuspiciousLogin] getAttemptsRequiringAlert - placeholder');
+    return [];
   }
 };

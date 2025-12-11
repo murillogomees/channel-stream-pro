@@ -23,37 +23,6 @@ export default function AdminSecurityMonitor() {
     return true;
   });
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'destructive';
-      case 'warning': return 'default';
-      case 'info': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
-  const getEventTypeLabel = (type: string) => {
-    switch (type) {
-      case 'failed_login': return 'Login Falhou';
-      case 'permission_change': return 'Mudança de Permissão';
-      case 'suspicious_activity': return 'Atividade Suspeita';
-      case 'rate_limit_exceeded': return 'Limite Excedido';
-      case 'unauthorized_access': return 'Acesso Não Autorizado';
-      default: return type;
-    }
-  };
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case 'failed_login': return <Lock className="h-4 w-4" />;
-      case 'permission_change': return <Shield className="h-4 w-4" />;
-      case 'suspicious_activity': return <AlertTriangle className="h-4 w-4" />;
-      case 'rate_limit_exceeded': return <Activity className="h-4 w-4" />;
-      case 'unauthorized_access': return <Eye className="h-4 w-4" />;
-      default: return <Shield className="h-4 w-4" />;
-    }
-  };
-
   return (
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl overflow-x-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
@@ -77,7 +46,7 @@ export default function AdminSecurityMonitor() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Eventos</CardTitle>
@@ -132,20 +101,9 @@ export default function AdminSecurityMonitor() {
             <p className="text-xs text-muted-foreground">Atividades</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Não Resolvidos</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.unresolvedEvents}</div>
-            <p className="text-xs text-muted-foreground">Pendentes</p>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Filters and Events List */}
+      {/* Events List */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
@@ -185,55 +143,17 @@ export default function AdminSecurityMonitor() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="unresolved">
-            <TabsList>
-              <TabsTrigger value="unresolved">
-                Não Resolvidos ({filteredEvents.filter(e => !e.resolved).length})
-              </TabsTrigger>
-              <TabsTrigger value="all">
-                Todos ({filteredEvents.length})
-              </TabsTrigger>
-              <TabsTrigger value="resolved">
-                Resolvidos ({filteredEvents.filter(e => e.resolved).length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="unresolved" className="space-y-3">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Carregando eventos...</p>
-              ) : filteredEvents.filter(e => !e.resolved).length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhum evento não resolvido</p>
-              ) : (
-                filteredEvents.filter(e => !e.resolved).map((event) => (
-                  <EventCard key={event.id} event={event} onResolve={resolveEvent} />
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="all" className="space-y-3">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Carregando eventos...</p>
-              ) : filteredEvents.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhum evento encontrado</p>
-              ) : (
-                filteredEvents.map((event) => (
-                  <EventCard key={event.id} event={event} onResolve={resolveEvent} />
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="resolved" className="space-y-3">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Carregando eventos...</p>
-              ) : filteredEvents.filter(e => e.resolved).length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhum evento resolvido</p>
-              ) : (
-                filteredEvents.filter(e => e.resolved).map((event) => (
-                  <EventCard key={event.id} event={event} onResolve={resolveEvent} />
-                ))
-              )}
-            </TabsContent>
-          </Tabs>
+          <div className="space-y-3">
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Carregando eventos...</p>
+            ) : filteredEvents.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhum evento encontrado</p>
+            ) : (
+              filteredEvents.map((event) => (
+                <EventCard key={event.id} event={event} onResolve={resolveEvent} />
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -247,15 +167,6 @@ function EventCard({
   event: any; 
   onResolve: (id: string) => void;
 }) {
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'destructive';
-      case 'warning': return 'default';
-      case 'info': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
   const getEventTypeLabel = (type: string) => {
     switch (type) {
       case 'failed_login': return 'Login Falhou';
@@ -290,12 +201,6 @@ function EventCard({
             <Badge variant="outline">
               {getEventTypeLabel(event.event_type)}
             </Badge>
-            {event.resolved && (
-              <Badge variant="secondary" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Resolvido
-              </Badge>
-            )}
           </div>
           <p className="text-sm">
             {event.event_type === 'failed_login' && event.event_details?.email ? (
@@ -327,21 +232,19 @@ function EventCard({
             </details>
           )}
           <p className="text-xs text-muted-foreground">
-            {format(new Date(event.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            {event.created_at && format(new Date(event.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </p>
         </div>
       </div>
-      {!event.resolved && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onResolve(event.id)}
-          className="ml-4"
-        >
-          <CheckCircle2 className="h-4 w-4 mr-1" />
-          Resolver
-        </Button>
-      )}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onResolve(event.id)}
+        className="ml-4"
+      >
+        <CheckCircle2 className="h-4 w-4 mr-1" />
+        Resolver
+      </Button>
     </div>
   );
 }
