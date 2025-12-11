@@ -36,8 +36,13 @@ export default function AdminUserList() {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   
-  // Get current user's role
-  const currentUserRole = (currentUser?.roles?.[0] || 'client') as 'client' | 'admin' | 'master';
+  // Get current user's role - usar isAdmin/isMaster que são mais confiáveis
+  const currentUserRole: 'client' | 'admin' | 'master' = 
+    currentUser?.isMaster ? 'master' : 
+    currentUser?.isAdmin ? 'admin' : 
+    (currentUser?.roles?.[0] as 'client' | 'admin' | 'master') || 'client';
+  
+  console.log('[AdminUserList] currentUser:', currentUser?.email, 'roles:', currentUser?.roles, 'isMaster:', currentUser?.isMaster, 'isAdmin:', currentUser?.isAdmin, 'currentUserRole:', currentUserRole);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');

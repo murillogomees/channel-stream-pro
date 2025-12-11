@@ -109,15 +109,18 @@ const SectionHeader = ({ icon, title, description, variant = 'primary', badge }:
   );
 };
 
-export function AdminUserForm({ formData, onChange, isEdit = false, currentUserRole, hideEmail = false }: AdminUserFormProps) {
+export function AdminUserForm({ formData, onChange, isEdit = false, currentUserRole = 'client', hideEmail = false }: AdminUserFormProps) {
   const updateField = (field: keyof UserFormData, value: any) => {
     onChange({ ...formData, [field]: value });
   };
 
   // Master pode atribuir qualquer role, admin só pode atribuir client
+  // Se currentUserRole não for passado, assume client e não mostra o campo
   const canEditRole = currentUserRole === 'master' || currentUserRole === 'admin';
   const canAssignAdmin = currentUserRole === 'master';
   const canAssignMaster = currentUserRole === 'master';
+
+  console.log('[AdminUserForm] currentUserRole:', currentUserRole, 'canEditRole:', canEditRole);
 
   return (
     <div className="space-y-4 sm:space-y-6 py-2">
