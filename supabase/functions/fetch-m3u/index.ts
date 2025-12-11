@@ -22,47 +22,68 @@ serve(async (req) => {
 
     console.log("[fetch-m3u] Fetching M3U from:", url);
 
-    // Try to fetch with multiple strategies
+    // Normalize URL - ensure HTTP for non-standard ports like 8880
+    let normalizedUrl = url;
+    try {
+      const urlObj = new URL(url);
+      // Ports like 8880, 8000, 25461 are typically HTTP on Xtream servers
+      const httpPorts = ['8880', '8000', '25461', '25462', '8080', '80'];
+      if (urlObj.protocol === 'https:' && httpPorts.includes(urlObj.port)) {
+        normalizedUrl = url.replace('https://', 'http://');
+        console.log("[fetch-m3u] Normalized to HTTP:", normalizedUrl);
+      }
+    } catch (e) {
+      console.log("[fetch-m3u] URL parse error, using original:", e.message);
+    }
+
+    // Try with different user agents - Xtream servers are picky
+    const userAgents = [
+      'VLC/3.0.18 LibVLC/3.0.18',
+      'Lavf/60.3.100',
+      'IPTVnator/0.14.0',
+      'Kodi/20.0 (Windows NT 10.0; Win64; x64)',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    ];
+
     let content: string | null = null;
     let lastError: Error | null = null;
 
-    // List of URLs to try (original, and protocol swap if applicable)
-    const urlsToTry: string[] = [url];
-    
-    // If URL has unusual port (like 8880), try HTTP version too
-    if (url.startsWith("https://")) {
-      urlsToTry.push(url.replace("https://", "http://"));
-    } else if (url.startsWith("http://")) {
-      urlsToTry.push(url.replace("http://", "https://"));
-    }
-
-    for (const tryUrl of urlsToTry) {
+    for (const userAgent of userAgents) {
       try {
-        console.log("[fetch-m3u] Trying URL:", tryUrl);
+        console.log("[fetch-m3u] Trying with User-Agent:", userAgent.substring(0, 30));
         
-        const response = await fetch(tryUrl, {
+        const response = await fetch(normalizedUrl, {
+          method: 'GET',
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate",
+            "User-Agent": userAgent,
+            "Accept": "audio/x-mpegurl, application/vnd.apple.mpegurl, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
           },
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status} ${response.statusText}`);
-        }
+        console.log("[fetch-m3u] Response status:", response.status);
 
-        content = await response.text();
-        console.log("[fetch-m3u] Success with URL:", tryUrl, "Content length:", content.length);
-        break;
+        if (response.ok) {
+          content = await response.text();
+          console.log("[fetch-m3u] Success! Content length:", content.length);
+          break;
+        } else {
+          lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
+        }
       } catch (err) {
-        console.log("[fetch-m3u] Failed with URL:", tryUrl, "Error:", err.message);
+        console.log("[fetch-m3u] Error with this UA:", err.message);
         lastError = err;
       }
     }
 
     if (!content) {
-      throw lastError || new Error("Failed to fetch M3U from all URLs");
+      throw lastError || new Error("Failed to fetch M3U");
+    }
+
+    // Validate it looks like M3U content
+    if (!content.includes('#EXTM3U') && !content.includes('#EXTINF')) {
+      console.log("[fetch-m3u] Warning: Content doesn't look like M3U, first 200 chars:", content.substring(0, 200));
     }
 
     return new Response(
@@ -70,7 +91,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("[fetch-m3u] Error:", error);
+    console.error("[fetch-m3u] Final error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
