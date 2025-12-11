@@ -1,14 +1,13 @@
 /**
  * ============================================================================
- * Predictive Cache Engine
+ * Predictive Cache Engine - Simplified
  * ============================================================================
  * 
- * ML-like prediction engine for intelligent content caching.
- * Combines multiple signals to predict what user will watch next.
+ * Prediction engine for content caching.
+ * Simplified to not depend on non-existent database tables.
  */
 
 import { behaviorTrackingService } from './behaviorTrackingService';
-import { supabase } from '@/integrations/supabase/client';
 
 // =============================================================================
 // TYPES
@@ -179,25 +178,6 @@ class PredictiveCacheEngine {
       }
     }
 
-    // 5. Trending content
-    const trending = await this.getTrendingChannels(context.channelList);
-    trending.forEach((channelId, index) => {
-      const score = this.getOrCreateScore(scores, channelId);
-      const weight = this.config.weights.trending * Math.pow(this.config.decayFactor, index);
-      score.score += weight * 80;
-      score.confidence += 0.1;
-      score.reasons.push('trending_content');
-    });
-
-    // 6. Continue watching (if applicable)
-    const continueWatching = await this.getContinueWatching(context.profileId);
-    continueWatching.forEach(channelId => {
-      const score = this.getOrCreateScore(scores, channelId);
-      score.score += this.config.weights.continueWatching * 90;
-      score.confidence += 0.2;
-      score.reasons.push('continue_watching');
-    });
-
     // Normalize and filter
     const predictions = Array.from(scores.values())
       .filter(s => s.channelId !== context.currentChannelId)
@@ -299,48 +279,6 @@ class PredictiveCacheEngine {
       });
     }
     return scores.get(channelId)!;
-  }
-
-  private async getTrendingChannels(
-    channelList: Array<{ id: string }>
-  ): Promise<string[]> {
-    try {
-      const { data, error } = await supabase
-        .from('trending_rankings')
-        .select('content_id')
-        .eq('content_type', 'live')
-        .eq('ranking_type', 'daily')
-        .order('rank_position', { ascending: true })
-        .limit(5);
-
-      if (error || !data) return [];
-
-      return data
-        .map(d => d.content_id)
-        .filter(id => channelList.some(c => c.id === id));
-    } catch {
-      return [];
-    }
-  }
-
-  private async getContinueWatching(profileId?: string): Promise<string[]> {
-    if (!profileId) return [];
-
-    try {
-      const { data, error } = await supabase
-        .from('watch_progress')
-        .select('content_id')
-        .eq('profile_id', profileId)
-        .eq('content_type', 'live')
-        .eq('completed', false)
-        .order('updated_at', { ascending: false })
-        .limit(3);
-
-      if (error || !data) return [];
-      return data.map(d => d.content_id);
-    } catch {
-      return [];
-    }
   }
 }
 

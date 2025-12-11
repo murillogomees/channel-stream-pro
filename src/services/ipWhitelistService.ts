@@ -1,7 +1,6 @@
 /**
- * SERVIÇO DE GERENCIAMENTO DE WHITELIST DE IPs
- * 
- * Gerencia IPs confiáveis que nunca são bloqueados
+ * IP Whitelist Service - Simplified
+ * Uses ip_whitelist table (existing schema only)
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -11,8 +10,8 @@ export interface IPWhitelist {
   ip_address: string;
   description: string | null;
   added_by: string | null;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean | null;
+  created_at: string | null;
 }
 
 export const ipWhitelistService = {
@@ -31,7 +30,7 @@ export const ipWhitelistService = {
         return [];
       }
 
-      return data || [];
+      return (data || []) as IPWhitelist[];
     } catch (error) {
       console.error('[IPWhitelist] Erro ao buscar IPs:', error);
       return [];
@@ -50,7 +49,8 @@ export const ipWhitelistService = {
         .insert({
           ip_address: ipAddress,
           description: description || null,
-          added_by: user?.id
+          added_by: user?.id,
+          is_active: true,
         });
 
       if (error) {
@@ -118,9 +118,10 @@ export const ipWhitelistService = {
         .from('ip_whitelist')
         .select('id')
         .eq('ip_address', ipAddress)
-        .single();
+        .eq('is_active', true)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('[IPWhitelist] Erro ao verificar IP:', error);
         return false;
       }

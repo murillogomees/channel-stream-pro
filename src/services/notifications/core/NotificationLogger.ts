@@ -1,14 +1,14 @@
 /**
- * Logger de Notificações
- * Responsável por registrar logs de notificações no Supabase
+ * Notification Logger - Simplified
+ * Logs notifications using sent_notifications table
  */
 
 import { supabase } from '@/integrations/supabase/client';
 
 export interface NotificationLogEntry {
-  cliente_id?: string;
-  phone: string;
-  template_name: string;
+  recipient_id?: string;
+  recipient_phone: string;
+  template_key: string;
   status: 'success' | 'error';
   message_content: string;
   error_message?: string;
@@ -20,13 +20,14 @@ export class NotificationLogger {
    */
   async log(entry: NotificationLogEntry): Promise<void> {
     try {
-      const { error } = await supabase.from('notification_logs').insert({
-        cliente_id: entry.cliente_id,
-        phone: entry.phone,
-        template_name: entry.template_name,
-        status: entry.status,
+      const { error } = await supabase.from('sent_notifications').insert({
+        recipient_id: entry.recipient_id || null,
+        recipient_phone: entry.recipient_phone,
+        template_key: entry.template_key,
+        status: entry.status === 'success' ? 'sent' : 'failed',
         message_content: entry.message_content,
-        error_message: entry.error_message,
+        error_message: entry.error_message || null,
+        sent_at: new Date().toISOString(),
       });
 
       if (error) {
@@ -44,12 +45,12 @@ export class NotificationLogger {
     phone: string,
     templateName: string,
     message: string,
-    clienteId?: string
+    recipientId?: string
   ): Promise<void> {
     await this.log({
-      cliente_id: clienteId,
-      phone,
-      template_name: templateName,
+      recipient_id: recipientId,
+      recipient_phone: phone,
+      template_key: templateName,
       status: 'success',
       message_content: message,
     });
@@ -63,12 +64,12 @@ export class NotificationLogger {
     templateName: string,
     message: string,
     errorMessage: string,
-    clienteId?: string
+    recipientId?: string
   ): Promise<void> {
     await this.log({
-      cliente_id: clienteId,
-      phone,
-      template_name: templateName,
+      recipient_id: recipientId,
+      recipient_phone: phone,
+      template_key: templateName,
       status: 'error',
       message_content: message,
       error_message: errorMessage,

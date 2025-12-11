@@ -1,6 +1,6 @@
 /**
- * Playback Token Service
- * Manages secure playback tokens tied to subscription status
+ * Playback Token Service - Simplified
+ * Uses profiles table for subscription check
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -30,7 +30,7 @@ export interface TokenValidation {
 class PlaybackTokenService {
   private functionUrl = SUPABASE_FUNCTIONS_URL;
   private tokenCache: Map<string, { token: PlaybackToken; expiresAt: number }> = new Map();
-  private refreshThreshold = 5 * 60 * 1000; // Refresh 5 min before expiry
+  private refreshThreshold = 5 * 60 * 1000;
 
   /**
    * Generate a playback token for content
@@ -39,7 +39,6 @@ class PlaybackTokenService {
     contentId?: string,
     contentType: "live" | "vod" = "live"
   ): Promise<PlaybackToken> {
-    // Check cache first
     const cacheKey = `${contentId || "*"}_${contentType}`;
     const cached = this.tokenCache.get(cacheKey);
     
@@ -75,7 +74,6 @@ class PlaybackTokenService {
       throw new Error(data.error || "Failed to generate token");
     }
 
-    // Cache the token
     this.tokenCache.set(cacheKey, {
       token: data,
       expiresAt: new Date(data.expires_at).getTime(),
@@ -136,7 +134,7 @@ class PlaybackTokenService {
   }
 
   /**
-   * Check if user can play content (quick check without generating token)
+   * Check if user can play content using profiles table
    */
   async canPlay(): Promise<boolean> {
     try {
@@ -144,9 +142,22 @@ class PlaybackTokenService {
       if (!user) return false;
 
       const { data } = await supabase
-        .rpc("get_subscription_status", { p_user_id: user.id });
+        .from('profiles')
+        .select('situacao, data_vencimento')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      return data?.[0]?.can_play || false;
+      if (!data) return false;
+
+      // Check if subscription is active
+      if (data.situacao === 'Ativo' || data.situacao === 'Testando') {
+        if (data.data_vencimento) {
+          return new Date(data.data_vencimento) > new Date();
+        }
+        return true;
+      }
+
+      return false;
     } catch {
       return false;
     }
