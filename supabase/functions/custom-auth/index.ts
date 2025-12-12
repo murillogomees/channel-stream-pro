@@ -46,21 +46,7 @@ async function createJWT(payload: object, secret: string): Promise<string> {
   return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // bcrypt verification using Deno
-  const bcrypt = await import("https://deno.land/x/bcrypt@v0.4.1/mod.ts");
-  try {
-    return await bcrypt.compare(password, hash);
-  } catch (e) {
-    console.error('Password verification error:', e);
-    return false;
-  }
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const bcrypt = await import("https://deno.land/x/bcrypt@v0.4.1/mod.ts");
-  return await bcrypt.hash(password);
-}
+// Password verification will be done via PostgreSQL crypt() function for compatibility
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -113,14 +99,15 @@ serve(async (req) => {
       if (action === 'login') {
         console.log(`Login attempt for: ${email}`);
         
-        // Get user from auth.users
-        const userResult = await client.queryObject(`
-          SELECT id, email, encrypted_password, email_confirmed_at, raw_user_meta_data
+        // Verify password using PostgreSQL crypt() function - 100% compatible
+        const authResult = await client.queryObject(`
+          SELECT id, email, email_confirmed_at, raw_user_meta_data,
+                 (encrypted_password = crypt($2, encrypted_password)) as password_valid
           FROM auth.users 
           WHERE email = $1
-        `, [email.toLowerCase()]);
+        `, [email.toLowerCase(), password]);
         
-        if (userResult.rows.length === 0) {
+        if (authResult.rows.length === 0) {
           return new Response(JSON.stringify({ 
             error: 'Invalid login credentials',
             details: 'User not found'
@@ -130,12 +117,9 @@ serve(async (req) => {
           });
         }
         
-        const user = userResult.rows[0] as any;
+        const user = authResult.rows[0] as any;
         
-        // Verify password
-        const passwordValid = await verifyPassword(password, user.encrypted_password);
-        
-        if (!passwordValid) {
+        if (!user.password_valid) {
           // Log failed attempt
           await client.queryObject(`
             INSERT INTO public.security_events (event_type, event_details, ip_address)
@@ -228,10 +212,7 @@ serve(async (req) => {
           });
         }
         
-        // Hash password
-        const hashedPassword = await hashPassword(password);
-        
-        // Create user in auth.users
+        // Create user in auth.users with password hashed via PostgreSQL crypt()
         const userId = crypto.randomUUID();
         const now = new Date().toISOString();
         
@@ -242,12 +223,12 @@ serve(async (req) => {
             raw_user_meta_data, raw_app_meta_data,
             aud, role, confirmation_token
           ) VALUES (
-            $1, '00000000-0000-0000-0000-000000000000', $2, $3,
+            $1, '00000000-0000-0000-0000-000000000000', $2, crypt($3, gen_salt('bf', 6)),
             $4, $4, $4,
             $5, '{"provider": "email", "providers": ["email"]}',
             'authenticated', 'authenticated', ''
           )
-        `, [userId, email.toLowerCase(), hashedPassword, now, JSON.stringify(userData || {})]);
+        `, [userId, email.toLowerCase(), password, now, JSON.stringify(userData || {})]);
         
         // Create identity
         await client.queryObject(`
