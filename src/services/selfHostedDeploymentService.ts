@@ -231,9 +231,20 @@ class SelfHostedDeploymentService {
       });
 
       const result = await response.json();
+      
+      // Handle various response formats from Coolify API
+      let services: any[] = [];
+      if (Array.isArray(result.data)) {
+        services = result.data;
+      } else if (result.data?.data && Array.isArray(result.data.data)) {
+        services = result.data.data;
+      } else if (Array.isArray(result)) {
+        services = result;
+      }
+      
       return {
-        success: result.success,
-        services: result.data || [],
+        success: result.success !== false,
+        services,
       };
     } catch (error) {
       console.error('[SelfHostedDeployment] Coolify services error:', error);
