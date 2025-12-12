@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
+import { customAuthService } from "@/services/customAuthService";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -94,75 +94,40 @@ export default function SignUp() {
       // Validar dados
       const validatedData = signUpSchema.parse(formData);
       
-      // Criar usuário no Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: validatedData.email,
-        password: validatedData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/app/profile`,
-          data: {
-            nome: validatedData.nome,
-            telefone: validatedData.telefone.replace(/\D/g, ''),
-            origem_cadastro: validatedData.origem || 'Website'
-          }
+      console.log('[SignUp] Tentando cadastro com Custom Auth:', validatedData.email);
+      
+      // Usar Custom Auth Service (bypassa GoTrue)
+      const { data, error } = await customAuthService.signUp(
+        validatedData.email,
+        validatedData.password,
+        {
+          nome: validatedData.nome,
+          telefone: validatedData.telefone.replace(/\D/g, ''),
+          origem_cadastro: validatedData.origem || 'Website'
         }
-      });
+      );
 
       if (error) {
+        console.error('[SignUp] Erro:', error.message);
+        
         if (error.message.includes("already registered")) {
           toast.error("Este email já está cadastrado. Tente fazer login.");
-        } else if (error.message.includes("Database error")) {
-          // Trigger removido - criar profile manualmente
-          toast.error("Erro no cadastro. Tente novamente.");
         } else {
-          toast.error(error.message);
+          toast.error(error.message || "Erro ao criar conta");
         }
         return;
       }
 
-      if (data.user) {
-        // Criar profile manualmente (trigger foi removido)
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          email: validatedData.email,
-          nome: validatedData.nome,
-          contact_phone: validatedData.telefone.replace(/\D/g, ''),
-          origem_cadastro: validatedData.origem || 'Website',
-          cliente_ativo: true,
-          situacao: 'Testando',
-          data_vencimento: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-          // Continua mesmo com erro - o perfil pode já existir
-        }
-
-        // Atribuir role de client
-        const { error: roleError } = await supabase.from('user_roles').insert({
-          user_id: data.user.id,
-          role: 'client'
-        });
-
-        if (roleError) {
-          console.error("Role assignment error:", roleError);
-          // Continua mesmo com erro - a role pode já existir
-        }
-
+      if (data?.user) {
+        console.log('[SignUp] Sucesso! User ID:', data.user.id);
+        
         toast.success(
-          "Conta criada com sucesso! Complete seu perfil e escolha um plano.",
+          "Conta criada com sucesso! Bem-vindo ao sistema.",
           { duration: 5000 }
         );
         
-        // Redireciona para perfil para completar cadastro e escolher plano
-        if (data.session) {
-          navigate("/app/profile", { replace: true });
-        } else {
-          toast.info("Verifique seu email para confirmar o cadastro.", { duration: 5000 });
-          navigate("/login", { replace: true });
-        }
+        // Custom auth já cria session automaticamente
+        navigate("/app/profile", { replace: true });
       }
     } catch (error) {
       if (error instanceof z.ZodError) {

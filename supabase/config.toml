@@ -442,3 +442,11 @@ verify_jwt = false
 
 [functions.fix-gotrue-auth]
 verify_jwt = false
+
+# ==========================================
+# CUSTOM AUTH WRAPPER (BYPASSES GOTRUE)
+# ==========================================
+
+# Custom auth - direct database authentication
+[functions.custom-auth]
+verify_jwt = false
