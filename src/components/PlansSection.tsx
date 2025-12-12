@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Star, Zap } from "lucide-react";
 import { trackEvent } from "@/services/metaPixelService";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Plan {

@@ -1,5 +1,5 @@
 // Simplified Security Analytics Service - Placeholder implementation
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 export interface DailySecurityMetrics {
   date: string;

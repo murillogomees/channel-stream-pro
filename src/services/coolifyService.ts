@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 export interface CoolifyResponse<T = unknown> {
   success: boolean;
