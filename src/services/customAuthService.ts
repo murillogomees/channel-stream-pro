@@ -102,10 +102,23 @@ class CustomAuthService {
     try {
       const result = await this.callAuthEndpoint('login', { email, password });
       
+      // Verify we got a valid auth response
+      if (!result.access_token) {
+        console.error('[CustomAuth] Invalid response:', result);
+        throw new Error(result.message || result.error || 'Authentication failed - invalid response');
+      }
+      
       // Extract app_role from JWT payload
-      const [, payloadBase64] = result.access_token.split('.');
-      const jwtPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
-      const appRole = jwtPayload.app_role || result.user.role || 'client';
+      let appRole = result.user?.role || 'client';
+      try {
+        const [, payloadBase64] = result.access_token.split('.');
+        if (payloadBase64) {
+          const jwtPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+          appRole = jwtPayload.app_role || jwtPayload.role || appRole;
+        }
+      } catch (e) {
+        console.warn('[CustomAuth] Could not parse JWT payload:', e);
+      }
       
       const session: CustomAuthSession = {
         access_token: result.access_token,
@@ -115,7 +128,7 @@ class CustomAuthService {
         expires_at: Date.now() + (result.expires_in * 1000),
         user: {
           ...result.user,
-          role: appRole // Use app_role from JWT
+          role: appRole
         }
       };
       
