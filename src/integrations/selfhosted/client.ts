@@ -27,6 +27,7 @@ export const selfHostedSupabase: SupabaseClient<Database> = createClient<Databas
   {
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
+      storageKey: 'sb-selfhosted-auth',
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
