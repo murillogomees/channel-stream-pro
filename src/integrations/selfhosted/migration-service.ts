@@ -14,6 +14,7 @@ const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
 const SELFHOSTED_SERVICE_ROLE_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.efcOMtFOUk5Ytcb2jN8krXkY5u6yG0byL-XtPEU1IWk";
 
 // Admin client for migrations - uses service role key to bypass RLS
+// Disable all auth features to prevent multiple GoTrueClient warnings
 const selfHostedAdminClient = createClient(
   SELFHOSTED_URL,
   SELFHOSTED_SERVICE_ROLE_KEY,
@@ -21,6 +22,13 @@ const selfHostedAdminClient = createClient(
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'sb-selfhosted-migration-auth',
+    },
+    global: {
+      headers: {
+        'x-client-info': 'migration-service',
+      },
     },
   }
 );
