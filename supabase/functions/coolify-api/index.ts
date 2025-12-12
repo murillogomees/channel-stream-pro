@@ -240,9 +240,48 @@ serve(async (req) => {
       
       'deploy-functions-to-coolify': async () => {
         // This action triggers a restart of the edge-runtime service in Coolify
-        // which picks up the new functions from the mounted volume
+        // Note: Requires valid COOLIFY_API_TOKEN with proper permissions
+        
+        if (!COOLIFY_TOKEN) {
+          return {
+            success: false,
+            error: 'COOLIFY_API_TOKEN not configured',
+            data: {
+              instructions: 'Configure COOLIFY_API_TOKEN in Supabase secrets with a valid Coolify API token that has full permissions'
+            }
+          };
+        }
+        
         try {
-          // Find the edge-runtime service
+          // First test API access
+          const testResponse = await fetch(`${COOLIFY_URL}/api/v1/version`, {
+            headers: {
+              'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (!testResponse.ok) {
+            const errorText = await testResponse.text();
+            return {
+              success: false,
+              error: `Coolify API authentication failed (${testResponse.status})`,
+              data: {
+                status: testResponse.status,
+                message: testResponse.status === 403 
+                  ? 'Token inválido ou sem permissões. Gere um novo token em Coolify → Settings → API Tokens com permissões completas.'
+                  : errorText,
+                coolify_url: COOLIFY_URL,
+                instructions: [
+                  '1. Acesse Coolify Dashboard → Settings → API Tokens',
+                  '2. Crie um novo token com TODAS as permissões',
+                  '3. Atualize o secret COOLIFY_API_TOKEN no Supabase'
+                ]
+              }
+            };
+          }
+          
+          // Try to list services
           const servicesResponse = await fetch(`${COOLIFY_URL}/api/v1/services`, {
             headers: {
               'Authorization': `Bearer ${COOLIFY_TOKEN}`,
@@ -251,13 +290,22 @@ serve(async (req) => {
           });
           
           if (!servicesResponse.ok) {
-            throw new Error('Failed to list services');
+            return {
+              success: false,
+              error: `Cannot list services (${servicesResponse.status})`,
+              data: {
+                status: servicesResponse.status,
+                message: 'Token não tem permissão para listar serviços. Verifique as permissões do token.',
+                instructions: 'Reinicie o container edge-runtime manualmente no Coolify Dashboard'
+              }
+            };
           }
           
           const services = await servicesResponse.json();
           const edgeRuntime = services.find((s: any) => 
             s.name?.toLowerCase().includes('edge') || 
-            s.name?.toLowerCase().includes('functions')
+            s.name?.toLowerCase().includes('functions') ||
+            s.name?.toLowerCase().includes('supabase-edge')
           );
           
           if (!edgeRuntime) {
@@ -265,8 +313,8 @@ serve(async (req) => {
               success: false,
               error: 'Edge Runtime service not found in Coolify',
               data: { 
-                available_services: services.map((s: any) => s.name),
-                instructions: 'Please restart the edge-runtime container manually in Coolify'
+                available_services: services.map((s: any) => ({ name: s.name, uuid: s.uuid })),
+                instructions: 'Reinicie o container edge-runtime manualmente no Coolify Dashboard'
               }
             };
           }
@@ -297,6 +345,9 @@ serve(async (req) => {
           return {
             success: false,
             error: error.message,
+            data: {
+              instructions: 'Verifique a conexão com o Coolify e tente novamente'
+            }
           };
         }
       },
