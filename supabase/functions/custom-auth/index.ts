@@ -149,18 +149,33 @@ serve(async (req) => {
         
         const profile = profileResult.rows.length > 0 ? profileResult.rows[0] : null;
         
-        // Create JWT token
+        // Create JWT token - Use Supabase-compatible claims
         const now = Math.floor(Date.now() / 1000);
         const expiresIn = 3600 * 24 * 7; // 7 days
         
+        // Get the Supabase project ref from URL or use default
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        const projectRef = supabaseUrl.match(/https:\/\/([^.]+)/)?.[1] || 'supabase';
+        
         const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: now + expiresIn,
+          iat: now,
+          iss: supabaseUrl + '/auth/v1',
           sub: user.id,
           email: user.email,
-          role: role,
-          iat: now,
-          exp: now + expiresIn,
-          aud: 'authenticated',
-          iss: 'custom-auth'
+          phone: '',
+          app_metadata: {
+            provider: 'email',
+            providers: ['email']
+          },
+          user_metadata: user.raw_user_meta_data || {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: now }],
+          session_id: crypto.randomUUID(),
+          // Custom claims for our app
+          app_role: role
         }, jwtSecret);
         
         const refreshToken = await createJWT({
@@ -258,14 +273,26 @@ serve(async (req) => {
         const nowTs = Math.floor(Date.now() / 1000);
         const expiresIn = 3600 * 24 * 7;
         
+        const supabaseUrlSignup = Deno.env.get('SUPABASE_URL') || '';
+        
         const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: nowTs + expiresIn,
+          iat: nowTs,
+          iss: supabaseUrlSignup + '/auth/v1',
           sub: userId,
           email: email.toLowerCase(),
-          role: 'client',
-          iat: nowTs,
-          exp: nowTs + expiresIn,
-          aud: 'authenticated',
-          iss: 'custom-auth'
+          phone: '',
+          app_metadata: {
+            provider: 'email',
+            providers: ['email']
+          },
+          user_metadata: userData || {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: nowTs }],
+          session_id: crypto.randomUUID(),
+          app_role: 'client'
         }, jwtSecret);
         
         const refreshToken = await createJWT({
@@ -328,14 +355,26 @@ serve(async (req) => {
         const nowTs = Math.floor(Date.now() / 1000);
         const expiresIn = 3600 * 24 * 7;
         
+        const supabaseUrlRefresh = Deno.env.get('SUPABASE_URL') || '';
+        
         const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: nowTs + expiresIn,
+          iat: nowTs,
+          iss: supabaseUrlRefresh + '/auth/v1',
           sub: user.id,
           email: user.email,
-          role: role,
-          iat: nowTs,
-          exp: nowTs + expiresIn,
-          aud: 'authenticated',
-          iss: 'custom-auth'
+          phone: '',
+          app_metadata: {
+            provider: 'email',
+            providers: ['email']
+          },
+          user_metadata: {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: nowTs }],
+          session_id: crypto.randomUUID(),
+          app_role: role
         }, jwtSecret);
         
         return new Response(JSON.stringify({

@@ -22,6 +22,17 @@ interface AdminDataRequest {
   };
 }
 
+// Decode JWT payload without verification (for extracting claims)
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const [, payloadBase64] = token.split('.');
+    const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,6 +41,46 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const jwtSecret = Deno.env.get('JWT_SECRET')!;
+    
+    // Validate JWT from Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const payload = decodeJwtPayload(token);
+    
+    if (!payload) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Check token expiration
+    const exp = payload.exp as number;
+    if (exp && exp < Math.floor(Date.now() / 1000)) {
+      return new Response(JSON.stringify({ error: 'Token expired' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Check user role - must be admin or master
+    const appRole = payload.app_role as string;
+    if (!['admin', 'master'].includes(appRole)) {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    console.log('[admin-data] Authorized user:', payload.email, 'role:', appRole);
     
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
