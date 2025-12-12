@@ -13,10 +13,8 @@ import type { Database } from "../supabase/types";
 // Self-hosted Supabase configuration
 const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
 
-// Anon key for self-hosted instance
-// This key should be configured in Coolify's Supabase deployment
-const SELFHOSTED_ANON_KEY = import.meta.env.VITE_SELFHOSTED_SUPABASE_ANON_KEY || 
-  "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU";
+// Anon key for self-hosted instance (Coolify deployment)
+const SELFHOSTED_ANON_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU";
 
 // Debug logging
 console.log('[Self-Hosted Supabase] Using URL:', SELFHOSTED_URL);
