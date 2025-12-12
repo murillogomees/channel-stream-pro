@@ -1,6 +1,7 @@
 /**
  * IPTV Service
  * Centralized service for IPTV channel management and playback
+ * With caching layer for improved performance
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -49,8 +50,58 @@ export interface ChannelGroup {
   channels: IPTVChannel[];
 }
 
+// Cache configuration
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+class CacheManager {
+  private cache = new Map<string, CacheEntry<unknown>>();
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data as T;
+  }
+
+  set<T>(key: string, data: T, ttlMs: number): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttlMs,
+    });
+  }
+
+  invalidate(pattern?: string): void {
+    if (!pattern) {
+      this.cache.clear();
+      return;
+    }
+    
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
 class IPTVService {
   private baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  private cache = new CacheManager();
+  
+  // Cache TTLs
+  private readonly CATEGORIES_TTL = 60 * 60 * 1000; // 1 hour
+  private readonly STATS_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly CHANNELS_TTL = 2 * 60 * 1000; // 2 minutes
 
   /**
    * Get channels with pagination and filters
@@ -71,6 +122,11 @@ class IPTVService {
       contentType,
       healthyOnly = true 
     } = options;
+
+    // Generate cache key based on options
+    const cacheKey = `channels:${JSON.stringify(options)}`;
+    const cached = this.cache.get<{ channels: IPTVChannel[]; total: number }>(cacheKey);
+    if (cached) return cached;
 
     let query = supabase
       .from('iptv_channels')
@@ -98,10 +154,13 @@ class IPTVService {
       throw error;
     }
 
-    return { 
+    const result = { 
       channels: (data || []) as IPTVChannel[], 
       total: count || 0 
     };
+
+    this.cache.set(cacheKey, result, this.CHANNELS_TTL);
+    return result;
   }
 
   /**
@@ -141,14 +200,23 @@ class IPTVService {
   }
 
   /**
-   * Get all categories
+   * Get all categories with caching (1 hour TTL)
    */
   async getCategories(): Promise<string[]> {
+    const cacheKey = 'categories:all';
+    const cached = this.cache.get<string[]>(cacheKey);
+    if (cached) {
+      console.log('[IPTVService] Categories served from cache');
+      return cached;
+    }
+
+    // Use distinct query with limit to avoid scanning entire table
     const { data, error } = await supabase
       .from('iptv_channels')
       .select('category')
       .not('category', 'is', null)
-      .eq('is_healthy', true);
+      .eq('is_healthy', true)
+      .limit(10000);
 
     if (error) {
       console.error('[IPTVService] Error fetching categories:', error);
@@ -156,7 +224,19 @@ class IPTVService {
     }
 
     const unique = [...new Set(data.map(c => c.category))].filter(Boolean) as string[];
-    return unique.sort();
+    const sorted = unique.sort();
+
+    this.cache.set(cacheKey, sorted, this.CATEGORIES_TTL);
+    console.log(`[IPTVService] Categories cached: ${sorted.length} categories`);
+    
+    return sorted;
+  }
+
+  /**
+   * Invalidate categories cache (call when categories change)
+   */
+  invalidateCategoriesCache(): void {
+    this.cache.invalidate('categories');
   }
 
   /**
@@ -306,7 +386,7 @@ class IPTVService {
   }
 
   /**
-   * Get channel stats
+   * Get channel stats with caching (5 min TTL)
    */
   async getStats(): Promise<{
     total: number;
@@ -315,6 +395,16 @@ class IPTVService {
     live: number;
     vod: number;
   }> {
+    const cacheKey = 'stats:all';
+    const cached = this.cache.get<{
+      total: number;
+      healthy: number;
+      unhealthy: number;
+      live: number;
+      vod: number;
+    }>(cacheKey);
+    if (cached) return cached;
+
     const [total, healthy, unhealthy, live, vod] = await Promise.all([
       supabase.from('iptv_channels').select('id', { count: 'exact', head: true }),
       supabase.from('iptv_channels').select('id', { count: 'exact', head: true }).eq('is_healthy', true),
@@ -323,13 +413,24 @@ class IPTVService {
       supabase.from('iptv_channels').select('id', { count: 'exact', head: true }).eq('content_type', 'vod'),
     ]);
 
-    return {
+    const result = {
       total: total.count || 0,
       healthy: healthy.count || 0,
       unhealthy: unhealthy.count || 0,
       live: live.count || 0,
       vod: vod.count || 0,
     };
+
+    this.cache.set(cacheKey, result, this.STATS_TTL);
+    return result;
+  }
+
+  /**
+   * Clear all caches
+   */
+  clearCache(): void {
+    this.cache.invalidate();
+    console.log('[IPTVService] All caches cleared');
   }
 }
 
