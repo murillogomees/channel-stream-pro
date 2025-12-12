@@ -450,3 +450,15 @@ verify_jwt = false
 # Custom auth - direct database authentication
 [functions.custom-auth]
 verify_jwt = false
+
+# ==========================================
+# MAINTENANCE & OPTIMIZATION
+# ==========================================
+
+# Scheduled backup - runs daily at 3 AM via pg_cron
+[functions.scheduled-backup]
+verify_jwt = false
+
+# Cleanup old logs - runs weekly, removes old logs and creates summaries
+[functions.cleanup-old-logs]
+verify_jwt = false
