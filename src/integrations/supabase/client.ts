@@ -15,6 +15,7 @@ console.log('[Supabase Client] Using URL:', SUPABASE_URL);
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
+    storageKey: 'sb-cloud-auth',
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
