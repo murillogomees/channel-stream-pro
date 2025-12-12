@@ -1,49 +1,21 @@
 /**
  * Self-Hosted Supabase Client
- * Connects to VPS self-hosted Supabase for heavy operations
+ * 
+ * Reexporta do cliente principal - apenas self-hosted.
  */
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { supabase, supabaseConfig, getFunctionUrl } from "./client";
 import type { Database } from "./types";
 
-// Self-hosted Supabase configuration (VPS)
-const SELF_HOSTED_URL = import.meta.env.VITE_SUPABASE_SELFHOSTED_URL || "https://srv1182856.hstgr.cloud";
-const SELF_HOSTED_KEY = import.meta.env.VITE_SUPABASE_SELFHOSTED_KEY || "";
+// Self-hosted URL (único)
+export const SELF_HOSTED_BASE_URL = supabaseConfig.url;
 
-// Check if self-hosted is configured
-export const isSelfHostedConfigured = (): boolean => {
-  return Boolean(SELF_HOSTED_URL && SELF_HOSTED_KEY);
-};
+// Sempre configurado (apenas self-hosted)
+export const isSelfHostedConfigured = (): boolean => true;
 
-// Create self-hosted client (lazy initialization)
-let selfHostedInstance: SupabaseClient<Database> | null = null;
+// Retorna o cliente principal
+export const getSelfHostedClient = () => supabase;
 
-export const getSelfHostedClient = (): SupabaseClient<Database> | null => {
-  if (!isSelfHostedConfigured()) {
-    console.warn('[SelfHosted] Not configured - missing URL or key');
-    return null;
-  }
-  
-  if (!selfHostedInstance) {
-    console.log('[SelfHosted] Initializing client:', SELF_HOSTED_URL);
-    
-    selfHostedInstance = createClient<Database>(SELF_HOSTED_URL, SELF_HOSTED_KEY, {
-      auth: {
-        storage: localStorage,
-        persistSession: false, // Don't persist self-hosted session
-        autoRefreshToken: false,
-      },
-      global: {
-        headers: {
-          "X-Client-Info": "iptv-link-selfhosted",
-        },
-      },
-    });
-  }
-  
-  return selfHostedInstance;
-};
-
-// Direct API call to self-hosted Edge Functions
+// Chama edge functions no self-hosted
 export const callSelfHostedFunction = async <T = unknown>(
   functionName: string,
   body?: Record<string, unknown>,
@@ -52,18 +24,14 @@ export const callSelfHostedFunction = async <T = unknown>(
     headers?: Record<string, string>;
   }
 ): Promise<{ data: T | null; error: Error | null }> => {
-  if (!isSelfHostedConfigured()) {
-    return { data: null, error: new Error('Self-hosted not configured') };
-  }
-  
-  const url = `${SELF_HOSTED_URL}/functions/v1/${functionName}`;
+  const url = getFunctionUrl(functionName);
   
   try {
     const response = await fetch(url, {
       method: options?.method || 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SELF_HOSTED_KEY}`,
+        'Authorization': `Bearer ${supabaseConfig.anonKey}`,
         ...options?.headers,
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -80,6 +48,3 @@ export const callSelfHostedFunction = async <T = unknown>(
     return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
   }
 };
-
-// Export URL for reference
-export const SELF_HOSTED_BASE_URL = SELF_HOSTED_URL;
