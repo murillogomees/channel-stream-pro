@@ -16,11 +16,30 @@ const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
 // Anon key for self-hosted instance (Coolify deployment)
 const SELFHOSTED_ANON_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU";
 
+// Storage key for custom auth session
+const CUSTOM_AUTH_STORAGE_KEY = 'custom_auth_session';
+
+// Helper to get custom auth token from localStorage
+const getCustomAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(CUSTOM_AUTH_STORAGE_KEY);
+    if (stored) {
+      const session = JSON.parse(stored);
+      if (session.expires_at > Date.now() && session.access_token) {
+        return session.access_token;
+      }
+    }
+  } catch (e) {
+    console.error('[Self-Hosted] Error reading custom auth token:', e);
+  }
+  return null;
+};
+
 // Debug logging
 console.log('[Self-Hosted Supabase] Using URL:', SELFHOSTED_URL);
-console.log('[Self-Hosted Supabase] Key configured:', SELFHOSTED_ANON_KEY ? 'Yes' : 'No');
 
-// Create the self-hosted client
+// Create the self-hosted client with dynamic auth header
 export const selfHostedSupabase: SupabaseClient<Database> = createClient<Database>(
   SELFHOSTED_URL,
   SELFHOSTED_ANON_KEY,
@@ -42,6 +61,16 @@ export const selfHostedSupabase: SupabaseClient<Database> = createClient<Databas
     global: {
       headers: {
         "X-Client-Info": "iptv-link-selfhosted",
+      },
+      fetch: (url, options: RequestInit = {}) => {
+        // Inject custom auth token into requests
+        const customToken = getCustomAuthToken();
+        if (customToken) {
+          const headers = new Headers(options.headers as HeadersInit);
+          headers.set('Authorization', `Bearer ${customToken}`);
+          options = { ...options, headers };
+        }
+        return fetch(url, options);
       },
     },
   }
