@@ -220,7 +220,7 @@ export const getBackendUrl = (backend: 'cloud' | 'selfhosted'): string => {
   if (backend === 'selfhosted') {
     return SELF_HOSTED_BASE_URL;
   }
-  return import.meta.env.VITE_SUPABASE_URL || 'https://waxgowafohlrfoefwhsf.supabase.co';
+  return 'https://supabase.iptvlink.com.br';
 };
 
 /**
