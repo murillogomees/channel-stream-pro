@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -27,14 +28,20 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  hideTitle?: boolean;
+  hideDescription?: boolean;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, hideTitle = false, hideDescription = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-describedby={hideDescription ? undefined : props['aria-describedby']}
       className={cn(
         // Positioning - centered with safe margins
         "fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]",
@@ -50,6 +57,16 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
+      {hideTitle && (
+        <VisuallyHidden.Root asChild>
+          <DialogPrimitive.Title>Dialog</DialogPrimitive.Title>
+        </VisuallyHidden.Root>
+      )}
+      {hideDescription && (
+        <VisuallyHidden.Root asChild>
+          <DialogPrimitive.Description>Dialog content</DialogPrimitive.Description>
+        </VisuallyHidden.Root>
+      )}
       {children}
       <DialogPrimitive.Close className="absolute right-3 top-3 sm:right-4 sm:top-4 z-10 rounded-lg opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-1.5">
         <X className="h-4 w-4" />
