@@ -430,3 +430,9 @@ verify_jwt = false
 # Test self-hosted auth - debugging utility
 [functions.test-selfhosted-auth]
 verify_jwt = false
+
+[functions.check-gotrue-config]
+verify_jwt = false
+
+[functions.gotrue-admin]
+verify_jwt = false
