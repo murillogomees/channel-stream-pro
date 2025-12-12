@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, sql, dbHost, dbPort, dbUser, dbPassword, dbName } = await req.json();
+    const body = await req.json();
+    const { action, sql, dbHost, dbPort, dbUser, dbPassword, dbName, email, newPassword } = body;
 
     // Get the database connection params from request or environment
     const host = dbHost || 'supabase.iptvlink.com.br';
@@ -126,10 +127,35 @@ serve(async (req) => {
         rowCount: typeof customResult.rowCount === 'bigint' ? Number(customResult.rowCount) : customResult.rowCount
       };
     }
+    else if (action === 'reset-password') {
+      if (!email || !newPassword) {
+        result = { error: 'email and newPassword required' };
+      } else {
+        console.log('Resetting password for:', email);
+        
+        // Use pgcrypto with cost factor 10 (bf = blowfish/bcrypt, iter_count 10)
+        const updateResult = await client.queryObject`
+          UPDATE auth.users 
+          SET encrypted_password = crypt(${newPassword}, gen_salt('bf', 10))
+          WHERE email = ${email}
+          RETURNING id, email
+        `;
+        
+        if (updateResult.rows.length === 0) {
+          result = { error: 'User not found', action: 'reset-password' };
+        } else {
+          result = {
+            action: 'reset-password',
+            success: true,
+            user: updateResult.rows[0]
+          };
+        }
+      }
+    }
     else {
       result = {
         error: 'Invalid action',
-        available_actions: ['disable-trigger', 'enable-trigger', 'list-triggers', 'check-users', 'custom-sql']
+        available_actions: ['disable-trigger', 'enable-trigger', 'list-triggers', 'check-users', 'custom-sql', 'reset-password']
       };
     }
 
