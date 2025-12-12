@@ -1,10 +1,46 @@
 /**
  * useProfiles - Hook unificado para gerenciar profiles/clientes
- * Usa Edge Function para bypass de problemas com JWT signature
+ * Usa Edge Function com autenticação JWT custom
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+
+const SUPABASE_URL = 'https://supabase.iptvlink.com.br';
+const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU';
+
+function getAuthToken(): string | null {
+  try {
+    const storedSession = localStorage.getItem('custom_auth_session');
+    return storedSession ? JSON.parse(storedSession).access_token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function callAdminData(action: string, data?: Record<string, unknown>): Promise<any> {
+  const accessToken = getAuthToken();
+  if (!accessToken) {
+    throw new Error('Not authenticated');
+  }
+  
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-data`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+      'apikey': SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify({ action, ...data })
+  });
+
+  const result = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(result.error || 'Request failed');
+  }
+  
+  return result;
+}
 
 export interface UnifiedProfile {
   id: string;
@@ -40,21 +76,8 @@ export function useProfiles() {
     setLoading(true);
     setError(null);
     try {
-      // Usar Edge Function para bypass de RLS/JWT issues
-      const { data, error: fnError } = await supabase.functions.invoke('admin-data', {
-        body: { action: 'list-profiles' }
-      });
-
-      if (fnError) {
-        console.error('Erro ao buscar profiles via Edge Function:', fnError);
-        throw fnError;
-      }
-
-      if (data?.profiles) {
-        setProfiles(data.profiles);
-      } else {
-        setProfiles([]);
-      }
+      const result = await callAdminData('list-profiles');
+      setProfiles(result?.profiles || []);
     } catch (e: any) {
       console.error('Erro ao carregar profiles:', e);
       setError(e?.message || 'Erro ao carregar profiles');
@@ -66,61 +89,23 @@ export function useProfiles() {
 
   useEffect(() => {
     fetchProfiles();
-
-    // Realtime subscription (pode falhar com JWT issues, mas tentamos)
-    const subscription = supabase
-      .channel('profiles_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'profiles' }, 
-        () => {
-          fetchProfiles();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [fetchProfiles]);
 
   const updateProfile = useCallback(async (id: string, updates: Partial<UnifiedProfile>) => {
-    const { data, error } = await supabase.functions.invoke('admin-data', {
-      body: { 
-        action: 'update-profile',
-        profileId: id,
-        data: updates
-      }
-    });
-    
-    if (error) throw error;
-    if (data?.profile) {
-      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...data.profile } : p));
-      return data.profile;
+    const result = await callAdminData('update-profile', { profileId: id, data: updates });
+    if (result?.profile) {
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...result.profile } : p));
+      return result.profile;
     }
   }, []);
 
   const deleteProfile = useCallback(async (id: string) => {
-    const { error } = await supabase.functions.invoke('admin-data', {
-      body: { 
-        action: 'delete-profile',
-        profileId: id
-      }
-    });
-    
-    if (error) throw error;
+    await callAdminData('delete-profile', { profileId: id });
     setProfiles(prev => prev.filter(p => p.id !== id));
   }, []);
 
   const updateRole = useCallback(async (id: string, role: string) => {
-    const { error } = await supabase.functions.invoke('admin-data', {
-      body: { 
-        action: 'update-role',
-        profileId: id,
-        data: { role }
-      }
-    });
-    
-    if (error) throw error;
+    await callAdminData('update-role', { profileId: id, data: { role } });
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, roles: [role] } : p));
   }, []);
 

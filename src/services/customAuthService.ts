@@ -102,18 +102,26 @@ class CustomAuthService {
     try {
       const result = await this.callAuthEndpoint('login', { email, password });
       
+      // Extract app_role from JWT payload
+      const [, payloadBase64] = result.access_token.split('.');
+      const jwtPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+      const appRole = jwtPayload.app_role || result.user.role || 'client';
+      
       const session: CustomAuthSession = {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
         token_type: result.token_type,
         expires_in: result.expires_in,
         expires_at: Date.now() + (result.expires_in * 1000),
-        user: result.user
+        user: {
+          ...result.user,
+          role: appRole // Use app_role from JWT
+        }
       };
       
       this.saveSession(session);
       
-      return { data: { session, user: result.user }, error: null };
+      return { data: { session, user: session.user }, error: null };
     } catch (error: any) {
       return { data: null, error };
     }
