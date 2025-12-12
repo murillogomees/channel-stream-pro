@@ -22,11 +22,11 @@ import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionP
 import { cn } from "@/lib/utils";
 
 const REMEMBER_ME_KEY = "iptv_remember_me";
-const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60 * 1000;
+const REMEMBER_ME_DURATION = 30 * 24 * 60 * 60;
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres")
+  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
 });
 
 type ViewMode = "initial" | "login" | "plans";
@@ -34,15 +34,9 @@ type ViewMode = "initial" | "login" | "plans";
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    isAuthenticated,
-    isAdmin,
-    loading: authLoading,
-    refreshUser,
-    user
-  } = useAuth();
+  const { isAuthenticated, isAdmin, loading: authLoading, refreshUser, user } = useAuth();
   const { plans, loading: plansLoading } = useSubscriptionPlans();
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -64,13 +58,13 @@ export default function Login() {
     if (!authLoading && isAuthenticated && user) {
       const isAdminOrMaster = isAdmin || user.roles?.includes("admin") || user.roles?.includes("master");
       let redirectTo: string;
-      
+
       if (isAdminOrMaster) {
         redirectTo = "/admin/dashboard";
       } else {
         redirectTo = "/app/player";
       }
-      
+
       navigate(redirectTo, { replace: true });
     }
   }, [isAuthenticated, isAdmin, authLoading, navigate, user]);
@@ -80,9 +74,9 @@ export default function Login() {
       const { securityMonitoringService } = await import("@/services/securityMonitoringService");
       await securityMonitoringService.logFailedLogin(email, undefined, navigator.userAgent, true);
       fetch("https://api.ipify.org?format=json")
-        .then(res => res.json())
-        .then(data => {
-          import("@/services/suspiciousLoginService").then(module => {
+        .then((res) => res.json())
+        .then((data) => {
+          import("@/services/suspiciousLoginService").then((module) => {
             module.suspiciousLoginService.checkLogin(data.ip, email);
           });
         })
@@ -97,27 +91,28 @@ export default function Login() {
     setIsLoading(true);
     try {
       const validatedData = loginSchema.parse({ email, password });
-      
-      console.log('[Login] Tentando login com Custom Auth:', validatedData.email);
-      
+
+      console.log("[Login] Tentando login com Custom Auth:", validatedData.email);
+
       // Use Custom Auth Service (bypasses GoTrue)
-      const { data, error } = await customAuthService.signIn(
-        validatedData.email,
-        validatedData.password
-      );
-      
-      console.log('[Login] Resposta Custom Auth:', { 
-        hasUser: !!data?.user, 
+      const { data, error } = await customAuthService.signIn(validatedData.email, validatedData.password);
+
+      console.log("[Login] Resposta Custom Auth:", {
+        hasUser: !!data?.user,
         hasSession: !!data?.session,
-        error: error?.message 
+        error: error?.message,
       });
-      
+
       if (error) {
-        console.error('[Login] Erro:', error.message);
-        
-        const errorMessage = error.message || '';
-        
-        if (errorMessage.includes("Invalid login credentials") || errorMessage.includes("Invalid password") || errorMessage.includes("User not found")) {
+        console.error("[Login] Erro:", error.message);
+
+        const errorMessage = error.message || "";
+
+        if (
+          errorMessage.includes("Invalid login credentials") ||
+          errorMessage.includes("Invalid password") ||
+          errorMessage.includes("User not found")
+        ) {
           toast.error("Email ou senha incorretos");
           setTimeout(() => logFailedLogin(validatedData.email), 0);
         } else if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
@@ -130,22 +125,25 @@ export default function Login() {
       if (data.user) {
         toast.success("Login realizado com sucesso!");
         if (rememberMe) {
-          localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({
-            expires: Date.now() + REMEMBER_ME_DURATION,
-            userId: data.user.id
-          }));
+          localStorage.setItem(
+            REMEMBER_ME_KEY,
+            JSON.stringify({
+              expires: Date.now() + REMEMBER_ME_DURATION,
+              userId: data.user.id,
+            }),
+          );
         } else {
           localStorage.removeItem(REMEMBER_ME_KEY);
         }
         await refreshUser();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     } catch (error: any) {
-      console.error('[Login] Erro capturado:', error);
-      
+      console.error("[Login] Erro capturado:", error);
+
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
-      } else if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
+      } else if (error?.message?.includes("fetch") || error?.name === "TypeError") {
         toast.error("Não foi possível conectar ao servidor de autenticação.");
       } else {
         toast.error(error?.message || "Erro ao fazer login. Tente novamente.");
@@ -163,7 +161,7 @@ export default function Login() {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
-      currency: "BRL"
+      currency: "BRL",
     }).format(price);
   };
 
@@ -214,12 +212,7 @@ export default function Login() {
       className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl flex items-center justify-center p-4"
     >
       {/* Close Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={goBack}
-        className="absolute top-4 right-4 z-10"
-      >
+      <Button variant="ghost" size="icon" onClick={goBack} className="absolute top-4 right-4 z-10">
         <X className="w-6 h-6" />
       </Button>
 
@@ -244,7 +237,7 @@ export default function Login() {
               type="email"
               placeholder="seu@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
               className="bg-background/50 border-border h-12 rounded-xl focus:ring-2 focus:ring-primary/20"
             />
@@ -260,7 +253,7 @@ export default function Login() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
                 className="bg-background/50 border-border h-12 rounded-xl pr-12 focus:ring-2 focus:ring-primary/20"
               />
@@ -278,7 +271,7 @@ export default function Login() {
             <Checkbox
               id="remember-me"
               checked={rememberMe}
-              onCheckedChange={checked => setRememberMe(checked === true)}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
             />
             <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
               Continuar conectado por 30 dias
@@ -325,12 +318,7 @@ export default function Login() {
       className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
     >
       {/* Close Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={goBack}
-        className="absolute top-4 right-4 z-10"
-      >
+      <Button variant="ghost" size="icon" onClick={goBack} className="absolute top-4 right-4 z-10">
         <X className="w-6 h-6" />
       </Button>
 
@@ -338,9 +326,7 @@ export default function Login() {
         {/* Header */}
         <div className="text-center mb-8 md:mb-10">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground">Escolha seu plano</h2>
-          <p className="text-muted-foreground mt-3 text-lg">
-            Assista em todos os seus dispositivos
-          </p>
+          <p className="text-muted-foreground mt-3 text-lg">Assista em todos os seus dispositivos</p>
         </div>
 
         {/* Devices Banner */}
@@ -357,7 +343,7 @@ export default function Login() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-            {plans.map(plan => (
+            {plans.map((plan) => (
               <motion.div
                 key={plan.id}
                 whileHover={{ scale: 1.02, y: -5 }}
@@ -370,7 +356,7 @@ export default function Login() {
                   plan.is_highlighted
                     ? "border-primary bg-primary/10 shadow-xl shadow-primary/20 ring-1 ring-primary/30"
                     : "border-border/50 bg-background/60 hover:border-primary/40 hover:bg-background/80",
-                  hoveredPlan === plan.id && "ring-2 ring-primary/40"
+                  hoveredPlan === plan.id && "ring-2 ring-primary/40",
                 )}
               >
                 {/* Highlighted Badge */}
@@ -392,11 +378,9 @@ export default function Login() {
 
                 <div className={cn("text-center flex-1 flex flex-col", plan.is_highlighted && "pt-3")}>
                   <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                  
+
                   <div className="flex items-baseline justify-center gap-1 mt-4">
-                    <span className="text-3xl md:text-4xl font-extrabold text-primary">
-                      {formatPrice(plan.price)}
-                    </span>
+                    <span className="text-3xl md:text-4xl font-extrabold text-primary">{formatPrice(plan.price)}</span>
                     <span className="text-muted-foreground font-medium">/{plan.period}</span>
                   </div>
 
@@ -432,9 +416,9 @@ export default function Login() {
                   size="lg"
                   className={cn(
                     "w-full font-semibold mt-5 h-12 rounded-xl",
-                    plan.is_highlighted 
-                      ? "bg-primary hover:bg-primary/90" 
-                      : "bg-foreground/10 hover:bg-foreground/20 text-foreground"
+                    plan.is_highlighted
+                      ? "bg-primary hover:bg-primary/90"
+                      : "bg-foreground/10 hover:bg-foreground/20 text-foreground",
                   )}
                 >
                   Assinar agora
@@ -482,9 +466,7 @@ export default function Login() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center py-20">
-        {initialView}
-      </div>
+      <div className="relative z-10 min-h-screen flex items-center justify-center py-20">{initialView}</div>
 
       {/* Full Screen Views */}
       <AnimatePresence>
