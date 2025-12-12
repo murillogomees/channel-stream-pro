@@ -406,3 +406,11 @@ verify_jwt = false
 # Remote command execution via Coolify - requires master role
 [functions.remote-command]
 verify_jwt = false
+
+# ==========================================
+# SELF-HOSTED MIGRATION UTILITIES
+# ==========================================
+
+# Clean self-hosted tables before dump - admin only
+[functions.clean-selfhosted-tables]
+verify_jwt = false
