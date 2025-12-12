@@ -143,12 +143,57 @@ serve(async (req) => {
 
     if (action === 'clean' && confirm === 'CONFIRMO_DELETAR_TUDO') {
       const results: Record<string, { success: boolean; error?: string }> = {};
+      const authResults: Record<string, { success: boolean; error?: string }> = {};
       
-      console.log('Starting cleanup of self-hosted tables...');
+      console.log('Starting cleanup of self-hosted tables (including auth)...');
 
-      // First, clean auth tables using raw SQL via RPC or direct connection
-      // We'll use the REST API to delete from public tables
-      
+      // First, clean auth tables in correct order (dependencies first)
+      const authTables = [
+        'auth.identities',
+        'auth.sessions', 
+        'auth.refresh_tokens',
+        'auth.mfa_factors',
+        'auth.mfa_challenges',
+        'auth.mfa_amr_claims',
+        'auth.flow_state',
+        'auth.saml_relay_states',
+        'auth.sso_domains',
+        'auth.sso_providers',
+        'auth.one_time_tokens',
+        'auth.users' // Last - after all dependencies
+      ];
+
+      // Clean auth tables using direct fetch with service role
+      for (const table of authTables) {
+        const [schema, tableName] = table.split('.');
+        try {
+          // Use PostgREST directly for auth schema
+          const response = await fetch(`${SELFHOSTED_URL}/rest/v1/${tableName}?select=*`, {
+            method: 'DELETE',
+            headers: {
+              'apikey': SELFHOSTED_SERVICE_KEY,
+              'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+              'Accept-Profile': schema
+            }
+          });
+          
+          if (response.ok || response.status === 204) {
+            authResults[table] = { success: true };
+            console.log(`Cleaned auth table ${table}: OK`);
+          } else {
+            const errorText = await response.text();
+            authResults[table] = { success: false, error: errorText };
+            console.log(`Cleaned auth table ${table}: FAILED - ${errorText}`);
+          }
+        } catch (e) {
+          authResults[table] = { success: false, error: e.message };
+          console.log(`Cleaned auth table ${table}: ERROR - ${e.message}`);
+        }
+      }
+
+      // Then clean public tables
       for (const table of publicTables) {
         try {
           const { error } = await supabase
@@ -175,20 +220,22 @@ serve(async (req) => {
       }
 
       // Summary
-      const successCount = Object.values(results).filter(r => r.success).length;
-      const failCount = Object.values(results).filter(r => !r.success).length;
+      const publicSuccess = Object.values(results).filter(r => r.success).length;
+      const publicFail = Object.values(results).filter(r => !r.success).length;
+      const authSuccess = Object.values(authResults).filter(r => r.success).length;
+      const authFail = Object.values(authResults).filter(r => !r.success).length;
 
       return new Response(JSON.stringify({
         success: true,
         action: 'clean',
         data: {
-          results,
+          auth_results: authResults,
+          public_results: results,
           summary: {
-            total: publicTables.length,
-            success: successCount,
-            failed: failCount
+            auth: { total: authTables.length, success: authSuccess, failed: authFail },
+            public: { total: publicTables.length, success: publicSuccess, failed: publicFail }
           },
-          message: `Limpeza concluída: ${successCount} tabelas limpas, ${failCount} com erros`,
+          message: `Limpeza concluída: Auth (${authSuccess}/${authTables.length}), Public (${publicSuccess}/${publicTables.length})`,
           next_step: 'Agora você pode fazer o dump do Cloud e restaurar no self-hosted'
         }
       }), {
