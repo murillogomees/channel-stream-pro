@@ -394,3 +394,15 @@ verify_jwt = false
 # Trigger event-based notifications - called by system events
 [functions.trigger-event-notification]
 verify_jwt = false
+
+# ==========================================
+# COOLIFY INTEGRATION & SSH MANAGEMENT
+# ==========================================
+
+# Coolify API proxy - public with internal auth verification
+[functions.coolify-api]
+verify_jwt = false
+
+# Remote command execution via Coolify - requires master role
+[functions.remote-command]
+verify_jwt = false

@@ -22,9 +22,11 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Key
 } from 'lucide-react';
 import { coolifyService, COOLIFY_ACTIONS, type CoolifyServer, type CoolifyProject, type CoolifyServiceType } from '@/services/coolifyService';
+import { SSHKeyManager } from './SSHKeyManager';
 
 interface EnvironmentData {
   servers: CoolifyServer[];
@@ -183,10 +185,14 @@ export function CoolifyDashboard() {
       )}
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-3xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="servers">Servidores</TabsTrigger>
           <TabsTrigger value="services">Serviços</TabsTrigger>
+          <TabsTrigger value="ssh" className="flex items-center gap-1">
+            <Key className="w-3 h-3" />
+            SSH
+          </TabsTrigger>
           <TabsTrigger value="actions">Ações API</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
@@ -433,6 +439,11 @@ export function CoolifyDashboard() {
               </ScrollArea>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* SSH Tab */}
+        <TabsContent value="ssh" className="space-y-4">
+          <SSHKeyManager />
         </TabsContent>
 
         {/* Logs Tab */}
