@@ -1,13 +1,18 @@
-// Supabase client - Using Lovable Cloud
+/**
+ * Supabase client - Using Self-Hosted (Primary)
+ * 
+ * Este arquivo agora aponta para o Supabase Self-Hosted no Coolify.
+ * URL: https://supabase.iptvlink.com.br
+ */
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-// Lovable Cloud Supabase configuration
-const SUPABASE_URL = "https://waxgowafohlrfoefwhsf.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";
+// Self-Hosted Supabase configuration (Coolify)
+const SUPABASE_URL = "https://supabase.iptvlink.com.br";
+const SUPABASE_PUBLISHABLE_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU";
 
 // Debug log to verify correct URL is being used
-console.log('[Supabase Client] Using URL:', SUPABASE_URL);
+console.log('[Supabase Client] Using Self-Hosted URL:', SUPABASE_URL);
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +20,7 @@ console.log('[Supabase Client] Using URL:', SUPABASE_URL);
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
-    storageKey: 'sb-cloud-auth',
+    storageKey: 'sb-selfhosted-auth',
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
@@ -29,7 +34,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
   global: {
     headers: {
-      "X-Client-Info": "iptv-link-web",
+      "X-Client-Info": "iptv-link-selfhosted",
     },
   },
 });
