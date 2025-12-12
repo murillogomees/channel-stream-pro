@@ -111,10 +111,19 @@ serve(async (req) => {
       console.log('Executing custom SQL:', sql);
       const customResult = await client.queryObject(sql);
       
+      // Convert BigInt to Number/String to avoid JSON serialization issues
+      const safeRows = customResult.rows.map((row: Record<string, unknown>) => {
+        const safeRow: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(row)) {
+          safeRow[key] = typeof value === 'bigint' ? Number(value) : value;
+        }
+        return safeRow;
+      });
+      
       result = {
         action: 'custom-sql',
-        rows: customResult.rows,
-        rowCount: customResult.rowCount
+        rows: safeRows,
+        rowCount: typeof customResult.rowCount === 'bigint' ? Number(customResult.rowCount) : customResult.rowCount
       };
     }
     else {

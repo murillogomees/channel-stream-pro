@@ -8,7 +8,7 @@
  * - Auto-fallback if self-hosted is unavailable
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { 
   getSelfHostedClient, 
   callSelfHostedFunction, 

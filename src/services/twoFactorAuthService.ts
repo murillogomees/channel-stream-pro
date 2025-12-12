@@ -3,7 +3,7 @@
  * Uses two_factor_auth table
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 
