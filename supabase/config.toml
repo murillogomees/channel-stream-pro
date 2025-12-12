@@ -422,3 +422,7 @@ verify_jwt = false
 # Self-hosted DB Admin - direct PostgreSQL access for trigger management
 [functions.selfhosted-db-admin]
 verify_jwt = false
+
+# Generate JWT keys for self-hosted Supabase - public utility
+[functions.generate-jwt-keys]
+verify_jwt = false
