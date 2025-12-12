@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { customAuthService } from "@/services/customAuthService";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -97,47 +98,32 @@ export default function Login() {
     try {
       const validatedData = loginSchema.parse({ email, password });
       
-      console.log('[Login] Tentando login com:', validatedData.email);
-      console.log('[Login] Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'usando client.ts');
+      console.log('[Login] Tentando login com Custom Auth:', validatedData.email);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validatedData.email,
-        password: validatedData.password
-      });
+      // Use Custom Auth Service (bypasses GoTrue)
+      const { data, error } = await customAuthService.signIn(
+        validatedData.email,
+        validatedData.password
+      );
       
-      console.log('[Login] Resposta completa:', JSON.stringify({ 
+      console.log('[Login] Resposta Custom Auth:', { 
         hasUser: !!data?.user, 
         hasSession: !!data?.session,
-        error: error ? { message: error.message, status: error.status, name: error.name } : null 
-      }, null, 2));
+        error: error?.message 
+      });
       
       if (error) {
-        console.error('[Login] Erro detalhado:', {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
+        console.error('[Login] Erro:', error.message);
         
         const errorMessage = error.message || '';
-        const errorStatus = error.status;
         
-        // Erro vazio ou status 0 indica problema de conexão/CORS
-        if (!errorMessage || errorMessage === '{}' || errorStatus === 0) {
-          toast.error("Erro de conexão com o servidor de autenticação. Verifique se o servidor está acessível.");
-          console.error('[Login] Possível problema de CORS ou servidor Auth inacessível');
-          return;
-        }
-        
-        if (errorMessage.includes("Invalid login credentials")) {
+        if (errorMessage.includes("Invalid login credentials") || errorMessage.includes("Invalid password") || errorMessage.includes("User not found")) {
           toast.error("Email ou senha incorretos");
           setTimeout(() => logFailedLogin(validatedData.email), 0);
-        } else if (errorMessage.includes("Email not confirmed")) {
-          toast.error("Por favor, confirme seu email antes de fazer login");
-        } else if (errorMessage.includes("fetch") || errorMessage.includes("network") || !errorMessage || errorMessage === '{}') {
+        } else if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
           toast.error("Erro de conexão com o servidor. Verifique sua internet.");
-          console.error('[Login] Possível erro de rede/CORS');
         } else {
-          toast.error(errorMessage || "Erro desconhecido ao fazer login");
+          toast.error(errorMessage || "Erro ao fazer login");
         }
         return;
       }
