@@ -38,6 +38,7 @@ interface TableStatus {
   cloudCount: number;
   selfHostedCount: number;
   synced: boolean;
+  exists: boolean; // Whether table exists on self-hosted
   lastSync?: Date;
 }
 
@@ -87,12 +88,14 @@ const SelfHostedMigrationDashboard = () => {
     for (const table of coreTables) {
       const cloudCount = await migrationService.getCloudTableCount(table);
       const selfHostedCount = await migrationService.getSelfHostedTableCount(table);
+      const exists = selfHostedCount >= 0; // -1 means table doesn't exist
       
       statuses.push({
         name: table,
         cloudCount,
-        selfHostedCount,
-        synced: cloudCount === selfHostedCount && cloudCount > 0,
+        selfHostedCount: exists ? selfHostedCount : 0,
+        synced: exists && cloudCount === selfHostedCount && cloudCount > 0,
+        exists,
       });
     }
     
@@ -250,15 +253,24 @@ const SelfHostedMigrationDashboard = () => {
                   {tableStatuses.map((table) => (
                     <div 
                       key={table.name}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        !table.exists ? 'bg-destructive/10 border border-destructive/20' : 'bg-muted'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
-                        {table.synced ? (
+                        {!table.exists ? (
+                          <XCircle className="h-5 w-5 text-destructive" />
+                        ) : table.synced ? (
                           <CheckCircle2 className="h-5 w-5 text-green-500" />
                         ) : (
                           <AlertTriangle className="h-5 w-5 text-yellow-500" />
                         )}
-                        <span className="font-medium">{table.name}</span>
+                        <div>
+                          <span className="font-medium">{table.name}</span>
+                          {!table.exists && (
+                            <p className="text-xs text-destructive">Tabela não existe - precisa migrar schema</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <span className="text-muted-foreground">
@@ -266,7 +278,9 @@ const SelfHostedMigrationDashboard = () => {
                         </span>
                         <ArrowRight className="h-4 w-4" />
                         <span className="text-muted-foreground">
-                          Self-Hosted: <span className="font-medium text-foreground">{table.selfHostedCount}</span>
+                          Self-Hosted: <span className={`font-medium ${!table.exists ? 'text-destructive' : 'text-foreground'}`}>
+                            {table.exists ? table.selfHostedCount : 'N/A'}
+                          </span>
                         </span>
                       </div>
                     </div>
