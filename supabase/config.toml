@@ -414,3 +414,7 @@ verify_jwt = false
 # Clean self-hosted tables before dump - admin only
 [functions.clean-selfhosted-tables]
 verify_jwt = false
+
+# Full migration dump from Cloud to Self-hosted
+[functions.full-migration-dump]
+verify_jwt = false
