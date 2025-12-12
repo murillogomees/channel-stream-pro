@@ -222,6 +222,7 @@ export class MigrationService {
 
   /**
    * Get count of records in a table from Self-Hosted
+   * Returns -1 if table doesn't exist
    */
   async getSelfHostedTableCount(tableName: string): Promise<number> {
     try {
@@ -231,13 +232,36 @@ export class MigrationService {
         .select('*', { count: 'exact', head: true });
 
       if (error) {
+        // 404 means table doesn't exist
+        if (error.message?.includes('404') || error.code === '42P01') {
+          console.warn(`[Migration] Table ${tableName} does not exist on self-hosted`);
+          return -1;
+        }
         console.error(`Error counting ${tableName}:`, error);
         return 0;
       }
 
       return count || 0;
     } catch {
-      return 0;
+      return -1;
+    }
+  }
+
+  /**
+   * Check if a table exists on the self-hosted instance
+   */
+  async tableExistsOnSelfHosted(tableName: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${SELFHOSTED_URL}/rest/v1/${tableName}?select=count&limit=0`, {
+        method: 'HEAD',
+        headers: {
+          'apikey': SELFHOSTED_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SELFHOSTED_SERVICE_ROLE_KEY}`,
+        },
+      });
+      return response.status !== 404;
+    } catch {
+      return false;
     }
   }
 
@@ -257,6 +281,20 @@ export class MigrationService {
     this.status.tables.push(progress);
 
     try {
+      // First check if table exists on self-hosted
+      const tableExists = await this.tableExistsOnSelfHosted(tableName);
+      if (!tableExists) {
+        progress.status = 'failed';
+        progress.error = 'Table does not exist on self-hosted (needs schema migration first)';
+        console.warn(`[Migration] Table ${tableName} does not exist on self-hosted, skipping`);
+        return { 
+          table: tableName, 
+          success: false, 
+          rowsCount: 0, 
+          error: 'Table not found on self-hosted - run schema migration first' 
+        };
+      }
+
       // Get total count
       const totalCount = await this.getCloudTableCount(tableName);
       progress.totalRows = totalCount;
