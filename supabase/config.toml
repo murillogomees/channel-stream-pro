@@ -426,3 +426,7 @@ verify_jwt = false
 # Generate JWT keys for self-hosted Supabase - public utility
 [functions.generate-jwt-keys]
 verify_jwt = false
+
+# Test self-hosted auth - debugging utility
+[functions.test-selfhosted-auth]
+verify_jwt = false
