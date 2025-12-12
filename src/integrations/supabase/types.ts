@@ -2379,6 +2379,57 @@ export type Database = {
         }
         Relationships: []
       }
+      remote_command_audit: {
+        Row: {
+          action: string
+          audit_id: string
+          backup_reference: string | null
+          completed_at: string | null
+          created_at: string
+          details: Json | null
+          environment: string
+          error_message: string | null
+          executed_by: string | null
+          host: string
+          id: string
+          key_source: string | null
+          status: string
+          user_remote: string
+        }
+        Insert: {
+          action: string
+          audit_id: string
+          backup_reference?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          environment: string
+          error_message?: string | null
+          executed_by?: string | null
+          host: string
+          id?: string
+          key_source?: string | null
+          status?: string
+          user_remote: string
+        }
+        Update: {
+          action?: string
+          audit_id?: string
+          backup_reference?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          environment?: string
+          error_message?: string | null
+          executed_by?: string | null
+          host?: string
+          id?: string
+          key_source?: string | null
+          status?: string
+          user_remote?: string
+        }
+        Relationships: []
+      }
       rls_audit_resolutions: {
         Row: {
           created_at: string | null

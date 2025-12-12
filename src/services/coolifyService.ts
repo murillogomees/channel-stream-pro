@@ -339,6 +339,23 @@ class CoolifyClient {
     return this.callApi('list-resources');
   }
 
+  // SSH Keys Management
+  async listPrivateKeys() {
+    return this.callApi<CoolifySSHKey[]>('list-private-keys');
+  }
+
+  async createPrivateKey(name: string, privateKey: string, description?: string) {
+    return this.callApi('create-private-key', undefined, { 
+      name, 
+      private_key: privateKey,
+      description 
+    });
+  }
+
+  async deletePrivateKey(uuid: string) {
+    return this.callApi('delete-private-key', { uuid });
+  }
+
   // Generic call for custom endpoints
   async call<T = unknown>(
     action: string,
@@ -347,6 +364,19 @@ class CoolifyClient {
   ) {
     return this.callApi<T>(action, params, body);
   }
+}
+
+// SSH Key interface
+export interface CoolifySSHKey {
+  uuid: string;
+  name: string;
+  description?: string;
+  public_key?: string;
+  fingerprint?: string;
+  created_at: string;
+  updated_at: string;
+  team_id?: number;
+  is_git_related?: boolean;
 }
 
 export const coolifyService = new CoolifyClient();
