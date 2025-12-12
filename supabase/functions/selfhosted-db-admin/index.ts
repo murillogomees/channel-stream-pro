@@ -15,12 +15,28 @@ serve(async (req) => {
     const body = await req.json();
     const { action, sql, dbHost, dbPort, dbUser, dbPassword, dbName, email, newPassword } = body;
 
-    // Get the database connection params from request or environment
-    const host = dbHost || 'supabase.iptvlink.com.br';
-    const port = dbPort || 5432;
-    const user = dbUser || 'postgres';
-    const password = dbPassword || Deno.env.get('SELFHOSTED_DB_URL')?.split(':')[2]?.split('@')[0] || '';
-    const database = dbName || 'postgres';
+    // Get the database connection params from environment or request
+    // SELFHOSTED_DB_URL format: postgresql://user:password@host:port/database
+    const dbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
+    let host = dbHost || 'supabase.iptvlink.com.br';
+    let port = dbPort || 5432;
+    let user = dbUser || 'postgres';
+    let password = dbPassword || '';
+    let database = dbName || 'postgres';
+    
+    // Parse SELFHOSTED_DB_URL if available
+    if (dbUrl && !dbPassword) {
+      try {
+        const url = new URL(dbUrl);
+        host = url.hostname;
+        port = parseInt(url.port) || 5432;
+        user = url.username;
+        password = url.password;
+        database = url.pathname.replace('/', '');
+      } catch (e) {
+        console.log('Failed to parse SELFHOSTED_DB_URL:', e);
+      }
+    }
 
     if (!password) {
       return new Response(JSON.stringify({
