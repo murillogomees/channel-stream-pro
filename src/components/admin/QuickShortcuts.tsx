@@ -62,14 +62,13 @@ export function QuickShortcuts() {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
-        .from('admin_shortcuts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('order_index');
+      // Usar Edge Function para bypass de RLS/JWT issues
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'list-shortcuts', userId: user.id }
+      });
 
       if (error) throw error;
-      setShortcuts(data || []);
+      setShortcuts(data?.shortcuts || []);
     } catch (error) {
       console.error('Error loading shortcuts:', error);
     } finally {
@@ -84,16 +83,19 @@ export function QuickShortcuts() {
     }
 
     try {
-      const { error } = await supabase
-        .from('admin_shortcuts')
-        .insert({
-          user_id: user.id,
-          title: formData.title,
-          description: formData.description || null,
-          path: formData.path,
-          icon: formData.icon,
-          order_index: shortcuts.length
-        });
+      const { error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'add-shortcut', 
+          userId: user.id,
+          data: {
+            title: formData.title,
+            description: formData.description || null,
+            path: formData.path,
+            icon: formData.icon,
+            order_index: shortcuts.length
+          }
+        }
+      });
 
       if (error) throw error;
 
@@ -108,10 +110,12 @@ export function QuickShortcuts() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('admin_shortcuts')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'delete-shortcut',
+          data: { shortcutId: id }
+        }
+      });
 
       if (error) throw error;
       toast.success('Atalho removido');
