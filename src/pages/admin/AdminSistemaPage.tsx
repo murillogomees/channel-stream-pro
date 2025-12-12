@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, Tag, Shield } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, Tag, Shield, ArrowRightLeft } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
@@ -14,6 +14,7 @@ import AdminCustomStatusBadges from "../AdminCustomStatusBadges";
 import AdminHomepageEditor from "../AdminHomepageEditor";
 import AdminPlansManager from "../AdminPlansManager";
 import { InteractiveRLSAuditPanel } from "@/components/admin/security/InteractiveRLSAuditPanel";
+import { HybridBackendDashboard } from "@/components/admin/HybridBackendDashboard";
 
 export default function AdminSistemaPage() {
   const [activeTab, setActiveTab] = useState("health");
@@ -24,6 +25,12 @@ export default function AdminSistemaPage() {
       label: "Health",
       icon: <Heart className="h-4 w-4" />,
       content: <AdminSystemHealth />
+    },
+    {
+      value: "hybrid-backend",
+      label: "Backend Híbrido",
+      icon: <ArrowRightLeft className="h-4 w-4" />,
+      content: <HybridBackendDashboard />
     },
     {
       value: "rls-audit",
