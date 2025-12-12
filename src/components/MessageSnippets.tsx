@@ -32,21 +32,21 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "saudacao-1",
       title: "Saudação Formal",
-      content: "Olá {{nome}}, tudo bem? Esperamos que sim!",
+      content: "Olá {nome}, tudo bem? Esperamos que sim!",
       category: "Saudações",
       variables: ["nome"]
     },
     {
       id: "saudacao-2",
       title: "Saudação Informal",
-      content: "Oi {{nome}}! 😊",
+      content: "Oi {nome}! 😊",
       category: "Saudações",
       variables: ["nome"]
     },
     {
       id: "saudacao-3",
       title: "Saudação com Horário",
-      content: "Bom dia, {{nome}}! Como você está?",
+      content: "Bom dia, {nome}! Como você está?",
       category: "Saudações",
       variables: ["nome"]
     },
@@ -55,21 +55,21 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "vencimento-1",
       title: "Alerta de Vencimento Próximo",
-      content: "⚠️ Seu plano {{plano}} vence em {{dias_restantes}} dias ({{data_vencimento}}). Para evitar a interrupção do serviço, renove sua assinatura o quanto antes!",
+      content: "⚠️ Seu plano {plano} vence em {dias_restantes} dias ({data_vencimento}). Para evitar a interrupção do serviço, renove sua assinatura o quanto antes!",
       category: "Vencimento",
       variables: ["plano", "dias_restantes", "data_vencimento"]
     },
     {
       id: "vencimento-2",
       title: "Vencimento Hoje",
-      content: "🔔 Atenção! Seu plano {{plano}} vence HOJE ({{data_vencimento}}). Renove agora para continuar aproveitando nossos serviços sem interrupções!",
+      content: "🔔 Atenção! Seu plano {plano} vence HOJE ({data_vencimento}). Renove agora para continuar aproveitando nossos serviços sem interrupções!",
       category: "Vencimento",
       variables: ["plano", "data_vencimento"]
     },
     {
       id: "vencimento-3",
       title: "Plano Vencido",
-      content: "❌ Seu plano {{plano}} venceu há {{dias_vencido}} dias. Para reativar seu acesso, renove sua assinatura o quanto antes!",
+      content: "❌ Seu plano {plano} venceu há {dias_vencido} dias. Para reativar seu acesso, renove sua assinatura o quanto antes!",
       category: "Vencimento",
       variables: ["plano", "dias_vencido"]
     },
@@ -78,28 +78,28 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "pagamento-1",
       title: "Valor e PIX",
-      content: "💰 Valor da renovação: R$ {{valor}}\n\n🔑 Chave PIX: {{chave_pix}}",
+      content: "💰 Valor da renovação: R$ {valor}\n\n🔑 Chave PIX: {chave_pix}",
       category: "Pagamento",
       variables: ["valor", "chave_pix"]
     },
     {
       id: "pagamento-2",
       title: "Link de Pagamento",
-      content: "Para facilitar, você pode pagar através do link:\n🔗 {{link_pagamento}}",
+      content: "Para facilitar, você pode pagar através do link:\n🔗 {link_pagamento}",
       category: "Pagamento",
       variables: ["link_pagamento"]
     },
     {
       id: "pagamento-3",
       title: "Instruções PIX Completas",
-      content: "📱 Como pagar:\n1. Abra o app do seu banco\n2. Escolha PIX\n3. Cole a chave: {{chave_pix}}\n4. Confirme o valor: R$ {{valor}}\n5. Finalize o pagamento",
+      content: "📱 Como pagar:\n1. Abra o app do seu banco\n2. Escolha PIX\n3. Cole a chave: {chave_pix}\n4. Confirme o valor: R$ {valor}\n5. Finalize o pagamento",
       category: "Pagamento",
       variables: ["chave_pix", "valor"]
     },
     {
       id: "pagamento-4",
       title: "Confirmação Recebida",
-      content: "✅ Pagamento confirmado!\nValor: R$ {{valor}}\nMétodo: {{metodo_pagamento}}\nData: {{data_atual}}",
+      content: "✅ Pagamento confirmado!\nValor: R$ {valor}\nMétodo: {metodo_pagamento}\nData: {data_atual}",
       category: "Pagamento",
       variables: ["valor", "metodo_pagamento", "data_atual"]
     },
@@ -108,21 +108,21 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "boasvindas-1",
       title: "Boas-vindas Período de Teste",
-      content: "🎉 Bem-vindo à {{empresa_nome}}!\n\nParabéns por ativar seu período de teste de {{duracao}}! Durante este período, você terá acesso completo a todos os recursos do plano {{plano}}.",
+      content: "🎉 Bem-vindo à {empresa_nome}!\n\nParabéns por ativar seu período de teste de {duracao}! Durante este período, você terá acesso completo a todos os recursos do plano {plano}.",
       category: "Boas-vindas",
       variables: ["empresa_nome", "duracao", "plano"]
     },
     {
       id: "boasvindas-2",
       title: "Boas-vindas Plano Pago",
-      content: "🎊 Seja muito bem-vindo à {{empresa_nome}}!\n\nSeu plano {{plano}} foi ativado com sucesso! Aproveite mais de 10.000 canais em Full HD e 4K.",
+      content: "🎊 Seja muito bem-vindo à {empresa_nome}!\n\nSeu plano {plano} foi ativado com sucesso! Aproveite mais de 10.000 canais em Full HD e 4K.",
       category: "Boas-vindas",
       variables: ["empresa_nome", "plano"]
     },
     {
       id: "boasvindas-3",
       title: "Instruções Iniciais",
-      content: "📺 Como começar:\n1. Abra o app IPTV na sua TV\n2. Faça login com seu email: {{email}}\n3. Aproveite nosso conteúdo!\n\nDúvidas? Entre em contato: {{empresa_telefone}}",
+      content: "📺 Como começar:\n1. Abra o app IPTV na sua TV\n2. Faça login com seu email: {email}\n3. Aproveite nosso conteúdo!\n\nDúvidas? Entre em contato: {empresa_telefone}",
       category: "Boas-vindas",
       variables: ["email", "empresa_telefone"]
     },
@@ -131,14 +131,14 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "suporte-1",
       title: "Informações de Contato",
-      content: "📞 Precisa de ajuda?\n\nWhatsApp: {{empresa_telefone}}\nEmail: {{empresa_email}}\n\nEstamos à disposição!",
+      content: "📞 Precisa de ajuda?\n\nWhatsApp: {empresa_telefone}\nEmail: {empresa_email}\n\nEstamos à disposição!",
       category: "Suporte",
       variables: ["empresa_telefone", "empresa_email"]
     },
     {
       id: "suporte-2",
       title: "Horário de Atendimento",
-      content: "⏰ Horário de atendimento:\nSegunda a Sexta: 8h às 18h\nSábado: 9h às 13h\n\nContato: {{empresa_telefone}}",
+      content: "⏰ Horário de atendimento:\nSegunda a Sexta: 8h às 18h\nSábado: 9h às 13h\n\nContato: {empresa_telefone}",
       category: "Suporte",
       variables: ["empresa_telefone"]
     },
@@ -147,14 +147,14 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "despedida-1",
       title: "Despedida Formal",
-      content: "Atenciosamente,\nEquipe {{empresa_nome}}",
+      content: "Atenciosamente,\nEquipe {empresa_nome}",
       category: "Despedida",
       variables: ["empresa_nome"]
     },
     {
       id: "despedida-2",
       title: "Despedida com Agradecimento",
-      content: "Agradecemos pela preferência! 💙\n\n{{empresa_nome}} - Sua diversão sem limites!",
+      content: "Agradecemos pela preferência! 💙\n\n{empresa_nome} - Sua diversão sem limites!",
       category: "Despedida",
       variables: ["empresa_nome"]
     },
@@ -170,7 +170,7 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
     {
       id: "promo-1",
       title: "Desconto para Renovação",
-      content: "🎁 OFERTA ESPECIAL!\nRenove hoje e ganhe 10% de desconto!\nDe R$ {{valor}} por apenas R$ [VALOR_COM_DESCONTO]",
+      content: "🎁 OFERTA ESPECIAL!\nRenove hoje e ganhe 10% de desconto!\nDe R$ {valor} por apenas R$ [VALOR_COM_DESCONTO]",
       category: "Promoções",
       variables: ["valor"]
     },
@@ -241,7 +241,7 @@ const MessageSnippets = ({ onInsert }: MessageSnippetsProps) => {
                             <div className="flex flex-wrap gap-1">
                               {snippet.variables.map((variable) => (
                                 <Badge key={variable} variant="outline" className="text-xs">
-                                  {`{{${variable}}}`}
+                                  {`{${variable}}`}
                                 </Badge>
                               ))}
                             </div>
