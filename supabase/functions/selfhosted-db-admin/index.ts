@@ -6,23 +6,44 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Self-hosted PostgreSQL connection
-const SELFHOSTED_DB_URL = Deno.env.get('SUPABASE_DB_URL') || '';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, sql } = await req.json();
+    const { action, sql, dbHost, dbPort, dbUser, dbPassword, dbName } = await req.json();
 
-    // Parse the connection URL for self-hosted
-    // Expected format: postgresql://postgres:password@host:5432/postgres
-    const selfHostedDbUrl = 'postgresql://postgres:Fc2vT97Nnfcd@supabase.iptvlink.com.br:5432/postgres';
+    // Get the database connection params from request or environment
+    const host = dbHost || 'supabase.iptvlink.com.br';
+    const port = dbPort || 5432;
+    const user = dbUser || 'postgres';
+    const password = dbPassword || Deno.env.get('SELFHOSTED_DB_URL')?.split(':')[2]?.split('@')[0] || '';
+    const database = dbName || 'postgres';
 
-    const client = new Client(selfHostedDbUrl);
+    if (!password) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Database password not configured. Provide dbPassword in request or set SELFHOSTED_DB_URL'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`Connecting to PostgreSQL at ${host}:${port}...`);
+    
+    const client = new Client({
+      hostname: host,
+      port: port,
+      user: user,
+      password: password,
+      database: database,
+      tls: { enabled: false }
+    });
+    
     await client.connect();
+    console.log('Connected successfully');
 
     let result: unknown;
 
