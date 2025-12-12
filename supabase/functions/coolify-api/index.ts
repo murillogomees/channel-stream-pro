@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,8 @@ const corsHeaders = {
 
 const COOLIFY_URL = "https://dashboard.iptvlink.com.br";
 const COOLIFY_TOKEN = Deno.env.get('COOLIFY_API_TOKEN') || '';
+const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
+const SELFHOSTED_SERVICE_KEY = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || '';
 
 interface CoolifyRequest {
   action: string;
@@ -15,6 +18,42 @@ interface CoolifyRequest {
   body?: Record<string, unknown>;
   params?: Record<string, string>;
 }
+
+// Edge Functions list for deployment
+const EDGE_FUNCTIONS = [
+  'alert-inactive-playlists', 'apply-migration-fix', 'backup-clients', 'cache-alerts',
+  'cache-invalidate', 'cache-prediction', 'cache-schedule-purge', 'cache-warming',
+  'calculate-trending', 'cdn-bulk-downloader', 'cdn-config', 'cdn-content-downloader',
+  'cdn-health', 'cdn-prewarm', 'cdn-router', 'cdn-scheduled-download', 'cdn-token',
+  'check-m3u-health', 'check-playlist-health', 'check-secrets', 'checkout-with-registration',
+  'clean-m3u', 'clean-sync-entries', 'confirm-security-alert', 'coolify-api',
+  'create-admin-user', 'create-client-auth-batch', 'daily-expiration-summary',
+  'daily-m3u-regeneration', 'escalate-security-alerts', 'fetch-m3u-url', 'fetch-m3u',
+  'fetch-tmdb', 'generate-m3u-file', 'generate-m3u-from-sync', 'generate-totp-secret',
+  'get-r2-config', 'health-check', 'iptv-channel-health', 'iptv-epg', 'iptv-m3u-generator',
+  'iptv-play', 'iptv-playlist', 'list-objects-test', 'list-users', 'm3u-clean-advanced',
+  'm3u-cron-sync', 'm3u-playlist', 'm3u-sync', 'main', 'mercado-pago-checkout',
+  'mercado-pago-test-users', 'mercado-pago-test', 'mercado-pago-webhook', 'notify-affiliate',
+  'notify-prospect', 'playback-token', 'player-events', 'process-auto-notifications',
+  'process-m3u-import', 'process-notification-queue', 'process-notification-retry-queue',
+  'qa-validation', 'r2-migration-worker', 'r2-scheduler', 'r2-signed-upload',
+  'r2-upload-proxy', 'r2-upload', 'remote-command', 'rls-coverage', 'rls-fix',
+  'scan-migrations', 'schedule-daily-notifications', 'security-audit', 'stream-proxy',
+  'stream-url-resolve', 'test-r2-connection', 'track-affiliate-click',
+  'trigger-event-notification', 'update-user-password', 'validate-password-signup',
+  'verify-totp-token', 'weekly-expiration-summary', 'whatsapp-test', 'whatsapp-webhook'
+];
+
+// Required secrets for Edge Functions
+const REQUIRED_SECRETS = [
+  'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
+  'MERCADO_PAGO_ACCESS_TOKEN', 'MERCADO_PAGO_WEBHOOK_SECRET',
+  'WHATSAPP_APPKEY', 'WHATSAPP_AUTHKEY', 'WHATSAPP_WEBHOOK_SECRET',
+  'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_ACCOUNT_ID', 'R2_PUBLIC_DOMAIN',
+  'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_STREAM_API_TOKEN', 'CLOUDFLARE_STREAM_SIGNING_KEY',
+  'CDN_WORKER_URL', 'STREAM_PROXY_SECRET', 'PROBE_WORKER_SECRET', 'TRANSCODE_CALLBACK_SECRET',
+  'TMDB_API_KEY', 'CRON_SECRET', 'JWT_SECRET', 'COOLIFY_API_TOKEN'
+];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,7 +71,7 @@ serve(async (req) => {
     }
 
     // Predefined actions
-    const actions: Record<string, { endpoint: string; method: string }> = {
+    const actions: Record<string, { endpoint: string; method: string } | Function> = {
       // Health & Version
       'health': { endpoint: '/health', method: 'GET' },
       'version': { endpoint: '/version', method: 'GET' },
@@ -99,14 +138,252 @@ serve(async (req) => {
       
       // Resources (Overview)
       'list-resources': { endpoint: '/resources', method: 'GET' },
+      
+      // ==========================================
+      // SELF-HOSTED SUPABASE MANAGEMENT
+      // ==========================================
+      
+      'get-edge-functions-list': async () => {
+        return {
+          success: true,
+          data: {
+            functions: EDGE_FUNCTIONS,
+            total: EDGE_FUNCTIONS.length,
+            selfhosted_url: SELFHOSTED_URL,
+          }
+        };
+      },
+      
+      'get-required-secrets': async () => {
+        return {
+          success: true,
+          data: {
+            secrets: REQUIRED_SECRETS,
+            total: REQUIRED_SECRETS.length,
+          }
+        };
+      },
+      
+      'test-selfhosted-connection': async () => {
+        try {
+          const response = await fetch(`${SELFHOSTED_URL}/rest/v1/`, {
+            headers: {
+              'apikey': Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || '',
+              'Authorization': `Bearer ${Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || ''}`,
+            }
+          });
+          
+          return {
+            success: response.ok,
+            data: {
+              status: response.status,
+              statusText: response.statusText,
+              url: SELFHOSTED_URL,
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          };
+        }
+      },
+      
+      'get-selfhosted-status': async () => {
+        const checks = {
+          database: false,
+          auth: false,
+          storage: false,
+          functions: false,
+        };
+        
+        try {
+          // Check database
+          const dbResponse = await fetch(`${SELFHOSTED_URL}/rest/v1/`, {
+            headers: {
+              'apikey': SELFHOSTED_SERVICE_KEY,
+              'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`,
+            }
+          });
+          checks.database = dbResponse.ok;
+          
+          // Check auth
+          const authResponse = await fetch(`${SELFHOSTED_URL}/auth/v1/health`);
+          checks.auth = authResponse.ok;
+          
+          // Check storage
+          const storageResponse = await fetch(`${SELFHOSTED_URL}/storage/v1/`, {
+            headers: {
+              'apikey': SELFHOSTED_SERVICE_KEY,
+              'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`,
+            }
+          });
+          checks.storage = storageResponse.ok;
+          
+          // Check functions
+          const functionsResponse = await fetch(`${SELFHOSTED_URL}/functions/v1/health-check`);
+          checks.functions = functionsResponse.ok;
+          
+        } catch (error) {
+          console.error('Status check error:', error);
+        }
+        
+        return {
+          success: true,
+          data: {
+            url: SELFHOSTED_URL,
+            checks,
+            all_healthy: Object.values(checks).every(v => v),
+          }
+        };
+      },
+      
+      'deploy-functions-to-coolify': async () => {
+        // This action triggers a restart of the edge-runtime service in Coolify
+        // which picks up the new functions from the mounted volume
+        try {
+          // Find the edge-runtime service
+          const servicesResponse = await fetch(`${COOLIFY_URL}/api/v1/services`, {
+            headers: {
+              'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (!servicesResponse.ok) {
+            throw new Error('Failed to list services');
+          }
+          
+          const services = await servicesResponse.json();
+          const edgeRuntime = services.find((s: any) => 
+            s.name?.toLowerCase().includes('edge') || 
+            s.name?.toLowerCase().includes('functions')
+          );
+          
+          if (!edgeRuntime) {
+            return {
+              success: false,
+              error: 'Edge Runtime service not found in Coolify',
+              data: { 
+                available_services: services.map((s: any) => s.name),
+                instructions: 'Please restart the edge-runtime container manually in Coolify'
+              }
+            };
+          }
+          
+          // Restart the service
+          const restartResponse = await fetch(
+            `${COOLIFY_URL}/api/v1/services/${edgeRuntime.uuid}/restart`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                'Accept': 'application/json',
+              }
+            }
+          );
+          
+          return {
+            success: restartResponse.ok,
+            data: {
+              service: edgeRuntime.name,
+              uuid: edgeRuntime.uuid,
+              action: 'restart',
+              status: restartResponse.ok ? 'triggered' : 'failed',
+            }
+          };
+          
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          };
+        }
+      },
+      
+      'sync-secrets-to-coolify': async () => {
+        const results: Record<string, boolean> = {};
+        
+        for (const secret of REQUIRED_SECRETS) {
+          const value = Deno.env.get(secret);
+          results[secret] = !!value;
+        }
+        
+        const configured = Object.values(results).filter(v => v).length;
+        const missing = REQUIRED_SECRETS.filter(s => !results[s]);
+        
+        return {
+          success: true,
+          data: {
+            total: REQUIRED_SECRETS.length,
+            configured,
+            missing_count: missing.length,
+            missing,
+            all_configured: missing.length === 0,
+          }
+        };
+      },
+      
+      'get-migration-status': async () => {
+        try {
+          // Check tables in self-hosted
+          const supabase = createClient(SELFHOSTED_URL, SELFHOSTED_SERVICE_KEY);
+          
+          const tables = [
+            'profiles', 'user_roles', 'user_subscriptions', 'payments',
+            'notification_logs', 'notification_templates', 'auto_notifications',
+            'subscription_plans', 'discount_coupons', 'affiliates'
+          ];
+          
+          const counts: Record<string, number> = {};
+          
+          for (const table of tables) {
+            const { count, error } = await supabase
+              .from(table)
+              .select('*', { count: 'exact', head: true });
+            
+            counts[table] = error ? -1 : (count || 0);
+          }
+          
+          return {
+            success: true,
+            data: {
+              selfhosted_url: SELFHOSTED_URL,
+              tables: counts,
+              timestamp: new Date().toISOString(),
+            }
+          };
+          
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          };
+        }
+      },
     };
+
+    // Check if action is a custom function
+    if (action && typeof actions[action] === 'function') {
+      const result = await (actions[action] as Function)();
+      return new Response(JSON.stringify({
+        ...result,
+        meta: {
+          action,
+          timestamp: new Date().toISOString(),
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     let finalEndpoint = endpoint || '';
     let finalMethod = method;
 
-    if (action && actions[action]) {
-      finalEndpoint = actions[action].endpoint;
-      finalMethod = actions[action].method;
+    if (action && actions[action] && typeof actions[action] === 'object') {
+      const actionConfig = actions[action] as { endpoint: string; method: string };
+      finalEndpoint = actionConfig.endpoint;
+      finalMethod = actionConfig.method;
     }
 
     // Replace path parameters

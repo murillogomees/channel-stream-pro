@@ -1,10 +1,13 @@
 /**
- * Supabase Client Wrapper
+ * Supabase Client Wrapper - 100% Self-Hosted
  * 
- * This file provides a unified interface that can switch between
- * Lovable Cloud and Self-Hosted Supabase based on configuration.
+ * Este arquivo redireciona TODAS as operações para o Supabase Self-Hosted.
+ * URL: https://supabase.iptvlink.com.br
  * 
- * For 100% self-hosted migration, this will be the primary client.
+ * Para migrar um arquivo, altere o import de:
+ *   import { supabase } from '@/integrations/supabase/client';
+ * Para:
+ *   import { supabase } from '@/integrations/supabase-client';
  */
 
 import { selfHostedSupabase, selfHostedConfig } from './selfhosted/client';
@@ -12,17 +15,19 @@ import { supabase as cloudSupabase } from './supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './supabase/types';
 
-// Configuration flag - set to true for 100% self-hosted
+// ============================================
+// CONFIGURAÇÃO: 100% SELF-HOSTED
+// ============================================
 const USE_SELFHOSTED = true;
 
-// Export the appropriate client based on configuration
+// Export principal - aponta para self-hosted
+export const supabase: SupabaseClient<Database> = USE_SELFHOSTED 
+  ? selfHostedSupabase 
+  : cloudSupabase;
+
+// Função getter para uso dinâmico
 export const getSupabaseClient = (): SupabaseClient<Database> => {
-  if (USE_SELFHOSTED) {
-    console.log('[Supabase] Using Self-Hosted client');
-    return selfHostedSupabase;
-  }
-  console.log('[Supabase] Using Cloud client');
-  return cloudSupabase;
+  return USE_SELFHOSTED ? selfHostedSupabase : cloudSupabase;
 };
 
 // Export configuration
@@ -36,9 +41,13 @@ export const getSupabaseConfig = () => {
   };
 };
 
-// Default export - the active client
-export const supabaseClient = getSupabaseClient();
+// Constantes para uso em Edge Functions e configs
+export const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
+export const SELFHOSTED_FUNCTIONS_URL = `${SELFHOSTED_URL}/functions/v1`;
 
-// Re-export for convenience
+// Default export
+export const supabaseClient = supabase;
+
+// Re-exports para compatibilidade
 export { selfHostedSupabase } from './selfhosted/client';
 export { supabase as cloudSupabase } from './supabase/client';
