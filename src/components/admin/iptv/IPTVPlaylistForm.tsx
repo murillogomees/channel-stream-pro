@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { callHybridFunction } from '@/services/hybridBackendService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, Link, FileText, Upload, CheckCircle2 } from 'lucide-react';
+import { Loader2, Link, FileText, Upload, CheckCircle2, Server, Cloud } from 'lucide-react';
 
 interface ParsedChannel {
   name: string;
@@ -86,7 +88,10 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
     return channels;
   };
 
-  // Fetch M3U from URL via Edge Function (to avoid CORS)
+  // Track which backend was used
+  const [usedBackend, setUsedBackend] = useState<string | null>(null);
+
+  // Fetch M3U from URL via Hybrid Backend (routes to VPS for heavy operations)
   const fetchM3U = async () => {
     if (!m3uUrl.trim()) {
       toast.error('Insira uma URL M3U');
@@ -95,17 +100,25 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
 
     setIsParsing(true);
     setUrlFetchError(null);
+    setUsedBackend(null);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-m3u', {
-        body: { url: m3uUrl },
+      // Use hybrid backend - will automatically route to self-hosted for this heavy operation
+      const { data, error, backend } = await callHybridFunction<{ content?: string; error?: string }>('fetch-m3u', {
+        url: m3uUrl,
       });
+      
+      setUsedBackend(backend);
 
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
+      if (!data?.content) throw new Error('Nenhum conteúdo retornado');
       
       const channels = parseM3U(data.content);
       setParsedChannels(channels);
-      toast.success(`${channels.length} canais encontrados`);
+      
+      const backendLabel = backend === 'selfhosted' ? 'VPS' : 'Cloud';
+      toast.success(`${channels.length} canais encontrados (via ${backendLabel})`);
       
       // Auto-fill name if empty
       if (!formData.name && channels.length > 0) {
@@ -120,7 +133,13 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Falha ao buscar M3U';
       setUrlFetchError(errorMsg);
-      toast.error(`O servidor bloqueou a requisição. Use a aba "Colar M3U" para importar o conteúdo manualmente.`);
+      
+      // Check if it's a size error
+      if (errorMsg.includes('muito grande') || errorMsg.includes('WORKER_LIMIT')) {
+        toast.error('Arquivo muito grande. Use a aba "Colar M3U" para importar o conteúdo manualmente.');
+      } else {
+        toast.error(`Erro: ${errorMsg}. Use a aba "Colar M3U" para importar.`);
+      }
       // Auto switch to paste tab
       setActiveTab('paste');
     } finally {
