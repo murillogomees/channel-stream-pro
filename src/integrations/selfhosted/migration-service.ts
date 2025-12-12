@@ -2,10 +2,28 @@
  * Migration Service
  * 
  * Handles migration of data from Lovable Cloud Supabase to Self-Hosted Supabase
+ * Uses service role key to bypass RLS for migrations
  */
 
+import { createClient } from '@supabase/supabase-js';
 import { supabase as cloudSupabase } from '../supabase/client';
-import { selfHostedSupabase } from './client';
+
+// Self-hosted admin client with service role key for migrations (bypasses RLS)
+const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
+// Service role key - allows bypassing RLS policies
+const SELFHOSTED_SERVICE_ROLE_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.efcOMtFOUk5Ytcb2jN8krXkY5u6yG0byL-XtPEU1IWk";
+
+// Admin client for migrations - uses service role key to bypass RLS
+const selfHostedAdminClient = createClient(
+  SELFHOSTED_URL,
+  SELFHOSTED_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
 
 export interface MigrationProgress {
   table: string;
@@ -83,7 +101,6 @@ const MIGRATION_ORDER = [
   'homepage_faqs',
   'banners',
   'app_versions',
-  'pwa_settings',
   
   // Payment and subscriptions
   'subscription_plans',
@@ -141,8 +158,8 @@ export class MigrationService {
    */
   async testConnection(): Promise<{ success: boolean; error?: string; details?: Record<string, unknown> }> {
     try {
-      // Test basic connection
-      const { data, error } = await selfHostedSupabase
+      // Test basic connection using admin client
+      const { data, error } = await selfHostedAdminClient
         .from('profiles')
         .select('count')
         .limit(1);
@@ -152,10 +169,10 @@ export class MigrationService {
       }
 
       // Get server info if available
-      const healthResponse = await fetch('https://supabase.iptvlink.com.br/rest/v1/', {
+      const healthResponse = await fetch(`${SELFHOSTED_URL}/rest/v1/`, {
         method: 'HEAD',
         headers: {
-          'apikey': selfHostedSupabase['supabaseKey'] || '',
+          'apikey': SELFHOSTED_SERVICE_ROLE_KEY,
         },
       });
 
@@ -180,7 +197,6 @@ export class MigrationService {
    */
   async getCloudTableCount(tableName: string): Promise<number> {
     try {
-      // Use any to bypass strict typing for dynamic table names
       const { count, error } = await (cloudSupabase as any)
         .from(tableName)
         .select('*', { count: 'exact', head: true });
@@ -201,8 +217,8 @@ export class MigrationService {
    */
   async getSelfHostedTableCount(tableName: string): Promise<number> {
     try {
-      // Use any to bypass strict typing for dynamic table names
-      const { count, error } = await (selfHostedSupabase as any)
+      // Use admin client with service role to bypass RLS
+      const { count, error } = await (selfHostedAdminClient as any)
         .from(tableName)
         .select('*', { count: 'exact', head: true });
 
@@ -248,7 +264,7 @@ export class MigrationService {
       let migratedCount = 0;
 
       while (offset < totalCount) {
-        // Fetch batch from Cloud - use any for dynamic table names
+        // Fetch batch from Cloud
         const { data, error: fetchError } = await (cloudSupabase as any)
           .from(tableName)
           .select('*')
@@ -262,8 +278,8 @@ export class MigrationService {
           break;
         }
 
-        // Insert batch to Self-Hosted - use any for dynamic table names
-        const { error: insertError } = await (selfHostedSupabase as any)
+        // Insert batch to Self-Hosted using admin client (bypasses RLS)
+        const { error: insertError } = await (selfHostedAdminClient as any)
           .from(tableName)
           .upsert(data, { onConflict: 'id', ignoreDuplicates: true });
 
