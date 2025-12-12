@@ -51,9 +51,9 @@ export function SelfHostedDeploymentPanel() {
 
       setServiceStatus(status);
       setSecretsStatus(secrets);
-      setFunctions(funcs);
-      setMigrationTables(migration.tables);
-      setCoolifyServices(services.services);
+      setFunctions(Array.isArray(funcs) ? funcs : []);
+      setMigrationTables(migration?.tables || {});
+      setCoolifyServices(Array.isArray(services?.services) ? services.services : []);
     } catch (error) {
       console.error('Error loading status:', error);
       toast.error('Erro ao carregar status');
