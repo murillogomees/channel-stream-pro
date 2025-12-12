@@ -72,45 +72,23 @@ export default function AdminUserList() {
   });
 
   useEffect(() => {
-    loadUsersWithRoles();
-  }, [profiles]);
-
-  const loadUsersWithRoles = async () => {
-    setLoading(true);
-    try {
-      // OTIMIZAÇÃO: Buscar todas as roles em uma única query (batch)
-      const userIds = profiles.map(p => p.id);
-      
-      const { data: allRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
-
-      // Criar mapa de roles por user_id
-      const rolesMap = new Map<string, string[]>();
-      allRoles?.forEach(r => {
-        const existing = rolesMap.get(r.user_id) || [];
-        existing.push(r.role);
-        rolesMap.set(r.user_id, existing);
-      });
-
-      // Mapear profiles com roles
+    // Profiles já vem com roles do useProfiles via Edge Function
+    if (profiles.length > 0) {
       const usersWithRoles: UserWithRole[] = profiles.map(profile => ({
         ...profile,
-        roles: rolesMap.get(profile.id) || ['client'],
+        roles: profile.roles || ['client'],
       }));
-
       setUsers(usersWithRoles);
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao carregar lista de usuários',
-        variant: 'destructive',
-      });
-    } finally {
+      setLoading(false);
+    } else if (!profilesLoading) {
+      setUsers([]);
       setLoading(false);
     }
+  }, [profiles, profilesLoading]);
+
+  const loadUsersWithRoles = async () => {
+    // Apenas refresh dos profiles - roles já vem junto via Edge Function
+    refresh();
   };
 
   const handleEdit = (user: UserWithRole) => {

@@ -1,6 +1,6 @@
 /**
  * useProfiles - Hook unificado para gerenciar profiles/clientes
- * Substitui useClientesDb após unificação das tabelas
+ * Usa Edge Function para bypass de problemas com JWT signature
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -11,6 +11,7 @@ export interface UnifiedProfile {
   nome: string;
   email: string;
   telefone: string;
+  contact_phone?: string;
   telefone_whatsapp?: string;
   origem_cadastro?: string;
   created_at: string;
@@ -26,6 +27,8 @@ export interface UnifiedProfile {
   forma_ultimo_pagamento?: string;
   is_recorrente?: boolean;
   dispositivo_contratado?: string;
+  // Roles
+  roles?: string[];
 }
 
 export function useProfiles() {
@@ -37,22 +40,24 @@ export function useProfiles() {
     setLoading(true);
     setError(null);
     try {
-      // Buscar todos os profiles (admins têm acesso via RLS policy)
-      const { data, error } = await (supabase as any)
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Usar Edge Function para bypass de RLS/JWT issues
+      const { data, error: fnError } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'list-profiles' }
+      });
 
-      if (error) {
-        console.error('Erro ao buscar profiles:', error);
-        throw error;
+      if (fnError) {
+        console.error('Erro ao buscar profiles via Edge Function:', fnError);
+        throw fnError;
       }
 
-      setProfiles(data || []);
+      if (data?.profiles) {
+        setProfiles(data.profiles);
+      } else {
+        setProfiles([]);
+      }
     } catch (e: any) {
       console.error('Erro ao carregar profiles:', e);
       setError(e?.message || 'Erro ao carregar profiles');
-      // Em caso de erro, definir array vazio para evitar crashes
       setProfiles([]);
     } finally {
       setLoading(false);
@@ -62,7 +67,7 @@ export function useProfiles() {
   useEffect(() => {
     fetchProfiles();
 
-    // Realtime subscription
+    // Realtime subscription (pode falhar com JWT issues, mas tentamos)
     const subscription = supabase
       .channel('profiles_changes')
       .on('postgres_changes', 
@@ -79,24 +84,44 @@ export function useProfiles() {
   }, [fetchProfiles]);
 
   const updateProfile = useCallback(async (id: string, updates: Partial<UnifiedProfile>) => {
-    const { data, error } = await (supabase as any)
-      .from('profiles')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.functions.invoke('admin-data', {
+      body: { 
+        action: 'update-profile',
+        profileId: id,
+        data: updates
+      }
+    });
     
     if (error) throw error;
-    if (data) {
-      setProfiles(prev => prev.map(p => p.id === id ? data : p));
-      return data;
+    if (data?.profile) {
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...data.profile } : p));
+      return data.profile;
     }
   }, []);
 
   const deleteProfile = useCallback(async (id: string) => {
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    const { error } = await supabase.functions.invoke('admin-data', {
+      body: { 
+        action: 'delete-profile',
+        profileId: id
+      }
+    });
+    
     if (error) throw error;
     setProfiles(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  const updateRole = useCallback(async (id: string, role: string) => {
+    const { error } = await supabase.functions.invoke('admin-data', {
+      body: { 
+        action: 'update-role',
+        profileId: id,
+        data: { role }
+      }
+    });
+    
+    if (error) throw error;
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, roles: [role] } : p));
   }, []);
 
   const getStats = useCallback(() => {
@@ -108,7 +133,7 @@ export function useProfiles() {
     // Ativos: cliente_ativo = true E situação = 'Ativo' E não vencido
     const ativos = profiles.filter(p => {
       if (!p.cliente_ativo || p.situacao !== 'Ativo') return false;
-      if (!p.data_vencimento) return true; // Sem data = considerado ativo
+      if (!p.data_vencimento) return true;
       const vencimento = new Date(p.data_vencimento);
       return vencimento >= now;
     }).length;
@@ -118,21 +143,21 @@ export function useProfiles() {
       p.cliente_ativo === false || p.situacao === 'Inativo'
     ).length;
 
-    // Vencendo nos próximos 5 dias (com assinatura ainda válida)
+    // Vencendo nos próximos 5 dias
     const vencendoProximos5Dias = profiles.filter(p => {
       if (!p.data_vencimento) return false;
       const vencimento = new Date(p.data_vencimento);
       return vencimento >= now && vencimento <= cincoProximos;
     }).length;
 
-    // Vencidos: data_vencimento < hoje (independente do status)
+    // Vencidos
     const vencidos = profiles.filter(p => {
       if (!p.data_vencimento) return false;
       const vencimento = new Date(p.data_vencimento);
       return vencimento < now;
     }).length;
 
-    // Em teste: situação = 'Testando'
+    // Em teste
     const emTeste = profiles.filter(p => p.situacao === 'Testando').length;
 
     const porSituacao = profiles.reduce((acc, p) => {
@@ -161,6 +186,7 @@ export function useProfiles() {
     refresh: fetchProfiles,
     updateProfile,
     deleteProfile,
+    updateRole,
     getStats: () => stats,
   };
 }

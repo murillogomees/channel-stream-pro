@@ -65,14 +65,13 @@ export const RecentActivities = memo(function RecentActivities() {
 
   const loadActivities = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('id, action, entity_type, created_at, details')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Usar Edge Function para bypass de RLS/JWT issues
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'list-activity', filters: { limit: 10 } }
+      });
 
       if (error) throw error;
-      setActivities(data || []);
+      setActivities(data?.activities || []);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Erro ao carregar atividades:', error);
