@@ -418,3 +418,7 @@ verify_jwt = false
 # Full migration dump from Cloud to Self-hosted
 [functions.full-migration-dump]
 verify_jwt = false
+
+# Self-hosted DB Admin - direct PostgreSQL access for trigger management
+[functions.selfhosted-db-admin]
+verify_jwt = false
