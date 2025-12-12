@@ -149,10 +149,10 @@ serve(async (req) => {
       } else {
         console.log('Resetting password for:', email);
         
-        // Use pgcrypto with cost factor 10 (bf = blowfish/bcrypt, iter_count 10)
+        // Use pgcrypto with cost factor 6 (GoTrue self-hosted requirement)
         const updateResult = await client.queryObject`
           UPDATE auth.users 
-          SET encrypted_password = crypt(${newPassword}, gen_salt('bf', 10))
+          SET encrypted_password = crypt(${newPassword}, gen_salt('bf', 6))
           WHERE email = ${email}
           RETURNING id, email
         `;
