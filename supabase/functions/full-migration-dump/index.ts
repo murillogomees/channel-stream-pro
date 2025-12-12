@@ -49,7 +49,6 @@ serve(async (req) => {
 
     // All public tables in migration order (respecting foreign keys)
     const ALL_TABLES = [
-      // Config/reference tables first (no dependencies)
       'subscription_plans',
       'notification_templates',
       'affiliate_tiers',
@@ -70,11 +69,9 @@ serve(async (req) => {
       'ip_whitelist',
       'auto_notifications',
       'test_contacts',
-      // Main entities
       'profiles',
       'user_roles',
       'affiliates',
-      // Dependent on profiles/affiliates
       'affiliate_analytics',
       'affiliate_dashboard',
       'affiliate_fraud_logs',
@@ -91,14 +88,11 @@ serve(async (req) => {
       'admin_shortcuts',
       'dashboard_widgets',
       'client_status_history',
-      // Subscriptions and payments
       'user_subscriptions',
       'payments',
       'payment_history',
       'discount_coupons',
-      // AB tests
       'ab_test_results',
-      // IPTV
       'iptv_channels',
       'iptv_playlists',
       'iptv_playlist_channels',
@@ -108,15 +102,12 @@ serve(async (req) => {
       'iptv_transcode_jobs',
       'iptv_stream_tokens',
       'epg_programs',
-      // Player/viewing
       'playback_tokens',
       'player_events',
       'viewing_history',
       'watch_progress',
-      // Notifications
       'notification_logs',
       'notification_queue',
-      // Security/logs
       'activity_logs',
       'auth_sessions_log',
       'security_events',
@@ -132,6 +123,153 @@ serve(async (req) => {
       'rls_scan_results',
     ];
 
+    // ===== MIGRATE AUTH SCHEMA =====
+    if (action === 'migrate-auth') {
+      console.log('🔐 Starting auth schema migration...');
+      
+      // Step 1: Get all users from Cloud
+      console.log('Fetching users from Cloud...');
+      const usersResponse = await fetch(`${CLOUD_URL}/auth/v1/admin/users?per_page=1000`, {
+        headers: {
+          'apikey': CLOUD_SERVICE_KEY,
+          'Authorization': `Bearer ${CLOUD_SERVICE_KEY}`
+        }
+      });
+
+      if (!usersResponse.ok) {
+        const errorText = await usersResponse.text();
+        return new Response(JSON.stringify({
+          success: false,
+          error: `Failed to fetch users from Cloud: ${usersResponse.status} - ${errorText}`
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const usersData = await usersResponse.json();
+      const cloudUsers = usersData.users || [];
+      console.log(`Found ${cloudUsers.length} users in Cloud`);
+
+      // Step 2: Delete existing users from Self-hosted that match cloud user emails
+      console.log('Checking for existing users on Self-hosted...');
+      const selfHostedUsersResponse = await fetch(`${SELFHOSTED_URL}/auth/v1/admin/users?per_page=1000`, {
+        headers: {
+          'apikey': SELFHOSTED_SERVICE_KEY,
+          'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`
+        }
+      });
+
+      let deletedCount = 0;
+      if (selfHostedUsersResponse.ok) {
+        const selfHostedData = await selfHostedUsersResponse.json();
+        const existingUsers = selfHostedData.users || [];
+        console.log(`Found ${existingUsers.length} existing users in Self-hosted`);
+
+        // Delete all existing users
+        for (const existingUser of existingUsers) {
+          try {
+            const deleteResponse = await fetch(`${SELFHOSTED_URL}/auth/v1/admin/users/${existingUser.id}`, {
+              method: 'DELETE',
+              headers: {
+                'apikey': SELFHOSTED_SERVICE_KEY,
+                'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`
+              }
+            });
+            if (deleteResponse.ok) deletedCount++;
+          } catch (e) {
+            console.log(`Failed to delete user ${existingUser.email}: ${e.message}`);
+          }
+        }
+        console.log(`Deleted ${deletedCount} existing users`);
+      }
+
+      // Step 3: Also clean profiles table on self-hosted to avoid trigger conflicts
+      console.log('Cleaning profiles on self-hosted to avoid trigger conflicts...');
+      try {
+        await selfHostedClient.from('profiles').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await selfHostedClient.from('user_roles').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (e) {
+        console.log('Could not clean profiles/user_roles:', e.message);
+      }
+
+      // Step 4: Create users on Self-hosted with same IDs
+      console.log('Creating users on Self-hosted...');
+      const results: { email: string; id: string; status: string; error?: string }[] = [];
+      
+      for (const user of cloudUsers) {
+        try {
+          // Create user with specific ID
+          const createResponse = await fetch(`${SELFHOSTED_URL}/auth/v1/admin/users`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SELFHOSTED_SERVICE_KEY,
+              'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`
+            },
+            body: JSON.stringify({
+              id: user.id, // Use same ID as cloud
+              email: user.email,
+              phone: user.phone || null,
+              email_confirm: true,
+              phone_confirm: !!user.phone_confirmed_at,
+              user_metadata: user.user_metadata || {},
+              app_metadata: user.app_metadata || {},
+              password: 'TempPassword123!'
+            })
+          });
+
+          if (createResponse.ok) {
+            results.push({ email: user.email, id: user.id, status: 'created' });
+          } else {
+            const errorText = await createResponse.text();
+            results.push({ email: user.email, id: user.id, status: 'error', error: errorText });
+          }
+        } catch (e) {
+          results.push({ email: user.email, id: user.id, status: 'error', error: e.message });
+        }
+      }
+
+      // Step 5: Re-migrate profiles and user_roles from cloud
+      console.log('Re-migrating profiles and user_roles from cloud...');
+      let profilesMigrated = 0;
+      let rolesMigrated = 0;
+
+      // Migrate profiles
+      const { data: cloudProfiles } = await cloudClient.from('profiles').select('*');
+      if (cloudProfiles && cloudProfiles.length > 0) {
+        for (const profile of cloudProfiles) {
+          const { error } = await selfHostedClient.from('profiles').upsert(profile, { onConflict: 'id' });
+          if (!error) profilesMigrated++;
+        }
+      }
+
+      // Migrate user_roles
+      const { data: cloudRoles } = await cloudClient.from('user_roles').select('*');
+      if (cloudRoles && cloudRoles.length > 0) {
+        for (const role of cloudRoles) {
+          const { error } = await selfHostedClient.from('user_roles').upsert(role, { onConflict: 'id' });
+          if (!error) rolesMigrated++;
+        }
+      }
+
+      const successCount = results.filter(r => r.status === 'created').length;
+      const errorCount = results.filter(r => r.status === 'error').length;
+
+      return new Response(JSON.stringify({
+        success: true,
+        action: 'migrate-auth',
+        data: {
+          cloud_users: cloudUsers.length,
+          deleted_from_selfhosted: deletedCount,
+          users_created: successCount,
+          users_errors: errorCount,
+          profiles_migrated: profilesMigrated,
+          roles_migrated: rolesMigrated,
+          results,
+          note: 'Users migrated. All users need to reset passwords via "Forgot Password".'
+        }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== PREVIEW =====
     if (action === 'preview') {
       console.log('Previewing migration from Cloud to Self-hosted...');
       const preview: Record<string, { cloud: number; selfhosted: number }> = {};
@@ -149,7 +287,7 @@ serve(async (req) => {
               .select('*', { count: 'exact', head: true });
             selfHostedCount = count || 0;
           } catch {
-            selfHostedCount = -1; // Table doesn't exist
+            selfHostedCount = -1;
           }
 
           preview[table] = {
@@ -161,6 +299,34 @@ serve(async (req) => {
         }
       }
 
+      // Also preview auth users
+      let authPreview = { cloud: 0, selfhosted: 0 };
+      try {
+        const cloudAuth = await fetch(`${CLOUD_URL}/auth/v1/admin/users?per_page=1`, {
+          headers: {
+            'apikey': CLOUD_SERVICE_KEY,
+            'Authorization': `Bearer ${CLOUD_SERVICE_KEY}`
+          }
+        });
+        if (cloudAuth.ok) {
+          const data = await cloudAuth.json();
+          authPreview.cloud = data.total || data.users?.length || 0;
+        }
+      } catch {}
+
+      try {
+        const selfAuth = await fetch(`${SELFHOSTED_URL}/auth/v1/admin/users?per_page=1`, {
+          headers: {
+            'apikey': SELFHOSTED_SERVICE_KEY,
+            'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}`
+          }
+        });
+        if (selfAuth.ok) {
+          const data = await selfAuth.json();
+          authPreview.selfhosted = data.total || data.users?.length || 0;
+        }
+      } catch {}
+
       const totalCloud = Object.values(preview).reduce((sum, v) => sum + (v.cloud > 0 ? v.cloud : 0), 0);
       const existingTables = Object.values(preview).filter(v => v.selfhosted >= 0).length;
       const missingTables = Object.values(preview).filter(v => v.selfhosted < 0).length;
@@ -169,12 +335,15 @@ serve(async (req) => {
         success: true,
         action: 'preview',
         data: {
+          auth: authPreview,
           tables: preview,
           summary: {
             total_tables: ALL_TABLES.length,
             existing_on_selfhosted: existingTables,
             missing_on_selfhosted: missingTables,
-            total_cloud_records: totalCloud
+            total_cloud_records: totalCloud,
+            auth_users_cloud: authPreview.cloud,
+            auth_users_selfhosted: authPreview.selfhosted
           },
           warning: 'Esta ação irá SOBRESCREVER todos os dados no self-hosted!'
         }
@@ -183,6 +352,7 @@ serve(async (req) => {
       });
     }
 
+    // ===== MIGRATE PUBLIC SCHEMA =====
     if (action === 'migrate' && confirm === 'CONFIRMO_MIGRAR_TUDO') {
       console.log('Starting full migration from Cloud to Self-hosted...');
       const results: MigrationResult[] = [];
@@ -193,7 +363,6 @@ serve(async (req) => {
         console.log(`\n=== Migrating table: ${table} ===`);
         
         try {
-          // 1. Get count from cloud
           const { count: cloudCount, error: countError } = await cloudClient
             .from(table)
             .select('*', { count: 'exact', head: true });
@@ -214,7 +383,6 @@ serve(async (req) => {
           console.log(`Cloud has ${totalRecords} records in ${table}`);
 
           if (totalRecords === 0) {
-            // Just try to clean the self-hosted table
             try {
               await selfHostedClient.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
             } catch {}
@@ -231,13 +399,10 @@ serve(async (req) => {
             continue;
           }
 
-          // 2. Clean self-hosted table first
           console.log(`Cleaning ${table} on self-hosted...`);
           try {
-            // Try UUID-based delete
             await selfHostedClient.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
           } catch {
-            // Try bigint-based delete
             try {
               await selfHostedClient.from(table).delete().gte('id', 0);
             } catch (e) {
@@ -245,7 +410,6 @@ serve(async (req) => {
             }
           }
 
-          // 3. Migrate data in batches
           let migratedCount = 0;
           let offset = 0;
 
@@ -266,21 +430,17 @@ serve(async (req) => {
               break;
             }
 
-            // Insert batch into self-hosted
             const { error: insertError } = await selfHostedClient
               .from(table)
               .insert(batch);
 
             if (insertError) {
               console.log(`Error inserting into ${table}: ${insertError.message}`);
-              // Try individual inserts for problematic batches
               for (const record of batch) {
                 try {
                   await selfHostedClient.from(table).insert(record);
                   migratedCount++;
-                } catch {
-                  // Skip individual failures
-                }
+                } catch {}
               }
             } else {
               migratedCount += batch.length;
@@ -310,7 +470,6 @@ serve(async (req) => {
         }
       }
 
-      // Summary
       const successCount = results.filter(r => r.status === 'success').length;
       const errorCount = results.filter(r => r.status === 'error').length;
       const skippedCount = results.filter(r => r.status === 'skipped').length;
@@ -341,8 +500,8 @@ serve(async (req) => {
       error: 'Invalid action or missing confirmation',
       usage: {
         preview: 'action: "preview" - mostra contagem de registros',
-        migrate: 'action: "migrate", confirm: "CONFIRMO_MIGRAR_TUDO" - executa migração completa',
-        migrate_specific: 'action: "migrate", confirm: "CONFIRMO_MIGRAR_TUDO", tables: ["profiles", "user_roles"] - migra tabelas específicas'
+        migrate: 'action: "migrate", confirm: "CONFIRMO_MIGRAR_TUDO" - migra schema public',
+        migrate_auth: 'action: "migrate-auth" - migra usuários do auth schema'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
