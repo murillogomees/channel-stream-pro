@@ -16,11 +16,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './supabase/types';
 
 // ============================================
-// CONFIGURAÇÃO: 100% SELF-HOSTED
+// CONFIGURAÇÃO: USAR CLOUD ATÉ MIGRAÇÃO COMPLETA
 // ============================================
-const USE_SELFHOSTED = true;
+// Self-hosted ainda não tem as tabelas migradas (404 errors)
+// Usar Cloud por enquanto, mudar para true após migração completa
+const USE_SELFHOSTED = false;
 
-// Export principal - aponta para self-hosted
+// Export principal - aponta para cloud até migração completa
 export const supabase: SupabaseClient<Database> = USE_SELFHOSTED 
   ? selfHostedSupabase 
   : cloudSupabase;
