@@ -1,21 +1,25 @@
 /**
- * IPTV Cache Tab - CDN cache and Redis-like cache management
+ * IPTV Cache Tab - CDN cache and Redis cache management
  */
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { iptvTranscodeService, CacheStats } from '@/services/iptvTranscodeService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Database, RefreshCw, Loader2, Trash2, Search, 
-  HardDrive, Zap, Clock, CheckCircle, AlertTriangle
+  HardDrive, Zap, Clock, AlertTriangle, Flame, Server, MemoryStick
 } from 'lucide-react';
 
 interface CacheEntry {
@@ -33,8 +37,11 @@ interface CacheEntry {
 export function IPTVCacheTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [isWarmupOpen, setIsWarmupOpen] = useState(false);
+  const [warmupTTL, setWarmupTTL] = useState(3600);
+  const [selectedChannels, setSelectedChannels] = useState<number[]>([]);
 
-  // Fetch cache entries
+  // Fetch cache entries from database
   const { data: cacheEntries = [], isLoading, refetch } = useQuery({
     queryKey: ['iptv-cache', search],
     queryFn: async () => {
@@ -54,13 +61,39 @@ export function IPTVCacheTab() {
     },
   });
 
-  // Stats
-  const stats = {
-    total: cacheEntries.length,
-    warm: cacheEntries.filter(c => c.is_warm).length,
-    cold: cacheEntries.filter(c => !c.is_warm).length,
-    expired: cacheEntries.filter(c => c.expires_at && new Date(c.expires_at) < new Date()).length,
-    providers: new Set(cacheEntries.map(c => c.cdn_provider)).size,
+  // Fetch cache stats via Edge Function
+  const { data: statsData } = useQuery({
+    queryKey: ['iptv-cache-stats'],
+    queryFn: async () => {
+      const { stats } = await iptvTranscodeService.getCacheStats();
+      return stats;
+    },
+    refetchInterval: 10000,
+  });
+
+  // Fetch channels for warmup
+  const { data: channels = [] } = useQuery({
+    queryKey: ['iptv-channels-warmup'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('iptv_channels')
+        .select('id, name, is_healthy')
+        .eq('is_healthy', true)
+        .order('name')
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const stats: CacheStats = statsData || {
+    totalKeys: cacheEntries.length,
+    warmKeys: cacheEntries.filter(c => c.is_warm).length,
+    coldKeys: cacheEntries.filter(c => !c.is_warm).length,
+    expiredKeys: cacheEntries.filter(c => c.expires_at && new Date(c.expires_at) < new Date()).length,
+    memoryKeys: 0,
+    providers: [...new Set(cacheEntries.map(c => c.cdn_provider))],
+    redisConfigured: false,
   };
 
   // Clear cache mutation
@@ -70,20 +103,37 @@ export function IPTVCacheTab() {
         const { error } = await supabase.from('iptv_cdn_cache').delete().in('id', ids);
         if (error) throw error;
       } else {
-        // Clear all cache
-        const { error } = await supabase.from('iptv_cdn_cache').delete().neq('id', 0);
-        if (error) throw error;
+        await iptvTranscodeService.flushCache();
       }
     },
     onSuccess: () => {
       toast.success('Cache limpo');
       queryClient.invalidateQueries({ queryKey: ['iptv-cache'] });
+      queryClient.invalidateQueries({ queryKey: ['iptv-cache-stats'] });
     },
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
   // Warm cache mutation
   const warmCacheMutation = useMutation({
+    mutationFn: async () => {
+      if (selectedChannels.length === 0) {
+        throw new Error('Selecione ao menos um canal');
+      }
+      return iptvTranscodeService.warmupCache(selectedChannels, warmupTTL);
+    },
+    onSuccess: (data) => {
+      toast.success(`Cache aquecido para ${data.warmed.length} canais`);
+      queryClient.invalidateQueries({ queryKey: ['iptv-cache'] });
+      queryClient.invalidateQueries({ queryKey: ['iptv-cache-stats'] });
+      setIsWarmupOpen(false);
+      setSelectedChannels([]);
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Warm single entry
+  const warmSingleMutation = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await supabase
         .from('iptv_cdn_cache')
@@ -106,13 +156,13 @@ export function IPTVCacheTab() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 md:gap-4">
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Total Entradas</p>
-                <p className="text-xl font-bold">{stats.total}</p>
+                <p className="text-xl font-bold">{stats.totalKeys}</p>
               </div>
               <Database className="h-6 w-6 text-primary opacity-50" />
             </div>
@@ -123,7 +173,7 @@ export function IPTVCacheTab() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Cache Quente</p>
-                <p className="text-xl font-bold text-green-500">{stats.warm}</p>
+                <p className="text-xl font-bold text-green-500">{stats.warmKeys}</p>
               </div>
               <Zap className="h-6 w-6 text-green-500 opacity-50" />
             </div>
@@ -134,7 +184,7 @@ export function IPTVCacheTab() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Cache Frio</p>
-                <p className="text-xl font-bold text-blue-500">{stats.cold}</p>
+                <p className="text-xl font-bold text-blue-500">{stats.coldKeys}</p>
               </div>
               <HardDrive className="h-6 w-6 text-blue-500 opacity-50" />
             </div>
@@ -145,7 +195,7 @@ export function IPTVCacheTab() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Expirados</p>
-                <p className="text-xl font-bold text-red-500">{stats.expired}</p>
+                <p className="text-xl font-bold text-red-500">{stats.expiredKeys}</p>
               </div>
               <Clock className="h-6 w-6 text-red-500 opacity-50" />
             </div>
@@ -155,10 +205,24 @@ export function IPTVCacheTab() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Providers</p>
-                <p className="text-xl font-bold">{stats.providers}</p>
+                <p className="text-xs text-muted-foreground">Em Memória</p>
+                <p className="text-xl font-bold text-purple-500">{stats.memoryKeys}</p>
               </div>
-              <HardDrive className="h-6 w-6 text-primary opacity-50" />
+              <MemoryStick className="h-6 w-6 text-purple-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Redis</p>
+                <p className="text-xl font-bold">{stats.redisConfigured ? 
+                  <Badge className="bg-green-500">Ativo</Badge> : 
+                  <Badge variant="secondary">Fallback</Badge>
+                }</p>
+              </div>
+              <Server className="h-6 w-6 text-primary opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -169,18 +233,19 @@ export function IPTVCacheTab() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Database className="h-4 w-4" />
-            Sistema de Cache CDN
+            Sistema de Cache Redis
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            O cache CDN armazena manifests HLS e metadados de canais para reduzir latência e carga no origin.
-            Entradas "quentes" são frequentemente acessadas e mantidas em memória para acesso rápido.
+            O cache Redis armazena manifests HLS, metadados de canais e URLs de stream para reduzir latência.
+            Quando Redis não está configurado, o sistema utiliza cache em memória + banco de dados como fallback.
           </p>
-          <div className="flex gap-4 text-xs">
+          <div className="flex gap-4 text-xs flex-wrap">
             <span className="flex items-center gap-1"><Zap className="h-3 w-3 text-green-500" /> Quente = Acessado recentemente</span>
             <span className="flex items-center gap-1"><HardDrive className="h-3 w-3 text-blue-500" /> Frio = Em storage</span>
             <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-red-500" /> Expirado = Precisa refresh</span>
+            <span className="flex items-center gap-1"><MemoryStick className="h-3 w-3 text-purple-500" /> Memória = Cache rápido</span>
           </div>
         </CardContent>
       </Card>
@@ -202,12 +267,80 @@ export function IPTVCacheTab() {
               <Button variant="outline" size="icon" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
+              <Dialog open={isWarmupOpen} onOpenChange={setIsWarmupOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Flame className="h-4 w-4 mr-1" />
+                    Warmup
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Aquecer Cache</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>TTL (segundos): {warmupTTL}</Label>
+                      <Slider
+                        value={[warmupTTL]}
+                        onValueChange={([v]) => setWarmupTTL(v)}
+                        min={300}
+                        max={86400}
+                        step={300}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {Math.floor(warmupTTL / 3600)}h {Math.floor((warmupTTL % 3600) / 60)}m
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Canais ({selectedChannels.length} selecionados)</Label>
+                      <div className="border rounded-md max-h-48 overflow-y-auto p-2 space-y-1">
+                        {channels.map((ch) => (
+                          <label key={ch.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedChannels.includes(ch.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedChannels([...selectedChannels, ch.id]);
+                                } else {
+                                  setSelectedChannels(selectedChannels.filter(id => id !== ch.id));
+                                }
+                              }}
+                              className="rounded"
+                            />
+                            <span className="text-sm truncate">{ch.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedChannels(channels.map(c => c.id))}>
+                          Selecionar todos
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setSelectedChannels([])}>
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button 
+                      className="w-full" 
+                      onClick={() => warmCacheMutation.mutate()}
+                      disabled={warmCacheMutation.isPending || selectedChannels.length === 0}
+                    >
+                      {warmCacheMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Flame className="h-4 w-4 mr-1" />}
+                      Aquecer {selectedChannels.length} Canais
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button 
                 variant="destructive" 
                 size="sm"
                 onClick={() => {
                   if (confirm('Limpar todo o cache? Esta ação não pode ser desfeita.')) {
-                    clearCacheMutation.mutate([]);
+                    clearCacheMutation.mutate(undefined);
                   }
                 }}
                 disabled={clearCacheMutation.isPending}
@@ -292,7 +425,7 @@ export function IPTVCacheTab() {
                       <div className="flex gap-1">
                         {!entry.is_warm && (
                           <Button variant="ghost" size="icon" className="h-8 w-8"
-                            onClick={() => warmCacheMutation.mutate(entry.id)} title="Aquecer cache">
+                            onClick={() => warmSingleMutation.mutate(entry.id)} title="Aquecer cache">
                             <Zap className="h-4 w-4" />
                           </Button>
                         )}

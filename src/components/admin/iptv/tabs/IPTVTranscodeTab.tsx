@@ -5,90 +5,114 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { iptvTranscodeService, TranscodeJob } from '@/services/iptvTranscodeService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
-  Zap, Play, Pause, RefreshCw, Loader2, CheckCircle, XCircle, 
-  Clock, Search, Plus, Trash2, Settings
+  Zap, RefreshCw, Loader2, CheckCircle, XCircle, 
+  Clock, Search, Plus, Trash2, Settings, Play, StopCircle
 } from 'lucide-react';
 
-interface TranscodeJob {
-  id: number;
-  channel_id: number;
-  status: string;
-  mode: string;
-  progress: number;
-  target_resolutions: string[];
-  output_urls: Record<string, string> | null;
-  error_message: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-}
+const RESOLUTION_OPTIONS = ['1080p', '720p', '480p', '360p', '240p'];
 
 export function IPTVTranscodeTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
+  const [selectedResolutions, setSelectedResolutions] = useState<string[]>(['720p', '480p', '360p']);
+  const [transcodeMode, setTranscodeMode] = useState<'hls' | 'dash'>('hls');
 
-  // Fetch transcode jobs
-  const { data: jobs = [], isLoading, refetch } = useQuery({
+  // Fetch transcode jobs via Edge Function
+  const { data: jobsData, isLoading, refetch } = useQuery({
     queryKey: ['transcode-jobs', search, statusFilter],
     queryFn: async () => {
-      let query = supabase
-        .from('iptv_transcode_jobs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { jobs, stats } = await iptvTranscodeService.listTranscodeJobs();
+      let filtered = jobs;
       
       if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        filtered = jobs.filter(j => j.status === statusFilter);
+      }
+      if (search) {
+        filtered = filtered.filter(j => 
+          j.channel_id.toString().includes(search) || 
+          j.id.toString().includes(search)
+        );
       }
       
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as TranscodeJob[];
+      return { jobs: filtered, stats };
     },
-    refetchInterval: 5000, // Poll every 5s for active jobs
+    refetchInterval: 5000,
   });
 
-  // Stats
-  const stats = {
-    total: jobs.length,
-    pending: jobs.filter(j => j.status === 'pending').length,
-    processing: jobs.filter(j => j.status === 'processing').length,
-    completed: jobs.filter(j => j.status === 'completed').length,
-    failed: jobs.filter(j => j.status === 'failed').length,
-  };
+  const jobs = jobsData?.jobs || [];
+  const stats = jobsData?.stats || { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 };
+
+  // Fetch channels for dropdown
+  const { data: channels = [] } = useQuery({
+    queryKey: ['iptv-channels-dropdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('iptv_channels')
+        .select('id, name')
+        .order('name')
+        .limit(500);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Create transcode job
   const createMutation = useMutation({
-    mutationFn: async (channelId: number) => {
-      const { error } = await supabase.from('iptv_transcode_jobs').insert({
-        channel_id: channelId,
-        status: 'pending',
-        mode: 'hls',
-        target_resolutions: ['720p', '480p', '360p'],
-        progress: 0,
+    mutationFn: async () => {
+      if (!selectedChannel) throw new Error('Selecione um canal');
+      return iptvTranscodeService.createTranscodeJob(selectedChannel, {
+        mode: transcodeMode,
+        resolutions: selectedResolutions,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Job de transcode criado');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      setIsCreateOpen(false);
+      setSelectedChannel(null);
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Cancel job
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => iptvTranscodeService.cancelTranscodeJob(id),
+    onSuccess: () => {
+      toast.success('Job cancelado');
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
     },
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
-  // Cancel/Delete job
+  // Retry failed job
+  const retryMutation = useMutation({
+    mutationFn: (id: number) => iptvTranscodeService.retryTranscodeJob(id),
+    onSuccess: () => {
+      toast.success('Job reagendado');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Delete job
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await supabase.from('iptv_transcode_jobs').delete().eq('id', id);
@@ -101,28 +125,13 @@ export function IPTVTranscodeTab() {
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
-  // Retry failed job
-  const retryMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase
-        .from('iptv_transcode_jobs')
-        .update({ status: 'pending', error_message: null, progress: 0 })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Job reagendado');
-      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
-    },
-    onError: (error) => toast.error(`Erro: ${error.message}`),
-  });
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending': return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
       case 'processing': return <Badge className="bg-blue-500"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Processando</Badge>;
       case 'completed': return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Concluído</Badge>;
       case 'failed': return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Falhou</Badge>;
+      case 'cancelled': return <Badge variant="secondary"><StopCircle className="h-3 w-3 mr-1" />Cancelado</Badge>;
       default: return <Badge variant="secondary">{status}</Badge>;
     }
   };
@@ -198,8 +207,8 @@ export function IPTVTranscodeTab() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           <p>
-            O sistema de transcode converte streams de vídeo para múltiplas resoluções (720p, 480p, 360p) 
-            com adaptive bitrate streaming (HLS). Jobs são processados em background por workers dedicados.
+            O sistema de transcode converte streams de vídeo para múltiplas resoluções (1080p, 720p, 480p, 360p) 
+            com adaptive bitrate streaming (HLS/DASH). Jobs são processados em background por workers dedicados.
           </p>
         </CardContent>
       </Card>
@@ -211,7 +220,7 @@ export function IPTVTranscodeTab() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por channel ID..."
+                placeholder="Buscar por channel ID ou job ID..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -232,6 +241,83 @@ export function IPTVTranscodeTab() {
             <Button variant="outline" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Novo Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Criar Job de Transcode</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Canal</Label>
+                    <Select 
+                      value={selectedChannel?.toString() || ''} 
+                      onValueChange={(v) => setSelectedChannel(parseInt(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um canal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {channels.map((ch) => (
+                          <SelectItem key={ch.id} value={ch.id.toString()}>
+                            {ch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Modo</Label>
+                    <Select value={transcodeMode} onValueChange={(v) => setTranscodeMode(v as 'hls' | 'dash')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hls">HLS (HTTP Live Streaming)</SelectItem>
+                        <SelectItem value="dash">DASH (Dynamic Adaptive Streaming)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Resoluções</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {RESOLUTION_OPTIONS.map((res) => (
+                        <div key={res} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={res}
+                            checked={selectedResolutions.includes(res)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedResolutions([...selectedResolutions, res]);
+                              } else {
+                                setSelectedResolutions(selectedResolutions.filter(r => r !== res));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={res} className="text-sm">{res}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button 
+                    className="w-full" 
+                    onClick={() => createMutation.mutate()}
+                    disabled={createMutation.isPending || !selectedChannel || selectedResolutions.length === 0}
+                  >
+                    {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
+                    Iniciar Transcode
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>
@@ -244,23 +330,24 @@ export function IPTVTranscodeTab() {
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Canal</TableHead>
+                <TableHead>Modo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Progresso</TableHead>
                 <TableHead>Resoluções</TableHead>
                 <TableHead>Criado</TableHead>
-                <TableHead className="w-20">Ações</TableHead>
+                <TableHead className="w-24">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : jobs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Nenhum job de transcode encontrado
                   </TableCell>
                 </TableRow>
@@ -269,6 +356,9 @@ export function IPTVTranscodeTab() {
                   <TableRow key={job.id}>
                     <TableCell className="font-mono text-xs">#{job.id}</TableCell>
                     <TableCell className="font-mono text-xs">{job.channel_id}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="uppercase">{job.mode || 'hls'}</Badge>
+                    </TableCell>
                     <TableCell>{getStatusBadge(job.status)}</TableCell>
                     <TableCell>
                       <div className="w-24">
@@ -288,6 +378,12 @@ export function IPTVTranscodeTab() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {job.status === 'processing' && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8"
+                            onClick={() => cancelMutation.mutate(job.id)} title="Cancelar">
+                            <StopCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                         {job.status === 'failed' && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" 
                             onClick={() => retryMutation.mutate(job.id)} title="Retry">
