@@ -1,8 +1,8 @@
 /**
- * Main Edge Function - Health Check Only
+ * Main Edge Function Router
  * 
- * For self-hosted: Each function runs independently via Docker.
- * This main function only provides a health check endpoint.
+ * Routes requests to the appropriate edge function based on URL path.
+ * Used when edge-runtime is configured with --main-service.
  */
 
 const corsHeaders = {
@@ -16,16 +16,528 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  return new Response(
-    JSON.stringify({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      version: '2.1.0',
-      message: 'Edge Functions Router Active'
-    }),
-    { 
-      status: 200, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+  const url = new URL(req.url);
+  const pathParts = url.pathname.split('/').filter(Boolean);
+  
+  // Expected path: /functions/v1/{function-name} or /{function-name}
+  let functionName = '';
+  
+  if (pathParts[0] === 'functions' && pathParts[1] === 'v1') {
+    functionName = pathParts[2] || '';
+  } else {
+    functionName = pathParts[0] || '';
+  }
+
+  console.log(`[Router] Path: ${url.pathname}, Function: ${functionName}`);
+
+  // Health check for root or empty function name
+  if (!functionName || functionName === 'main' || functionName === 'health-check') {
+    return new Response(
+      JSON.stringify({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        version: '2.2.0',
+        message: 'Edge Functions Router Active'
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+
+  // Dynamic import of the target function
+  try {
+    const functionPath = `/home/deno/functions/${functionName}/index.ts`;
+    console.log(`[Router] Loading function from: ${functionPath}`);
+    
+    // Import the function module dynamically
+    const module = await import(functionPath);
+    
+    // If the module exports a handler, use it
+    if (typeof module.default === 'function') {
+      return await module.default(req);
     }
-  );
+    
+    // Otherwise, assume the function uses Deno.serve pattern
+    // In this case, we need to forward the request to the function's URL
+    // Since we can't directly invoke Deno.serve handlers, we'll inline the logic
+    
+    // For custom-auth specifically, inline the handler
+    if (functionName === 'custom-auth') {
+      return await handleCustomAuth(req);
+    }
+
+    // For other functions, return error (they need to be handled individually)
+    return new Response(
+      JSON.stringify({ 
+        error: 'Function found but no compatible handler',
+        function: functionName
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error) {
+    console.error(`[Router] Error loading function ${functionName}:`, error);
+    return new Response(
+      JSON.stringify({ 
+        error: `Function '${functionName}' not found or failed to load`,
+        details: error.message
+      }),
+      { 
+        status: 404, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
 });
+
+// Inline custom-auth handler to avoid import issues
+async function handleCustomAuth(req: Request): Promise<Response> {
+  const { encode } = await import("https://deno.land/std@0.168.0/encoding/base64.ts");
+  
+  function base64UrlEncode(data: Uint8Array): string {
+    return encode(data)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
+
+  function stringToUint8Array(str: string): Uint8Array {
+    return new TextEncoder().encode(str);
+  }
+
+  async function createJWT(payload: object, secret: string): Promise<string> {
+    const header = { alg: 'HS256', typ: 'JWT' };
+    
+    const encodedHeader = base64UrlEncode(stringToUint8Array(JSON.stringify(header)));
+    const encodedPayload = base64UrlEncode(stringToUint8Array(JSON.stringify(payload)));
+    
+    const signatureInput = `${encodedHeader}.${encodedPayload}`;
+    
+    const key = await crypto.subtle.importKey(
+      'raw',
+      stringToUint8Array(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      stringToUint8Array(signatureInput)
+    );
+    
+    const encodedSignature = base64UrlEncode(new Uint8Array(signature));
+    
+    return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
+  }
+
+  try {
+    const { action, email, password, userData } = await req.json();
+    
+    const dbUrl = Deno.env.get('SELFHOSTED_DB_URL');
+    const jwtSecret = Deno.env.get('JWT_SECRET') || 'super-secret-jwt-token-with-at-least-32-characters-long';
+    
+    console.log('[CustomAuth] Action:', action, 'Email:', email);
+    console.log('[CustomAuth] DB URL preview:', dbUrl?.substring(0, 30) + '...');
+    
+    if (!dbUrl) {
+      throw new Error('SELFHOSTED_DB_URL not configured');
+    }
+
+    const dbUrlMatch = dbUrl.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
+    
+    if (!dbUrlMatch) {
+      console.error('[CustomAuth] Failed to parse DB URL:', dbUrl.substring(0, 50));
+      throw new Error('Invalid database URL format');
+    }
+
+    const [, dbUser, dbPassword, dbHost, dbPortStr, dbName] = dbUrlMatch;
+    const dbPort = dbPortStr ? parseInt(dbPortStr) : 5432;
+    
+    console.log('[CustomAuth] Connecting to DB:', dbHost, dbPort, dbName);
+    
+    const postgres = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
+    const { Client } = postgres;
+    
+    const client = new Client({
+      user: dbUser,
+      password: dbPassword,
+      hostname: dbHost,
+      port: dbPort,
+      database: dbName,
+    });
+    
+    await client.connect();
+    
+    try {
+      if (action === 'login') {
+        console.log(`[CustomAuth] Login attempt for: ${email}`);
+        
+        const authResult = await client.queryObject(`
+          SELECT id, email, email_confirmed_at, raw_user_meta_data,
+                 (encrypted_password = crypt($2, encrypted_password)) as password_valid
+          FROM auth.users 
+          WHERE email = $1
+        `, [email.toLowerCase(), password]);
+        
+        if (authResult.rows.length === 0) {
+          return new Response(JSON.stringify({ 
+            error: 'Invalid login credentials',
+            details: 'User not found'
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const user = authResult.rows[0] as any;
+        
+        if (!user.password_valid) {
+          await client.queryObject(`
+            INSERT INTO public.security_events (event_type, event_details, ip_address)
+            VALUES ('failed_login', $1, $2)
+          `, [JSON.stringify({ email }), req.headers.get('x-forwarded-for') || 'unknown']);
+          
+          return new Response(JSON.stringify({ 
+            error: 'Invalid login credentials',
+            details: 'Invalid password'
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const roleResult = await client.queryObject(`
+          SELECT role FROM public.user_roles WHERE user_id = $1
+        `, [user.id]);
+        
+        const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
+        
+        const profileResult = await client.queryObject(`
+          SELECT * FROM public.profiles WHERE id = $1
+        `, [user.id]);
+        
+        const profile = profileResult.rows.length > 0 ? profileResult.rows[0] : null;
+        
+        const now = Math.floor(Date.now() / 1000);
+        const expiresIn = 3600 * 24 * 7;
+        
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        
+        const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: now + expiresIn,
+          iat: now,
+          iss: supabaseUrl + '/auth/v1',
+          sub: user.id,
+          email: user.email,
+          phone: '',
+          app_metadata: { provider: 'email', providers: ['email'] },
+          user_metadata: user.raw_user_meta_data || {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: now }],
+          session_id: crypto.randomUUID(),
+          app_role: role
+        }, jwtSecret);
+        
+        const refreshToken = await createJWT({
+          sub: user.id,
+          type: 'refresh',
+          iat: now,
+          exp: now + (expiresIn * 4),
+        }, jwtSecret);
+        
+        await client.queryObject(`
+          INSERT INTO public.auth_sessions_log (user_id, user_email, event_type, ip_address, user_agent)
+          VALUES ($1, $2, 'login', $3, $4)
+        `, [user.id, user.email, req.headers.get('x-forwarded-for') || 'unknown', req.headers.get('user-agent') || 'unknown']);
+        
+        console.log(`[CustomAuth] Login successful for: ${email}, role: ${role}`);
+        
+        return new Response(JSON.stringify({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          token_type: 'bearer',
+          expires_in: expiresIn,
+          user: {
+            id: user.id,
+            email: user.email,
+            role: role,
+            email_confirmed_at: user.email_confirmed_at,
+            user_metadata: user.raw_user_meta_data || {},
+            profile: profile
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'signup') {
+        console.log(`[CustomAuth] Signup attempt for: ${email}`);
+        
+        const existingUser = await client.queryObject(`
+          SELECT id FROM auth.users WHERE email = $1
+        `, [email.toLowerCase()]);
+        
+        if (existingUser.rows.length > 0) {
+          return new Response(JSON.stringify({ 
+            error: 'User already registered' 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const userId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        
+        await client.queryObject(`
+          INSERT INTO auth.users (
+            id, instance_id, email, encrypted_password, 
+            email_confirmed_at, created_at, updated_at,
+            raw_user_meta_data, raw_app_meta_data,
+            aud, role, confirmation_token
+          ) VALUES (
+            $1, '00000000-0000-0000-0000-000000000000', $2, crypt($3, gen_salt('bf', 6)),
+            $4, $4, $4,
+            $5, '{"provider": "email", "providers": ["email"]}',
+            'authenticated', 'authenticated', ''
+          )
+        `, [userId, email.toLowerCase(), password, now, JSON.stringify(userData || {})]);
+        
+        await client.queryObject(`
+          INSERT INTO auth.identities (
+            id, user_id, provider_id, provider, identity_data, 
+            last_sign_in_at, created_at, updated_at
+          ) VALUES (
+            $1, $1, $2, 'email', $3, $4, $4, $4
+          )
+        `, [userId, email.toLowerCase(), JSON.stringify({ sub: userId, email: email.toLowerCase() }), now]);
+        
+        await client.queryObject(`
+          INSERT INTO public.profiles (id, email, nome, contact_phone, origem_cadastro, data_vencimento, situacao, cliente_ativo)
+          VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '3 days', 'Testando', true)
+          ON CONFLICT (id) DO NOTHING
+        `, [userId, email.toLowerCase(), userData?.nome || email.split('@')[0], userData?.telefone || null, userData?.origem_cadastro || 'Website']);
+        
+        await client.queryObject(`
+          INSERT INTO public.user_roles (user_id, role)
+          VALUES ($1, 'client')
+          ON CONFLICT (user_id, role) DO NOTHING
+        `, [userId]);
+        
+        const nowTs = Math.floor(Date.now() / 1000);
+        const expiresIn = 3600 * 24 * 7;
+        
+        const supabaseUrlSignup = Deno.env.get('SUPABASE_URL') || '';
+        
+        const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: nowTs + expiresIn,
+          iat: nowTs,
+          iss: supabaseUrlSignup + '/auth/v1',
+          sub: userId,
+          email: email.toLowerCase(),
+          phone: '',
+          app_metadata: { provider: 'email', providers: ['email'] },
+          user_metadata: userData || {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: nowTs }],
+          session_id: crypto.randomUUID(),
+          app_role: 'client'
+        }, jwtSecret);
+        
+        const refreshToken = await createJWT({
+          sub: userId,
+          type: 'refresh',
+          iat: nowTs,
+          exp: nowTs + (expiresIn * 4),
+        }, jwtSecret);
+        
+        console.log(`[CustomAuth] Signup successful for: ${email}`);
+        
+        return new Response(JSON.stringify({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          token_type: 'bearer',
+          expires_in: expiresIn,
+          user: {
+            id: userId,
+            email: email.toLowerCase(),
+            role: 'client'
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'refresh') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const userResult = await client.queryObject(`
+          SELECT id, email FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        if (userResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const user = userResult.rows[0] as any;
+        
+        const roleResult = await client.queryObject(`
+          SELECT role FROM public.user_roles WHERE user_id = $1
+        `, [user.id]);
+        
+        const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
+        
+        const nowTs = Math.floor(Date.now() / 1000);
+        const expiresIn = 3600 * 24 * 7;
+        
+        const supabaseUrlRefresh = Deno.env.get('SUPABASE_URL') || '';
+        
+        const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: nowTs + expiresIn,
+          iat: nowTs,
+          iss: supabaseUrlRefresh + '/auth/v1',
+          sub: user.id,
+          email: user.email,
+          phone: '',
+          app_metadata: { provider: 'email', providers: ['email'] },
+          user_metadata: {},
+          role: 'authenticated',
+          aal: 'aal1',
+          amr: [{ method: 'password', timestamp: nowTs }],
+          session_id: crypto.randomUUID(),
+          app_role: role
+        }, jwtSecret);
+        
+        return new Response(JSON.stringify({
+          access_token: accessToken,
+          token_type: 'bearer',
+          expires_in: expiresIn
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'logout') {
+        const authHeader = req.headers.get('authorization');
+        if (authHeader) {
+          const token = authHeader.replace('Bearer ', '');
+          try {
+            const [, payloadBase64] = token.split('.');
+            const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+            
+            await client.queryObject(`
+              INSERT INTO public.auth_sessions_log (user_id, event_type, ip_address)
+              VALUES ($1, 'logout', $2)
+            `, [payload.sub, req.headers.get('x-forwarded-for') || 'unknown']);
+          } catch (e) {
+            console.log('[CustomAuth] Could not log logout:', e);
+          }
+        }
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'get-user') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        if (payload.exp < Math.floor(Date.now() / 1000)) {
+          return new Response(JSON.stringify({ error: 'Token expired' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const userResult = await client.queryObject(`
+          SELECT id, email, email_confirmed_at, raw_user_meta_data
+          FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        if (userResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const user = userResult.rows[0] as any;
+        
+        const roleResult = await client.queryObject(`
+          SELECT role FROM public.user_roles WHERE user_id = $1
+        `, [user.id]);
+        
+        const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
+        
+        const profileResult = await client.queryObject(`
+          SELECT * FROM public.profiles WHERE id = $1
+        `, [user.id]);
+        
+        const profile = profileResult.rows.length > 0 ? profileResult.rows[0] : null;
+        
+        return new Response(JSON.stringify({
+          user: {
+            id: user.id,
+            email: user.email,
+            role: role,
+            email_confirmed_at: user.email_confirmed_at,
+            user_metadata: user.raw_user_meta_data || {},
+            profile: profile
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else {
+        return new Response(JSON.stringify({ error: 'Invalid action' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+    } finally {
+      await client.end();
+    }
+    
+  } catch (error) {
+    console.error('[CustomAuth] Error:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: error.stack
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
