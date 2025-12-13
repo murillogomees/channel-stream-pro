@@ -23,18 +23,15 @@ export function useGlobalOrientationLock() {
         // Native Capacitor
         if (Capacitor.isNativePlatform() && ScreenOrientation) {
           await ScreenOrientation.lock({ orientation: 'portrait' });
-          console.log('[Orientation] Locked to portrait (native)');
           return;
         }
 
         // Web API
         if (screen.orientation && 'lock' in screen.orientation) {
           await (screen.orientation as any).lock('portrait-primary');
-          console.log('[Orientation] Locked to portrait (web)');
         }
       } catch (e) {
         // Silently fail - not all browsers support this
-        console.log('[Orientation] Could not lock (not supported)');
       }
     };
 

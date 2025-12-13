@@ -42,7 +42,7 @@ export default function AdminUserList() {
     currentUser?.isAdmin ? 'admin' : 
     (currentUser?.roles?.[0] as 'client' | 'admin' | 'master') || 'client';
   
-  console.log('[AdminUserList] currentUser:', currentUser?.email, 'roles:', currentUser?.roles, 'isMaster:', currentUser?.isMaster, 'isAdmin:', currentUser?.isAdmin, 'currentUserRole:', currentUserRole);
+  
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -95,7 +95,7 @@ export default function AdminUserList() {
     // Determinar a role do usuário sendo editado
     const userRole = user.roles && user.roles.length > 0 ? user.roles[0] : 'client';
     
-    console.log('[AdminUserList] handleEdit - user:', user.email, 'roles array:', user.roles, 'selected role:', userRole);
+    
     
     setSelectedUser(user);
     setEditFormData({
@@ -160,7 +160,6 @@ export default function AdminUserList() {
       // Enviar notificação se cliente foi desativado e checkbox está marcada
       if (clienteDesativado && enviarNotificacao) {
         try {
-          console.log('[AdminUserList] Cliente desativado, disparando notificação...');
           
           const { automaticNotificationTriggerService } = await import('@/services/automaticNotificationTriggerService');
           
