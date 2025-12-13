@@ -1,12 +1,25 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NotFound = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isClient, loading } = useAuth();
   const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
+    // Wait for auth to finish loading
+    if (loading) return;
+
+    // If user is logged in as client, redirect to /app/home
+    if (user && isClient) {
+      console.log("[NotFound] Client logged in, redirecting to /app/home");
+      setRedirecting(true);
+      navigate('/app/home', { replace: true });
+      return;
+    }
+
     // Check if pathname has encoded query string (e.g., %3F = ?)
     // This happens when URLs are copied/pasted incorrectly
     const pathname = location.pathname;
@@ -27,9 +40,9 @@ const NotFound = () => {
     }
     
     console.error("404 Error: User attempted to access non-existent route:", pathname);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, user, isClient, loading]);
 
-  if (redirecting) {
+  if (redirecting || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-muted-foreground">Redirecionando...</p>
