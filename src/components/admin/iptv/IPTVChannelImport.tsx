@@ -123,17 +123,14 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       }
 
       const { data, error } = await supabase.functions.invoke('process-m3u-import', {
-        body: {
-          content: m3uContent,
-          sessionId: `import-${Date.now()}`,
-        },
+        body: { content: m3uContent },
       });
 
       if (error) {
         throw new Error(error.message || 'Erro ao importar canais');
       }
 
-      const result = data as { success?: boolean; error?: string; data?: { inserted?: number } } | null;
+      const result = data as { success?: boolean; error?: string; data?: { inserted?: number; skipped?: number } } | null;
       if (!result?.success) {
         throw new Error(result?.error || 'Erro desconhecido');
       }
@@ -150,7 +147,6 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       toast.error(`Erro na importação: ${error.message}`);
     },
   });
-
   return (
     <div className="space-y-4">
       <Tabs defaultValue="url">
