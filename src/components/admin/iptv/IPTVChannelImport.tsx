@@ -68,7 +68,7 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     return channels;
   };
 
-  // Fetch and parse M3U from URL (via Edge Function to evitar Mixed Content)
+  // Fetch and parse M3U from URL (via Edge Function para evitar Mixed Content)
   const fetchMutation = useMutation({
     mutationFn: async (url: string) => {
       setIsParsing(true);
@@ -81,7 +81,18 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         throw new Error(error.message || 'Erro ao buscar M3U');
       }
 
-      const content = (data as { content?: string } | null)?.content;
+      const response = (data || {}) as { content?: string; mode?: string; success?: boolean; message?: string; entryCount?: number };
+
+      // Streaming mode: importado direto no backend, sem pré-visualização
+      if (response.mode === 'streaming' || (response.success && !response.content)) {
+        const count = response.entryCount ?? 0;
+        toast.success(response.message || `Importados ${count} canais com sucesso (modo streaming)`);
+        setIsParsing(false);
+        // Não há conteúdo para pré-visualizar neste modo
+        return [] as ParsedChannel[];
+      }
+
+      const content = response.content;
       if (!content) {
         throw new Error('Resposta inválida do servidor');
       }
@@ -90,7 +101,9 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     },
     onSuccess: (channels) => {
       setParsedChannels(channels);
-      toast.success(`${channels.length} canais encontrados`);
+      if (channels.length > 0) {
+        toast.success(`${channels.length} canais encontrados`);
+      }
       setIsParsing(false);
     },
     onError: (error) => {

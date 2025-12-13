@@ -103,8 +103,15 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
     setUsedBackend(null);
     
     try {
-      // Use hybrid backend - will automatically route to self-hosted for this heavy operation
-      const { data, error, backend } = await callHybridFunction<{ content?: string; error?: string }>('fetch-m3u', {
+      // Use hybrid backend - irá automaticamente para Cloud neste projeto
+      const { data, error, backend } = await callHybridFunction<{
+        content?: string;
+        error?: string;
+        mode?: string;
+        success?: boolean;
+        message?: string;
+        entryCount?: number;
+      }>('fetch-m3u', {
         url: m3uUrl,
       });
       
@@ -112,6 +119,16 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
 
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
+
+      // Novo modo streaming: import direto no backend, sem conteúdo retornado
+      if (data?.mode === 'streaming' || (data?.success && !data.content)) {
+        const count = data.entryCount ?? 0;
+        const backendLabel = backend === 'selfhosted' ? 'VPS' : 'Cloud';
+        toast.success(data.message || `${count} canais importados com sucesso (modo streaming via ${backendLabel})`);
+        // Não há pré-visualização neste modo, apenas encerra o parsing
+        return;
+      }
+
       if (!data?.content) throw new Error('Nenhum conteúdo retornado');
       
       const channels = parseM3U(data.content);
