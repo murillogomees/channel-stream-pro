@@ -407,7 +407,7 @@ export default function UnifiedProfile() {
     return isAppRoute ? <AppLayout>{loadingContent}</AppLayout> : loadingContent;
   }
 
-  const backPath = isAdmin ? '/admin/dashboard' : '/app/player';
+  const backPath = isAdmin ? '/admin/dashboard' : '/app/home';
 
   const content = (
     <div className="min-h-screen bg-background">
