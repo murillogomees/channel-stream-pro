@@ -153,6 +153,6 @@ jobs:
 
       - name: Test REST API
         run: |
-          echo "Testing REST API..."
+          echo "Testing REST API on /rest/v1/profiles..."
           sleep 10
-          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" "https://supabase.iptvlink.com.br/rest/v1/" || echo "API not accessible yet"
+          curl -i "https://supabase.iptvlink.com.br/rest/v1/profiles?select=id&limit=1" || echo "API endpoint /profiles not accessible yet"
