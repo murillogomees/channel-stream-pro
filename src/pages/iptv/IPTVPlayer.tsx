@@ -39,8 +39,16 @@ export default function IPTVPlayer() {
     );
   }
 
-  // Use original_url directly - avoids 502 from stream-proxy
-  const streamUrl = channel?.original_url || null;
+  // Build proxied stream URL to handle CORS/Mixed Content
+  const getProxiedUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
+    
+    // Use stream-proxy edge function to bypass CORS and Mixed Content issues
+    const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy`;
+    return `${proxyBase}?url=${encodeURIComponent(url)}`;
+  };
+
+  const streamUrl = getProxiedUrl(channel?.original_url);
 
   if (!streamUrl) {
     return (
