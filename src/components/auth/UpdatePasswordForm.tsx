@@ -42,7 +42,7 @@ export function UpdatePasswordForm() {
     }
 
     try {
-      await updatePassword(password, token || undefined);
+      await updatePassword(password);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err: any) {

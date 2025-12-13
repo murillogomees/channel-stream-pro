@@ -340,6 +340,21 @@ class CustomAuthService {
   async revokeSession(): Promise<AuthResponse<null>> {
     return { data: null, error: null };
   }
+
+  /**
+   * Update user data
+   */
+  async updateUser(data: { password?: string; email?: string }): Promise<AuthResponse<null>> {
+    try {
+      const { error } = await supabase.auth.updateUser(data);
+      if (error) {
+        return { data: null, error: { message: error.message } };
+      }
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
 }
 
 export const customAuthService = new CustomAuthService();

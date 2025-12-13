@@ -62,8 +62,8 @@ export function DeviceManager() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Laptop className="h-4 w-4" />
             <span>Dispositivo Atual</span>
-            <Badge variant="secondary" className="ml-auto">
-              {currentFingerprint.hash.substring(0, 8)}...
+          <Badge variant="secondary" className="ml-auto">
+            {currentFingerprint.substring(0, 8)}...
             </Badge>
           </div>
         </div>
@@ -80,7 +80,7 @@ export function DeviceManager() {
           <div className="space-y-3">
             {devices.map((device) => {
               const DeviceIcon = getDeviceIcon(device.device_type);
-              const isCurrentDevice = device.fingerprint_hash === currentFingerprint.hash;
+              const isCurrentDevice = device.fingerprint_hash === currentFingerprint;
               const isProcessing = processingId === device.id;
 
               return (

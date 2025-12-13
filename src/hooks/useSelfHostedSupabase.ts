@@ -1,11 +1,12 @@
 /**
- * Hook for Self-Hosted Supabase operations
+ * Hook for Supabase operations
  * 
- * Use this hook instead of direct supabase imports for self-hosted operations
+ * Simplified wrapper for Cloud Supabase
  */
 
 import { useState, useCallback } from 'react';
-import { selfHostedSupabase, selfHostedConfig, invokeSelfHostedFunction } from '@/integrations/selfhosted';
+import { supabase } from '@/integrations/supabase/client';
+import { supabaseConfig, getFunctionUrl } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface SelfHostedConnectionStatus {
@@ -18,7 +19,7 @@ export interface SelfHostedConnectionStatus {
 export function useSelfHostedSupabase() {
   const [connectionStatus, setConnectionStatus] = useState<SelfHostedConnectionStatus>({
     connected: false,
-    url: selfHostedConfig.url,
+    url: supabaseConfig.url,
     lastChecked: null,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -26,8 +27,7 @@ export function useSelfHostedSupabase() {
   const testConnection = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Simple query to test connection
-      const { error } = await selfHostedSupabase
+      const { error } = await supabase
         .from('profiles')
         .select('id')
         .limit(1);
@@ -35,7 +35,7 @@ export function useSelfHostedSupabase() {
       if (error) {
         setConnectionStatus({
           connected: false,
-          url: selfHostedConfig.url,
+          url: supabaseConfig.url,
           lastChecked: new Date(),
           error: error.message,
         });
@@ -44,7 +44,7 @@ export function useSelfHostedSupabase() {
 
       setConnectionStatus({
         connected: true,
-        url: selfHostedConfig.url,
+        url: supabaseConfig.url,
         lastChecked: new Date(),
       });
       return true;
@@ -52,7 +52,7 @@ export function useSelfHostedSupabase() {
       const errorMsg = err instanceof Error ? err.message : 'Connection failed';
       setConnectionStatus({
         connected: false,
-        url: selfHostedConfig.url,
+        url: supabaseConfig.url,
         lastChecked: new Date(),
         error: errorMsg,
       });
@@ -66,19 +66,19 @@ export function useSelfHostedSupabase() {
     functionName: string,
     body?: Record<string, unknown>
   ): Promise<T | null> => {
-    const { data, error } = await invokeSelfHostedFunction<T>(functionName, { body });
+    const { data, error } = await supabase.functions.invoke(functionName, { body });
     
     if (error) {
       toast.error(`Function ${functionName} failed: ${error.message}`);
       return null;
     }
     
-    return data;
+    return data as T;
   }, []);
 
   return {
-    client: selfHostedSupabase,
-    config: selfHostedConfig,
+    client: supabase,
+    config: supabaseConfig,
     connectionStatus,
     isLoading,
     testConnection,
