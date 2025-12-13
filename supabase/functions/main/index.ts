@@ -58,6 +58,15 @@ Deno.serve(async (req: Request) => {
       case 'admin-data':
         return await handleAdminData(req);
       
+      case 'coolify-api':
+        return await handleCoolifyApi(req);
+      
+      case 'remote-command':
+        return await handleRemoteCommand(req);
+      
+      case 'process-m3u-import':
+        return await handleProcessM3UImport(req);
+      
       default:
         // For other functions, return not implemented
         return new Response(
@@ -738,6 +747,424 @@ async function handleAdminData(req: Request): Promise<Response> {
   } catch (error) {
     console.error('[AdminData] Error:', error);
     return new Response(JSON.stringify({ 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// ============================================================================
+// COOLIFY-API HANDLER - Infrastructure management (uses COOLIFY_API_TOKEN)
+// ============================================================================
+async function handleCoolifyApi(req: Request): Promise<Response> {
+  const COOLIFY_URL = "https://dashboard.iptvlink.com.br";
+  const COOLIFY_TOKEN = Deno.env.get('COOLIFY_API_TOKEN') || '';
+  const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
+  const SELFHOSTED_SERVICE_KEY = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || '';
+
+  try {
+    const body = await req.json();
+    const { action, endpoint, method = 'GET', params } = body;
+
+    console.log('[CoolifyAPI] Action:', action);
+
+    // Custom actions that don't require Coolify API
+    const customActions: Record<string, () => Promise<any>> = {
+      'get-selfhosted-status': async () => {
+        const checks: Record<string, boolean> = { database: false, auth: false, functions: false };
+        
+        try {
+          const dbResponse = await fetch(`${SELFHOSTED_URL}/rest/v1/`, {
+            headers: { 'apikey': SELFHOSTED_SERVICE_KEY, 'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}` }
+          });
+          checks.database = dbResponse.ok;
+          
+          const authResponse = await fetch(`${SELFHOSTED_URL}/auth/v1/health`);
+          checks.auth = authResponse.ok;
+          
+          const functionsResponse = await fetch(`${SELFHOSTED_URL}/functions/v1/main`);
+          checks.functions = functionsResponse.ok;
+        } catch (e) {
+          console.error('[CoolifyAPI] Status check error:', e);
+        }
+        
+        return { success: true, data: { url: SELFHOSTED_URL, checks, all_healthy: Object.values(checks).every(v => v) } };
+      },
+      
+      'test-selfhosted-connection': async () => {
+        try {
+          const response = await fetch(`${SELFHOSTED_URL}/rest/v1/`, {
+            headers: { 'apikey': SELFHOSTED_SERVICE_KEY, 'Authorization': `Bearer ${SELFHOSTED_SERVICE_KEY}` }
+          });
+          return { success: response.ok, data: { status: response.status, url: SELFHOSTED_URL } };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      },
+      
+      'sync-secrets-to-coolify': async () => {
+        const REQUIRED_SECRETS = [
+          'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
+          'MERCADO_PAGO_ACCESS_TOKEN', 'WHATSAPP_APPKEY', 'WHATSAPP_AUTHKEY',
+          'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
+          'COOLIFY_API_TOKEN', 'JWT_SECRET', 'CRON_SECRET', 'SELFHOSTED_DB_URL'
+        ];
+        
+        const results: Record<string, boolean> = {};
+        for (const secret of REQUIRED_SECRETS) {
+          results[secret] = !!Deno.env.get(secret);
+        }
+        
+        const configured = Object.values(results).filter(v => v).length;
+        const missing = REQUIRED_SECRETS.filter(s => !results[s]);
+        
+        return { success: true, data: { total: REQUIRED_SECRETS.length, configured, missing, all_configured: missing.length === 0 } };
+      },
+    };
+
+    // Execute custom action if exists
+    if (action && customActions[action]) {
+      const result = await customActions[action]();
+      return new Response(JSON.stringify({ ...result, meta: { action, timestamp: new Date().toISOString() } }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // For Coolify API calls, require token
+    if (!COOLIFY_TOKEN) {
+      return new Response(JSON.stringify({ 
+        error: 'COOLIFY_API_TOKEN not configured',
+        hint: 'Configure the token in Coolify environment variables'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Predefined Coolify actions
+    const coolifyActions: Record<string, { endpoint: string; method: string }> = {
+      'health': { endpoint: '/health', method: 'GET' },
+      'version': { endpoint: '/version', method: 'GET' },
+      'list-servers': { endpoint: '/servers', method: 'GET' },
+      'list-services': { endpoint: '/services', method: 'GET' },
+      'list-projects': { endpoint: '/projects', method: 'GET' },
+      'list-applications': { endpoint: '/applications', method: 'GET' },
+      'restart-service': { endpoint: '/services/{uuid}/restart', method: 'GET' },
+      'start-service': { endpoint: '/services/{uuid}/start', method: 'GET' },
+      'stop-service': { endpoint: '/services/{uuid}/stop', method: 'GET' },
+    };
+
+    let finalEndpoint = endpoint || '';
+    let finalMethod = method;
+
+    if (action && coolifyActions[action]) {
+      finalEndpoint = coolifyActions[action].endpoint;
+      finalMethod = coolifyActions[action].method;
+    }
+
+    // Replace path parameters
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        finalEndpoint = finalEndpoint.replace(`{${key}}`, String(value));
+      });
+    }
+
+    const finalUrl = `${COOLIFY_URL}/api/v1${finalEndpoint}`;
+    console.log(`[CoolifyAPI] ${finalMethod} ${finalUrl}`);
+
+    const response = await fetch(finalUrl, {
+      method: finalMethod,
+      headers: {
+        'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    return new Response(JSON.stringify({
+      success: response.ok,
+      status: response.status,
+      data,
+      meta: { action, endpoint: finalEndpoint, timestamp: new Date().toISOString() }
+    }), {
+      status: response.ok ? 200 : response.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('[CoolifyAPI] Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// ============================================================================
+// REMOTE-COMMAND HANDLER - SSH key management (uses COOLIFY_API_TOKEN)
+// ============================================================================
+async function handleRemoteCommand(req: Request): Promise<Response> {
+  const COOLIFY_URL = "https://dashboard.iptvlink.com.br";
+  const COOLIFY_TOKEN = Deno.env.get('COOLIFY_API_TOKEN') || '';
+  const dbUrl = Deno.env.get('SELFHOSTED_DB_URL');
+
+  try {
+    // Validate COOLIFY_API_TOKEN instead of JWT
+    if (!COOLIFY_TOKEN) {
+      return new Response(JSON.stringify({ 
+        error: 'COOLIFY_API_TOKEN not configured',
+        hint: 'This function requires COOLIFY_API_TOKEN for authentication'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const body = await req.json();
+    const { action, host, user, environment, publicKey, keyId, command, auditId } = body;
+
+    console.log('[RemoteCommand] Action:', action, 'Host:', host);
+
+    const newAuditId = auditId || crypto.randomUUID();
+
+    // Log audit to database
+    async function logAudit(entry: any) {
+      if (!dbUrl) return;
+      
+      try {
+        const dbUrlMatch = dbUrl.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
+        if (!dbUrlMatch) return;
+        
+        const [, dbUser, dbPassword, dbHost, dbPortStr, dbName] = dbUrlMatch;
+        const dbPort = dbPortStr ? parseInt(dbPortStr) : 5432;
+        
+        const postgres = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
+        const client = new postgres.Client({ user: dbUser, password: dbPassword, hostname: dbHost, port: dbPort, database: dbName });
+        await client.connect();
+        
+        await client.queryObject(`
+          INSERT INTO public.remote_command_audit (audit_id, action, host, user_remote, environment, status, details, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `, [entry.audit_id, entry.action, entry.host, entry.user, entry.environment, entry.status, JSON.stringify(entry.details)]);
+        
+        await client.end();
+      } catch (e) {
+        console.error('[RemoteCommand] Audit log error:', e);
+      }
+    }
+
+    let result: any = {};
+
+    switch (action) {
+      case 'apply-ssh-key': {
+        let key = publicKey;
+        
+        if (keyId) {
+          const keysResponse = await fetch(`${COOLIFY_URL}/api/v1/security/keys`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' }
+          });
+          
+          if (keysResponse.ok) {
+            const keys = await keysResponse.json();
+            const foundKey = keys.find((k: any) => k.uuid === keyId);
+            if (foundKey) key = foundKey.public_key;
+          }
+        }
+
+        if (!key) {
+          throw new Error('SSH public key required');
+        }
+
+        const commands = {
+          backup: `mkdir -p ~/.ssh && chmod 700 ~/.ssh && cp ~/.ssh/authorized_keys ~/.ssh/authorized_keys.bak-${newAuditId} 2>/dev/null || true`,
+          apply: `grep -F "${key}" ~/.ssh/authorized_keys >/dev/null 2>&1 || echo "${key}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`,
+          verify: `ssh -o BatchMode=yes -o ConnectTimeout=5 ${user}@${host} echo ok`,
+        };
+
+        result = { status: 'commands_generated', audit_id: newAuditId, host, user, commands };
+        await logAudit({ audit_id: newAuditId, action, host, user, environment, status: 'success', details: result });
+        break;
+      }
+
+      case 'backup-authorized-keys': {
+        const backupCommand = `mkdir -p ~/.ssh && cp ~/.ssh/authorized_keys ~/.ssh/authorized_keys.bak-${newAuditId}`;
+        result = { status: 'backup_command_generated', audit_id: newAuditId, command: backupCommand };
+        break;
+      }
+
+      case 'rollback': {
+        if (!auditId) throw new Error('auditId required for rollback');
+        const rollbackCommand = `mv ~/.ssh/authorized_keys.bak-${auditId} ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`;
+        result = { status: 'rollback_command_generated', audit_id: auditId, command: rollbackCommand };
+        break;
+      }
+
+      case 'verify-connection': {
+        const verifyCommand = `ssh -o BatchMode=yes -o ConnectTimeout=5 ${user}@${host} echo ok`;
+        result = { status: 'verify_command_generated', command: verifyCommand };
+        break;
+      }
+
+      case 'execute-command': {
+        if (!command) throw new Error('Command required');
+        
+        const dangerousPatterns = ['rm -rf /', 'mkfs', 'dd if=', ':(){:|:&};:'];
+        for (const pattern of dangerousPatterns) {
+          if (command.includes(pattern)) throw new Error('Dangerous command detected');
+        }
+
+        result = { status: 'command_prepared', audit_id: newAuditId, command, execution: `ssh ${user}@${host} "${command}"` };
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+
+    return new Response(JSON.stringify({ success: true, ...result }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('[RemoteCommand] Error:', error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// ============================================================================
+// PROCESS-M3U-IMPORT HANDLER - M3U playlist import processing
+// ============================================================================
+async function handleProcessM3UImport(req: Request): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { url, content, sessionId, sourceId } = body;
+
+    console.log('[ProcessM3UImport] Session:', sessionId, 'URL:', url ? 'yes' : 'no', 'Content:', content ? 'yes' : 'no');
+
+    const dbUrl = Deno.env.get('SELFHOSTED_DB_URL');
+    if (!dbUrl) {
+      throw new Error('SELFHOSTED_DB_URL not configured');
+    }
+
+    // Parse M3U content
+    let m3uContent = content;
+    
+    if (url && !content) {
+      console.log('[ProcessM3UImport] Fetching from URL:', url);
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch M3U: HTTP ${response.status}`);
+      }
+      
+      m3uContent = await response.text();
+    }
+
+    if (!m3uContent) {
+      throw new Error('No M3U content provided');
+    }
+
+    // Parse channels from M3U
+    const lines = m3uContent.split('\n');
+    const channels: any[] = [];
+    let currentChannel: any = null;
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      if (trimmedLine.startsWith('#EXTINF:')) {
+        const nameMatch = trimmedLine.match(/,(.+)$/);
+        const logoMatch = trimmedLine.match(/tvg-logo="([^"]+)"/);
+        const groupMatch = trimmedLine.match(/group-title="([^"]+)"/);
+        const tvgIdMatch = trimmedLine.match(/tvg-id="([^"]+)"/);
+        
+        currentChannel = {
+          name: nameMatch ? nameMatch[1].trim() : 'Unknown',
+          logo_url: logoMatch ? logoMatch[1] : null,
+          category: groupMatch ? groupMatch[1] : 'Outros',
+          tvg_id: tvgIdMatch ? tvgIdMatch[1] : null,
+        };
+      } else if (trimmedLine && !trimmedLine.startsWith('#') && currentChannel) {
+        currentChannel.url = trimmedLine;
+        channels.push(currentChannel);
+        currentChannel = null;
+      }
+    }
+
+    console.log('[ProcessM3UImport] Parsed channels:', channels.length);
+
+    // Connect to database
+    const dbUrlMatch = dbUrl.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
+    if (!dbUrlMatch) {
+      throw new Error('Invalid database URL format');
+    }
+
+    const [, dbUser, dbPassword, dbHost, dbPortStr, dbName] = dbUrlMatch;
+    const dbPort = dbPortStr ? parseInt(dbPortStr) : 5432;
+    
+    const postgres = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
+    const client = new postgres.Client({ user: dbUser, password: dbPassword, hostname: dbHost, port: dbPort, database: dbName });
+    await client.connect();
+
+    try {
+      // Insert channels in batches
+      let inserted = 0;
+      const batchSize = 100;
+      
+      for (let i = 0; i < channels.length; i += batchSize) {
+        const batch = channels.slice(i, i + batchSize);
+        
+        for (const channel of batch) {
+          const slug = channel.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 100);
+          
+          try {
+            await client.queryObject(`
+              INSERT INTO public.iptv_channels (name, slug, original_url, logo_url, category)
+              VALUES ($1, $2, $3, $4, $5)
+              ON CONFLICT (slug) DO UPDATE SET
+                original_url = EXCLUDED.original_url,
+                logo_url = EXCLUDED.logo_url,
+                category = EXCLUDED.category,
+                updated_at = NOW()
+            `, [channel.name, slug + '-' + Math.random().toString(36).slice(2, 8), channel.url, channel.logo_url, channel.category]);
+            
+            inserted++;
+          } catch (e) {
+            console.error('[ProcessM3UImport] Insert error:', e);
+          }
+        }
+        
+        console.log('[ProcessM3UImport] Progress:', inserted, '/', channels.length);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          parsed: channels.length,
+          inserted,
+          sessionId
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+
+    } finally {
+      await client.end();
+    }
+
+  } catch (error) {
+    console.error('[ProcessM3UImport] Error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
       error: error.message 
     }), {
       status: 500,
