@@ -1,4 +1,4 @@
-name: Deploy Edge Functions to Coolify
+name: Deploy Edge Functions to Self-Hosted Supabase
 
 on:
   push:
@@ -20,68 +20,125 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH Key
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Add VPS to known hosts
+      - name: Create functions archive
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          echo "📦 Creating functions archive..."
+          cd supabase/functions
+          tar -czvf /tmp/functions.tar.gz .
+          echo "✅ Archive created with $(tar -tzf /tmp/functions.tar.gz | wc -l) files"
 
-      - name: Deploy Edge Functions
+      - name: Deploy to VPS via SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
+          FUNCTIONS_PATH: ${{ secrets.FUNCTIONS_PATH }}
         run: |
-          echo "🚀 Deploying Edge Functions to Coolify..."
+          echo "🚀 Deploying Edge Functions to VPS..."
           
-          # Copy functions to VPS
-          scp -r supabase/functions/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/edge-functions/
+          # Default path if not set
+          DEPLOY_PATH="${FUNCTIONS_PATH:-/data/coolify/services/vcs0c0k8kww48kgws44swkk0/volumes/functions}"
           
-          # Execute deploy on VPS
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          # Disable strict host key checking for automation
+          export SSHPASS="$VPS_PASS"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          
+          # Copy archive to VPS
+          echo "📤 Copying functions archive..."
+          sshpass -e scp $SSH_OPTS /tmp/functions.tar.gz ${VPS_USER}@${VPS_HOST}:/tmp/functions.tar.gz
+          
+          # Extract and deploy on VPS
+          echo "📂 Extracting and deploying..."
+          sshpass -e ssh $SSH_OPTS ${VPS_USER}@${VPS_HOST} << ENDSSH
             set -e
             
-            # Find functions volume
-            FUNCTIONS_VOL=$(docker volume inspect --format '{{ .Mountpoint }}' $(docker volume ls -q | grep functions | head -1) 2>/dev/null)
-            if [ -z "$FUNCTIONS_VOL" ]; then
-              FUNCTIONS_VOL="/data/coolify/services/vcs0c0k8kww48kgws44swkk0/volumes/functions"
+            echo "🔍 Finding functions directory..."
+            FUNCTIONS_DIR="$DEPLOY_PATH"
+            
+            # Try to find the correct path if default doesn't exist
+            if [ ! -d "\$FUNCTIONS_DIR" ]; then
+              echo "Default path not found, searching..."
+              FUNCTIONS_DIR=\$(find /data/coolify -name "functions" -type d 2>/dev/null | grep -E "volumes/functions$" | head -1)
             fi
             
-            echo "📁 Deploying to: $FUNCTIONS_VOL"
+            if [ -z "\$FUNCTIONS_DIR" ]; then
+              echo "❌ Could not find functions directory"
+              exit 1
+            fi
+            
+            echo "📁 Deploying to: \$FUNCTIONS_DIR"
             
             # Backup existing functions
-            if [ -d "$FUNCTIONS_VOL" ]; then
-              cp -r $FUNCTIONS_VOL /tmp/functions-backup-$(date +%Y%m%d%H%M%S)
+            BACKUP_DIR="/tmp/functions-backup-\$(date +%Y%m%d%H%M%S)"
+            if [ -d "\$FUNCTIONS_DIR" ]; then
+              echo "💾 Creating backup at \$BACKUP_DIR"
+              cp -r "\$FUNCTIONS_DIR" "\$BACKUP_DIR" 2>/dev/null || true
             fi
             
-            # Copy new functions
-            mkdir -p $FUNCTIONS_VOL
-            cp -r /tmp/edge-functions/* $FUNCTIONS_VOL/
+            # Extract new functions
+            echo "📦 Extracting new functions..."
+            mkdir -p "\$FUNCTIONS_DIR"
+            cd "\$FUNCTIONS_DIR"
+            tar -xzvf /tmp/functions.tar.gz --overwrite
             
-            # Restart edge-runtime
-            CONTAINER_ID=$(docker ps -q --filter "ancestor=supabase/edge-runtime:v1.67.4" | head -1)
-            if [ -n "$CONTAINER_ID" ]; then
-              docker restart $CONTAINER_ID
-              echo "✅ Edge runtime restarted: $CONTAINER_ID"
+            # Find and restart edge-runtime container
+            echo "🔄 Restarting edge-runtime..."
+            CONTAINER_ID=\$(docker ps -q --filter "ancestor=supabase/edge-runtime:v1.67.4" | head -1)
+            
+            if [ -n "\$CONTAINER_ID" ]; then
+              docker restart \$CONTAINER_ID
+              echo "✅ Edge runtime restarted: \$CONTAINER_ID"
+              
+              # Wait for container to be ready
+              sleep 5
+              
+              # Verify container is running
+              if docker ps -q --filter "id=\$CONTAINER_ID" | grep -q .; then
+                echo "✅ Container is running"
+              else
+                echo "⚠️ Container may have issues, checking logs..."
+                docker logs --tail 20 \$CONTAINER_ID 2>/dev/null || true
+              fi
             else
-              echo "⚠️ Edge runtime container not found"
+              echo "⚠️ Edge runtime container not found with image filter"
+              echo "Trying alternative search..."
+              CONTAINER_ID=\$(docker ps --format '{{.ID}} {{.Image}}' | grep -i edge | awk '{print \$1}' | head -1)
+              if [ -n "\$CONTAINER_ID" ]; then
+                docker restart \$CONTAINER_ID
+                echo "✅ Restarted container: \$CONTAINER_ID"
+              else
+                echo "❌ No edge runtime container found"
+              fi
             fi
             
             # Cleanup
-            rm -rf /tmp/edge-functions
+            rm -f /tmp/functions.tar.gz
             
             echo "✅ Deploy complete!"
           ENDSSH
 
-      - name: Notify Coolify API
-        run: |
-          curl -X POST "https://dashboard.iptvlink.com.br/api/v1/services/vcs0c0k8kww48kgws44swkk0/restart" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            || echo "Coolify notification failed (non-critical)"
-
       - name: Verify Deployment
+        env:
+          SUPABASE_URL: ${{ secrets.SELFHOSTED_SUPABASE_URL }}
         run: |
+          echo "🔍 Verifying deployment..."
           sleep 10
-          curl -f "https://supabase.iptvlink.com.br/functions/v1/health-check" \
-            || echo "Health check pending..."
+          
+          # Use default URL if secret not set
+          CHECK_URL="${SUPABASE_URL:-https://supabase.iptvlink.com.br}"
+          
+          # Check health endpoint
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CHECK_URL}/functions/v1/health-check" || echo "000")
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Health check passed (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Health check returned HTTP $HTTP_CODE (may still be starting)"
+          fi
+          
+          # Check main router
+          ROUTER_RESPONSE=$(curl -s "${CHECK_URL}/functions/v1/main" || echo "{}")
+          echo "Router response: $ROUTER_RESPONSE"
