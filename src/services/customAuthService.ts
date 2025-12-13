@@ -497,6 +497,28 @@ class CustomAuthService {
   }
 
   /**
+   * Request password reset (alias for resetPasswordForEmail)
+   */
+  async requestPasswordReset(email: string, redirectTo?: string): Promise<AuthResponse<null>> {
+    return this.resetPasswordForEmail(email, { redirectTo });
+  }
+
+  /**
+   * Confirm password reset with token and new password
+   */
+  async confirmPasswordReset(token: string, newPassword: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('confirm-password-reset', { 
+        token,
+        new_password: newPassword 
+      });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
    * Update password with reset token
    */
   async updatePassword(newPassword: string, token?: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {

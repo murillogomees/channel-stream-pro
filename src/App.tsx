@@ -19,6 +19,10 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Forbidden = lazy(() => import("./pages/Forbidden"));
 const Login = lazy(() => import("./pages/Login"));
 const SignUp = lazy(() => import("./pages/SignUp"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const AccountSettings = lazy(() => import("./pages/AccountSettings"));
 
 // ========================================
 // ADMIN PAGES - Consolidated Hub Structure
@@ -94,6 +98,10 @@ function AppContent() {
             <Route path="/cadastro" element={<SignUp />} />
             <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/account/settings" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
             
             {/* Checkout - All routes require authentication */}
             <Route path="/checkout" element={<ProtectedRoute><CheckoutAuthenticated /></ProtectedRoute>} />
