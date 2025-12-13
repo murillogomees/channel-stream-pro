@@ -1624,6 +1624,100 @@ serve(async (req) => {
         }
       },
 
+      'generate-realtime-secrets': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const log: { step: string; status: string; details?: any }[] = [];
+
+        try {
+          // Generate secure random strings for Realtime secrets
+          const generateSecret = (length: number = 32): string => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            const randomValues = new Uint8Array(length);
+            crypto.getRandomValues(randomValues);
+            for (let i = 0; i < length; i++) {
+              result += chars[randomValues[i] % chars.length];
+            }
+            return result;
+          };
+
+          const realtimeSecrets = {
+            'SECRET_KEY_BASE_REALTIME': generateSecret(64),
+            'SECRET_PASSWORD_REALTIME': generateSecret(32),
+          };
+
+          log.push({ step: '1-generate-secrets', status: 'done', details: { generated: Object.keys(realtimeSecrets) } });
+
+          // Get current envs
+          const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+
+          if (!envsRes.ok) {
+            return { success: false, error: `Failed to get envs: ${envsRes.status}`, log };
+          }
+
+          const envs = await envsRes.json();
+          const envMap: Record<string, { id: string; value: string }> = {};
+          for (const env of envs) {
+            envMap[env.key] = { id: env.id, value: env.value };
+          }
+
+          log.push({ step: '2-fetch-envs', status: 'done', details: { total: envs.length } });
+
+          // Update or create Realtime secrets
+          let updated = 0;
+          for (const [key, value] of Object.entries(realtimeSecrets)) {
+            const existing = envMap[key];
+            if (existing?.id) {
+              // Update if empty
+              if (!existing.value || existing.value.trim() === '') {
+                const patchRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${existing.id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  body: JSON.stringify({ value }),
+                });
+                if (patchRes.ok) updated++;
+              }
+            } else {
+              // Create new
+              const createRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: JSON.stringify({ key, value, is_preview: false }),
+              });
+              if (createRes.ok) updated++;
+            }
+          }
+
+          log.push({ step: '3-update-secrets', status: 'done', details: { updated } });
+
+          return {
+            success: true,
+            data: {
+              secrets_configured: Object.keys(realtimeSecrets),
+              updated,
+              log,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message, log };
+        }
+      },
+
       'get-service-status': async () => {
         if (!COOLIFY_TOKEN) {
           return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
