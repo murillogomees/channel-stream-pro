@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 
 export interface ABTest {
   id: string;
@@ -61,11 +62,12 @@ export function useABTesting() {
 
   const createTest = async (testData: Omit<ABTest, 'id' | 'created_at' | 'created_by'>) => {
     try {
+      const userId = authCache.getUserId();
       const { error } = await supabase
         .from('ab_test_offers')
         .insert([{
           ...testData,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: userId
         }]);
 
       if (error) throw error;

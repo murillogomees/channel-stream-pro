@@ -1,9 +1,12 @@
 /**
  * Two Factor Authentication Service
  * Uses two_factor_auth table
+ * 
+ * USES CUSTOM AUTH - GoTrue removed
  */
 
 import { supabase } from "@/lib/supabase";
+import { authHelper } from "./authHelper";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 
@@ -18,7 +21,7 @@ class TwoFactorAuthService {
 
   async generateSecret(): Promise<TwoFactorSetup | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authHelper.getUser();
       if (!user?.email) return null;
 
       // Generate TOTP secret
@@ -69,7 +72,7 @@ class TwoFactorAuthService {
     enableAfterVerify: boolean = false
   ): Promise<{ valid: boolean; enabled: boolean } | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authHelper.getUser();
       if (!user) return null;
 
       // Get stored secret

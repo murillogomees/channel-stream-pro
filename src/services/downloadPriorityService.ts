@@ -1,9 +1,12 @@
 /**
  * Download Priority Service
  * Pausa downloads de VOD quando o player está ativo para priorizar performance
+ * 
+ * USES CUSTOM AUTH - GoTrue removed
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from './authCacheService';
 
 let playerActiveCount = 0;
 let isPaused = false;
@@ -17,12 +20,15 @@ export async function onPlayerOpen(): Promise<void> {
   
   if (playerActiveCount === 1 && !isPaused) {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session) return;
+      const token = authCache.getAccessToken();
+      if (!token) return;
 
       const response = await supabase.functions.invoke('download-vod', {
         body: { pauseAll: true },
-        headers: { Authorization: `Bearer ${session.session.access_token}` },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'X-Custom-Token': token,
+        },
       });
 
       if (!response.error) {
@@ -48,12 +54,15 @@ export async function onPlayerClose(): Promise<void> {
       if (playerActiveCount > 0) return; // Outro player abriu
       
       try {
-        const { data: session } = await supabase.auth.getSession();
-        if (!session?.session) return;
+        const token = authCache.getAccessToken();
+        if (!token) return;
 
         const response = await supabase.functions.invoke('download-vod', {
           body: { resumeAll: true },
-          headers: { Authorization: `Bearer ${session.session.access_token}` },
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'X-Custom-Token': token,
+          },
         });
 
         if (!response.error) {
@@ -86,12 +95,15 @@ export function areDownloadsPaused(): boolean {
  */
 export async function forceResumeDownloads(): Promise<boolean> {
   try {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session?.session) return false;
+    const token = authCache.getAccessToken();
+    if (!token) return false;
 
     const response = await supabase.functions.invoke('download-vod', {
       body: { resumeAll: true },
-      headers: { Authorization: `Bearer ${session.session.access_token}` },
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'X-Custom-Token': token,
+      },
     });
 
     if (!response.error) {

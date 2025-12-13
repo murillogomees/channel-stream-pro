@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { authCache } from '@/services/authCacheService';
 import { toast } from 'sonner';
 
 export interface SupabaseInstance {
@@ -86,8 +87,8 @@ export function useSupabaseInstances() {
     pg_port?: number;
   }) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Usuário não autenticado');
+      const userId = authCache.getUserId();
+      if (!userId) throw new Error('Usuário não autenticado');
 
       const { error: insertError } = await supabase.from('supabase_instances').insert({
         name: data.name,
@@ -97,7 +98,7 @@ export function useSupabaseInstances() {
         pg_host: data.pg_host || null,
         pg_port: data.pg_port || 5432,
         status: 'pending',
-        created_by: user.user.id,
+        created_by: userId,
       });
 
       if (insertError) throw insertError;
@@ -196,12 +197,12 @@ export function useSupabaseInstances() {
 
   const logAudit = async (instanceId: string | null, action: string, details: Record<string, unknown>) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
+      const userId = authCache.getUserId();
       await supabase.from('supabase_instance_audit').insert([{
         instance_id: instanceId,
         action,
         details: details as any,
-        performed_by: user.user?.id || null,
+        performed_by: userId,
       }]);
     } catch (err) {
       console.error('Audit log failed:', err);
@@ -247,7 +248,7 @@ export function useSupabaseInstances() {
 
   const triggerBackup = async (instanceId: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const { data: user } = await supabase.auth.getUser();
+      const userId = authCache.getUserId();
       
       // Create backup record
       const { data: backup, error: insertError } = await supabase
@@ -255,7 +256,7 @@ export function useSupabaseInstances() {
         .insert({
           instance_id: instanceId,
           status: 'pending',
-          created_by: user.user?.id,
+          created_by: userId,
         })
         .select()
         .single();
