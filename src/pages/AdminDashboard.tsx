@@ -215,7 +215,7 @@ const AdminDashboard = () => {
               title="Player IPTV"
               description="Canais ao vivo, filmes e séries"
               icon={<Play className="h-4 w-4" />}
-              path="/app/player"
+              path="/app/home"
               isNew
               isHighlighted
             />
