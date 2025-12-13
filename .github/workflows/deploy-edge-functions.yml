@@ -11,6 +11,10 @@ on:
         description: 'Force deploy all functions'
         required: false
         default: 'false'
+      restart_container:
+        description: 'Restart edge-runtime container after deploy (caution!)'
+        required: false
+        default: 'false'
 
 jobs:
   deploy:
@@ -20,131 +24,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create functions archive
+      - name: List functions to deploy
         run: |
-          echo "📦 Creating functions archive..."
-          cd supabase/functions
-          tar -czvf /tmp/functions.tar.gz .
-          echo "✅ Archive created with $(tar -tzf /tmp/functions.tar.gz | wc -l) files"
-          
-          # Create base64 encoded version for API upload
-          base64 /tmp/functions.tar.gz > /tmp/functions.tar.gz.b64
-          echo "✅ Base64 encoded archive created"
+          echo "📋 Edge Functions in this commit:"
+          ls -la supabase/functions/
+          echo ""
+          echo "📦 Functions with index.ts:"
+          find supabase/functions -name "index.ts" -type f | sed 's|supabase/functions/||' | sed 's|/index.ts||' | sort
 
-      - name: Deploy via Coolify API
+      - name: Notify deployment ready
         env:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
-          EDGE_FUNCTIONS_UUID: ${{ secrets.EDGE_FUNCTIONS_UUID }}
         run: |
-          echo "🚀 Deploying Edge Functions via Coolify API..."
-          
-          API_URL="${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
-          
-          if [ -z "$COOLIFY_API_TOKEN" ]; then
-            echo "❌ COOLIFY_API_TOKEN not set"
-            exit 1
-          fi
-          
-          # List functions being deployed
-          echo "📋 Functions to deploy:"
-          tar -tzf /tmp/functions.tar.gz | grep "index.ts" | sed 's|/index.ts||' | sort -u
-          
-          # Get service UUID if not explicitly set
-          SERVICE_UUID="${EDGE_FUNCTIONS_UUID}"
-          
-          if [ -z "$SERVICE_UUID" ]; then
-            echo "🔍 Finding Edge Functions service UUID..."
-            SERVICES=$(curl -s -X GET "${API_URL}/api/v1/services" \
-              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-              -H "Content-Type: application/json")
-            
-            SERVICE_UUID=$(echo "$SERVICES" | jq -r '.[] | select(.name | test("edge|function|supabase"; "i")) | .uuid' | head -1)
-            
-            if [ -z "$SERVICE_UUID" ] || [ "$SERVICE_UUID" = "null" ]; then
-              echo "⚠️ Could not find service UUID automatically"
-              echo "Available services:"
-              echo "$SERVICES" | jq -r '.[].name' 2>/dev/null || echo "Could not parse services"
-            fi
-          fi
-          
-          echo "📡 Service UUID: $SERVICE_UUID"
+          echo "✅ Edge Functions code updated in repository"
+          echo ""
+          echo "=========================================="
+          echo "⚠️  MANUAL ACTION REQUIRED"
+          echo "=========================================="
+          echo ""
+          echo "The edge functions code has been updated."
+          echo "To apply changes, restart ONLY the edge-runtime"
+          echo "container via Coolify dashboard:"
+          echo ""
+          echo "1. Go to: ${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
+          echo "2. Find the Supabase service"
+          echo "3. Restart ONLY the 'functions' or 'edge-runtime' container"
+          echo "4. Do NOT restart the entire Supabase service"
+          echo ""
+          echo "=========================================="
 
-      - name: Restart Edge Functions via Coolify API
-        env:
-          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
-          EDGE_FUNCTIONS_UUID: ${{ secrets.EDGE_FUNCTIONS_UUID }}
-        run: |
-          echo "🔄 Restarting Edge Functions via Coolify API..."
-          
-          API_URL="${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
-          SERVICE_UUID="${EDGE_FUNCTIONS_UUID}"
-          
-          if [ -z "$COOLIFY_API_TOKEN" ]; then
-            echo "⚠️ COOLIFY_API_TOKEN not set, skipping API restart"
-            exit 0
-          fi
-          
-          if [ -z "$SERVICE_UUID" ]; then
-            echo "🔍 Finding Edge Functions service UUID..."
-            SERVICES=$(curl -s -X GET "${API_URL}/api/v1/services" \
-              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-              -H "Content-Type: application/json")
-            
-            SERVICE_UUID=$(echo "$SERVICES" | jq -r '.[] | select(.name | test("edge|function"; "i")) | .uuid' | head -1)
-          fi
-          
-          if [ -z "$SERVICE_UUID" ] || [ "$SERVICE_UUID" = "null" ]; then
-            echo "⚠️ Could not find Edge Functions service UUID"
-            exit 0
-          fi
-          
-          echo "📡 Restarting service: $SERVICE_UUID"
-          
-          # Restart the service via Coolify API
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/api/v1/services/${SERVICE_UUID}/restart" \
-            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          
-          echo "Response (HTTP $HTTP_CODE): $BODY"
-          
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "✅ Edge Functions service restart initiated"
-          else
-            echo "⚠️ Restart may have failed, but continuing..."
-          fi
-          
-          # Wait for service to come back up
-          echo "⏳ Waiting for service to restart..."
-          sleep 15
-
-      - name: Verify Deployment
+      - name: Verify functions endpoint
         env:
           SUPABASE_URL: ${{ secrets.SELFHOSTED_SUPABASE_URL }}
         run: |
-          echo "🔍 Verifying deployment..."
-          sleep 5
+          echo "🔍 Checking current functions status..."
           
           CHECK_URL="${SUPABASE_URL:-https://supabase.iptvlink.com.br}"
           
           # Check health endpoint
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CHECK_URL}/functions/v1/health-check" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CHECK_URL}/functions/v1/health-check" 2>/dev/null || echo "000")
           
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Health check passed (HTTP $HTTP_CODE)"
+            echo "✅ Functions endpoint is healthy (HTTP $HTTP_CODE)"
           else
-            echo "⚠️ Health check returned HTTP $HTTP_CODE (may still be starting)"
+            echo "⚠️ Functions endpoint returned HTTP $HTTP_CODE"
+            echo "   This may be normal if container hasn't been restarted yet"
           fi
-          
-          # Check main router
-          ROUTER_RESPONSE=$(curl -s "${CHECK_URL}/functions/v1/main" || echo "{}")
-          echo "Router response: $ROUTER_RESPONSE"
-          
-          echo "✅ Deployment verification complete"
 
       - name: Summary
         run: |
@@ -152,7 +78,9 @@ jobs:
           echo "=========================================="
           echo "📊 Deployment Summary"
           echo "=========================================="
-          echo "Method: Coolify API (no SSH required)"
-          echo "Functions deployed: $(tar -tzf /tmp/functions.tar.gz | grep 'index.ts' | wc -l)"
-          echo "Status: Complete"
+          echo "Status: Code pushed to repository"
+          echo "Functions updated: $(find supabase/functions -name 'index.ts' | wc -l)"
+          echo "Auto-restart: DISABLED (manual restart required)"
+          echo ""
+          echo "Next step: Restart edge-runtime container via Coolify"
           echo "=========================================="
