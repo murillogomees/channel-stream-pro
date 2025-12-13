@@ -407,13 +407,12 @@ serve(async (req) => {
           return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
         }
 
-        // Prefer SUPABASE_DB_URL (main DB), fallback to SELFHOSTED_DB_URL for backward compatibility
-        const supabaseDbUrl = Deno.env.get('SUPABASE_DB_URL') || '';
+        // Use SELFHOSTED_DB_URL (banco correto do Supabase self-hosted)
         const selfHostedDbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
-        const dbUrl = supabaseDbUrl || selfHostedDbUrl;
+        const dbUrl = selfHostedDbUrl;
 
         if (!dbUrl) {
-          return { success: false, error: 'Neither SUPABASE_DB_URL nor SELFHOSTED_DB_URL is configured' };
+          return { success: false, error: 'SELFHOSTED_DB_URL is not configured' };
         }
 
         let dbUri = '';
@@ -500,7 +499,7 @@ serve(async (req) => {
             service: { name: supabaseService.name, uuid: supabaseService.uuid, fqdn: supabaseService.fqdn, type: supabaseService.type },
             db_uri: dbUri,
             restart_status: restartRes.ok ? 'triggered' : `failed (${restartRes.status})`,
-            db_url_source: supabaseDbUrl ? 'SUPABASE_DB_URL' : 'SELFHOSTED_DB_URL',
+            db_url_source: 'SELFHOSTED_DB_URL',
           },
         };
       },
