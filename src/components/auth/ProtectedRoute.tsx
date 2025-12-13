@@ -121,6 +121,18 @@ export const ProtectedRoute = ({
   }
 
   // Verificar acesso válido (não vencido) para rotas /app/*
+  // Rotas permitidas mesmo com acesso expirado (fluxo de assinatura)
+  const allowedExpiredPaths = [
+    '/app/profile',
+    '/profile',
+    '/checkout',
+    '/checkout/success',
+    '/checkout/failure',
+    '/checkout/pending',
+  ];
+  
+  const isAllowedPath = allowedExpiredPaths.some(p => location.pathname.startsWith(p));
+  
   if (isAppRoute || requireValidAccess) {
     // Admin/Master sempre tem acesso
     if (isAdmin || isMaster) {
@@ -132,10 +144,9 @@ export const ProtectedRoute = ({
       return <>{children}</>;
     }
     
-    // Cliente com acesso vencido → checkout
-    if (isExpired) {
-      console.log('[ProtectedRoute] Acesso vencido, redirecionando para checkout');
-      return <Navigate to="/checkout" state={{ from: location, expired: true }} replace />;
+    // Cliente com acesso vencido → perfil (exceto se já está em rota permitida)
+    if (isExpired && !isAllowedPath) {
+      return <Navigate to="/app/profile" state={{ from: location, expired: true }} replace />;
     }
   }
 

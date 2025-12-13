@@ -2657,9 +2657,13 @@ export type Database = {
           contact_phone: string | null
           created_at: string | null
           data_contratacao: string | null
+          data_ultimo_pagamento: string | null
           data_vencimento: string | null
+          dispositivo_contratado: string | null
           email: string
+          forma_ultimo_pagamento: string | null
           id: string
+          is_recorrente: boolean | null
           login_alerts_email: boolean | null
           login_alerts_whatsapp: boolean | null
           nome: string | null
@@ -2677,9 +2681,13 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string | null
           data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
+          dispositivo_contratado?: string | null
           email: string
+          forma_ultimo_pagamento?: string | null
           id: string
+          is_recorrente?: boolean | null
           login_alerts_email?: boolean | null
           login_alerts_whatsapp?: boolean | null
           nome?: string | null
@@ -2697,9 +2705,13 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string | null
           data_contratacao?: string | null
+          data_ultimo_pagamento?: string | null
           data_vencimento?: string | null
+          dispositivo_contratado?: string | null
           email?: string
+          forma_ultimo_pagamento?: string | null
           id?: string
+          is_recorrente?: boolean | null
           login_alerts_email?: boolean | null
           login_alerts_whatsapp?: boolean | null
           nome?: string | null
