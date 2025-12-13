@@ -1,12 +1,12 @@
 /**
- * IPTV Player Page - Enterprise V3
- * Uses stream-proxy with auto token refresh
+ * IPTV Player Page - Modular White-Label Player
+ * Uses custom modular architecture with TokenManager, StreamResolver, etc.
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService } from '@/services/iptvService';
-import { IPTVPlayerWhiteLabelV3 } from '@/components/player/IPTVPlayerWhiteLabelV3';
+import { IPTVPlayerWhiteLabel } from '@/components/player';
 import { Loader2 } from 'lucide-react';
 
 export default function IPTVPlayer() {
@@ -23,6 +23,10 @@ export default function IPTVPlayer() {
     navigate('/app/home');
   };
 
+  const handleError = (message: string) => {
+    console.error('[IPTVPlayer] Error:', message);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -34,16 +38,7 @@ export default function IPTVPlayer() {
     );
   }
 
-  // Build proxied URL - token will be injected by PlayerEngineV3
-  const getProxiedUrl = (url: string | undefined): string | null => {
-    if (!url) return null;
-    const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy`;
-    return `${proxyBase}?url=${encodeURIComponent(url)}`;
-  };
-
-  const streamUrl = getProxiedUrl(channel?.original_url);
-
-  if (!streamUrl) {
+  if (!channel?.original_url) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -55,14 +50,16 @@ export default function IPTVPlayer() {
 
   return (
     <div className="h-screen w-screen bg-black">
-      <IPTVPlayerWhiteLabelV3
-        streamUrl={streamUrl}
-        title={channel?.name}
+      <IPTVPlayerWhiteLabel
+        streamUrl={channel.original_url}
+        title={channel.name}
         brand={{
           name: 'IPTV Link',
-          primaryColor: '#3b82f6'
+          logo: channel.logo_url,
+          primaryColor: 'hsl(var(--primary))'
         }}
         onBack={handleBack}
+        onError={handleError}
       />
     </div>
   );
