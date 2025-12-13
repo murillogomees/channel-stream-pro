@@ -201,16 +201,37 @@ export class ShakaPlayerEngine {
   }
 
   /**
+   * Check if URL is a direct media file (not HLS/DASH manifest)
+   */
+  private isDirectMediaFile(url: string): boolean {
+    const urlLower = url.toLowerCase()
+    return urlLower.endsWith('.mp4') || 
+           urlLower.endsWith('.mkv') ||
+           urlLower.endsWith('.avi') ||
+           urlLower.endsWith('.webm') ||
+           urlLower.endsWith('.mov') ||
+           urlLower.includes('.mp4?') ||
+           urlLower.includes('/movie/') ||
+           urlLower.includes('/series/')
+  }
+
+  /**
    * Load manifest with proxy wrapping
    */
   private async loadManifest(url: string): Promise<void> {
-    if (!this.player) return
+    if (!this.player || !this.video) return
 
     // Build proxied URL
     const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy`
     const proxiedUrl = `${proxyBase}?url=${encodeURIComponent(url)}`
 
     console.log('[ShakaEngine] Loading:', proxiedUrl.substring(0, 100))
+
+    // Check if this is a direct media file (MP4, etc) - use native playback
+    if (this.isDirectMediaFile(url)) {
+      console.log('[ShakaEngine] Direct media file detected, using native playback')
+      return this.loadDirectMedia(proxiedUrl)
+    }
 
     try {
       await this.player.load(proxiedUrl)
@@ -225,6 +246,46 @@ export class ShakaPlayerEngine {
     } catch (err) {
       throw err
     }
+  }
+
+  /**
+   * Load direct media file (MP4, etc) using native HTML5 video
+   */
+  private async loadDirectMedia(proxiedUrl: string): Promise<void> {
+    if (!this.video) return
+
+    // Detach Shaka from video element for native playback
+    if (this.player) {
+      await this.player.detach()
+    }
+
+    return new Promise((resolve, reject) => {
+      const video = this.video!
+
+      const onCanPlay = () => {
+        console.log('[ShakaEngine] Direct media can play')
+        video.removeEventListener('canplay', onCanPlay)
+        video.removeEventListener('error', onError)
+        this.setState('playing')
+        video.play().catch(console.error)
+        resolve()
+      }
+
+      const onError = () => {
+        video.removeEventListener('canplay', onCanPlay)
+        video.removeEventListener('error', onError)
+        const mediaError = video.error
+        console.error('[ShakaEngine] Direct media error:', mediaError?.message)
+        reject(new Error(mediaError?.message || 'Erro ao carregar mídia'))
+      }
+
+      video.addEventListener('canplay', onCanPlay)
+      video.addEventListener('error', onError)
+
+      // Set source directly
+      video.src = proxiedUrl
+      video.load()
+    })
   }
 
   /**
