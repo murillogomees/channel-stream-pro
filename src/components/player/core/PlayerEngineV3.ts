@@ -150,11 +150,13 @@ export class PlayerEngineV3 {
       fragLoadingMaxRetry: 2,
       manifestLoadingMaxRetry: 2,
       levelLoadingMaxRetry: 2,
-      xhrSetup: async (xhr, xhrUrl) => {
-        // Ensure valid token for every request
+      // IMPORTANT: xhrSetup must be synchronous. We only inject
+      // the last known token here to avoid warnings.
+      xhrSetup: (xhr) => {
         try {
-          const token = await ensureValidToken()
-          xhr.setRequestHeader('x-stream-token', token)
+          if (streamToken) {
+            xhr.setRequestHeader('x-stream-token', streamToken)
+          }
         } catch (err) {
           console.warn('[PlayerEngineV3] Could not set token header')
         }
