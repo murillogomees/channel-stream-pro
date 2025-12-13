@@ -499,6 +499,10 @@ verify_jwt = false
 [functions.iptv-transcode]
 verify_jwt = false
 
+# SSH Command execution - infrastructure management
+[functions.ssh-command]
+verify_jwt = false
+
 # Redis Cache Manager - tiered caching operations
 [functions.iptv-redis-cache]
 verify_jwt = false
