@@ -38,10 +38,6 @@ export interface UnifiedProfile {
   data_contratacao?: string;
   valor_pago?: number;
   cliente_ativo?: boolean;
-  data_ultimo_pagamento?: string;
-  forma_ultimo_pagamento?: string;
-  is_recorrente?: boolean;
-  dispositivo_contratado?: string;
   // Roles
   roles?: string[];
 }

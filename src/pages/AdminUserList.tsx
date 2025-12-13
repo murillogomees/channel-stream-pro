@@ -101,7 +101,6 @@ export default function AdminUserList() {
     setEditFormData({
       ...user,
       cliente_ativo: user.cliente_ativo ?? true,
-      is_recorrente: user.is_recorrente ?? false,
       totp_enabled: user.totp_enabled ?? false,
       valor_pago: user.valor_pago ?? 0,
       user_role: userRole as 'client' | 'admin' | 'master',
@@ -121,7 +120,7 @@ export default function AdminUserList() {
       const clienteDesativado = clienteEraAtivo && clienteAgoraInativo;
 
       // Preparar dados para update (remover campos readonly e que não existem em profiles)
-      const { id, created_at, updated_at, totp_secret, totp_verified_at, 
+      const { id, created_at, updated_at, totp_secret, totp_verified_at, totp_enabled,
               roles, user_role, ...updateData } = editFormData;
 
       const { error } = await supabase
