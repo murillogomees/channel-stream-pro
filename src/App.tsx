@@ -38,7 +38,7 @@ const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage")
 // AdminRLSCoverage removed - table not available
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
 const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupabaseIntegrationPage"));
-const AdminSelfHostedPage = lazy(() => import("./pages/admin/AdminSelfHostedPage"));
+// AdminSelfHostedPage removed - using Supabase Cloud only
 
 // IPTV Management Pages
 const AdminIPTVPage = lazy(() => import("./pages/admin/AdminIPTVPage"));
@@ -141,7 +141,7 @@ function AppContent() {
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
 <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
             <Route path="/admin/supabase-integration" element={<ProtectedRoute requireAdmin><AdminSupabaseIntegrationPage /></ProtectedRoute>} />
-            <Route path="/admin/self-hosted" element={<ProtectedRoute requireAdmin><AdminSelfHostedPage /></ProtectedRoute>} />
+            {/* Self-hosted route removed - using Supabase Cloud only */}
             
             {/* IPTV Management - Unified */}
             <Route path="/admin/iptv" element={<ProtectedRoute requireAdmin><AdminIPTVPage /></ProtectedRoute>} />

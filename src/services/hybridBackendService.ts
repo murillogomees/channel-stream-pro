@@ -1,8 +1,7 @@
 /**
- * Backend Service - Self-Hosted Only
+ * Backend Service - Supabase Cloud Only
  * 
- * Todas as operações vão exclusivamente para o Supabase Self-Hosted.
- * URL: https://supabase.iptvlink.com.br
+ * All operations go exclusively to Supabase Cloud.
  */
 
 import { supabase, supabaseConfig, getFunctionUrl } from "@/integrations/supabase/client";
@@ -24,7 +23,7 @@ let healthStatus: BackendHealth = {
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000;
 
 /**
- * Call Edge Function on Self-Hosted
+ * Call Edge Function on Supabase Cloud
  */
 export const callHybridFunction = async <T = unknown>(
   functionName: string,
@@ -35,7 +34,7 @@ export const callHybridFunction = async <T = unknown>(
 ): Promise<{ data: T | null; error: Error | null; backend: string }> => {
   const startTime = performance.now();
   
-  console.log(`[Backend] Calling ${functionName} on self-hosted`);
+  console.log(`[Backend] Calling ${functionName} on Supabase Cloud`);
   
   try {
     const { data, error } = await supabase.functions.invoke<T>(functionName, {
@@ -51,7 +50,7 @@ export const callHybridFunction = async <T = unknown>(
     return { 
       data, 
       error: error ? new Error(error.message) : null, 
-      backend: 'selfhosted' 
+      backend: 'cloud' 
     };
     
   } catch (err) {
@@ -59,7 +58,7 @@ export const callHybridFunction = async <T = unknown>(
     return { 
       data: null, 
       error: err instanceof Error ? err : new Error(String(err)),
-      backend: 'selfhosted',
+      backend: 'cloud',
     };
   }
 };
@@ -107,7 +106,7 @@ export const getBackendUrl = (): string => {
  * Initialize backend
  */
 export const initHybridBackend = async (): Promise<void> => {
-  console.log('[Backend] Initializing Self-Hosted...');
+  console.log('[Backend] Initializing Supabase Cloud...');
   console.log('[Backend] URL:', supabaseConfig.url);
   
   await checkBackendHealth();
@@ -131,6 +130,6 @@ export const resetBackendStats = (): void => {
   stats = { calls: 0, avgLatency: 0 };
 };
 
-// Backward compatibility
+// Backward compatibility - all point to Cloud
 export const isSelfHostedConfigured = (): boolean => true;
 export const SELF_HOSTED_BASE_URL = supabaseConfig.url;

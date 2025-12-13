@@ -9,15 +9,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig, getFunctionUrl } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export interface SelfHostedConnectionStatus {
+export interface ConnectionStatus {
   connected: boolean;
   url: string;
   lastChecked: Date | null;
   error?: string;
 }
 
-export function useSelfHostedSupabase() {
-  const [connectionStatus, setConnectionStatus] = useState<SelfHostedConnectionStatus>({
+export function useSupabase() {
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     connected: false,
     url: supabaseConfig.url,
     lastChecked: null,
@@ -86,4 +86,8 @@ export function useSelfHostedSupabase() {
   };
 }
 
-export default useSelfHostedSupabase;
+// Backward compatibility alias
+export const useSelfHostedSupabase = useSupabase;
+export type SelfHostedConnectionStatus = ConnectionStatus;
+
+export default useSupabase;
