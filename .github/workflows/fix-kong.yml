@@ -1,0 +1,147 @@
+name: Fix Kong Configuration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-kong:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Create and deploy kong.yml
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
+        run: |
+          # Create kong.yml content
+          cat <<'KONGEOF' > /tmp/kong.yml
+          _format_version: "2.1"
+          _transform: true
+
+          services:
+            - name: rest-v1
+              url: http://supabase-rest:3000/
+              routes:
+                - name: rest-v1
+                  strip_path: true
+                  paths:
+                    - /rest/v1/
+
+            - name: auth-v1
+              url: http://supabase-auth:9999/
+              routes:
+                - name: auth-v1
+                  strip_path: true
+                  paths:
+                    - /auth/v1/
+
+            - name: storage-v1
+              url: http://supabase-storage:5000/
+              routes:
+                - name: storage-v1
+                  strip_path: true
+                  paths:
+                    - /storage/v1/
+
+            - name: functions-v1
+              url: http://supabase-edge-functions:9000/
+              routes:
+                - name: functions-v1
+                  strip_path: true
+                  paths:
+                    - /functions/v1/
+
+            - name: realtime-v1
+              url: http://realtime-dev.supabase-realtime:4000/socket/
+              routes:
+                - name: realtime-v1
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/
+
+            - name: meta
+              url: http://supabase-meta:8080/
+              routes:
+                - name: meta
+                  strip_path: true
+                  paths:
+                    - /pg/
+          KONGEOF
+
+          # Remove leading spaces (heredoc adds them)
+          sed -i 's/^          //' /tmp/kong.yml
+          
+          echo "=== kong.yml content ==="
+          cat /tmp/kong.yml
+          echo "========================"
+
+          # Copy kong.yml to VPS
+          sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
+
+          # Find Kong container and deploy
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST << 'ENDSSH'
+            set -e
+            
+            echo "=== Finding Kong container ==="
+            KONG_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -i kong | head -1)
+            echo "Kong container: $KONG_CONTAINER"
+            
+            if [ -z "$KONG_CONTAINER" ]; then
+              echo "ERROR: Kong container not found!"
+              exit 1
+            fi
+            
+            echo "=== Stopping Kong container ==="
+            docker stop $KONG_CONTAINER || true
+            
+            echo "=== Creating directories in container ==="
+            docker start $KONG_CONTAINER || true
+            sleep 2
+            docker exec $KONG_CONTAINER mkdir -p /home/kong || true
+            docker exec $KONG_CONTAINER mkdir -p /usr/local/kong/declarative || true
+            
+            echo "=== Copying kong.yml to container ==="
+            docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml
+            docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
+            
+            echo "=== Setting permissions ==="
+            docker exec $KONG_CONTAINER sh -c 'chmod 644 /home/kong/kong.yml && chmod 644 /usr/local/kong/declarative/kong.yml' || true
+            
+            echo "=== Validating kong.yml ==="
+            docker exec $KONG_CONTAINER cat /home/kong/kong.yml
+            
+            echo "=== Restarting Kong ==="
+            docker restart $KONG_CONTAINER
+            
+            echo "=== Waiting for Kong to start ==="
+            sleep 10
+            
+            echo "=== Kong status ==="
+            docker ps | grep -i kong || true
+            
+            echo "=== Kong logs (last 30 lines) ==="
+            docker logs $KONG_CONTAINER --tail 30 2>&1 || true
+          ENDSSH
+
+      - name: Verify Kong is running
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
+        run: |
+          sleep 5
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST << 'ENDSSH'
+            echo "=== Final Kong status ==="
+            docker ps | grep -i kong
+            
+            KONG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i kong | head -1)
+            if [ -n "$KONG_CONTAINER" ]; then
+              echo "SUCCESS: Kong is running!"
+              docker logs $KONG_CONTAINER --tail 10 2>&1
+            else
+              echo "WARNING: Kong may still be restarting. Check Coolify dashboard."
+            fi
+          ENDSSH
