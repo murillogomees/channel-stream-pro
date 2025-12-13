@@ -155,37 +155,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Note: The trigger handle_new_user already assigns 'client' role automatically
-    // For admin/master users, we need to explicitly add the role
-    if (role === 'admin' || role === 'master') {
-      const { error: roleError } = await serviceClient
-        .from('user_roles')
-        .insert({
-          user_id: newUser.user.id,
-          role: role,
-        });
+    // IMPORTANTE: Cada usuário só pode ter UMA role
+    // Primeiro remove qualquer role existente, depois insere a nova
+    await serviceClient
+      .from('user_roles')
+      .delete()
+      .eq('user_id', newUser.user.id);
 
-      if (roleError) {
-        console.error(`Error assigning ${role} role in create-admin-user:`, roleError);
-        return new Response(
-          JSON.stringify({
-            error: `User created but failed to assign ${role} role`,
-            details: roleError.message,
-            userId: newUser.user.id,
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    const { error: roleError } = await serviceClient
+      .from('user_roles')
+      .insert({
+        user_id: newUser.user.id,
+        role: role,
+      });
 
-      // Also add admin role for master (they need both)
-      if (role === 'master') {
-        await serviceClient
-          .from('user_roles')
-          .insert({
-            user_id: newUser.user.id,
-            role: 'admin',
-          });
-      }
+    if (roleError) {
+      console.error(`Error assigning ${role} role in create-admin-user:`, roleError);
+      return new Response(
+        JSON.stringify({
+          error: `User created but failed to assign ${role} role`,
+          details: roleError.message,
+          userId: newUser.user.id,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`User created successfully: ${newUser.user.id} with role: ${role}`);
