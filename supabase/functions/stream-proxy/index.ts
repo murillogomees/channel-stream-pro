@@ -1,229 +1,90 @@
 /**
  * ============================================================================
- * IPTV Stream Proxy - Netflix-Grade Performance V5 (SECURITY HARDENED)
+ * IPTV Stream Proxy - Enterprise Grade V6
  * ============================================================================
  * 
- * Proxy otimizado para streams HLS/IPTV com:
- * - Domain whitelisting for security
- * - Rate limiting per IP
- * - Playback token integration
- * - Cache agressivo para segmentos (até 5 min)
- * - Connection pooling e keep-alive
- * - Compression automática
- * - Retry exponencial com jitter
- * - Headers otimizados para CDN
+ * Proxy para streams HLS/IPTV com:
+ * - Suporte completo a .m3u8 e .ts
+ * - Preservação de headers de sessão
+ * - Retry com backoff exponencial
+ * - Sem cache de segmentos (evita 403)
+ * - Headers otimizados para Xtream
  * 
- * @version 5.0.0
+ * @version 6.0.0
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 // =============================================================================
 // CORS HEADERS
 // =============================================================================
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept-encoding, x-playback-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept-encoding, x-stream-token, x-original-referer',
   'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, X-Cache-Status',
 } as const;
 
 // =============================================================================
-// SECURITY CONFIGURATION
-// =============================================================================
-const SECURITY = {
-  // Allowed upstream domains (whitelist)
-  ALLOWED_DOMAINS: [
-    // IPTV providers
-    '.m3u8',
-    '.ts',
-    'xtream',
-    'live.',
-    'vod.',
-    'series.',
-    'movie.',
-    // CDN domains
-    'cloudflare',
-    'akamai',
-    'fastly',
-    'cloudfront',
-    'cdn.',
-    // R2 storage
-    'r2.cloudflarestorage.com',
-    // Our own domains
-    'iptvlink.com.br',
-    'iptvlink.app',
-  ],
-  
-  // Blocked patterns (blacklist)
-  BLOCKED_PATTERNS: [
-    'localhost',
-    '127.0.0.1',
-    '0.0.0.0',
-    '10.',
-    '172.16.',
-    '172.17.',
-    '172.18.',
-    '172.19.',
-    '172.20.',
-    '172.21.',
-    '172.22.',
-    '172.23.',
-    '172.24.',
-    '172.25.',
-    '172.26.',
-    '172.27.',
-    '172.28.',
-    '172.29.',
-    '172.30.',
-    '172.31.',
-    '192.168.',
-    'metadata.google',
-    '169.254.',
-    'supabase.co',
-    'supabase.in',
-  ],
-  
-  // Rate limiting
-  RATE_LIMIT: {
-    WINDOW_MS: 60000, // 1 minute
-    MAX_REQUESTS: 300, // 300 requests per minute per IP
-  },
-} as const;
-
-// In-memory rate limit tracking
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-// =============================================================================
-// CONFIGURATION - NETFLIX-GRADE SETTINGS
+// CONFIGURATION
 // =============================================================================
 const CONFIG = {
-  // Timeouts
-  FETCH_TIMEOUT_MS: 15000,
-  MANIFEST_FETCH_TIMEOUT_MS: 8000,
-  LIVE_FETCH_TIMEOUT_MS: 10000,
-  
-  // Retry settings
+  FETCH_TIMEOUT_MS: 20000,
+  MANIFEST_TIMEOUT_MS: 10000,
   MAX_RETRIES: 2,
-  MANIFEST_MAX_RETRIES: 1,
-  RETRY_DELAY_BASE_MS: 200,
-  RETRY_JITTER_MS: 50,
-  
-  // Cache settings
-  MANIFEST_CACHE_SECONDS: 5,
-  SEGMENT_CACHE_SECONDS: 300,
-  VOD_SEGMENT_CACHE_SECONDS: 3600,
-  KEY_CACHE_SECONDS: 3600,
-  
-  // Prefetch
-  PREFETCH_ENABLED: true,
-  PREFETCH_SEGMENTS: 2,
-  
-  // Quality
-  MAX_BANDWIDTH_HINT: 10000000,
+  RETRY_DELAY_MS: 500,
 } as const;
 
 // =============================================================================
-// SECURITY FUNCTIONS
+// SECURITY - BLOCKED PATTERNS (SSRF Protection)
 // =============================================================================
+const BLOCKED_PATTERNS = [
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '10.',
+  '172.16.', '172.17.', '172.18.', '172.19.',
+  '172.20.', '172.21.', '172.22.', '172.23.',
+  '172.24.', '172.25.', '172.26.', '172.27.',
+  '172.28.', '172.29.', '172.30.', '172.31.',
+  '192.168.',
+  'metadata.google',
+  '169.254.',
+  'supabase.co',
+  'supabase.in',
+];
 
-function isDomainAllowed(url: string): boolean {
-  try {
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname.toLowerCase();
-    
-    // Check blocked patterns first (SSRF protection)
-    for (const blocked of SECURITY.BLOCKED_PATTERNS) {
-      if (hostname.includes(blocked) || url.includes(blocked)) {
-        console.log(`[Proxy] BLOCKED: ${hostname} matches blocked pattern: ${blocked}`);
-        return false;
-      }
-    }
-    
-    // For IPTV content, we allow most external domains but block internal
-    // The whitelist is more permissive for media content
-    const urlLower = url.toLowerCase();
-    
-    // Allow if URL contains allowed patterns (media files, CDNs)
-    for (const allowed of SECURITY.ALLOWED_DOMAINS) {
-      if (hostname.includes(allowed) || urlLower.includes(allowed)) {
-        return true;
-      }
-    }
-    
-    // Allow any HTTP/HTTPS URL that isn't blocked (for IPTV flexibility)
-    // The SSRF protection from blocked patterns is the main security layer
-    if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
-      return true;
-    }
-    
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + SECURITY.RATE_LIMIT.WINDOW_MS });
-    return { allowed: true, remaining: SECURITY.RATE_LIMIT.MAX_REQUESTS - 1 };
-  }
-  
-  if (entry.count >= SECURITY.RATE_LIMIT.MAX_REQUESTS) {
-    return { allowed: false, remaining: 0 };
-  }
-  
-  entry.count++;
-  return { allowed: true, remaining: SECURITY.RATE_LIMIT.MAX_REQUESTS - entry.count };
-}
-
-async function verifyPlaybackToken(token: string, supabase: any): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.rpc('validate_playback_token', {
-      p_token_hash: token,
-      p_ip_address: null
-    });
-    
-    if (error || !data) {
-      return false;
-    }
-    
-    return data.valid === true;
-  } catch {
-    return false;
-  }
+function isUrlBlocked(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return BLOCKED_PATTERNS.some(pattern => urlLower.includes(pattern));
 }
 
 // =============================================================================
-// IN-MEMORY CACHE (Edge Function instance)
+// CONTENT TYPE DETECTION
 // =============================================================================
-const memoryCache = new Map<string, { data: string | ArrayBuffer; expires: number; contentType: string }>();
-const MEMORY_CACHE_MAX_SIZE = 100;
-
-function getCached(key: string): { data: string | ArrayBuffer; contentType: string } | null {
-  const entry = memoryCache.get(key);
-  if (entry && entry.expires > Date.now()) {
-    return { data: entry.data, contentType: entry.contentType };
-  }
-  memoryCache.delete(key);
-  return null;
+function isManifest(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.m3u8') || urlLower.includes('.m3u');
 }
 
-function setCache(key: string, data: string | ArrayBuffer, contentType: string, ttlSeconds: number): void {
-  if (memoryCache.size >= MEMORY_CACHE_MAX_SIZE) {
-    const oldest = memoryCache.keys().next().value;
-    if (oldest) memoryCache.delete(oldest);
-  }
-  memoryCache.set(key, { data, expires: Date.now() + ttlSeconds * 1000, contentType });
+function isSegment(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.ts') || 
+         urlLower.includes('.aac') || 
+         urlLower.includes('.mp4') ||
+         urlLower.includes('.m4s') ||
+         urlLower.includes('.fmp4');
+}
+
+function isKeyFile(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.includes('.key') || urlLower.includes('key=');
 }
 
 // =============================================================================
 // URL UTILITIES
 // =============================================================================
-
 function getBaseUrl(url: string): string {
   try {
     const urlObj = new URL(url);
@@ -236,159 +97,46 @@ function getBaseUrl(url: string): string {
   }
 }
 
-function getOrigin(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    return `${urlObj.protocol}//${urlObj.host}`;
-  } catch {
-    return '';
+function resolveUrl(uri: string, baseUrl: string): string {
+  if (uri.startsWith('http://') || uri.startsWith('https://')) {
+    return uri;
   }
-}
-
-function resolveUrl(url: string, baseUrl: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  if (url.startsWith('/')) {
+  if (uri.startsWith('/')) {
     try {
       const base = new URL(baseUrl);
-      return `${base.protocol}//${base.host}${url}`;
+      return `${base.protocol}//${base.host}${uri}`;
     } catch {
-      return url;
+      return uri;
     }
   }
-  return `${baseUrl}/${url}`;
-}
-
-// =============================================================================
-// CONTENT TYPE DETECTION
-// =============================================================================
-
-function isHlsContent(url: string, contentType: string | null): boolean {
-  const urlLower = url.toLowerCase();
-  if (urlLower.includes('.m3u8') || urlLower.includes('.m3u')) return true;
-  if (contentType) {
-    const ctLower = contentType.toLowerCase();
-    return ctLower.includes('mpegurl') || ctLower.includes('x-mpegurl') || ctLower.includes('vnd.apple');
-  }
-  return false;
-}
-
-function isSegment(url: string): boolean {
-  const urlLower = url.toLowerCase();
-  if (urlLower.includes('.ts') || urlLower.includes('.aac') || 
-      urlLower.includes('.mp4') || urlLower.includes('.fmp4') ||
-      urlLower.includes('.m4s') || urlLower.includes('.m4a') ||
-      urlLower.includes('.m4v')) {
-    return true;
-  }
-  if (urlLower.includes('/movie/') || urlLower.includes('/series/')) {
-    return true;
-  }
-  return false;
-}
-
-function isVodContent(url: string): boolean {
-  const urlLower = url.toLowerCase();
-  return urlLower.includes('/movie/') || 
-         urlLower.includes('/series/') || 
-         urlLower.includes('/vod/') ||
-         urlLower.includes('.mp4') ||
-         urlLower.includes('.mkv');
-}
-
-function isDirectStream(url: string): boolean {
-  // Xtream live stream patterns:
-  // /live/user/pass/channelId
-  // /user/pass/channelId (direct without /live/)
-  // Just ends with numeric ID and no file extension
-  const urlLower = url.toLowerCase();
-  
-  // Skip if it has a file extension
-  if (urlLower.includes('.m3u8') || urlLower.includes('.m3u') || 
-      urlLower.includes('.ts') || urlLower.includes('.mp4')) {
-    return false;
-  }
-  
-  // Pattern: ends with numeric ID
-  const endsWithNumericId = /\/\d+$/.test(url);
-  
-  // Pattern: typical Xtream structure user/pass/id or port:number followed by path/id
-  const xtreamPattern = /:\d+\/[^\/]+\/[^\/]+\/\d+$/.test(url);
-  
-  return endsWithNumericId || xtreamPattern;
-}
-
-function isKeyFile(url: string): boolean {
-  const urlLower = url.toLowerCase();
-  return urlLower.includes('.key') || urlLower.includes('key=') || urlLower.includes('/key/');
+  return `${baseUrl}/${uri}`;
 }
 
 // =============================================================================
 // HLS MANIFEST REWRITING
 // =============================================================================
-
-// Detect if URL is from an Xtream server (uses session tokens for segments)
-function isXtreamUrl(url: string): boolean {
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname.toLowerCase();
-    
-    // Xtream patterns: /live/user/pass/id.m3u8 or /hls/token/id.ts
-    const isXtreamLive = /\/live\/[^\/]+\/[^\/]+\/\d+\.m3u8/.test(pathname);
-    const isXtreamHls = /\/hls\/[a-f0-9]+\/\d+/.test(pathname);
-    const hasXtreamPort = [8080, 8880, 25461, 25463, 1935].includes(parseInt(urlObj.port) || 80);
-    
-    return isXtreamLive || isXtreamHls || hasXtreamPort;
-  } catch {
-    return false;
-  }
-}
-
-// Extract base origin from Xtream URL for Referer header
-function getXtreamOrigin(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.origin;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Rewrite HLS manifest - ALWAYS proxy all URLs
- * 
- * We proxy ALL segment URLs to avoid:
- * 1. Mixed Content errors (HTTPS page loading HTTP resources)
- * 2. CORS errors when fetching cross-origin segments
- * 
- * The proxy handles session/auth by maintaining request flow
- */
-function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string, originalUrl: string): string {
+function rewriteManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
   const lines = content.split('\n');
-  const isXtream = isXtreamUrl(originalUrl);
-  
-  console.log(`[Manifest] Rewriting ALL URLs for: ${originalUrl.substring(0, 80)}...`);
   
   return lines.map(line => {
-    const trimmedLine = line.trim();
+    const trimmed = line.trim();
     
-    // Skip empty lines and comments without URI
-    if (!trimmedLine || (trimmedLine.startsWith('#') && !trimmedLine.includes('URI="'))) {
+    // Skip empty lines and pure comments
+    if (!trimmed || (trimmed.startsWith('#') && !trimmed.includes('URI="'))) {
       return line;
     }
     
     // Handle encryption key URIs
-    if (trimmedLine.includes('URI="')) {
+    if (trimmed.includes('URI="')) {
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
         const fullUrl = resolveUrl(uri, baseUrl);
         return `URI="${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}"`;
       });
     }
     
-    // Handle ALL segment URLs - proxy everything to avoid CORS/Mixed Content
-    if (!trimmedLine.startsWith('#')) {
-      const fullUrl = resolveUrl(trimmedLine, baseUrl);
+    // Handle segment/playlist URLs (non-comment lines)
+    if (!trimmed.startsWith('#')) {
+      const fullUrl = resolveUrl(trimmed, baseUrl);
       return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
     }
     
@@ -397,92 +145,41 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 }
 
 // =============================================================================
-// HTTP FETCHING
+// FETCH WITH RETRY
 // =============================================================================
-
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers {
-  // Create headers with minimal but essential settings for Xtream compatibility
-  const headers = new Headers();
-  
-  // CRITICAL: User-Agent is required by most Xtream servers
-  // VLC is universally accepted by all IPTV providers
-  headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
-  
-  // Accept all content types
-  headers.set('Accept', '*/*');
-  
-  // Add Range header if needed for seeking
-  if (rangeHeader) {
-    headers.set('Range', rangeHeader);
-  }
-  
-  // Add origin as Referer for some servers that check it
-  if (origin) {
-    headers.set('Referer', origin + '/');
-  }
-  
-  return headers;
-}
-
-function getJitter(): number {
-  return Math.random() * CONFIG.RETRY_JITTER_MS;
-}
-
 async function fetchWithRetry(
-  url: string, 
-  headers: Headers | undefined, 
-  timeoutMs: number = CONFIG.FETCH_TIMEOUT_MS,
-  maxRetries: number = CONFIG.MAX_RETRIES
-): Promise<{ response: Response; usedUrl: string }> {
+  url: string,
+  headers: Headers,
+  timeoutMs: number,
+  maxRetries: number
+): Promise<Response> {
   let lastError: Error | null = null;
-  let urlToFetch = url;
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
-      // Build fetch options - omit headers if undefined to use Deno defaults
-      const fetchOptions: RequestInit = {
+      const response = await fetch(url, {
         method: 'GET',
+        headers,
         signal: controller.signal,
         redirect: 'follow',
-      };
-      
-      // Add headers (always provided now with VLC User-Agent)
-      fetchOptions.headers = headers;
-      
-      const response = await fetch(urlToFetch, fetchOptions);
+      });
       
       clearTimeout(timeoutId);
       
-      if (response.ok || response.status === 206) {
-        return { response, usedUrl: urlToFetch };
-      }
-      
-      if (response.status === 403 || response.status === 401) {
-        return { response, usedUrl: urlToFetch };
-      }
-      
-      lastError = new Error(`HTTP ${response.status}`);
+      // Return response even if not OK (let caller handle status)
+      return response;
       
     } catch (err) {
       lastError = err as Error;
-      const msg = lastError.message || '';
+      console.log(`[Proxy] Attempt ${attempt + 1} failed: ${lastError.message}`);
       
-      if (attempt === 0 && urlToFetch.startsWith('https://')) {
-        const tlsIndicators = ['tls', 'ssl', 'certificate', 'handshake', 'corrupt', 'CERT'];
-        if (tlsIndicators.some(ind => msg.toLowerCase().includes(ind.toLowerCase()))) {
-          console.log(`[Proxy] TLS error, falling back to HTTP`);
-          urlToFetch = urlToFetch.replace('https://', 'http://');
-          continue;
-        }
+      if (attempt < maxRetries - 1) {
+        const delay = CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt);
+        await new Promise(r => setTimeout(r, delay));
       }
-    }
-    
-    if (attempt < maxRetries - 1) {
-      const delay = CONFIG.RETRY_DELAY_BASE_MS * Math.pow(2, attempt) + getJitter();
-      await new Promise(r => setTimeout(r, delay));
     }
   }
   
@@ -492,220 +189,148 @@ async function fetchWithRetry(
 // =============================================================================
 // MAIN HANDLER
 // =============================================================================
-
-async function handler(req: Request): Promise<Response> {
-  const startTime = Date.now();
-  
+serve(async (req: Request): Promise<Response> => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
-  // Get client IP for rate limiting
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-                   req.headers.get('cf-connecting-ip') || 
-                   'unknown';
-
-  // Check rate limit
-  const rateLimit = checkRateLimit(clientIp);
-  if (!rateLimit.allowed) {
-    console.log(`[Proxy] RATE LIMITED: ${clientIp}`);
-    return new Response(
-      JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-      { 
-        status: 429, 
-        headers: { 
-          ...CORS_HEADERS, 
-          'Content-Type': 'application/json',
-          'Retry-After': '60',
-          'X-RateLimit-Remaining': '0'
-        } 
-      }
-    );
-  }
-
   try {
-    const url = new URL(req.url);
-    const streamUrl = url.searchParams.get('url');
-    const playbackToken = url.searchParams.get('token') || req.headers.get('x-playback-token');
+    const { searchParams } = new URL(req.url);
+    const targetUrl = searchParams.get('url');
 
-    if (!streamUrl) {
+    if (!targetUrl) {
       return new Response(
-        JSON.stringify({ error: 'Missing url parameter' }), 
+        JSON.stringify({ error: 'Missing url parameter' }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
-    const decodedUrl = decodeURIComponent(streamUrl);
+    const decodedUrl = decodeURIComponent(targetUrl);
 
-    // Security: Domain whitelist check
-    if (!isDomainAllowed(decodedUrl)) {
-      console.log(`[Proxy] DOMAIN BLOCKED: ${decodedUrl.substring(0, 100)}`);
+    // Security check
+    if (isUrlBlocked(decodedUrl)) {
+      console.log(`[Proxy] BLOCKED: ${decodedUrl.substring(0, 50)}...`);
       return new Response(
-        JSON.stringify({ error: 'Domain not allowed' }),
+        JSON.stringify({ error: 'URL not allowed' }),
         { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Optional: Verify playback token for premium content
-    if (playbackToken) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      
-      const isValid = await verifyPlaybackToken(playbackToken, supabase);
-      if (!isValid) {
-        console.log(`[Proxy] Invalid playback token`);
-        return new Response(
-          JSON.stringify({ error: 'Invalid or expired playback token' }),
-          { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    const origin = getOrigin(decodedUrl);
-    const isVideoSegment = isSegment(decodedUrl);
-    const isLiveStream = isDirectStream(decodedUrl);
-    const isVod = isVodContent(decodedUrl);
+    const isM3u8 = isManifest(decodedUrl);
+    const isTs = isSegment(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
-    
-    const reqType = isKey ? 'KEY' : isVideoSegment ? 'SEG' : isLiveStream ? 'LIVE' : 'M3U';
-    const cacheKey = `proxy:${decodedUrl}`;
-    
-    // Check memory cache for manifests and keys
-    if (reqType === 'M3U' || reqType === 'KEY') {
-      const cached = getCached(cacheKey);
-      if (cached) {
-        const responseHeaders = new Headers(CORS_HEADERS);
-        responseHeaders.set('Content-Type', cached.contentType);
-        responseHeaders.set('X-Cache-Status', 'HIT');
-        responseHeaders.set('X-RateLimit-Remaining', String(rateLimit.remaining));
-        responseHeaders.set('Cache-Control', `public, max-age=${reqType === 'KEY' ? CONFIG.KEY_CACHE_SECONDS : CONFIG.MANIFEST_CACHE_SECONDS}`);
-        return new Response(cached.data, { status: 200, headers: responseHeaders });
-      }
+
+    // Validate stream type
+    if (!isM3u8 && !isTs && !isKey) {
+      // Allow other media types but log
+      console.log(`[Proxy] Non-standard media type: ${decodedUrl.substring(0, 50)}...`);
     }
-    
-    console.log(`[Proxy] ${req.method} ${reqType}: ${decodedUrl.substring(0, 60)}...`);
 
-    const rangeHeader = req.headers.get('Range');
-    const acceptEncoding = req.headers.get('Accept-Encoding');
-    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding, isLiveStream, isVideoSegment);
+    const reqType = isM3u8 ? 'M3U8' : isTs ? 'TS' : isKey ? 'KEY' : 'OTHER';
+    console.log(`[Proxy] ${reqType}: ${decodedUrl.substring(0, 60)}...`);
 
-    let timeout: number;
-    let maxRetries: number;
+    // Build upstream headers - preserve session context
+    const upstreamHeaders = new Headers();
     
-    if (reqType === 'M3U') {
-      timeout = CONFIG.MANIFEST_FETCH_TIMEOUT_MS;
-      maxRetries = CONFIG.MANIFEST_MAX_RETRIES;
-    } else if (isLiveStream) {
-      timeout = CONFIG.LIVE_FETCH_TIMEOUT_MS;
-      maxRetries = CONFIG.MAX_RETRIES;
-    } else {
-      timeout = CONFIG.FETCH_TIMEOUT_MS;
-      maxRetries = CONFIG.MAX_RETRIES;
+    // CRITICAL: VLC User-Agent is universally accepted by IPTV providers
+    upstreamHeaders.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
+    upstreamHeaders.set('Accept', '*/*');
+    upstreamHeaders.set('Connection', 'keep-alive');
+    
+    // Forward important headers from client
+    const headersToForward = ['range', 'authorization', 'cookie', 'x-stream-token'];
+    headersToForward.forEach(header => {
+      const value = req.headers.get(header);
+      if (value) upstreamHeaders.set(header, value);
+    });
+    
+    // Set referer from original URL origin
+    try {
+      const urlObj = new URL(decodedUrl);
+      upstreamHeaders.set('Referer', urlObj.origin + '/');
+      upstreamHeaders.set('Origin', urlObj.origin);
+    } catch {
+      // Ignore
     }
-    
-    const { response: streamResponse, usedUrl } = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout, maxRetries);
 
-    if (!streamResponse.ok && streamResponse.status !== 206) {
-      const status = streamResponse.status;
-      
-      if (status === 403 || status === 401) {
-        return new Response(
-          JSON.stringify({ error: 'Access denied by upstream server' }), 
-          { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
+    // Custom referer override
+    const customReferer = req.headers.get('x-original-referer');
+    if (customReferer) {
+      upstreamHeaders.set('Referer', customReferer);
+    }
+
+    const timeout = isM3u8 ? CONFIG.MANIFEST_TIMEOUT_MS : CONFIG.FETCH_TIMEOUT_MS;
+    const retries = isM3u8 ? 1 : CONFIG.MAX_RETRIES;
+
+    const upstreamResponse = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout, retries);
+
+    // Handle non-OK responses
+    if (!upstreamResponse.ok && upstreamResponse.status !== 206) {
+      console.log(`[Proxy] Upstream error: ${upstreamResponse.status}`);
       
       return new Response(
-        JSON.stringify({ error: `Upstream error: ${status}` }), 
-        { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'UPSTREAM_ERROR', 
+          status: upstreamResponse.status,
+          message: upstreamResponse.status === 403 ? 'Session expired or access denied' : 'Upstream error'
+        }),
+        { 
+          status: upstreamResponse.status, 
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    let contentType = streamResponse.headers.get('Content-Type');
-    const isHls = isHlsContent(decodedUrl, contentType);
+    // Build response headers
+    const responseHeaders = new Headers(CORS_HEADERS);
     
+    // Determine content type
+    let contentType = upstreamResponse.headers.get('Content-Type');
     if (!contentType || contentType === 'application/octet-stream') {
-      const urlLower = decodedUrl.toLowerCase();
-      if (isHls) {
+      if (isM3u8) {
         contentType = 'application/vnd.apple.mpegurl';
+      } else if (isTs) {
+        contentType = 'video/mp2t';
       } else if (isKey) {
         contentType = 'application/octet-stream';
-      } else if (urlLower.includes('.mp4') || urlLower.includes('/movie/')) {
-        contentType = 'video/mp4';
-      } else if (urlLower.includes('.mkv')) {
-        contentType = 'video/x-matroska';
-      } else if (urlLower.includes('.ts') || isVideoSegment || isLiveStream) {
-        contentType = 'video/mp2t';
       } else {
         contentType = 'application/octet-stream';
       }
     }
-
-    const responseHeaders = new Headers(CORS_HEADERS);
     responseHeaders.set('Content-Type', contentType);
-    responseHeaders.set('X-Cache-Status', 'MISS');
-    responseHeaders.set('X-RateLimit-Remaining', String(rateLimit.remaining));
-    responseHeaders.set('Vary', 'Accept-Encoding');
     
-    if (isHls) {
-      responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.MANIFEST_CACHE_SECONDS}, stale-while-revalidate=2`);
-    } else if (isKey) {
-      responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.KEY_CACHE_SECONDS}, immutable`);
-    } else if (isVod) {
-      responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.VOD_SEGMENT_CACHE_SECONDS}, immutable`);
-    } else {
-      responseHeaders.set('Cache-Control', `public, max-age=${CONFIG.SEGMENT_CACHE_SECONDS}`);
-    }
+    // No cache for segments (avoid stale token issues)
+    responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    responseHeaders.set('Pragma', 'no-cache');
 
-    if (isHls) {
-      const manifestContent = await streamResponse.text();
-      const baseUrl = getBaseUrl(usedUrl);
+    // Process manifest - rewrite URLs to go through proxy
+    if (isM3u8) {
+      const manifestContent = await upstreamResponse.text();
+      
+      // Validate manifest
+      if (!manifestContent || !manifestContent.includes('#EXTM3U')) {
+        console.error(`[Proxy] Invalid manifest received`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid HLS manifest' }),
+          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      const baseUrl = getBaseUrl(decodedUrl);
       const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
       
-      // Debug: Log manifest content
-      console.log(`[Proxy] Manifest content length: ${manifestContent.length}`);
-      console.log(`[Proxy] Manifest preview: ${manifestContent.substring(0, 200)}`);
+      const rewrittenManifest = rewriteManifest(manifestContent, baseUrl, proxyBaseUrl);
       
-      // Check if manifest is empty or not valid HLS
-      if (!manifestContent || manifestContent.length === 0) {
-        console.error(`[Proxy] Empty manifest received from upstream`);
-        return new Response(
-          JSON.stringify({ error: 'Empty manifest from upstream' }),
-          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // Validate HLS format
-      if (!manifestContent.includes('#EXTM3U')) {
-        console.error(`[Proxy] Invalid HLS manifest - missing #EXTM3U`);
-        console.log(`[Proxy] Full content: ${manifestContent}`);
-        return new Response(
-          JSON.stringify({ error: 'Invalid HLS manifest format' }),
-          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl, decodedUrl);
-      
-      setCache(cacheKey, rewrittenManifest, 'application/vnd.apple.mpegurl', CONFIG.MANIFEST_CACHE_SECONDS);
-      
-      const duration = Date.now() - startTime;
-      console.log(`[Proxy] M3U served in ${duration}ms, size: ${rewrittenManifest.length}`);
+      console.log(`[Proxy] Manifest served, size: ${rewrittenManifest.length}`);
       
       return new Response(rewrittenManifest, { status: 200, headers: responseHeaders });
     }
 
-    if (isKey) {
-      const keyData = await streamResponse.arrayBuffer();
-      setCache(cacheKey, keyData, contentType, CONFIG.KEY_CACHE_SECONDS);
-      return new Response(keyData, { status: 200, headers: responseHeaders });
-    }
-
-    const passHeaders = ['Content-Length', 'Accept-Ranges', 'Content-Range'];
+    // Pass through binary content (segments, keys)
+    const passHeaders = ['Content-Length', 'Content-Range', 'Accept-Ranges'];
     passHeaders.forEach(header => {
-      const value = streamResponse.headers.get(header);
+      const value = upstreamResponse.headers.get(header);
       if (value) responseHeaders.set(header, value);
     });
 
@@ -713,18 +338,20 @@ async function handler(req: Request): Promise<Response> {
       responseHeaders.set('Accept-Ranges', 'bytes');
     }
 
+    // HEAD request
     if (req.method === 'HEAD') {
       return new Response(null, { status: 200, headers: responseHeaders });
     }
 
-    if (!streamResponse.body) {
-      return new Response(null, { status: streamResponse.status, headers: responseHeaders });
+    // Stream body
+    if (!upstreamResponse.body) {
+      return new Response(null, { status: upstreamResponse.status, headers: responseHeaders });
     }
 
-    const duration = Date.now() - startTime;
-    console.log(`[Proxy] ${reqType} started in ${duration}ms`);
-
-    return new Response(streamResponse.body, { status: streamResponse.status, headers: responseHeaders });
+    return new Response(upstreamResponse.body, { 
+      status: upstreamResponse.status, 
+      headers: responseHeaders 
+    });
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -733,16 +360,14 @@ async function handler(req: Request): Promise<Response> {
     const isTimeout = message.includes('abort') || message.includes('timeout');
     
     return new Response(
-      JSON.stringify({ error: isTimeout ? 'Upstream timeout' : 'Proxy error', details: message }),
-      { status: isTimeout ? 504 : 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: isTimeout ? 'TIMEOUT' : 'PROXY_ERROR', 
+        message 
+      }),
+      { 
+        status: isTimeout ? 504 : 502, 
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } 
+      }
     );
   }
-}
-
-// Export for dynamic import by main router
-export default handler;
-
-// Also support direct Deno.serve for standalone mode
-if (import.meta.main) {
-  Deno.serve(handler);
-}
+});
