@@ -1385,6 +1385,42 @@ export type Database = {
         }
         Relationships: []
       }
+      email_change_requests: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          new_email: string
+          old_email: string
+          token: string
+          user_id: string
+          verification_code: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          new_email: string
+          old_email: string
+          token: string
+          user_id: string
+          verification_code?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          new_email?: string
+          old_email?: string
+          token?: string
+          user_id?: string
+          verification_code?: string | null
+        }
+        Relationships: []
+      }
       epg_programs: {
         Row: {
           category: string | null
@@ -2540,6 +2576,8 @@ export type Database = {
           data_vencimento: string | null
           email: string
           id: string
+          login_alerts_email: boolean | null
+          login_alerts_whatsapp: boolean | null
           nome: string | null
           origem_cadastro: string | null
           phone_verified: boolean | null
@@ -2558,6 +2596,8 @@ export type Database = {
           data_vencimento?: string | null
           email: string
           id: string
+          login_alerts_email?: boolean | null
+          login_alerts_whatsapp?: boolean | null
           nome?: string | null
           origem_cadastro?: string | null
           phone_verified?: boolean | null
@@ -2576,6 +2616,8 @@ export type Database = {
           data_vencimento?: string | null
           email?: string
           id?: string
+          login_alerts_email?: boolean | null
+          login_alerts_whatsapp?: boolean | null
           nome?: string | null
           origem_cadastro?: string | null
           phone_verified?: boolean | null
