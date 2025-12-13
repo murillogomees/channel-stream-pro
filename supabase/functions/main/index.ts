@@ -1330,7 +1330,17 @@ async function handleIptvPlay(req: Request): Promise<Response> {
 
     const token = customToken;
 
-    const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    // Use self-hosted service role key or fallback to cloud
+    const serviceRoleKey = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!serviceRoleKey) {
+      console.error('[iptv-play] No service role key found');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error - missing service role key' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const supabaseAdmin = createClient(SUPABASE_URL, serviceRoleKey);
 
     // Decode JWT to get user_id
     let userId: string | null = null;
