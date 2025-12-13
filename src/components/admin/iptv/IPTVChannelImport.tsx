@@ -110,38 +110,35 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     toast.success(`${channels.length} canais encontrados`);
   };
 
-  // Import channels to database
+  // Import channels to database via Edge Function (bypasses RLS)
   const importMutation = useMutation({
     mutationFn: async (channels: ParsedChannel[]) => {
-      const batchSize = 100;
-      let imported = 0;
-
-      for (let i = 0; i < channels.length; i += batchSize) {
-        const batch = channels.slice(i, i + batchSize);
-        
-        const payload = batch.map((ch, idx) => ({
-          name: ch.name,
-          slug: `${ch.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${i + idx}`,
-          original_url: ch.url,
-          logo_url: ch.logo || null,
-          category: ch.group || null,
-          content_type: 'live',
-        }));
-
-        const { error } = await supabase
-          .from('iptv_channels')
-          .insert(payload);
-
-        if (error) {
-          console.error('Batch insert error:', error);
-          // Continue with next batch even if some fail
-        }
-
-        imported += batch.length;
-        setImportProgress(Math.round((imported / channels.length) * 100));
+      // Convert parsed channels to M3U format for the edge function
+      let m3uContent = '#EXTM3U\n';
+      for (const ch of channels) {
+        const logo = ch.logo ? ` tvg-logo="${ch.logo}"` : '';
+        const group = ch.group ? ` group-title="${ch.group}"` : '';
+        const tvgId = ch.tvgId ? ` tvg-id="${ch.tvgId}"` : '';
+        m3uContent += `#EXTINF:-1${tvgId}${logo}${group},${ch.name}\n${ch.url}\n`;
       }
 
-      return imported;
+      const { data, error } = await supabase.functions.invoke('process-m3u-import', {
+        body: {
+          content: m3uContent,
+          sessionId: `import-${Date.now()}`,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao importar canais');
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: { inserted?: number } } | null;
+      if (!result?.success) {
+        throw new Error(result?.error || 'Erro desconhecido');
+      }
+
+      return result.data?.inserted || channels.length;
     },
     onSuccess: (count) => {
       toast.success(`${count} canais importados com sucesso!`);
