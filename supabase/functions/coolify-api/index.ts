@@ -937,10 +937,176 @@ serve(async (req) => {
       },
 
       'normalize-secrets': async () => {
-        // This will be used after audit approval to actually fix secrets
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const results: { action: string; key: string; status: string; error?: string }[] = [];
+
+        try {
+          // Step 1: Get current envs
+          const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!envsRes.ok) {
+            return { success: false, error: `Failed to get envs: ${envsRes.status}` };
+          }
+          
+          const envs = await envsRes.json();
+          const envMap: Record<string, { id: string; value: string }> = {};
+          for (const env of envs) {
+            envMap[env.key] = { id: env.id, value: env.value };
+          }
+
+          // Step 2: Build canonical values from resolved SERVICE_* secrets
+          const canonicalValues: Record<string, string> = {};
+          
+          // JWT_SECRET from SERVICE_PASSWORD_JWT
+          if (envMap['SERVICE_PASSWORD_JWT']?.value) {
+            canonicalValues['JWT_SECRET'] = envMap['SERVICE_PASSWORD_JWT'].value;
+          }
+          
+          // SUPABASE_URL from API_EXTERNAL_URL or SERVICE_URL_SUPABASEKONG
+          if (envMap['API_EXTERNAL_URL']?.value && !envMap['API_EXTERNAL_URL'].value.includes('${')) {
+            canonicalValues['SUPABASE_URL'] = envMap['API_EXTERNAL_URL'].value;
+            canonicalValues['GOTRUE_SITE_URL'] = envMap['API_EXTERNAL_URL'].value;
+            canonicalValues['SUPABASE_PUBLIC_URL'] = envMap['API_EXTERNAL_URL'].value;
+            canonicalValues['SUPABASE_PUBLIC_API'] = envMap['API_EXTERNAL_URL'].value;
+          }
+          
+          // SUPABASE_ANON_KEY from SERVICE_SUPABASEANON_KEY
+          if (envMap['SERVICE_SUPABASEANON_KEY']?.value && !envMap['SERVICE_SUPABASEANON_KEY'].value.includes('${')) {
+            canonicalValues['SUPABASE_ANON_KEY'] = envMap['SERVICE_SUPABASEANON_KEY'].value;
+          }
+          
+          // SUPABASE_SERVICE_ROLE_KEY from SERVICE_SUPABASESERVICE_KEY
+          if (envMap['SERVICE_SUPABASESERVICE_KEY']?.value && !envMap['SERVICE_SUPABASESERVICE_KEY'].value.includes('${')) {
+            canonicalValues['SUPABASE_SERVICE_ROLE_KEY'] = envMap['SERVICE_SUPABASESERVICE_KEY'].value;
+            canonicalValues['SUPABASE_SERVICE_KEY'] = envMap['SERVICE_SUPABASESERVICE_KEY'].value;
+          }
+
+          // Step 3: Build list of secrets to update
+          const secretsToFix = [
+            'JWT_SECRET', 'API_JWT_SECRET', 'AUTH_JWT_SECRET', 'GOTRUE_JWT_SECRET',
+            'METRICS_JWT_SECRET', 'PGRST_JWT_SECRET', 'PGRST_APP_SETTINGS_JWT_SECRET',
+            'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
+            'SUPABASE_SERVICE_KEY', 'GOTRUE_SITE_URL', 'SUPABASE_PUBLIC_URL', 'SUPABASE_PUBLIC_API'
+          ];
+
+          // Step 4: Update secrets that have unresolved variables
+          const updates: { key: string; value: string; is_preview: boolean }[] = [];
+          
+          for (const key of secretsToFix) {
+            const current = envMap[key];
+            if (!current) continue;
+            
+            // Check if it contains unresolved variable reference
+            if (current.value.includes('${')) {
+              let newValue = '';
+              
+              // Determine correct canonical value
+              if (key.includes('JWT')) {
+                newValue = canonicalValues['JWT_SECRET'] || '';
+              } else if (key.includes('URL') || key.includes('API')) {
+                newValue = canonicalValues['SUPABASE_URL'] || '';
+              } else if (key.includes('ANON')) {
+                newValue = canonicalValues['SUPABASE_ANON_KEY'] || '';
+              } else if (key.includes('SERVICE') && key.includes('KEY')) {
+                newValue = canonicalValues['SUPABASE_SERVICE_ROLE_KEY'] || '';
+              }
+              
+              if (newValue) {
+                updates.push({ key, value: newValue, is_preview: false });
+              }
+            }
+          }
+
+          // Step 5: Apply updates via bulk API
+          if (updates.length > 0) {
+            const bulkUpdateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/bulk`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({ data: updates.map(u => ({ ...u, is_literal: true, is_multiline: false, is_shown_once: false })) }),
+            });
+            
+            if (bulkUpdateRes.ok) {
+              for (const u of updates) {
+                results.push({ action: 'updated', key: u.key, status: 'success' });
+              }
+            } else {
+              const errText = await bulkUpdateRes.text();
+              // Try individual updates
+              for (const u of updates) {
+                try {
+                  const singleRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ key: u.key, value: u.value, is_preview: false }),
+                  });
+                  
+                  if (singleRes.ok || singleRes.status === 409) {
+                    // 409 = already exists, try PATCH
+                    if (singleRes.status === 409 && envMap[u.key]?.id) {
+                      const patchRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${envMap[u.key].id}`, {
+                        method: 'PATCH',
+                        headers: {
+                          'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                          'Content-Type': 'application/json',
+                          'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ value: u.value }),
+                      });
+                      results.push({ action: 'patched', key: u.key, status: patchRes.ok ? 'success' : 'failed' });
+                    } else {
+                      results.push({ action: 'created', key: u.key, status: 'success' });
+                    }
+                  } else {
+                    results.push({ action: 'update', key: u.key, status: 'failed', error: `${singleRes.status}` });
+                  }
+                } catch (e) {
+                  results.push({ action: 'update', key: u.key, status: 'error', error: e.message });
+                }
+              }
+            }
+          }
+
+          // Step 6: Restart service to apply changes
+          const restartRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/restart`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+
+          return {
+            success: true,
+            data: {
+              canonical_values_found: Object.keys(canonicalValues),
+              updates_attempted: updates.length,
+              results,
+              restart_triggered: restartRes.ok,
+              message: `${results.filter(r => r.status === 'success').length}/${updates.length} secrets normalizadas. Serviço reiniciando.`
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message, results };
+        }
+      },
+
+      'delete-duplicate-secrets': async () => {
+        // For Phase 2 - consolidation of duplicates
         return {
           success: false,
-          error: 'Execute audit-all-secrets primeiro e confirme o plano de ação',
+          error: 'Execute normalize-secrets primeiro. Deduplicação requer análise manual.',
         };
       },
     };
