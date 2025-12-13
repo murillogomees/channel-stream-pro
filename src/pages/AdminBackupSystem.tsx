@@ -126,7 +126,7 @@ export default function AdminBackupSystem() {
       const rows = profiles?.map((profile: any) => [
         profile.id,
         profile.nome,
-        profile.telefone,
+        profile.contact_phone || '',
         profile.email || '',
         profile.situacao,
         profile.plano,

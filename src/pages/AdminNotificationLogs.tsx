@@ -368,7 +368,7 @@ export default function AdminNotificationLogs() {
                           <TableCell>
                             <div>
                               <p className="font-medium">{cliente.nome}</p>
-                              <p className="text-xs text-muted-foreground">{cliente.telefone || cliente.telefone_whatsapp}</p>
+                              <p className="text-xs text-muted-foreground">{cliente.contact_phone || ''}</p>
                             </div>
                           </TableCell>
                           <TableCell>

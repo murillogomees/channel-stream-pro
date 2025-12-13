@@ -259,11 +259,11 @@ export default function AdminClientes() {
         .replace(/{valor}/g, selectedCliente.valor_pago?.toFixed(2) || '0.00')
         .replace(/{dataVencimento}/g, selectedCliente.data_vencimento ? new Date(selectedCliente.data_vencimento).toLocaleDateString('pt-BR') : '');
       
-      await whatsappService.sendTextMessage(selectedCliente.telefone, message);
+      await whatsappService.sendTextMessage(selectedCliente.contact_phone || '', message);
       await addLog({
         clienteId: selectedCliente.id,
         clienteNome: selectedCliente.nome,
-        telefone: selectedCliente.telefone,
+        telefone: selectedCliente.contact_phone || '',
         tipo: template.id,
         template: template.name,
         status: 'success',
@@ -305,7 +305,7 @@ export default function AdminClientes() {
       }
 
       const response = await whatsappService.sendFile(
-        selectedCliente.telefone,
+        selectedCliente.contact_phone || '',
         file,
         fileMessage || undefined
       );
@@ -314,7 +314,7 @@ export default function AdminClientes() {
       addLog({
         clienteId: selectedCliente.id,
         clienteNome: selectedCliente.nome,
-        telefone: selectedCliente.telefone,
+        telefone: selectedCliente.contact_phone || '',
         tipo: 'arquivo',
         template: 'Envio de Arquivo',
         status: response.message_status === 'success' ? 'success' : 'error',
@@ -339,7 +339,7 @@ export default function AdminClientes() {
       addLog({
         clienteId: selectedCliente.id,
         clienteNome: selectedCliente.nome,
-        telefone: selectedCliente.telefone,
+        telefone: selectedCliente.contact_phone || '',
         tipo: 'arquivo',
         template: 'Envio de Arquivo',
         status: 'error',
@@ -564,13 +564,13 @@ export default function AdminClientes() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={!isConfigured || !cliente.telefone}
+                        disabled={!isConfigured || !cliente.contact_phone}
                         onClick={() => {
                           setSelectedCliente(cliente);
                           setSelectedTemplate('');
                           setShowWhatsAppDialog(true);
                         }}
-                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar WhatsApp'}
+                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.contact_phone ? 'Cliente sem telefone' : 'Enviar WhatsApp'}
                       >
                         <MessageSquare className="h-4 w-4" />
                       </Button>
@@ -578,14 +578,14 @@ export default function AdminClientes() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={!isConfigured || !cliente.telefone}
+                        disabled={!isConfigured || !cliente.contact_phone}
                         onClick={() => {
                           setSelectedCliente(cliente);
                           clearFile();
                           setFileMessage('');
                           setShowFileDialog(true);
                         }}
-                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.telefone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
+                        title={!isConfigured ? 'Configure WhatsApp primeiro' : !cliente.contact_phone ? 'Cliente sem telefone' : 'Enviar Arquivo'}
                       >
                       <Paperclip className="h-4 w-4" />
                       </Button>

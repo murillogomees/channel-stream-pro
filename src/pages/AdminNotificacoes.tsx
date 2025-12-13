@@ -266,7 +266,7 @@ export default function AdminNotificacoes() {
                         setSelectedCliente(profile ? {
                           id: profile.id,
                           nome: profile.nome,
-                          telefone: profile.telefone,
+                          telefone: profile.contact_phone || '',
                           email: profile.email,
                           situacao: profile.situacao as any || 'Testando',
                           dataContratacao: profile.data_contratacao || profile.created_at,
@@ -282,7 +282,7 @@ export default function AdminNotificacoes() {
                       <option value="">Selecione um cliente</option>
                       {profiles.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.nome} - {formatPhoneForDisplay(c.telefone)}
+                          {c.nome} - {formatPhoneForDisplay(c.contact_phone || '')}
                         </option>
                       ))}
                     </select>
@@ -339,7 +339,7 @@ export default function AdminNotificacoes() {
                         setSelectedCliente(profile ? {
                           id: profile.id,
                           nome: profile.nome,
-                          telefone: profile.telefone,
+                          telefone: profile.contact_phone || '',
                           email: profile.email,
                           situacao: profile.situacao as any || 'Testando',
                           dataContratacao: profile.data_contratacao || profile.created_at,
@@ -355,7 +355,7 @@ export default function AdminNotificacoes() {
                       <option value="">Selecione um cliente</option>
                       {profiles.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.nome} - {formatPhoneForDisplay(c.telefone)}
+                          {c.nome} - {formatPhoneForDisplay(c.contact_phone || '')}
                         </option>
                       ))}
                     </select>

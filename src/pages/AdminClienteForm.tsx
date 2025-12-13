@@ -149,8 +149,7 @@ export default function AdminClienteForm() {
               id: data.id,
               nome: data.nome,
               email: data.email || '',
-              telefone: data.telefone || '',
-              telefone_whatsapp: data.telefone_whatsapp,
+              contact_phone: data.contact_phone || '',
               origem_cadastro: data.origem_cadastro,
               created_at: data.created_at || '',
               updated_at: data.updated_at || '',
@@ -170,7 +169,7 @@ export default function AdminClienteForm() {
             
             // Preencher os campos do formulário
             setValue('nome', cliente.nome);
-            setValue('telefone', cliente.telefone);
+            setValue('telefone', cliente.contact_phone || '');
             setValue('email', cliente.email);
             setValue('situacao', cliente.situacao as any || 'Testando');
             setValue('dataContratacao', cliente.data_contratacao || cliente.created_at);
