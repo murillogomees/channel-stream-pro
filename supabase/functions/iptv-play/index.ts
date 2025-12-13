@@ -7,33 +7,16 @@
  * Features:
  * - Batch metrics collection (reduces DB writes by 80%)
  * - Circuit breaker for CDN domains
+ * - Uses fetch directly to avoid SDK import issues in self-hosted
  */
-
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-custom-token',
 };
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-// Prefer self-hosted service role key but fall back to default if needed
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('SELFHOSTED_DB_URL')?.replace(/:\d+\/postgres$/, '') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const R2_CDN_URL = 'https://pub-iptvlink.r2.dev';
-
-// Metrics buffer for batch inserts
-interface MetricEntry {
-  channel_id: number;
-  metric_type: string;
-  value: number;
-  timestamp: number;
-}
-
-const metricsBuffer: MetricEntry[] = [];
-const BUFFER_FLUSH_SIZE = 100;
-const BUFFER_FLUSH_INTERVAL = 30000; // 30 seconds
-let lastFlushTime = Date.now();
 
 // Circuit breaker state per CDN domain
 interface CircuitBreakerState {
@@ -58,7 +41,6 @@ function isCircuitOpen(domain: string): boolean {
   const state = circuitBreakers.get(domain);
   if (!state) return false;
   
-  // Reset circuit if timeout has passed
   if (state.isOpen && Date.now() - state.lastFailure > CIRCUIT_RESET_TIMEOUT) {
     state.isOpen = false;
     state.failures = 0;
@@ -68,28 +50,99 @@ function isCircuitOpen(domain: string): boolean {
   return state.isOpen;
 }
 
-function recordFailure(domain: string): void {
-  const state = circuitBreakers.get(domain) || { failures: 0, lastFailure: 0, isOpen: false };
-  state.failures++;
-  state.lastFailure = Date.now();
-  
-  if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
-    state.isOpen = true;
-    console.log(`[iptv-play] Circuit breaker OPEN for domain: ${domain}`);
+// Helper function to query Supabase via REST API
+async function supabaseQuery(
+  table: string,
+  params: { select?: string; eq?: Record<string, string>; single?: boolean }
+): Promise<{ data: unknown; error: unknown }> {
+  try {
+    let url = `${SUPABASE_URL}/rest/v1/${table}`;
+    const queryParams = new URLSearchParams();
+    
+    if (params.select) {
+      queryParams.set('select', params.select);
+    }
+    
+    if (params.eq) {
+      for (const [key, value] of Object.entries(params.eq)) {
+        queryParams.set(key, `eq.${value}`);
+      }
+    }
+    
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': params.single ? 'return=representation' : '',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[supabaseQuery] Error querying ${table}:`, response.status, errorText);
+      return { data: null, error: { message: errorText, status: response.status } };
+    }
+    
+    const data = await response.json();
+    
+    if (params.single) {
+      return { data: Array.isArray(data) ? data[0] : data, error: null };
+    }
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error(`[supabaseQuery] Exception querying ${table}:`, error);
+    return { data: null, error };
   }
-  
-  circuitBreakers.set(domain, state);
 }
 
-function recordSuccess(domain: string): void {
-  const state = circuitBreakers.get(domain);
-  if (state) {
-    state.failures = Math.max(0, state.failures - 1);
-    if (state.failures === 0) {
-      state.isOpen = false;
+// Helper function to insert into Supabase via REST API
+async function supabaseInsert(table: string, records: unknown[]): Promise<{ error: unknown }> {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${table}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(records),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[supabaseInsert] Error inserting into ${table}:`, response.status, errorText);
+      return { error: { message: errorText, status: response.status } };
     }
+    
+    return { error: null };
+  } catch (error) {
+    console.error(`[supabaseInsert] Exception inserting into ${table}:`, error);
+    return { error };
   }
 }
+
+// Metrics buffer for batch inserts
+interface MetricEntry {
+  channel_id: number;
+  metric_type: string;
+  value: number;
+  timestamp: number;
+}
+
+const metricsBuffer: MetricEntry[] = [];
+const BUFFER_FLUSH_SIZE = 100;
+const BUFFER_FLUSH_INTERVAL = 30000;
+let lastFlushTime = Date.now();
 
 async function flushMetrics(): Promise<void> {
   if (metricsBuffer.length === 0) return;
@@ -103,8 +156,6 @@ async function flushMetrics(): Promise<void> {
       console.error('[iptv-play] Metrics flush skipped - missing service role key');
       return;
     }
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     
     // Aggregate metrics by channel_id
     const aggregated = new Map<number, number>();
@@ -120,10 +171,9 @@ async function flushMetrics(): Promise<void> {
       value,
     }));
     
-    const { error } = await supabase.from('iptv_channel_metrics').insert(inserts);
+    const { error } = await supabaseInsert('iptv_channel_metrics', inserts);
     if (error) {
       console.error('[iptv-play] Metrics flush error:', error);
-      // Re-add to buffer on error
       metricsBuffer.push(...metricsToFlush);
     } else {
       console.log(`[iptv-play] Flushed ${inserts.length} aggregated metrics`);
@@ -141,20 +191,19 @@ function addMetric(channelId: number): void {
     timestamp: Date.now(),
   });
   
-  // Flush if buffer is full or timeout reached
   if (metricsBuffer.length >= BUFFER_FLUSH_SIZE || Date.now() - lastFlushTime > BUFFER_FLUSH_INTERVAL) {
-    // Use EdgeRuntime.waitUntil for background processing when available
-    if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
-      // @ts-ignore - EdgeRuntime is provided by the edge runtime in some environments
-      EdgeRuntime.waitUntil(flushMetrics());
-    } else {
-      // Fallback for runtimes without EdgeRuntime helper
-      flushMetrics();
-    }
+    flushMetrics().catch(console.error);
   }
 }
 
 Deno.serve(async (req) => {
+  console.log('[iptv-play] Function start', { 
+    url: req.url, 
+    hasToken: !!req.headers.get('X-Custom-Token'),
+    supabaseUrl: SUPABASE_URL ? 'configured' : 'missing',
+    serviceKey: SERVICE_ROLE_KEY ? 'configured' : 'missing'
+  });
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -179,9 +228,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const token = customToken;
-    
-    // Validate token by checking profiles table with service role
+    // Validate config
     if (!SERVICE_ROLE_KEY) {
       console.error('[iptv-play] No service role key configured');
       return new Response(
@@ -190,15 +237,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    if (!SUPABASE_URL) {
+      console.error('[iptv-play] No Supabase URL configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error - missing Supabase URL' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Decode JWT to get user_id (simple base64 decode of payload)
     let userId: string | null = null;
     try {
-      const parts = token.split('.');
+      const parts = customToken.split('.');
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1]));
         userId = payload.sub || payload.user_id || payload.id;
+        console.log('[iptv-play] Token decoded, userId:', userId);
       }
     } catch (e) {
       console.error('[iptv-play] Token decode error:', e);
@@ -212,35 +266,38 @@ Deno.serve(async (req) => {
     }
 
     // Verify user exists and is active
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, email, cliente_ativo')
-      .eq('id', userId)
-      .single();
+    const { data: profile, error: profileError } = await supabaseQuery('profiles', {
+      select: 'id,email,cliente_ativo',
+      eq: { id: userId },
+      single: true,
+    }) as { data: { id: string; email: string; cliente_ativo: boolean } | null; error: unknown };
 
     if (profileError || !profile) {
+      console.error('[iptv-play] Profile lookup failed:', profileError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - User not found' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use service role client for data queries
-    const supabase = supabaseAdmin;
+    console.log('[iptv-play] User verified:', profile.email);
 
     // Get channel info from iptv_channels table
-    const { data: channel, error: channelError } = await supabase
-      .from('iptv_channels')
-      .select('id, name, slug, original_url, transcode_manifest_url, transcode_status, content_type')
-      .eq('id', channelId)
-      .single();
+    const { data: channel, error: channelError } = await supabaseQuery('iptv_channels', {
+      select: 'id,name,slug,original_url,transcode_manifest_url,transcode_status,content_type',
+      eq: { id: channelId },
+      single: true,
+    }) as { data: { id: number; name: string; slug: string; original_url: string; transcode_manifest_url: string | null; transcode_status: string | null; content_type: string | null } | null; error: unknown };
 
     if (channelError || !channel) {
+      console.error('[iptv-play] Channel lookup failed:', channelError);
       return new Response(
         JSON.stringify({ error: 'Channel not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[iptv-play] Channel found:', channel.name);
 
     // Build CDN list with priorities, filtering out open circuits
     const cdnList: Array<{ url: string; priority: number; type: string; region?: string }> = [];
@@ -299,7 +356,7 @@ Deno.serve(async (req) => {
     // Add metric to buffer (non-blocking)
     addMetric(parseInt(channelId));
 
-    console.log(`[iptv-play] Channel ${channelId} requested by ${userId}, using ${primaryCdn.type}`);
+    console.log(`[iptv-play] Success - Channel ${channelId} requested by ${userId}, using ${primaryCdn.type}`);
 
     return new Response(
       JSON.stringify({
@@ -310,7 +367,6 @@ Deno.serve(async (req) => {
           id: channel.id,
           name: channel.name,
         },
-        // Include circuit breaker status for debugging
         circuitBreakers: Object.fromEntries(
           Array.from(circuitBreakers.entries())
             .filter(([_, state]) => state.isOpen)
