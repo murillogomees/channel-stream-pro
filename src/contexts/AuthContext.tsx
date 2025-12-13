@@ -16,14 +16,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * Converte Supabase User para UnifiedUser
  */
 async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
-  // Buscar profile e role do banco
-  const [profileResult, roleResult] = await Promise.all([
+  // Buscar profile e TODAS as roles do banco
+  const [profileResult, rolesResult] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('user_roles').select('role').eq('user_id', user.id).single()
+    supabase.from('user_roles').select('role').eq('user_id', user.id)
   ]);
 
   const profile = profileResult.data;
-  const role = (roleResult.data?.role || 'client') as AppRole;
+  const allRoles = (rolesResult.data || []).map(r => r.role as AppRole);
+  
+  // Prioridade: master > admin > client
+  let role: AppRole = 'client';
+  if (allRoles.includes('master')) {
+    role = 'master';
+  } else if (allRoles.includes('admin')) {
+    role = 'admin';
+  } else if (allRoles.includes('client')) {
+    role = 'client';
+  }
   
   // Calcular status de acesso
   let daysRemaining = 0;
