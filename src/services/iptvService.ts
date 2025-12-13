@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { customAuthService } from './customAuthService';
 
 export interface IPTVChannel {
   id: number;
@@ -284,9 +285,11 @@ class IPTVService {
    */
   async getPlaybackUrl(channelId: number): Promise<PlaybackInfo | null> {
     try {
-      const { data: session } = await supabase.auth.getSession();
+      // Use custom auth service for self-hosted Supabase
+      const { data } = await customAuthService.getSession();
+      const accessToken = data.session?.access_token;
       
-      if (!session?.session?.access_token) {
+      if (!accessToken) {
         console.error('[IPTVService] No auth session');
         return null;
       }
@@ -295,7 +298,7 @@ class IPTVService {
         `${this.baseUrl}/functions/v1/iptv-play?channelId=${channelId}`,
         {
           headers: {
-            'Authorization': `Bearer ${session.session.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         }
@@ -318,16 +321,17 @@ class IPTVService {
    * Get user's playlists
    */
   async getUserPlaylists(): Promise<IPTVPlaylist[]> {
-    const { data: session } = await supabase.auth.getSession();
+    const { data } = await customAuthService.getSession();
+    const userId = data.session?.user?.id;
     
-    if (!session?.session?.user?.id) {
+    if (!userId) {
       return [];
     }
 
-    const { data, error } = await supabase
+    const { data: playlists, error } = await supabase
       .from('iptv_playlists')
       .select('*')
-      .or(`user_id.eq.${session.session.user.id},is_public.eq.true`)
+      .or(`user_id.eq.${userId},is_public.eq.true`)
       .order('name');
 
     if (error) {
@@ -335,7 +339,7 @@ class IPTVService {
       return [];
     }
 
-    return (data || []) as IPTVPlaylist[];
+    return (playlists || []) as IPTVPlaylist[];
   }
 
   /**
@@ -371,9 +375,9 @@ class IPTVService {
    * Generate M3U playlist URL
    */
   async getM3UPlaylistUrl(playlistId?: number): Promise<string | null> {
-    const { data: session } = await supabase.auth.getSession();
+    const { data } = await customAuthService.getSession();
     
-    if (!session?.session?.access_token) {
+    if (!data.session?.access_token) {
       return null;
     }
 
