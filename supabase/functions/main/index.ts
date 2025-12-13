@@ -1544,6 +1544,169 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
         
+      } else if (action === 'generate-backup-codes') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Generate 10 backup codes
+        const codes: string[] = [];
+        for (let i = 0; i < 10; i++) {
+          const code = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('')
+            .toUpperCase();
+          codes.push(code);
+        }
+        
+        // Hash codes for storage
+        const hashedCodes = await Promise.all(codes.map(async (code) => {
+          const encoder = new TextEncoder();
+          const data = encoder.encode(code);
+          const hash = await crypto.subtle.digest('SHA-256', data);
+          return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }));
+        
+        // Store hashed codes in profile
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET backup_codes = $1, backup_codes_generated_at = NOW()
+          WHERE id = $2
+        `, [JSON.stringify(hashedCodes), payload.sub]);
+        
+        console.log(`[CustomAuth] Backup codes generated for user: ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ codes }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'verify-backup-code') {
+        const { code } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !code) {
+          return new Response(JSON.stringify({ error: 'Token and code required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Get stored backup codes
+        const profileResult = await client.queryObject(`
+          SELECT backup_codes FROM public.profiles WHERE id = $1
+        `, [payload.sub]);
+        
+        if (profileResult.rows.length === 0 || !(profileResult.rows[0] as any).backup_codes) {
+          return new Response(JSON.stringify({ error: 'No backup codes found' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const storedCodes = JSON.parse((profileResult.rows[0] as any).backup_codes);
+        
+        // Hash provided code
+        const encoder = new TextEncoder();
+        const data = encoder.encode(code.toUpperCase().replace(/-/g, ''));
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        const codeHash = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Check if code is valid and not used
+        const codeIndex = storedCodes.indexOf(codeHash);
+        if (codeIndex === -1) {
+          return new Response(JSON.stringify({ error: 'Invalid backup code' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Mark code as used by removing it
+        storedCodes.splice(codeIndex, 1);
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET backup_codes = $1
+          WHERE id = $2
+        `, [JSON.stringify(storedCodes), payload.sub]);
+        
+        console.log(`[CustomAuth] Backup code used for user: ${payload.sub}, remaining: ${storedCodes.length}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          remaining: storedCodes.length
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'get-security-status') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Get profile with security info
+        const profileResult = await client.queryObject(`
+          SELECT totp_enabled, backup_codes, backup_codes_generated_at
+          FROM public.profiles WHERE id = $1
+        `, [payload.sub]);
+        
+        const profile = profileResult.rows[0] as any || {};
+        
+        // Get user email verification status
+        const userResult = await client.queryObject(`
+          SELECT email_confirmed_at, updated_at FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        const user = userResult.rows[0] as any || {};
+        
+        // Count active sessions
+        const sessionsResult = await client.queryObject(`
+          SELECT COUNT(*) as count FROM public.user_sessions
+          WHERE user_id = $1 AND is_active = true AND expires_at > NOW()
+        `, [payload.sub]);
+        
+        const sessionCount = parseInt((sessionsResult.rows[0] as any)?.count || '0');
+        
+        // Check backup codes
+        let hasBackupCodes = false;
+        if (profile.backup_codes) {
+          try {
+            const codes = JSON.parse(profile.backup_codes);
+            hasBackupCodes = Array.isArray(codes) && codes.length > 0;
+          } catch (e) {
+            hasBackupCodes = false;
+          }
+        }
+        
+        return new Response(JSON.stringify({
+          mfa_enabled: profile.totp_enabled || false,
+          has_backup_codes: hasBackupCodes,
+          email_verified: !!user.email_confirmed_at,
+          password_strong: true, // TODO: Implement password strength check
+          active_sessions_count: sessionCount,
+          last_password_change: user.updated_at || null
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
       } else {
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
