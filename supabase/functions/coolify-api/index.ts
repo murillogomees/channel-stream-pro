@@ -402,6 +402,88 @@ serve(async (req) => {
         };
       },
       
+      'fix-postgrest-db-uri': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+        const dbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
+        if (!dbUrl) {
+          return { success: false, error: 'SELFHOSTED_DB_URL not configured' };
+        }
+        let dbUri = '';
+        try {
+          const url = new URL(dbUrl);
+          const host = url.hostname;
+          const port = url.port || '5432';
+          const database = url.pathname.replace('/', '') || 'postgres';
+          const password = encodeURIComponent(url.password);
+          dbUri = `postgres://authenticator:${password}@${host}:${port}/${database}`;
+        } catch (e) {
+          return { success: false, error: `Invalid SELFHOSTED_DB_URL: ${e.message}` };
+        }
+
+        // Find Supabase application in Coolify
+        const appsRes = await fetch(`${COOLIFY_URL}/api/v1/applications`, {
+          headers: {
+            'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+            'Accept': 'application/json',
+          },
+        });
+        if (!appsRes.ok) {
+          return { success: false, error: `Failed to list applications (${appsRes.status})` };
+        }
+        const apps = await appsRes.json();
+        const supabaseApp = apps.find((a: any) =>
+          a.name?.toLowerCase().includes('supabase') ||
+          a.url?.includes('supabase.iptvlink.com.br')
+        );
+        if (!supabaseApp) {
+          return {
+            success: false,
+            error: 'Supabase application not found in Coolify',
+            data: apps.map((a: any) => ({ name: a.name, uuid: a.uuid, url: a.url })),
+          };
+        }
+
+        // Update PGRST_DB_URI via bulk envs API
+        const envsBody = {
+          data: [
+            {
+              key: 'PGRST_DB_URI',
+              value: dbUri,
+              is_preview: false,
+              is_literal: true,
+              is_multiline: false,
+              is_shown_once: false,
+            },
+          ],
+        };
+
+        const envsRes = await fetch(`${COOLIFY_URL}/api/v1/applications/${supabaseApp.uuid}/envs/bulk`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(envsBody),
+        });
+
+        if (!envsRes.ok) {
+          const text = await envsRes.text();
+          return { success: false, error: `Failed to update envs (${envsRes.status})`, data: text };
+        }
+
+        return {
+          success: true,
+          data: {
+            message: 'PGRST_DB_URI updated successfully',
+            application: { name: supabaseApp.name, uuid: supabaseApp.uuid, url: supabaseApp.url },
+            db_uri: dbUri,
+          },
+        };
+      },
+
       'get-migration-status': async () => {
         try {
           // Check tables in self-hosted
