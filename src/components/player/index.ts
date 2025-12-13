@@ -20,6 +20,15 @@ export { GestureIndicator } from './GestureIndicator';
 export { DoubleTapIndicator } from './DoubleTapIndicator';
 export { ThumbnailPreview } from './ThumbnailPreview';
 
+// White-label IPTV Player
+export { IPTVPlayerWhiteLabel } from './IPTVPlayerWhiteLabel';
+
+// Core Engine
+export * from './core';
+
+// UI Components  
+export * from './ui';
+
 // Re-export performance hooks
 export { useVisibilityOptimization } from '@/hooks/useVisibilityOptimization';
 export { useAdvancedHlsConfig, applyDynamicConfig } from '@/hooks/useAdvancedHlsConfig';
