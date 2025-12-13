@@ -1103,11 +1103,280 @@ serve(async (req) => {
       },
 
       'delete-duplicate-secrets': async () => {
-        // For Phase 2 - consolidation of duplicates
-        return {
-          success: false,
-          error: 'Execute normalize-secrets primeiro. Deduplicação requer análise manual.',
-        };
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const results: { action: string; key: string; status: string }[] = [];
+
+        // Secrets duplicadas para remover (manter apenas o canônico)
+        const duplicatesToRemove = [
+          'VITE_SUPABASE_SELFHOSTED_KEY',  // Duplica SUPABASE_ANON_KEY
+          'VITE_SUPABASE_SELFHOSTED_URL',  // Duplica SUPABASE_URL
+          'SUPABASE_SERVICE_KEY',           // Duplica SUPABASE_SERVICE_ROLE_KEY
+          'SUPABASE_PUBLIC_API',            // Duplica SUPABASE_URL
+          'SUPABASE_PUBLIC_URL',            // Duplica SUPABASE_URL
+        ];
+
+        try {
+          // Get current envs to find IDs
+          const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!envsRes.ok) {
+            return { success: false, error: `Failed to get envs: ${envsRes.status}` };
+          }
+          
+          const envs = await envsRes.json();
+          const envMap: Record<string, { id: string; value: string }> = {};
+          for (const env of envs) {
+            envMap[env.key] = { id: env.id, value: env.value };
+          }
+
+          // Delete duplicates
+          for (const key of duplicatesToRemove) {
+            const env = envMap[key];
+            if (env?.id) {
+              const deleteRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${env.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+              });
+              results.push({ 
+                action: 'delete', 
+                key, 
+                status: deleteRes.ok ? 'removed' : `failed (${deleteRes.status})` 
+              });
+            } else {
+              results.push({ action: 'skip', key, status: 'not found' });
+            }
+          }
+
+          return {
+            success: true,
+            data: {
+              removed: results.filter(r => r.status === 'removed').length,
+              skipped: results.filter(r => r.status === 'not found').length,
+              failed: results.filter(r => r.status.includes('failed')).length,
+              results,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message, results };
+        }
+      },
+
+      'full-secrets-cleanup': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const log: { step: string; status: string; details?: any }[] = [];
+
+        try {
+          // === STEP 1: Get current envs ===
+          log.push({ step: '1-fetch-envs', status: 'starting' });
+          const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!envsRes.ok) {
+            log.push({ step: '1-fetch-envs', status: 'failed', details: envsRes.status });
+            return { success: false, error: `Failed to get envs: ${envsRes.status}`, log };
+          }
+          
+          const envs = await envsRes.json();
+          const envMap: Record<string, { id: string; value: string }> = {};
+          for (const env of envs) {
+            envMap[env.key] = { id: env.id, value: env.value };
+          }
+          log.push({ step: '1-fetch-envs', status: 'done', details: { total: envs.length } });
+
+          // === STEP 2: Build canonical values ===
+          log.push({ step: '2-build-canonical', status: 'starting' });
+          const canonical: Record<string, string> = {};
+          
+          // JWT_SECRET
+          if (envMap['SERVICE_PASSWORD_JWT']?.value) {
+            canonical['JWT_SECRET'] = envMap['SERVICE_PASSWORD_JWT'].value;
+          }
+          
+          // SUPABASE_URL
+          if (envMap['API_EXTERNAL_URL']?.value && !envMap['API_EXTERNAL_URL'].value.includes('${')) {
+            canonical['SUPABASE_URL'] = envMap['API_EXTERNAL_URL'].value;
+          } else if (envMap['SERVICE_URL_SUPABASEKONG']?.value && !envMap['SERVICE_URL_SUPABASEKONG'].value.includes('${')) {
+            canonical['SUPABASE_URL'] = envMap['SERVICE_URL_SUPABASEKONG'].value;
+          }
+          
+          // SUPABASE_ANON_KEY
+          if (envMap['SERVICE_SUPABASEANON_KEY']?.value && !envMap['SERVICE_SUPABASEANON_KEY'].value.includes('${')) {
+            canonical['SUPABASE_ANON_KEY'] = envMap['SERVICE_SUPABASEANON_KEY'].value;
+          }
+          
+          // SUPABASE_SERVICE_ROLE_KEY
+          if (envMap['SERVICE_SUPABASESERVICE_KEY']?.value && !envMap['SERVICE_SUPABASESERVICE_KEY'].value.includes('${')) {
+            canonical['SUPABASE_SERVICE_ROLE_KEY'] = envMap['SERVICE_SUPABASESERVICE_KEY'].value;
+          }
+          
+          // POSTGRES_PASSWORD
+          if (envMap['SERVICE_PASSWORD_POSTGRES']?.value && !envMap['SERVICE_PASSWORD_POSTGRES'].value.includes('${')) {
+            canonical['POSTGRES_PASSWORD'] = envMap['SERVICE_PASSWORD_POSTGRES'].value;
+          }
+          
+          // DATABASE_URL from PGRST_DB_URI
+          if (envMap['PGRST_DB_URI']?.value && !envMap['PGRST_DB_URI'].value.includes('${')) {
+            canonical['DATABASE_URL'] = envMap['PGRST_DB_URI'].value;
+          }
+
+          log.push({ step: '2-build-canonical', status: 'done', details: Object.keys(canonical) });
+
+          // === STEP 3: Normalize all JWT secrets ===
+          log.push({ step: '3-normalize-jwt', status: 'starting' });
+          const jwtSecrets = ['JWT_SECRET', 'API_JWT_SECRET', 'AUTH_JWT_SECRET', 'GOTRUE_JWT_SECRET', 
+                             'METRICS_JWT_SECRET', 'PGRST_JWT_SECRET', 'PGRST_APP_SETTINGS_JWT_SECRET'];
+          
+          let jwtUpdated = 0;
+          for (const key of jwtSecrets) {
+            const current = envMap[key];
+            if (current && canonical['JWT_SECRET']) {
+              // Check if needs update (has unresolved var OR different value)
+              if (current.value.includes('${') || current.value !== canonical['JWT_SECRET']) {
+                const updateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${current.id}`, {
+                  method: 'PATCH',
+                  headers: { 
+                    'Authorization': `Bearer ${COOLIFY_TOKEN}`, 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json' 
+                  },
+                  body: JSON.stringify({ value: canonical['JWT_SECRET'] }),
+                });
+                if (updateRes.ok) jwtUpdated++;
+              }
+            }
+          }
+          log.push({ step: '3-normalize-jwt', status: 'done', details: { updated: jwtUpdated } });
+
+          // === STEP 4: Normalize URL secrets ===
+          log.push({ step: '4-normalize-urls', status: 'starting' });
+          const urlSecrets = ['SUPABASE_URL', 'SUPABASE_PUBLIC_URL', 'SUPABASE_PUBLIC_API', 'GOTRUE_SITE_URL'];
+          
+          let urlUpdated = 0;
+          for (const key of urlSecrets) {
+            const current = envMap[key];
+            if (current && canonical['SUPABASE_URL']) {
+              if (current.value.includes('${') || current.value !== canonical['SUPABASE_URL']) {
+                const updateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${current.id}`, {
+                  method: 'PATCH',
+                  headers: { 
+                    'Authorization': `Bearer ${COOLIFY_TOKEN}`, 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json' 
+                  },
+                  body: JSON.stringify({ value: canonical['SUPABASE_URL'] }),
+                });
+                if (updateRes.ok) urlUpdated++;
+              }
+            }
+          }
+          log.push({ step: '4-normalize-urls', status: 'done', details: { updated: urlUpdated } });
+
+          // === STEP 5: Normalize Key secrets ===
+          log.push({ step: '5-normalize-keys', status: 'starting' });
+          let keysUpdated = 0;
+          
+          // ANON_KEY
+          if (envMap['SUPABASE_ANON_KEY'] && canonical['SUPABASE_ANON_KEY']) {
+            if (envMap['SUPABASE_ANON_KEY'].value.includes('${')) {
+              const updateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${envMap['SUPABASE_ANON_KEY'].id}`, {
+                method: 'PATCH',
+                headers: { 
+                  'Authorization': `Bearer ${COOLIFY_TOKEN}`, 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json' 
+                },
+                body: JSON.stringify({ value: canonical['SUPABASE_ANON_KEY'] }),
+              });
+              if (updateRes.ok) keysUpdated++;
+            }
+          }
+          
+          // SERVICE_ROLE_KEY
+          if (envMap['SUPABASE_SERVICE_ROLE_KEY'] && canonical['SUPABASE_SERVICE_ROLE_KEY']) {
+            if (envMap['SUPABASE_SERVICE_ROLE_KEY'].value.includes('${')) {
+              const updateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${envMap['SUPABASE_SERVICE_ROLE_KEY'].id}`, {
+                method: 'PATCH',
+                headers: { 
+                  'Authorization': `Bearer ${COOLIFY_TOKEN}`, 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json' 
+                },
+                body: JSON.stringify({ value: canonical['SUPABASE_SERVICE_ROLE_KEY'] }),
+              });
+              if (updateRes.ok) keysUpdated++;
+            }
+          }
+          log.push({ step: '5-normalize-keys', status: 'done', details: { updated: keysUpdated } });
+
+          // === STEP 6: Remove duplicates ===
+          log.push({ step: '6-remove-duplicates', status: 'starting' });
+          const duplicatesToRemove = [
+            'VITE_SUPABASE_SELFHOSTED_KEY',
+            'VITE_SUPABASE_SELFHOSTED_URL',
+          ];
+          
+          let removed = 0;
+          for (const key of duplicatesToRemove) {
+            if (envMap[key]?.id) {
+              const deleteRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${envMap[key].id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+              });
+              if (deleteRes.ok) removed++;
+            }
+          }
+          log.push({ step: '6-remove-duplicates', status: 'done', details: { removed } });
+
+          // === STEP 7: Restart service ===
+          log.push({ step: '7-restart-service', status: 'starting' });
+          const restartRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/restart`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          log.push({ step: '7-restart-service', status: restartRes.ok ? 'triggered' : 'failed' });
+
+          return {
+            success: true,
+            data: {
+              summary: {
+                jwt_secrets_updated: jwtUpdated,
+                url_secrets_updated: urlUpdated,
+                key_secrets_updated: keysUpdated,
+                duplicates_removed: removed,
+                service_restart: restartRes.ok ? 'triggered' : 'failed',
+              },
+              canonical_values: Object.keys(canonical),
+              log,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message, log };
+        }
+      },
+
+      'start-service': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const res = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/start`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+        });
+        return { success: res.ok, data: { status: res.ok ? 'starting' : 'failed', statusCode: res.status } };
       },
     };
 
