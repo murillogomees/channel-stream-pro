@@ -68,13 +68,24 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     return channels;
   };
 
-  // Fetch and parse M3U from URL
+  // Fetch and parse M3U from URL (via Edge Function to evitar Mixed Content)
   const fetchMutation = useMutation({
     mutationFn: async (url: string) => {
       setIsParsing(true);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch M3U');
-      const content = await response.text();
+
+      const { data, error } = await supabase.functions.invoke('fetch-m3u', {
+        body: { url },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao buscar M3U');
+      }
+
+      const content = (data as { content?: string } | null)?.content;
+      if (!content) {
+        throw new Error('Resposta inválida do servidor');
+      }
+
       return parseM3U(content);
     },
     onSuccess: (channels) => {
