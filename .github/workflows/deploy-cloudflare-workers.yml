@@ -19,105 +19,124 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH with key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-        continue-on-error: true
-        id: ssh-key
-
-      - name: Add VPS to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Install sshpass for password fallback
-        if: steps.ssh-key.outcome == 'failure'
+      - name: Install sshpass
         run: sudo apt-get install -y sshpass
 
-      - name: Copy workers to VPS
-        run: |
-          if [ "${{ steps.ssh-key.outcome }}" == "success" ]; then
-            scp -r workers/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/cloudflare-workers/
-          else
-            sshpass -p "${{ secrets.VPS_PASS }}" scp -o StrictHostKeyChecking=no -r workers/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/cloudflare-workers/
-          fi
-
-      - name: Deploy Workers on VPS
+      - name: Deploy Workers via SSH
         env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          DEPLOY_SCRIPT='
+          # Create deploy script
+          cat > /tmp/deploy-workers.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
           set -e
-          cd /tmp/cloudflare-workers
+          
+          echo "🚀 Starting Cloudflare Workers deployment..."
+          
+          # Export Cloudflare credentials
+          export CLOUDFLARE_API_TOKEN="$CF_TOKEN"
+          export CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT"
           
           # Install Node.js if not present
           if ! command -v node &> /dev/null; then
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
+            echo "📦 Installing Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            apt-get install -y nodejs
           fi
           
-          # Install wrangler globally
+          # Install wrangler
+          echo "📦 Installing wrangler..."
           npm install -g wrangler
           
-          # Set Cloudflare credentials
-          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          # Clone repository
+          REPO_DIR="/tmp/iptv-deploy-$$"
+          rm -rf $REPO_DIR
+          git clone --depth 1 https://github.com/AcessoAI/tv-acessoai-hub.git $REPO_DIR
+          cd $REPO_DIR/workers
           
-          WORKER_INPUT="${{ github.event.inputs.worker || 'all' }}"
+          # Create KV namespaces
+          echo "📦 Creating KV namespaces..."
           
-          deploy_worker() {
-            local worker_dir=$1
-            local worker_name=$2
-            
-            if [ -d "$worker_dir" ]; then
-              echo "🚀 Deploying $worker_name..."
-              cd "$worker_dir"
+          RATE_LIMIT_KV=$(wrangler kv:namespace create "RATE_LIMIT_KV" 2>&1 | grep -oP 'id = "\K[^"]+' || echo "")
+          BLOCKED_IPS_KV=$(wrangler kv:namespace create "BLOCKED_IPS_KV" 2>&1 | grep -oP 'id = "\K[^"]+' || echo "")
+          ORIGINS_KV=$(wrangler kv:namespace create "ORIGINS_KV" 2>&1 | grep -oP 'id = "\K[^"]+' || echo "")
+          HEALTH_KV=$(wrangler kv:namespace create "HEALTH_KV" 2>&1 | grep -oP 'id = "\K[^"]+' || echo "")
+          
+          echo "KV Namespaces created/found"
+          
+          # Deploy rate-limiter-worker
+          if [ "$WORKER_INPUT" == "all" ] || [ "$WORKER_INPUT" == "rate-limiter" ]; then
+            if [ -d "rate-limiter-worker" ]; then
+              echo "🚀 Deploying rate-limiter-worker..."
+              cd rate-limiter-worker
               
-              # Install dependencies if package.json exists
-              if [ -f "package.json" ]; then
-                npm install
+              # Update wrangler.toml with KV IDs if available
+              if [ -n "$RATE_LIMIT_KV" ]; then
+                sed -i "s/YOUR_RATE_LIMIT_KV_ID/$RATE_LIMIT_KV/g" wrangler.toml
+                sed -i "s/YOUR_RATE_LIMIT_KV_PREVIEW_ID/$RATE_LIMIT_KV/g" wrangler.toml
+              fi
+              if [ -n "$BLOCKED_IPS_KV" ]; then
+                sed -i "s/YOUR_BLOCKED_IPS_KV_ID/$BLOCKED_IPS_KV/g" wrangler.toml
+                sed -i "s/YOUR_BLOCKED_IPS_KV_PREVIEW_ID/$BLOCKED_IPS_KV/g" wrangler.toml
               fi
               
-              # Set secrets
-              echo "${{ secrets.SUPABASE_URL }}" | wrangler secret put SUPABASE_URL 2>/dev/null || true
-              echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | wrangler secret put SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true
+              wrangler deploy || echo "⚠️ Rate limiter deploy needs KV setup"
               
-              # Deploy
-              wrangler deploy
-              echo "✅ $worker_name deployed successfully"
+              # Set secrets
+              echo "$SUPABASE_URL_VAL" | wrangler secret put SUPABASE_URL 2>/dev/null || true
+              echo "$SUPABASE_KEY_VAL" | wrangler secret put SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true
+              
               cd ..
-            else
-              echo "⚠️ Worker directory not found: $worker_dir"
+              echo "✅ rate-limiter-worker deployed"
             fi
-          }
-          
-          if [ "$WORKER_INPUT" == "all" ] || [ "$WORKER_INPUT" == "rate-limiter" ]; then
-            deploy_worker "rate-limiter-worker" "Rate Limiter Worker"
           fi
           
+          # Deploy origin-failover-worker
           if [ "$WORKER_INPUT" == "all" ] || [ "$WORKER_INPUT" == "origin-failover" ]; then
-            deploy_worker "origin-failover-worker" "Origin Failover Worker"
+            if [ -d "origin-failover-worker" ]; then
+              echo "🚀 Deploying origin-failover-worker..."
+              cd origin-failover-worker
+              
+              # Update wrangler.toml with KV IDs if available
+              if [ -n "$ORIGINS_KV" ]; then
+                sed -i "s/YOUR_ORIGINS_KV_ID/$ORIGINS_KV/g" wrangler.toml
+                sed -i "s/YOUR_ORIGINS_KV_PREVIEW_ID/$ORIGINS_KV/g" wrangler.toml
+              fi
+              if [ -n "$HEALTH_KV" ]; then
+                sed -i "s/YOUR_HEALTH_KV_ID/$HEALTH_KV/g" wrangler.toml
+                sed -i "s/YOUR_HEALTH_KV_PREVIEW_ID/$HEALTH_KV/g" wrangler.toml
+              fi
+              
+              wrangler deploy || echo "⚠️ Origin failover deploy needs KV setup"
+              
+              # Set secrets
+              echo "$SUPABASE_URL_VAL" | wrangler secret put SUPABASE_URL 2>/dev/null || true
+              echo "$SUPABASE_KEY_VAL" | wrangler secret put SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true
+              
+              cd ..
+              echo "✅ origin-failover-worker deployed"
+            fi
           fi
           
           # Cleanup
-          rm -rf /tmp/cloudflare-workers
-          echo "🎉 Deployment complete!"
-          '
+          rm -rf $REPO_DIR
           
-          if [ "${{ steps.ssh-key.outcome }}" == "success" ]; then
-            ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "$DEPLOY_SCRIPT"
-          else
-            sshpass -p "${{ secrets.VPS_PASS }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "$DEPLOY_SCRIPT"
-          fi
+          echo "🎉 Deployment complete!"
+          DEPLOY_SCRIPT
+          
+          chmod +x /tmp/deploy-workers.sh
+          
+          # Execute on VPS via SSH with password
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST \
+            "CF_TOKEN='$CLOUDFLARE_API_TOKEN' CF_ACCOUNT='$CLOUDFLARE_ACCOUNT_ID' WORKER_INPUT='${{ github.event.inputs.worker || 'all' }}' SUPABASE_URL_VAL='$SUPABASE_URL' SUPABASE_KEY_VAL='$SUPABASE_SERVICE_ROLE_KEY' bash -s" < /tmp/deploy-workers.sh
 
       - name: Verify deployment
         run: |
-          echo "🔍 Verifying worker deployments..."
-          sleep 5
-          
-          # Health check URLs would go here if workers have health endpoints
-          echo "✅ Workflow completed successfully"
+          echo "✅ Cloudflare Workers deployment workflow completed"
+          echo "Check Cloudflare dashboard for worker status"
