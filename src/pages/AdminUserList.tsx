@@ -165,8 +165,7 @@ export default function AdminUserList() {
           const { automaticNotificationTriggerService } = await import('@/services/automaticNotificationTriggerService');
           
           const telefoneCliente = editFormData.contact_phone || 
-                                  selectedUser.telefone || 
-                                  (selectedUser as any).contact_phone || '';
+                                  selectedUser.contact_phone || '';
           
           const clienteData = {
             id: selectedUser.id,
@@ -393,7 +392,7 @@ export default function AdminUserList() {
     const matchesSearch = 
       user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.telefone?.toLowerCase().includes(searchTerm.toLowerCase());
+      (user.contact_phone || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesRole = roleFilter === 'all' || user.roles.includes(roleFilter);
     const matchesStatus = statusFilter === 'all' || user.situacao === statusFilter;
@@ -556,10 +555,10 @@ export default function AdminUserList() {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <div className="text-sm">
-                          {user.telefone && (
+                          {user.contact_phone && (
                             <div className="flex items-center gap-1">
                               <Phone className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">{user.telefone}</span>
+                              <span className="truncate">{user.contact_phone}</span>
                             </div>
                           )}
                         </div>

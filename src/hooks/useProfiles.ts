@@ -27,9 +27,7 @@ export interface UnifiedProfile {
   id: string;
   nome: string;
   email: string;
-  telefone: string;
-  contact_phone?: string;
-  telefone_whatsapp?: string;
+  contact_phone?: string; // Campo unificado - único campo de telefone
   origem_cadastro?: string;
   created_at: string;
   updated_at: string;
