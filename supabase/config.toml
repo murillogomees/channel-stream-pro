@@ -335,13 +335,13 @@ verify_jwt = false
 # IPTV PLAYER API
 # ==========================================
 
-# IPTV Play - returns signed URL with CDN list
+# IPTV Play - returns signed URL with CDN list (custom auth validation inside)
 [functions.iptv-play]
-verify_jwt = true
+verify_jwt = false
 
-# IPTV Playlist - returns M3U/JSON playlist
+# IPTV Playlist - returns M3U/JSON playlist (custom auth validation inside)
 [functions.iptv-playlist]
-verify_jwt = true
+verify_jwt = false
 
 # IPTV EPG - returns program guide data
 [functions.iptv-epg]
