@@ -3866,6 +3866,12 @@ export type Database = {
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
       cleanup_rate_limits: { Args: never; Returns: number }
+      force_detect_series_by_pattern: {
+        Args: never
+        Returns: {
+          organized_count: number
+        }[]
+      }
       generate_stream_token: {
         Args: {
           p_channel_id: number
