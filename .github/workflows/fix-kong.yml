@@ -7,121 +7,36 @@ jobs:
   fix-kong:
     runs-on: ubuntu-latest
     steps:
-      - name: Install sshpass and Docker
+      - name: Install sshpass
         run: |
           sudo apt-get update
           sudo apt-get install -y sshpass
 
-      - name: Create kong.yml file
+      - name: Create and validate kong.yml
         run: |
-          cat > /tmp/kong.yml << 'EOF'
-_format_version: "1.1"
-_transform: true
-
-services:
-  - name: rest-v1
-    url: http://supabase-rest:3000/
-    routes:
-      - name: rest-v1
-        strip_path: true
-        paths:
-          - /rest/v1/
-
-  - name: auth-v1
-    url: http://supabase-auth:9999/
-    routes:
-      - name: auth-v1
-        strip_path: true
-        paths:
-          - /auth/v1/
-
-  - name: storage-v1
-    url: http://supabase-storage:5000/
-    routes:
-      - name: storage-v1
-        strip_path: true
-        paths:
-          - /storage/v1/
-
-  - name: functions-v1
-    url: http://supabase-edge-functions:9000/
-    routes:
-      - name: functions-v1
-        strip_path: true
-        paths:
-          - /functions/v1/
-
-  - name: realtime-v1
-    url: http://realtime-dev.supabase-realtime:4000/socket/
-    routes:
-      - name: realtime-v1
-        strip_path: true
-        paths:
-          - /realtime/v1/
-
-  - name: meta
-    url: http://supabase-meta:8080/
-    routes:
-      - name: meta
-        strip_path: true
-        paths:
-          - /pg/
-EOF
-
-          echo "=== kong.yml content (local) ==="
+          # Base64 encoded kong.yml to avoid YAML parsing issues
+          KONG_YML_B64="X2Zvcm1hdF92ZXJzaW9uOiAiMS4xIgpfdHJhbnNmb3JtOiB0cnVlCgpzZXJ2aWNlczoKICAtIG5hbWU6IHJlc3QtdjEKICAgIHVybDogaHR0cDovL3N1cGFiYXNlLXJlc3Q6MzAwMC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiByZXN0LXYxCiAgICAgICAgc3RyaXBfcGF0aDogdHJ1ZQogICAgICAgIHBhdGhzOgogICAgICAgICAgLSAvcmVzdC92MS8KCiAgLSBuYW1lOiBhdXRoLXYxCiAgICB1cmw6IGh0dHA6Ly9zdXBhYmFzZS1hdXRoOjk5OTkvCiAgICByb3V0ZXM6CiAgICAgIC0gbmFtZTogYXV0aC12MQogICAgICAgIHN0cmlwX3BhdGg6IHRydWUKICAgICAgICBwYXRoczoKICAgICAgICAgIC0gL2F1dGgvdjEvCgogIC0gbmFtZTogc3RvcmFnZS12MQogICAgdXJsOiBodHRwOi8vc3VwYWJhc2Utc3RvcmFnZTo1MDAwLwogICAgcm91dGVzOgogICAgICAtIG5hbWU6IHN0b3JhZ2UtdjEKICAgICAgICBzdHJpcF9wYXRoOiB0cnVlCiAgICAgICAgcGF0aHM6CiAgICAgICAgICAtIC9zdG9yYWdlL3YxLwoKICAtIG5hbWU6IGZ1bmN0aW9ucy12MQogICAgdXJsOiBodHRwOi8vc3VwYWJhc2UtZWRnZS1mdW5jdGlvbnM6OTAwMC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiBmdW5jdGlvbnMtdjEKICAgICAgICBzdHJpcF9wYXRoOiB0cnVlCiAgICAgICAgcGF0aHM6CiAgICAgICAgICAtIC9mdW5jdGlvbnMvdjEvCgogIC0gbmFtZTogcmVhbHRpbWUtdjEKICAgIHVybDogaHR0cDovL3JlYWx0aW1lLWRldi5zdXBhYmFzZS1yZWFsdGltZTo0MDAwL3NvY2tldC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiByZWFsdGltZS12MQogICAgICAgIHN0cmlwX3BhdGg6IHRydWUKICAgICAgICBwYXRoczoKICAgICAgICAgIC0gL3JlYWx0aW1lL3YxLwoKICAtIG5hbWU6IG1ldGEKICAgIHVybDogaHR0cDovL3N1cGFiYXNlLW1ldGE6ODA4MC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiBtZXRhCiAgICAgICAgc3RyaXBfcGF0aDogdHJ1ZQogICAgICAgIHBhdGhzOgogICAgICAgICAgLSAvcGcvCg=="
+          
+          echo "$KONG_YML_B64" | base64 -d > /tmp/kong.yml
+          
+          echo "=== kong.yml content ==="
           cat /tmp/kong.yml
-          echo "================================"
-
-      - name: Validate kong.yml syntax with Kong image
-        run: |
+          echo "========================"
+          
+          # Validate with Kong image
           docker run --rm -v /tmp/kong.yml:/kong.yml kong:2.8.1 kong config parse /kong.yml
 
-      - name: Deploy kong.yml to VPS
+      - name: Deploy to VPS and configure Kong
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
+          # Copy to VPS
           sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
-
-      - name: Apply configuration in Kong container
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASS: ${{ secrets.VPS_PASS }}
-        run: |
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
-            set -e
-
-            echo "=== Finding Kong container ==="
-            KONG_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -i kong | head -1)
-            echo "Kong container: $KONG_CONTAINER"
-
-            if [ -z "$KONG_CONTAINER" ]; then
-              echo "ERROR: Kong container not found!"
-              exit 1
-            fi
-
-            echo "=== Stopping Kong container (if running) ==="
-            docker stop $KONG_CONTAINER || true
-            sleep 3
-
-            echo "=== Copying kong.yml into container ==="
-            docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
-            docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml || true
-
-            echo "=== Starting Kong container ==="
-            docker start $KONG_CONTAINER
-
-            echo "=== Waiting for Kong to initialize ==="
-            sleep 15
-
-            echo "=== Kong status ==="
-            docker ps | grep -i kong || true
-
-            echo "=== Kong logs (last 40 lines) ==="
-            docker logs $KONG_CONTAINER --tail 40 2>&1 || true
-          ENDSSH
+          
+          # Configure Kong
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'KONG_CONTAINER=$(docker ps -a --format "{{.Names}}" | grep -i kong | head -1); echo "Kong container: $KONG_CONTAINER"; docker stop $KONG_CONTAINER || true; sleep 3; docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml; docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml || true; docker start $KONG_CONTAINER; sleep 15; docker ps | grep -i kong; docker logs $KONG_CONTAINER --tail 40 2>&1'
 
       - name: Final verification
         env:
@@ -129,7 +44,4 @@ EOF
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
-            echo "=== Final Kong containers ==="
-            docker ps | grep -i kong || true
-          ENDSSH
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'docker ps | grep -i kong'
