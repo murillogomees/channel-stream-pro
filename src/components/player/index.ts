@@ -33,6 +33,12 @@ export { PlayerController } from './modules/PlayerController'
 export { useIPTVPlayer } from './hooks/useIPTVPlayer'
 export { IPTVPlayerWhiteLabel } from './ui/IPTVPlayerWhiteLabel'
 
+// Shaka Player (Enterprise - Xtream Ready)
+export { ShakaPlayerEngine } from './engines/ShakaPlayerEngine'
+export { XtreamAdapter } from './adapters/XtreamAdapter'
+export { useShakaPlayer } from './hooks/useShakaPlayer'
+export { ShakaPlayerUI } from './ui/ShakaPlayerUI'
+
 // Core Engine
 export * from './core';
 

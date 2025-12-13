@@ -1,12 +1,12 @@
 /**
- * IPTV Player Page - Modular White-Label Player
- * Uses custom modular architecture with TokenManager, StreamResolver, etc.
+ * IPTV Player Page - Shaka Player Enterprise
+ * Uses Shaka Player engine with stream-proxy
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService } from '@/services/iptvService';
-import { IPTVPlayerWhiteLabel } from '@/components/player';
+import { ShakaPlayerUI } from '@/components/player';
 import { Loader2 } from 'lucide-react';
 
 export default function IPTVPlayer() {
@@ -50,12 +50,13 @@ export default function IPTVPlayer() {
 
   return (
     <div className="h-screen w-screen bg-black">
-      <IPTVPlayerWhiteLabel
+      <ShakaPlayerUI
         streamUrl={channel.original_url}
         title={channel.name}
+        subtitle={channel.category || undefined}
         brand={{
           name: 'IPTV Link',
-          logo: channel.logo_url,
+          logo: channel.logo_url || undefined,
           primaryColor: 'hsl(var(--primary))'
         }}
         onBack={handleBack}
