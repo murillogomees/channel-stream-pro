@@ -41,41 +41,40 @@ jobs:
           echo ""
           echo "Total: $(find supabase/functions -name 'index.ts' | wc -l) functions"
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
       - name: Deploy functions via SSH
+        env:
+          VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
           echo "🚀 Deploying edge functions to self-hosted Supabase..."
           
           # Create temp directory on server
-          ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "mkdir -p /tmp/functions-deploy"
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "mkdir -p /tmp/functions-deploy"
           
           # Copy all functions
-          scp -o StrictHostKeyChecking=no -r supabase/functions/* ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/tmp/functions-deploy/
+          sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -r supabase/functions/* ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/tmp/functions-deploy/
           
           # Backup existing and deploy new
-          ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'ENDSSH'
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'ENDSSH'
             set -e
             
             echo "📁 Backing up existing functions..."
-            if [ -d "${{ env.FUNCTIONS_PATH }}" ]; then
-              cp -r ${{ env.FUNCTIONS_PATH }} ${{ env.FUNCTIONS_PATH }}.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+            FUNCTIONS_PATH="/root/supabase/docker/volumes/functions"
+            if [ -d "$FUNCTIONS_PATH" ]; then
+              cp -r $FUNCTIONS_PATH ${FUNCTIONS_PATH}.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
             fi
             
             echo "📦 Deploying new functions..."
-            mkdir -p ${{ env.FUNCTIONS_PATH }}
-            cp -r /tmp/functions-deploy/* ${{ env.FUNCTIONS_PATH }}/
+            mkdir -p $FUNCTIONS_PATH
+            cp -r /tmp/functions-deploy/* $FUNCTIONS_PATH/
             
             echo "🧹 Cleaning temp files..."
             rm -rf /tmp/functions-deploy
             
             echo "✅ Functions deployed successfully!"
-            ls -la ${{ env.FUNCTIONS_PATH }}/
+            ls -la $FUNCTIONS_PATH/
           ENDSSH
 
       - name: Restart edge-runtime container via Coolify API
