@@ -160,100 +160,86 @@ export function IPTVPlaylistForm({ playlist, onSuccess }: IPTVPlaylistFormProps)
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const slug = data.slug || data.name.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
 
-      const payload = {
-        name: data.name,
-        slug,
-        description: data.description || null,
-        is_public: data.is_public,
-        user_id: user?.id,
-        channel_count: parsedChannels.length,
-      };
-
       let playlistId: number;
 
       if (playlist?.id) {
-        const { error } = await supabase
-          .from('iptv_playlists')
-          .update(payload)
-          .eq('id', playlist.id);
-        if (error) throw error;
+        // Update existing playlist via Edge Function
+        const { data: result, error } = await supabase.functions.invoke('iptv-admin', {
+          body: {
+            action: 'update-playlist',
+            data: {
+              id: playlist.id,
+              name: data.name,
+              slug,
+              description: data.description || null,
+              is_public: data.is_public,
+              channel_count: parsedChannels.length || undefined,
+            },
+          },
+        });
+        if (error) throw new Error(error.message);
+        if (!(result as { success?: boolean })?.success) throw new Error((result as { error?: string })?.error || 'Erro ao atualizar');
         playlistId = playlist.id;
       } else {
-        const { data: newPlaylist, error } = await supabase
-          .from('iptv_playlists')
-          .insert(payload)
-          .select('id')
-          .single();
-        if (error) throw error;
-        playlistId = newPlaylist.id;
+        // Create new playlist via Edge Function
+        const { data: result, error } = await supabase.functions.invoke('iptv-admin', {
+          body: {
+            action: 'create-playlist',
+            data: {
+              name: data.name,
+              slug,
+              description: data.description || null,
+              is_public: data.is_public,
+              channel_count: parsedChannels.length,
+            },
+          },
+        });
+        if (error) throw new Error(error.message);
+        const res = result as { success?: boolean; error?: string; data?: { id?: number } } | null;
+        if (!res?.success) throw new Error(res?.error || 'Erro ao criar playlist');
+        playlistId = res.data?.id || 0;
       }
 
       // Import channels if we have parsed channels
-      if (parsedChannels.length > 0) {
-        // First, insert channels to iptv_channels table
+      if (parsedChannels.length > 0 && playlistId) {
+        // Insert channels via Edge Function
         const batchSize = 100;
-        const channelIds: number[] = [];
+        const allChannelIds: number[] = [];
 
         for (let i = 0; i < parsedChannels.length; i += batchSize) {
           const batch = parsedChannels.slice(i, i + batchSize);
           
-          const channelPayload = batch.map((ch, idx) => ({
+          const channelPayload = batch.map((ch) => ({
             name: ch.name,
-            slug: `${ch.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now()}-${i + idx}`,
-            original_url: ch.url,
-            logo_url: ch.logo || null,
-            category: ch.group || null,
-            content_type: 'live',
+            url: ch.url,
+            logo: ch.logo || null,
+            group: ch.group || null,
           }));
 
-          const { data: insertedChannels, error } = await supabase
-            .from('iptv_channels')
-            .insert(channelPayload)
-            .select('id');
+          const { data: chResult, error: chError } = await supabase.functions.invoke('iptv-admin', {
+            body: { action: 'insert-channels', data: { channels: channelPayload } },
+          });
 
-          if (error) {
-            console.error('Channel insert error:', error);
-          } else if (insertedChannels) {
-            channelIds.push(...insertedChannels.map(c => c.id));
+          if (!chError) {
+            const ids = (chResult as { data?: { ids?: number[] } })?.data?.ids || [];
+            allChannelIds.push(...ids);
           }
 
           setImportProgress(Math.round(((i + batch.length) / parsedChannels.length) * 50));
         }
 
-        // Now link channels to playlist
-        if (channelIds.length > 0) {
-          const playlistChannels = channelIds.map((channelId, idx) => ({
-            playlist_id: playlistId,
-            channel_id: channelId,
-            position: idx,
-          }));
-
-          for (let i = 0; i < playlistChannels.length; i += batchSize) {
-            const batch = playlistChannels.slice(i, i + batchSize);
-            
-            const { error } = await supabase
-              .from('iptv_playlist_channels')
-              .insert(batch);
-
-            if (error) {
-              console.error('Playlist channel link error:', error);
-            }
-
-            setImportProgress(50 + Math.round(((i + batch.length) / playlistChannels.length) * 50));
-          }
+        // Link channels to playlist
+        if (allChannelIds.length > 0) {
+          const { error: linkError } = await supabase.functions.invoke('iptv-admin', {
+            body: { action: 'link-channels', data: { playlist_id: playlistId, channel_ids: allChannelIds } },
+          });
+          if (linkError) console.error('Link error:', linkError);
+          setImportProgress(100);
         }
-
-        // Update channel count
-        await supabase
-          .from('iptv_playlists')
-          .update({ channel_count: channelIds.length })
-          .eq('id', playlistId);
       }
 
       return playlistId;

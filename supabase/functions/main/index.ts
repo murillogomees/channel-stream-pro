@@ -67,6 +67,8 @@ Deno.serve(async (req: Request) => {
       case 'process-m3u-import':
         return await handleProcessM3UImport(req);
       
+      case 'iptv-admin':
+        return await handleIptvAdmin(req);
       default:
         // For other functions, return not implemented
         return new Response(
@@ -1167,6 +1169,127 @@ async function handleProcessM3UImport(req: Request): Promise<Response> {
       success: false, 
       error: error.message 
     }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// ============================================================================
+// IPTV-ADMIN HANDLER - Admin IPTV operations (bypasses RLS)
+// ============================================================================
+async function handleIptvAdmin(req: Request): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { action, data } = body;
+
+    console.log('[IptvAdmin] Action:', action);
+
+    const dbUrl = Deno.env.get('SELFHOSTED_DB_URL');
+    if (!dbUrl) {
+      throw new Error('SELFHOSTED_DB_URL not configured');
+    }
+
+    const dbUrlMatch = dbUrl.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
+    if (!dbUrlMatch) {
+      throw new Error('Invalid database URL format');
+    }
+
+    const [, dbUser, dbPassword, dbHost, dbPortStr, dbName] = dbUrlMatch;
+    const dbPort = dbPortStr ? parseInt(dbPortStr) : 5432;
+    
+    const postgres = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
+    const client = new postgres.Client({ user: dbUser, password: dbPassword, hostname: dbHost, port: dbPort, database: dbName });
+    await client.connect();
+
+    try {
+      switch (action) {
+        case 'create-playlist': {
+          const { name, slug, description, is_public, user_id, channel_count } = data;
+          const result = await client.queryObject<{ id: number }>(`
+            INSERT INTO public.iptv_playlists (name, slug, description, is_public, user_id, channel_count)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+          `, [name, slug, description || null, is_public || false, user_id || null, channel_count || 0]);
+          
+          return new Response(JSON.stringify({ success: true, data: { id: result.rows[0]?.id } }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        case 'update-playlist': {
+          const { id, name, slug, description, is_public, channel_count } = data;
+          await client.queryObject(`
+            UPDATE public.iptv_playlists 
+            SET name = $1, slug = $2, description = $3, is_public = $4, channel_count = COALESCE($5, channel_count), updated_at = NOW()
+            WHERE id = $6
+          `, [name, slug, description || null, is_public || false, channel_count, id]);
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        case 'delete-playlist': {
+          const { id } = data;
+          await client.queryObject(`DELETE FROM public.iptv_playlist_channels WHERE playlist_id = $1`, [id]);
+          await client.queryObject(`DELETE FROM public.iptv_playlists WHERE id = $1`, [id]);
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        case 'link-channels': {
+          const { playlist_id, channel_ids } = data;
+          
+          for (let i = 0; i < channel_ids.length; i++) {
+            await client.queryObject(`
+              INSERT INTO public.iptv_playlist_channels (playlist_id, channel_id, position)
+              VALUES ($1, $2, $3)
+              ON CONFLICT (playlist_id, channel_id) DO NOTHING
+            `, [playlist_id, channel_ids[i], i]);
+          }
+          
+          await client.queryObject(`
+            UPDATE public.iptv_playlists SET channel_count = $1, updated_at = NOW() WHERE id = $2
+          `, [channel_ids.length, playlist_id]);
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        case 'insert-channels': {
+          const { channels } = data;
+          const insertedIds: number[] = [];
+          
+          for (const ch of channels) {
+            const slug = ch.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 100);
+            const result = await client.queryObject<{ id: number }>(`
+              INSERT INTO public.iptv_channels (name, slug, original_url, logo_url, category, content_type)
+              VALUES ($1, $2, $3, $4, $5, $6)
+              ON CONFLICT (slug) DO UPDATE SET original_url = EXCLUDED.original_url, updated_at = NOW()
+              RETURNING id
+            `, [ch.name, slug + '-' + Math.random().toString(36).slice(2, 8), ch.url, ch.logo || null, ch.group || null, 'live']);
+            
+            if (result.rows[0]) insertedIds.push(result.rows[0].id);
+          }
+          
+          return new Response(JSON.stringify({ success: true, data: { ids: insertedIds } }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    console.error('[IptvAdmin] Error:', error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

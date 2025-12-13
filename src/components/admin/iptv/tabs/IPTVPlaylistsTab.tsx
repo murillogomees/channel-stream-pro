@@ -65,8 +65,11 @@ export function IPTVPlaylistsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { error } = await supabase.from('iptv_playlists').delete().eq('id', id);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('iptv-admin', {
+        body: { action: 'delete-playlist', data: { id } },
+      });
+      if (error) throw new Error(error.message);
+      if (!(data as { success?: boolean })?.success) throw new Error((data as { error?: string })?.error || 'Erro');
     },
     onSuccess: () => {
       toast.success('Playlist excluída');
@@ -77,8 +80,11 @@ export function IPTVPlaylistsTab() {
 
   const togglePublicMutation = useMutation({
     mutationFn: async ({ id, isPublic }: { id: number; isPublic: boolean }) => {
-      const { error } = await supabase.from('iptv_playlists').update({ is_public: isPublic }).eq('id', id);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('iptv-admin', {
+        body: { action: 'update-playlist', data: { id, is_public: isPublic, name: '', slug: '' } },
+      });
+      if (error) throw new Error(error.message);
+      if (!(data as { success?: boolean })?.success) throw new Error((data as { error?: string })?.error || 'Erro');
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['iptv-playlists'] }),
   });
