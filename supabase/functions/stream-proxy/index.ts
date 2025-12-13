@@ -412,30 +412,20 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 // HTTP FETCHING
 // =============================================================================
 
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers {
-  const headers = new Headers();
+function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers | undefined {
+  // CRITICAL FIX: For Xtream servers, return undefined to let Deno use default headers
+  // Many Xtream servers return 406 (Not Acceptable) for ANY custom headers
+  // The safest approach is to not set any headers at all
   
-  // CRITICAL: For Xtream servers, use MINIMAL headers
-  // Many Xtream servers return 406 (Not Acceptable) if they receive unexpected headers
-  // VLC-style User-Agent is most compatible with IPTV servers
-  headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
-  headers.set('Accept', '*/*');
-  headers.set('Connection', 'keep-alive');
-  
-  // Only add Referer for segments (helps with session validation on some servers)
-  if (isSegment && origin) {
-    headers.set('Referer', `${origin}/`);
-  }
-  
-  // Range header for seeking
+  // Only add Range header if needed for seeking (this is universally accepted)
   if (rangeHeader) {
+    const headers = new Headers();
     headers.set('Range', rangeHeader);
+    return headers;
   }
   
-  // NOTE: Do NOT add Accept-Encoding, Accept-Language, Origin for Xtream
-  // These can cause 406 errors on strict IPTV servers
-  
-  return headers;
+  // Return undefined = no custom headers = Deno defaults
+  return undefined;
 }
 
 function getJitter(): number {
@@ -444,7 +434,7 @@ function getJitter(): number {
 
 async function fetchWithRetry(
   url: string, 
-  headers: Headers, 
+  headers: Headers | undefined, 
   timeoutMs: number = CONFIG.FETCH_TIMEOUT_MS,
   maxRetries: number = CONFIG.MAX_RETRIES
 ): Promise<{ response: Response; usedUrl: string }> {
@@ -456,12 +446,19 @@ async function fetchWithRetry(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
-      const response = await fetch(urlToFetch, {
+      // Build fetch options - omit headers if undefined to use Deno defaults
+      const fetchOptions: RequestInit = {
         method: 'GET',
-        headers,
         signal: controller.signal,
         redirect: 'follow',
-      });
+      };
+      
+      // Only add headers if provided (undefined = use Deno defaults)
+      if (headers) {
+        fetchOptions.headers = headers;
+      }
+      
+      const response = await fetch(urlToFetch, fetchOptions);
       
       clearTimeout(timeoutId);
       
@@ -489,7 +486,7 @@ async function fetchWithRetry(
       }
     }
     
-    if (attempt < CONFIG.MAX_RETRIES - 1) {
+    if (attempt < maxRetries - 1) {
       const delay = CONFIG.RETRY_DELAY_BASE_MS * Math.pow(2, attempt) + getJitter();
       await new Promise(r => setTimeout(r, delay));
     }
