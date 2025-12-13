@@ -11,7 +11,7 @@ interface CreateUserRequest {
   password: string;
   nome: string;
   telefone?: string;
-  role?: 'admin' | 'super_admin' | 'client';
+  role?: 'admin' | 'master' | 'client';
 }
 
 Deno.serve(async (req) => {
@@ -86,16 +86,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
-    const isAdmin = userRoles?.some(r => r.role === 'admin') || isSuperAdmin;
+    const isMaster = userRoles?.some(r => r.role === 'master');
+    const isAdmin = userRoles?.some(r => r.role === 'admin') || isMaster;
 
     // Permission check:
-    // - super_admin can create any type of user (admin, super_admin, client)
+    // - master can create any type of user (admin, master, client)
     // - admin can only create client users
-    if ((role === 'admin' || role === 'super_admin') && !isSuperAdmin) {
-      console.log('User is not super_admin, cannot create admin/super_admin users:', user.id);
+    if ((role === 'admin' || role === 'master') && !isMaster) {
+      console.log('User is not master, cannot create admin/master users:', user.id);
       return new Response(
-        JSON.stringify({ error: 'Forbidden: Only super admins can create admin users' }),
+        JSON.stringify({ error: 'Forbidden: Only master users can create admin users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -155,9 +155,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Note: The trigger handle_new_user_role already assigns 'client' role automatically
-    // For admin/super_admin users, we need to explicitly add the role
-    if (role === 'admin' || role === 'super_admin') {
+    // Note: The trigger handle_new_user already assigns 'client' role automatically
+    // For admin/master users, we need to explicitly add the role
+    if (role === 'admin' || role === 'master') {
       const { error: roleError } = await serviceClient
         .from('user_roles')
         .insert({
@@ -177,8 +177,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Also add admin role for super_admin (they need both)
-      if (role === 'super_admin') {
+      // Also add admin role for master (they need both)
+      if (role === 'master') {
         await serviceClient
           .from('user_roles')
           .insert({
