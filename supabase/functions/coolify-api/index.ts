@@ -406,46 +406,56 @@ serve(async (req) => {
         if (!COOLIFY_TOKEN) {
           return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
         }
-        const dbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
+
+        // Prefer SUPABASE_DB_URL (main DB), fallback to SELFHOSTED_DB_URL for backward compatibility
+        const supabaseDbUrl = Deno.env.get('SUPABASE_DB_URL') || '';
+        const selfHostedDbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
+        const dbUrl = supabaseDbUrl || selfHostedDbUrl;
+
         if (!dbUrl) {
-          return { success: false, error: 'SELFHOSTED_DB_URL not configured' };
+          return { success: false, error: 'Neither SUPABASE_DB_URL nor SELFHOSTED_DB_URL is configured' };
         }
+
         let dbUri = '';
         try {
           const url = new URL(dbUrl);
           const host = url.hostname;
           const port = url.port || '5432';
           const database = url.pathname.replace('/', '') || 'postgres';
+
+          // We always use the "authenticator" role for PostgREST and only reuse the host/port/database
+          // from the DB URL. The authenticator password must already be configured in the database.
           const password = encodeURIComponent(url.password);
           dbUri = `postgres://authenticator:${password}@${host}:${port}/${database}`;
         } catch (e) {
-          return { success: false, error: `Invalid SELFHOSTED_DB_URL: ${e.message}` };
+          return { success: false, error: `Invalid DB URL: ${e.message}`, data: { dbUrl } };
         }
 
-        // Find Supabase application in Coolify
-        const appsRes = await fetch(`${COOLIFY_URL}/api/v1/applications`, {
+        // Find Supabase service in Coolify
+        const servicesRes = await fetch(`${COOLIFY_URL}/api/v1/services`, {
           headers: {
             'Authorization': `Bearer ${COOLIFY_TOKEN}`,
             'Accept': 'application/json',
           },
         });
-        if (!appsRes.ok) {
-          return { success: false, error: `Failed to list applications (${appsRes.status})` };
+        if (!servicesRes.ok) {
+          return { success: false, error: `Failed to list services (${servicesRes.status})` };
         }
-        const apps = await appsRes.json();
-        const supabaseApp = apps.find((a: any) =>
-          a.name?.toLowerCase().includes('supabase') ||
-          a.url?.includes('supabase.iptvlink.com.br')
+        const services = await servicesRes.json();
+        const supabaseService = services.find((s: any) =>
+          s.name?.toLowerCase().includes('supabase') ||
+          s.fqdn?.includes('supabase.iptvlink.com.br') ||
+          s.type?.toLowerCase() === 'supabase'
         );
-        if (!supabaseApp) {
+        if (!supabaseService) {
           return {
             success: false,
-            error: 'Supabase application not found in Coolify',
-            data: apps.map((a: any) => ({ name: a.name, uuid: a.uuid, url: a.url })),
+            error: 'Supabase service not found in Coolify',
+            data: services.map((s: any) => ({ name: s.name, uuid: s.uuid, fqdn: s.fqdn, type: s.type })),
           };
         }
 
-        // Update PGRST_DB_URI via bulk envs API
+        // Update PGRST_DB_URI via bulk envs API for the Supabase service
         const envsBody = {
           data: [
             {
@@ -459,7 +469,7 @@ serve(async (req) => {
           ],
         };
 
-        const envsRes = await fetch(`${COOLIFY_URL}/api/v1/applications/${supabaseApp.uuid}/envs/bulk`, {
+        const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${supabaseService.uuid}/envs/bulk`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${COOLIFY_TOKEN}`,
@@ -474,12 +484,23 @@ serve(async (req) => {
           return { success: false, error: `Failed to update envs (${envsRes.status})`, data: text };
         }
 
+        // Restart Supabase service so PostgREST picks up new DB URI
+        const restartRes = await fetch(`${COOLIFY_URL}/api/v1/services/${supabaseService.uuid}/restart`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+            'Accept': 'application/json',
+          },
+        });
+
         return {
-          success: true,
+          success: restartRes.ok,
           data: {
-            message: 'PGRST_DB_URI updated successfully',
-            application: { name: supabaseApp.name, uuid: supabaseApp.uuid, url: supabaseApp.url },
+            message: 'PGRST_DB_URI updated and Supabase service restart triggered',
+            service: { name: supabaseService.name, uuid: supabaseService.uuid, fqdn: supabaseService.fqdn, type: supabaseService.type },
             db_uri: dbUri,
+            restart_status: restartRes.ok ? 'triggered' : `failed (${restartRes.status})`,
+            db_url_source: supabaseDbUrl ? 'SUPABASE_DB_URL' : 'SELFHOSTED_DB_URL',
           },
         };
       },
