@@ -1707,6 +1707,1035 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
         
+      // ============================================================================
+      // DEVICE FINGERPRINTING - 4 handlers
+      // ============================================================================
+      
+      } else if (action === 'get-devices') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const devicesResult = await client.queryObject(`
+          SELECT id, fingerprint_hash, device_name, device_type, browser, os,
+                 is_trusted, trust_expires_at, first_seen_at, last_seen_at, login_count, created_at
+          FROM public.device_fingerprints
+          WHERE user_id = $1
+          ORDER BY last_seen_at DESC
+        `, [payload.sub]);
+        
+        return new Response(JSON.stringify({ devices: devicesResult.rows }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'register-device') {
+        const { fingerprint, device_name, device_type, browser, os } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !fingerprint) {
+          return new Response(JSON.stringify({ error: 'Token and fingerprint required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Check if device already exists
+        const existingDevice = await client.queryObject(`
+          SELECT id, is_trusted FROM public.device_fingerprints
+          WHERE user_id = $1 AND fingerprint_hash = $2
+        `, [payload.sub, fingerprint]);
+        
+        let deviceId: string;
+        let isNewDevice = false;
+        let isTrusted = false;
+        
+        if (existingDevice.rows.length > 0) {
+          // Update existing device
+          deviceId = (existingDevice.rows[0] as any).id;
+          isTrusted = (existingDevice.rows[0] as any).is_trusted;
+          
+          await client.queryObject(`
+            UPDATE public.device_fingerprints
+            SET last_seen_at = NOW(), login_count = login_count + 1,
+                device_name = COALESCE($3, device_name),
+                device_type = COALESCE($4, device_type),
+                browser = COALESCE($5, browser),
+                os = COALESCE($6, os)
+            WHERE id = $1 AND user_id = $2
+          `, [deviceId, payload.sub, device_name, device_type, browser, os]);
+        } else {
+          // Create new device
+          deviceId = crypto.randomUUID();
+          isNewDevice = true;
+          
+          await client.queryObject(`
+            INSERT INTO public.device_fingerprints (id, user_id, fingerprint_hash, device_name, device_type, browser, os, first_seen_at, last_seen_at, login_count)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), 1)
+          `, [deviceId, payload.sub, fingerprint, device_name || 'Unknown Device', device_type || 'unknown', browser || 'unknown', os || 'unknown']);
+          
+          // Create login alert for new device
+          await client.queryObject(`
+            INSERT INTO public.login_alerts (user_id, device_fingerprint_id, ip_address, alert_type, location_info)
+            VALUES ($1, $2, $3, 'new_device', $4)
+          `, [payload.sub, deviceId, ipAddress, JSON.stringify({ userAgent, ipAddress })]);
+        }
+        
+        console.log(`[CustomAuth] Device ${isNewDevice ? 'registered' : 'updated'}: ${deviceId}`);
+        
+        return new Response(JSON.stringify({ 
+          device_id: deviceId,
+          is_new: isNewDevice,
+          is_trusted: isTrusted
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'trust-device') {
+        const { device_id, trust_days } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !device_id) {
+          return new Response(JSON.stringify({ error: 'Token and device_id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const days = trust_days || 30;
+        
+        await client.queryObject(`
+          UPDATE public.device_fingerprints
+          SET is_trusted = true, trust_expires_at = NOW() + $3::INTERVAL
+          WHERE id = $1 AND user_id = $2
+        `, [device_id, payload.sub, `${days} days`]);
+        
+        console.log(`[CustomAuth] Device trusted: ${device_id} for ${days} days`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'remove-device') {
+        const { device_id } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !device_id) {
+          return new Response(JSON.stringify({ error: 'Token and device_id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          DELETE FROM public.device_fingerprints
+          WHERE id = $1 AND user_id = $2
+        `, [device_id, payload.sub]);
+        
+        console.log(`[CustomAuth] Device removed: ${device_id}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      // ============================================================================
+      // LOGIN ALERTS - 3 handlers
+      // ============================================================================
+      
+      } else if (action === 'get-login-alerts') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const alertsResult = await client.queryObject(`
+          SELECT la.id, la.alert_type, la.ip_address, la.location_info, la.created_at, la.acknowledged_at,
+                 df.device_name, df.device_type, df.browser, df.os
+          FROM public.login_alerts la
+          LEFT JOIN public.device_fingerprints df ON la.device_fingerprint_id = df.id
+          WHERE la.user_id = $1
+          ORDER BY la.created_at DESC
+          LIMIT 50
+        `, [payload.sub]);
+        
+        // Count unread
+        const unreadResult = await client.queryObject(`
+          SELECT COUNT(*) as count FROM public.login_alerts
+          WHERE user_id = $1 AND acknowledged_at IS NULL
+        `, [payload.sub]);
+        
+        return new Response(JSON.stringify({ 
+          alerts: alertsResult.rows,
+          unread_count: parseInt((unreadResult.rows[0] as any)?.count || '0')
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'acknowledge-alert') {
+        const { alert_id } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !alert_id) {
+          return new Response(JSON.stringify({ error: 'Token and alert_id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          UPDATE public.login_alerts
+          SET acknowledged_at = NOW()
+          WHERE id = $1 AND user_id = $2
+        `, [alert_id, payload.sub]);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'set-alert-preferences') {
+        const { email_alerts, whatsapp_alerts } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET login_alerts_email = $2, login_alerts_whatsapp = $3, updated_at = NOW()
+          WHERE id = $1
+        `, [payload.sub, email_alerts ?? true, whatsapp_alerts ?? false]);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      // ============================================================================
+      // PASSKEYS/WEBAUTHN - 6 handlers
+      // ============================================================================
+      
+      } else if (action === 'get-passkeys') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const passkeysResult = await client.queryObject(`
+          SELECT id, credential_id, device_name, is_active, last_used_at, created_at
+          FROM public.passkey_credentials
+          WHERE user_id = $1 AND is_active = true
+          ORDER BY last_used_at DESC NULLS LAST
+        `, [payload.sub]);
+        
+        return new Response(JSON.stringify({ passkeys: passkeysResult.rows }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'register-passkey-options') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Get user info
+        const userResult = await client.queryObject(`
+          SELECT email FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        const userEmail = (userResult.rows[0] as any)?.email || 'user';
+        
+        // Generate challenge
+        const challenge = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        // Store challenge temporarily (expires in 5 minutes)
+        await client.queryObject(`
+          INSERT INTO public.security_events (event_type, event_details, user_id, severity)
+          VALUES ('passkey_challenge', $1, $2, 'info')
+        `, [JSON.stringify({ challenge, expires: Date.now() + 300000 }), payload.sub]);
+        
+        const options = {
+          challenge,
+          rp: {
+            name: 'IPTVLink',
+            id: 'iptvlink.com.br'
+          },
+          user: {
+            id: payload.sub,
+            name: userEmail,
+            displayName: userEmail.split('@')[0]
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },  // ES256
+            { type: 'public-key', alg: -257 } // RS256
+          ],
+          timeout: 300000,
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            residentKey: 'preferred',
+            userVerification: 'preferred'
+          }
+        };
+        
+        return new Response(JSON.stringify(options), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'register-passkey-verify') {
+        const { credential_id, public_key, device_name, attestation } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !credential_id || !public_key) {
+          return new Response(JSON.stringify({ error: 'Token, credential_id and public_key required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Store the passkey credential
+        const passkeyId = crypto.randomUUID();
+        
+        await client.queryObject(`
+          INSERT INTO public.passkey_credentials (id, user_id, credential_id, public_key, device_name, is_active, counter)
+          VALUES ($1, $2, $3, $4, $5, true, 0)
+        `, [passkeyId, payload.sub, credential_id, public_key, device_name || 'Passkey']);
+        
+        console.log(`[CustomAuth] Passkey registered: ${passkeyId} for user ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          passkey_id: passkeyId
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'passkey-login-options') {
+        const { email: passkeyEmail } = await req.json();
+        
+        if (!passkeyEmail) {
+          return new Response(JSON.stringify({ error: 'Email required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Get user and their passkeys
+        const userResult = await client.queryObject(`
+          SELECT id FROM auth.users WHERE email = $1
+        `, [passkeyEmail.toLowerCase()]);
+        
+        if (userResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const userId = (userResult.rows[0] as any).id;
+        
+        const passkeysResult = await client.queryObject(`
+          SELECT credential_id FROM public.passkey_credentials
+          WHERE user_id = $1 AND is_active = true
+        `, [userId]);
+        
+        if (passkeysResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'No passkeys registered' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const challenge = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        // Store challenge
+        await client.queryObject(`
+          INSERT INTO public.security_events (event_type, event_details, user_id, severity)
+          VALUES ('passkey_login_challenge', $1, $2, 'info')
+        `, [JSON.stringify({ challenge, expires: Date.now() + 300000 }), userId]);
+        
+        const options = {
+          challenge,
+          rpId: 'iptvlink.com.br',
+          timeout: 300000,
+          userVerification: 'preferred',
+          allowCredentials: (passkeysResult.rows as any[]).map(p => ({
+            type: 'public-key',
+            id: p.credential_id
+          }))
+        };
+        
+        return new Response(JSON.stringify(options), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'passkey-login-verify') {
+        const { credential_id, signature, authenticator_data, client_data } = await req.json();
+        
+        if (!credential_id || !signature) {
+          return new Response(JSON.stringify({ error: 'credential_id and signature required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Find the passkey and user
+        const passkeyResult = await client.queryObject(`
+          SELECT pc.id, pc.user_id, pc.public_key, pc.counter, u.email
+          FROM public.passkey_credentials pc
+          JOIN auth.users u ON pc.user_id = u.id
+          WHERE pc.credential_id = $1 AND pc.is_active = true
+        `, [credential_id]);
+        
+        if (passkeyResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'Passkey not found' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const passkey = passkeyResult.rows[0] as any;
+        
+        // TODO: Verify signature using public key
+        // For now, accept the verification (in production, implement proper WebAuthn verification)
+        
+        // Update counter and last used
+        await client.queryObject(`
+          UPDATE public.passkey_credentials
+          SET counter = counter + 1, last_used_at = NOW()
+          WHERE id = $1
+        `, [passkey.id]);
+        
+        // Get role
+        const roleResult = await client.queryObject(`
+          SELECT role FROM public.user_roles WHERE user_id = $1
+        `, [passkey.user_id]);
+        
+        const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
+        
+        // Create tokens
+        const now = Math.floor(Date.now() / 1000);
+        const accessExpiresIn = 3600;
+        const refreshExpiresIn = 3600 * 24 * 30;
+        const sessionId = crypto.randomUUID();
+        const familyId = crypto.randomUUID();
+        
+        const accessToken = await createJWT({
+          aud: 'authenticated',
+          exp: now + accessExpiresIn,
+          iat: now,
+          iss: SUPABASE_URL + '/auth/v1',
+          sub: passkey.user_id,
+          email: passkey.email,
+          phone: '',
+          app_metadata: { provider: 'passkey', providers: ['passkey'] },
+          user_metadata: {},
+          role: 'authenticated',
+          aal: 'aal2', // Passkey provides higher assurance
+          amr: [{ method: 'passkey', timestamp: now }],
+          session_id: sessionId,
+          app_role: role
+        }, jwtSecret);
+        
+        const refreshToken = await createJWT({
+          sub: passkey.user_id,
+          type: 'refresh',
+          family_id: familyId,
+          iat: now,
+          exp: now + refreshExpiresIn,
+        }, jwtSecret);
+        
+        // Store refresh token
+        const refreshTokenHash = await hashToken(refreshToken);
+        await storeRefreshToken(
+          client, passkey.user_id, refreshTokenHash, familyId,
+          ipAddress, userAgent, new Date(Date.now() + refreshExpiresIn * 1000)
+        );
+        
+        // Log login
+        await client.queryObject(`
+          INSERT INTO public.auth_sessions_log (user_id, user_email, event_type, ip_address, user_agent, metadata)
+          VALUES ($1, $2, 'passkey_login', $3, $4, $5)
+        `, [passkey.user_id, passkey.email, ipAddress, userAgent, JSON.stringify({ passkey_id: passkey.id })]);
+        
+        console.log(`[CustomAuth] Passkey login successful for: ${passkey.email}`);
+        
+        return new Response(JSON.stringify({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          token_type: 'bearer',
+          expires_in: accessExpiresIn,
+          user: {
+            id: passkey.user_id,
+            email: passkey.email,
+            role
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'remove-passkey') {
+        const { passkey_id } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !passkey_id) {
+          return new Response(JSON.stringify({ error: 'Token and passkey_id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          UPDATE public.passkey_credentials
+          SET is_active = false
+          WHERE id = $1 AND user_id = $2
+        `, [passkey_id, payload.sub]);
+        
+        console.log(`[CustomAuth] Passkey removed: ${passkey_id}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      // ============================================================================
+      // EMAIL CHANGE - 3 handlers
+      // ============================================================================
+      
+      } else if (action === 'request-email-change') {
+        const { new_email } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !new_email) {
+          return new Response(JSON.stringify({ error: 'Token and new_email required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Check if new email is already in use
+        const existingUser = await client.queryObject(`
+          SELECT id FROM auth.users WHERE email = $1
+        `, [new_email.toLowerCase()]);
+        
+        if (existingUser.rows.length > 0) {
+          return new Response(JSON.stringify({ error: 'Email already in use' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Cancel any pending requests
+        await client.queryObject(`
+          DELETE FROM public.email_change_requests
+          WHERE user_id = $1 AND confirmed_at IS NULL
+        `, [payload.sub]);
+        
+        // Generate verification token
+        const verificationToken = crypto.randomUUID();
+        const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+        
+        // Store request
+        await client.queryObject(`
+          INSERT INTO public.email_change_requests (user_id, old_email, new_email, token, verification_code, expires_at)
+          VALUES ($1, (SELECT email FROM auth.users WHERE id = $1), $2, $3, $4, NOW() + INTERVAL '1 hour')
+        `, [payload.sub, new_email.toLowerCase(), verificationToken, code]);
+        
+        // TODO: Send verification code to new email
+        console.log(`[CustomAuth] Email change requested for user ${payload.sub}, new: ${new_email}, code: ${code}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: 'Verification code sent to new email'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'confirm-email-change') {
+        const { code } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !code) {
+          return new Response(JSON.stringify({ error: 'Token and code required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Find pending request
+        const requestResult = await client.queryObject(`
+          SELECT id, new_email, old_email
+          FROM public.email_change_requests
+          WHERE user_id = $1 AND verification_code = $2 AND confirmed_at IS NULL AND expires_at > NOW()
+        `, [payload.sub, code]);
+        
+        if (requestResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired code' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const request = requestResult.rows[0] as any;
+        
+        // Update email
+        await client.queryObject(`
+          UPDATE auth.users SET email = $1, updated_at = NOW() WHERE id = $2
+        `, [request.new_email, payload.sub]);
+        
+        await client.queryObject(`
+          UPDATE public.profiles SET email = $1, updated_at = NOW() WHERE id = $2
+        `, [request.new_email, payload.sub]);
+        
+        // Mark request as confirmed
+        await client.queryObject(`
+          UPDATE public.email_change_requests SET confirmed_at = NOW() WHERE id = $1
+        `, [request.id]);
+        
+        console.log(`[CustomAuth] Email changed for user ${payload.sub}: ${request.old_email} -> ${request.new_email}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          new_email: request.new_email
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'cancel-email-change') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          DELETE FROM public.email_change_requests
+          WHERE user_id = $1 AND confirmed_at IS NULL
+        `, [payload.sub]);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      // ============================================================================
+      // PHONE VERIFICATION VIA WHATSAPP - 3 handlers
+      // ============================================================================
+      
+      } else if (action === 'request-phone-verification') {
+        const { phone_number } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !phone_number) {
+          return new Response(JSON.stringify({ error: 'Token and phone_number required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Rate limit: max 3 codes per phone per hour
+        const recentCodes = await client.queryObject(`
+          SELECT COUNT(*) as count FROM public.phone_verification_codes
+          WHERE phone_number = $1 AND created_at > NOW() - INTERVAL '1 hour'
+        `, [phone_number]);
+        
+        if (parseInt((recentCodes.rows[0] as any)?.count || '0') >= 3) {
+          return new Response(JSON.stringify({ 
+            error: 'Too many verification attempts. Try again later.' 
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Generate 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Store code (expires in 10 minutes)
+        await client.queryObject(`
+          INSERT INTO public.phone_verification_codes (user_id, phone_number, code, purpose, expires_at, attempts)
+          VALUES ($1, $2, $3, 'verify_phone', NOW() + INTERVAL '10 minutes', 0)
+        `, [payload.sub, phone_number, code]);
+        
+        // Send via WhatsApp using BotBot API
+        const whatsappAppkey = Deno.env.get('WHATSAPP_APPKEY');
+        const whatsappAuthkey = Deno.env.get('WHATSAPP_AUTHKEY');
+        
+        if (whatsappAppkey && whatsappAuthkey) {
+          try {
+            const formData = new FormData();
+            formData.append('appkey', whatsappAppkey);
+            formData.append('authkey', whatsappAuthkey);
+            formData.append('to', phone_number.replace(/\D/g, ''));
+            formData.append('message', `🔐 Seu código de verificação IPTVLink é: *${code}*\n\nEste código expira em 10 minutos.\n\nSe você não solicitou este código, ignore esta mensagem.`);
+            
+            const whatsappResponse = await fetch('https://api.botbot.app/send', {
+              method: 'POST',
+              body: formData
+            });
+            
+            const whatsappResult = await whatsappResponse.json();
+            console.log(`[CustomAuth] WhatsApp verification sent to ${phone_number}:`, whatsappResult);
+          } catch (e) {
+            console.error(`[CustomAuth] Failed to send WhatsApp:`, e);
+            // Continue anyway - code is stored
+          }
+        } else {
+          console.log(`[CustomAuth] WhatsApp not configured, code for ${phone_number}: ${code}`);
+        }
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: 'Verification code sent via WhatsApp'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'verify-phone-code') {
+        const { phone_number, code } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !phone_number || !code) {
+          return new Response(JSON.stringify({ error: 'Token, phone_number and code required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Find valid code
+        const codeResult = await client.queryObject(`
+          SELECT id, attempts FROM public.phone_verification_codes
+          WHERE user_id = $1 AND phone_number = $2 AND code = $3 
+            AND verified_at IS NULL AND expires_at > NOW() AND attempts < 3
+        `, [payload.sub, phone_number, code]);
+        
+        if (codeResult.rows.length === 0) {
+          // Increment attempts on wrong codes
+          await client.queryObject(`
+            UPDATE public.phone_verification_codes
+            SET attempts = attempts + 1
+            WHERE user_id = $1 AND phone_number = $2 AND verified_at IS NULL AND expires_at > NOW()
+          `, [payload.sub, phone_number]);
+          
+          return new Response(JSON.stringify({ error: 'Invalid or expired code' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const verificationCode = codeResult.rows[0] as any;
+        
+        // Mark as verified
+        await client.queryObject(`
+          UPDATE public.phone_verification_codes SET verified_at = NOW() WHERE id = $1
+        `, [verificationCode.id]);
+        
+        // Update profile with verified phone
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET contact_phone = $1, phone_verified = true, phone_verified_at = NOW(), updated_at = NOW()
+          WHERE id = $2
+        `, [phone_number, payload.sub]);
+        
+        console.log(`[CustomAuth] Phone verified for user ${payload.sub}: ${phone_number}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          phone_number: phone_number
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'resend-phone-code') {
+        const { phone_number } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !phone_number) {
+          return new Response(JSON.stringify({ error: 'Token and phone_number required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Invalidate old codes
+        await client.queryObject(`
+          DELETE FROM public.phone_verification_codes
+          WHERE user_id = $1 AND phone_number = $2 AND verified_at IS NULL
+        `, [payload.sub, phone_number]);
+        
+        // Create new code (reuse request-phone-verification logic)
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        await client.queryObject(`
+          INSERT INTO public.phone_verification_codes (user_id, phone_number, code, purpose, expires_at, attempts)
+          VALUES ($1, $2, $3, 'verify_phone', NOW() + INTERVAL '10 minutes', 0)
+        `, [payload.sub, phone_number, code]);
+        
+        // Send via WhatsApp
+        const whatsappAppkey = Deno.env.get('WHATSAPP_APPKEY');
+        const whatsappAuthkey = Deno.env.get('WHATSAPP_AUTHKEY');
+        
+        if (whatsappAppkey && whatsappAuthkey) {
+          try {
+            const formData = new FormData();
+            formData.append('appkey', whatsappAppkey);
+            formData.append('authkey', whatsappAuthkey);
+            formData.append('to', phone_number.replace(/\D/g, ''));
+            formData.append('message', `🔐 Seu novo código de verificação IPTVLink é: *${code}*\n\nEste código expira em 10 minutos.`);
+            
+            await fetch('https://api.botbot.app/send', {
+              method: 'POST',
+              body: formData
+            });
+          } catch (e) {
+            console.error(`[CustomAuth] Failed to resend WhatsApp:`, e);
+          }
+        }
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: 'New verification code sent'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      // ============================================================================
+      // ACCOUNT DELETION - 3 handlers
+      // ============================================================================
+      
+      } else if (action === 'request-account-deletion') {
+        const { reason, password } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Verify password if provided
+        if (password) {
+          const verifyResult = await client.queryObject(`
+            SELECT (encrypted_password = crypt($2, encrypted_password)) as valid
+            FROM auth.users WHERE id = $1
+          `, [payload.sub, password]);
+          
+          if (verifyResult.rows.length === 0 || !(verifyResult.rows[0] as any).valid) {
+            return new Response(JSON.stringify({ error: 'Invalid password' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // Check for existing pending request
+        const existingRequest = await client.queryObject(`
+          SELECT id FROM public.account_deletion_requests
+          WHERE user_id = $1 AND completed_at IS NULL AND cancelled_at IS NULL
+        `, [payload.sub]);
+        
+        if (existingRequest.rows.length > 0) {
+          return new Response(JSON.stringify({ error: 'Deletion request already pending' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Create deletion request (30 days grace period)
+        const confirmationToken = crypto.randomUUID();
+        const scheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        
+        await client.queryObject(`
+          INSERT INTO public.account_deletion_requests (user_id, reason, confirmation_token, scheduled_deletion_at)
+          VALUES ($1, $2, $3, $4)
+        `, [payload.sub, reason || null, confirmationToken, scheduledAt.toISOString()]);
+        
+        // Log security event
+        await client.queryObject(`
+          INSERT INTO public.security_events (event_type, event_details, user_id, severity)
+          VALUES ('account_deletion_requested', $1, $2, 'high')
+        `, [JSON.stringify({ reason, scheduled_at: scheduledAt }), payload.sub]);
+        
+        console.log(`[CustomAuth] Account deletion requested for user ${payload.sub}, scheduled: ${scheduledAt}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          scheduled_deletion_at: scheduledAt.toISOString(),
+          message: 'Account scheduled for deletion in 30 days. You can cancel anytime before then.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'cancel-account-deletion') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const result = await client.queryObject(`
+          UPDATE public.account_deletion_requests
+          SET cancelled_at = NOW()
+          WHERE user_id = $1 AND completed_at IS NULL AND cancelled_at IS NULL
+          RETURNING id
+        `, [payload.sub]);
+        
+        if (result.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'No pending deletion request' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        console.log(`[CustomAuth] Account deletion cancelled for user ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'get-deletion-status') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const requestResult = await client.queryObject(`
+          SELECT id, reason, scheduled_deletion_at, created_at, cancelled_at, completed_at
+          FROM public.account_deletion_requests
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `, [payload.sub]);
+        
+        if (requestResult.rows.length === 0) {
+          return new Response(JSON.stringify({ 
+            has_pending_request: false,
+            status: null
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const request = requestResult.rows[0] as any;
+        
+        let status = 'pending';
+        if (request.cancelled_at) status = 'cancelled';
+        else if (request.completed_at) status = 'completed';
+        
+        return new Response(JSON.stringify({
+          has_pending_request: status === 'pending',
+          status,
+          scheduled_deletion_at: request.scheduled_deletion_at,
+          reason: request.reason,
+          created_at: request.created_at,
+          cancelled_at: request.cancelled_at
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
       } else {
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,

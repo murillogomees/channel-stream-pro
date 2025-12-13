@@ -820,7 +820,10 @@ class CustomAuthService {
    */
   async setAlertPreferences(prefs: { email: boolean; whatsapp: boolean }): Promise<AuthResponse<null>> {
     try {
-      await this.callAuthEndpoint('set-alert-preferences', prefs);
+      await this.callAuthEndpoint('set-alert-preferences', { 
+        email_alerts: prefs.email, 
+        whatsapp_alerts: prefs.whatsapp 
+      });
       return { data: null, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
@@ -848,8 +851,8 @@ class CustomAuthService {
    */
   async startPasskeyRegistration(): Promise<AuthResponse<{ options: any }>> {
     try {
-      const result = await this.callAuthEndpoint('start-passkey-registration');
-      return { data: { options: result.options }, error: null };
+      const result = await this.callAuthEndpoint('register-passkey-options');
+      return { data: { options: result }, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
     }
@@ -860,7 +863,16 @@ class CustomAuthService {
    */
   async completePasskeyRegistration(credential: any, deviceName?: string): Promise<AuthResponse<null>> {
     try {
-      await this.callAuthEndpoint('complete-passkey-registration', { credential, device_name: deviceName });
+      // Extract credential data for the server
+      const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+      const publicKey = btoa(String.fromCharCode(...new Uint8Array(credential.response.getPublicKey?.() || [])));
+      
+      await this.callAuthEndpoint('register-passkey-verify', { 
+        credential_id: credentialId,
+        public_key: publicKey || credentialId, 
+        device_name: deviceName,
+        attestation: credential.response.attestationObject ? btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))) : null
+      });
       return { data: null, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
@@ -898,15 +910,15 @@ class CustomAuthService {
   /**
    * Confirm email change with token
    */
-  async confirmEmailChange(token: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
+  async confirmEmailChange(code: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
     try {
-      const result = await this.callAuthEndpoint('confirm-email-change', { token });
-      if (this.session && result.user) {
-        this.session.user = result.user;
+      const result = await this.callAuthEndpoint('confirm-email-change', { code });
+      if (this.session && result.new_email) {
+        this.session.user.email = result.new_email;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
         this.notifyListeners('USER_UPDATED', this.session);
       }
-      return { data: { user: result.user }, error: null };
+      return { data: { user: this.session?.user as CustomAuthUser }, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
     }
@@ -933,7 +945,7 @@ class CustomAuthService {
    */
   async verifyPhone(phoneNumber: string, code: string): Promise<AuthResponse<null>> {
     try {
-      await this.callAuthEndpoint('verify-phone', { phone_number: phoneNumber, code });
+      await this.callAuthEndpoint('verify-phone-code', { phone_number: phoneNumber, code });
       if (this.session) {
         this.session.user.phone = phoneNumber;
         this.session.user.phone_confirmed_at = new Date().toISOString();
@@ -980,7 +992,13 @@ class CustomAuthService {
   async getAccountDeletionStatus(): Promise<AuthResponse<{ pending: boolean; scheduled_at?: string }>> {
     try {
       const result = await this.callAuthEndpoint('get-deletion-status');
-      return { data: { pending: result.pending || false, scheduled_at: result.scheduled_at }, error: null };
+      return { 
+        data: { 
+          pending: result.has_pending_request || false, 
+          scheduled_at: result.scheduled_deletion_at 
+        }, 
+        error: null 
+      };
     } catch (error: any) {
       return { data: { pending: false }, error: null };
     }
