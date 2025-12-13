@@ -328,55 +328,80 @@ function isKeyFile(url: string): boolean {
 // HLS MANIFEST REWRITING
 // =============================================================================
 
-// Extract Xtream credentials from URL pattern: /live/username/password/channelid.m3u8
-function extractXtreamCredentials(url: string): { username: string; password: string; host: string } | null {
+// Detect if URL is from an Xtream server (uses session tokens for segments)
+function isXtreamUrl(url: string): boolean {
   try {
     const urlObj = new URL(url);
-    const pathMatch = urlObj.pathname.match(/\/live\/([^\/]+)\/([^\/]+)\/\d+\.m3u8/);
-    if (pathMatch) {
-      return {
-        username: pathMatch[1],
-        password: pathMatch[2],
-        host: urlObj.origin
-      };
-    }
+    const pathname = urlObj.pathname.toLowerCase();
+    
+    // Xtream patterns: /live/user/pass/id.m3u8 or /hls/token/id.ts
+    const isXtreamLive = /\/live\/[^\/]+\/[^\/]+\/\d+\.m3u8/.test(pathname);
+    const isXtreamHls = /\/hls\/[a-f0-9]+\/\d+/.test(pathname);
+    const hasXtreamPort = [8080, 8880, 25461, 25463, 1935].includes(parseInt(urlObj.port) || 80);
+    
+    return isXtreamLive || isXtreamHls || hasXtreamPort;
   } catch {
-    // Not a valid URL
+    return false;
   }
-  return null;
 }
 
-// Rewrite segment URL to use Xtream credentials format if available
-function rewriteSegmentUrl(segmentUrl: string, credentials: { username: string; password: string; host: string } | null): string {
-  // If we have Xtream credentials and the segment is from /hls/ path (token-based)
-  // We need to keep the original URL as-is because Xtream servers validate the session token
-  // The token in /hls/{token}/{segment}.ts is tied to the original .m3u8 request session
-  return segmentUrl;
+// Extract base origin from Xtream URL for Referer header
+function getXtreamOrigin(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.origin;
+  } catch {
+    return null;
+  }
 }
 
+/**
+ * Rewrite HLS manifest with intelligent segment handling
+ * 
+ * CRITICAL: For Xtream servers, we DO NOT proxy segment URLs because:
+ * 1. Xtream generates temporary session tokens in /hls/{token}/
+ * 2. These tokens are tied to the original .m3u8 request IP/session
+ * 3. Proxying breaks the session validation, resulting in 403
+ * 
+ * Instead, we let HLS.js fetch segments directly with proper headers
+ */
 function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string, originalUrl: string): string {
   const lines = content.split('\n');
-  const credentials = extractXtreamCredentials(originalUrl);
+  const isXtream = isXtreamUrl(originalUrl);
+  const xtreamOrigin = getXtreamOrigin(originalUrl);
+  
+  // Log for debugging
+  console.log(`[Manifest] Rewriting for ${isXtream ? 'XTREAM' : 'STANDARD'} stream: ${originalUrl.substring(0, 80)}...`);
   
   return lines.map(line => {
     const trimmedLine = line.trim();
     
+    // Skip empty lines and comments without URI
     if (!trimmedLine || (trimmedLine.startsWith('#') && !trimmedLine.includes('URI="'))) {
       return line;
     }
     
+    // Handle encryption key URIs (always proxy these)
     if (trimmedLine.includes('URI="')) {
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
         const fullUrl = resolveUrl(uri, baseUrl);
-        const finalUrl = rewriteSegmentUrl(fullUrl, credentials);
-        return `URI="${proxyBaseUrl}?url=${encodeURIComponent(finalUrl)}"`;
+        return `URI="${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}"`;
       });
     }
     
+    // Handle segment URLs
     if (!trimmedLine.startsWith('#')) {
       const fullUrl = resolveUrl(trimmedLine, baseUrl);
-      const finalUrl = rewriteSegmentUrl(fullUrl, credentials);
-      return `${proxyBaseUrl}?url=${encodeURIComponent(finalUrl)}`;
+      
+      // FOR XTREAM: Return original URL - let HLS.js fetch directly
+      // The player will be configured with xhrSetup to add proper headers
+      if (isXtream) {
+        console.log(`[Manifest] XTREAM: Keeping original segment URL (no proxy)`);
+        return fullUrl; // Return absolute URL without proxy
+      }
+      
+      // FOR STANDARD: Proxy the segment
+      return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
     }
     
     return line;

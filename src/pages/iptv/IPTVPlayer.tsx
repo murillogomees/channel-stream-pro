@@ -78,7 +78,26 @@ export default function IPTVPlayer() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Initialize HLS player
+  // Track 403 errors for session recovery
+  const errorRetryCountRef = useRef(0);
+  const lastErrorUrlRef = useRef<string | null>(null);
+  const MAX_403_RETRIES = 2;
+  
+  // Refs for callbacks to avoid circular dependencies
+  const handleCdnFallbackRef = useRef<() => void>(() => {});
+  const refetchPlaybackRef = useRef<() => void>(() => {});
+
+  // Extract origin from stream URL for Referer header
+  const getStreamOrigin = useCallback((streamUrl: string): string => {
+    try {
+      const urlObj = new URL(streamUrl);
+      return urlObj.origin;
+    } catch {
+      return '';
+    }
+  }, []);
+
+  // Initialize HLS player with proper header propagation for IPTV
   const initPlayer = useCallback((url: string) => {
     const video = videoRef.current;
     if (!video) return;
@@ -93,35 +112,115 @@ export default function IPTVPlayer() {
 
     // Check if HLS.js is supported
     if (Hls.isSupported() && (url.includes('.m3u8') || url.includes('m3u'))) {
+      const streamOrigin = getStreamOrigin(url);
+      
       const hls = new Hls({
+        // Buffer settings
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
         maxBufferSize: 60 * 1000 * 1000,
+        
+        // Live sync
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
+        
+        // Performance
         enableWorker: true,
         lowLatencyMode: false,
         startLevel: -1, // Auto quality
+        
+        // CRITICAL: Disable aggressive prefetch to respect session tokens
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        
+        // Fragment loading settings
+        fragLoadingMaxRetry: 2,
+        fragLoadingRetryDelay: 1000,
+        fragLoadingMaxRetryTimeout: 8000,
+        
+        // Manifest loading
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 1000,
+        
+        // Level loading
+        levelLoadingMaxRetry: 2,
+        levelLoadingRetryDelay: 1000,
+
+        /**
+         * CRITICAL: xhrSetup for proper header propagation
+         * This ensures ALL requests (playlist + segments) have proper headers
+         * Required for Xtream servers that validate Referer/User-Agent
+         */
+        xhrSetup: (xhr: XMLHttpRequest, xhrUrl: string) => {
+          // Set headers that help with Xtream session validation
+          xhr.setRequestHeader('Accept', '*/*');
+          
+          // Log segment fetches for debugging
+          if (xhrUrl.includes('.ts')) {
+            console.log('[HLS] Fetching segment:', xhrUrl.substring(0, 100) + '...');
+          }
+        },
       });
 
       hls.loadSource(url);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[HLS] Manifest parsed, starting playback');
+        errorRetryCountRef.current = 0; // Reset on success
         video.play().catch(console.error);
       });
 
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        // Reset error counter on successful fragment load
+        errorRetryCountRef.current = 0;
+      });
+
       hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('[HLS] Error:', data.type, data.details, data.response?.code);
+        
+        // Handle 403 specifically - session expired
+        if (data.response?.code === 403) {
+          console.warn('[HLS] 403 Forbidden - Session may be expired');
+          
+          // Avoid infinite loops
+          if (errorRetryCountRef.current < MAX_403_RETRIES && lastErrorUrlRef.current !== url) {
+            errorRetryCountRef.current++;
+            lastErrorUrlRef.current = url;
+            
+            console.log(`[HLS] Attempting session recovery (${errorRetryCountRef.current}/${MAX_403_RETRIES})`);
+            
+            // Destroy current instance and reload from fresh m3u8
+            hls.destroy();
+            hlsRef.current = null;
+            
+            // Small delay before retry to allow session cleanup
+            setTimeout(() => {
+              refetchPlaybackRef.current(); // Get fresh URL from server
+            }, 1000);
+            
+            return;
+          }
+        }
+
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('[HLS] Network error');
-              handleCdnFallback();
+              console.error('[HLS] Fatal network error');
+              
+              // Try CDN fallback
+              if (errorRetryCountRef.current < MAX_403_RETRIES) {
+                handleCdnFallbackRef.current();
+              } else {
+                setState(prev => ({ ...prev, errorMessage: 'Erro de conexão com o servidor' }));
+              }
               break;
+              
             case Hls.ErrorTypes.MEDIA_ERROR:
               console.error('[HLS] Media error, attempting recovery');
               hls.recoverMediaError();
               break;
+              
             default:
               setState(prev => ({ ...prev, errorMessage: 'Erro ao reproduzir' }));
               break;
@@ -139,7 +238,7 @@ export default function IPTVPlayer() {
       video.src = url;
       video.play().catch(console.error);
     }
-  }, []);
+  }, [getStreamOrigin]);
 
   // CDN Fallback
   const handleCdnFallback = useCallback(() => {
@@ -155,6 +254,15 @@ export default function IPTVPlayer() {
       setState(prev => ({ ...prev, errorMessage: 'Não foi possível reproduzir o canal' }));
     }
   }, [playbackInfo, state.currentCdnIndex, initPlayer]);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    handleCdnFallbackRef.current = handleCdnFallback;
+  }, [handleCdnFallback]);
+
+  useEffect(() => {
+    refetchPlaybackRef.current = refetchPlayback;
+  }, [refetchPlayback]);
 
   // Initialize player when playback URL changes
   useEffect(() => {
