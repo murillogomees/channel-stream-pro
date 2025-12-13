@@ -478,3 +478,31 @@ verify_jwt = false
 # Edge Functions sync - sync functions from GitHub
 [functions.edge-functions-sync]
 verify_jwt = false
+
+# ==========================================
+# IPTV PERFORMANCE OPTIMIZATION
+# ==========================================
+
+# IPTV Performance Optimizer - CDN routing, load balancing, metrics
+[functions.iptv-performance]
+verify_jwt = false
+
+# ABR Controller - adaptive bitrate quality decisions
+[functions.iptv-abr-controller]
+verify_jwt = false
+
+# Prefetch Orchestrator - intelligent segment prefetching
+[functions.iptv-prefetch]
+verify_jwt = false
+
+# Transcode Manager - job queue management
+[functions.iptv-transcode]
+verify_jwt = false
+
+# Redis Cache Manager - tiered caching operations
+[functions.iptv-redis-cache]
+verify_jwt = false
+
+# Probe Service - channel health checking
+[functions.iptv-probe]
+verify_jwt = false
