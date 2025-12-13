@@ -1,25 +1,28 @@
 /**
  * IPTV Channel Import Component
  * Import channels from M3U file or URL - saves directly to iptv_channels
+ * With real-time progress via SSE
  */
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Loader2, Upload, Link, FileText, CheckCircle } from 'lucide-react';
+import { Loader2, Upload, Link, FileText, CheckCircle, XCircle } from 'lucide-react';
 
-interface ImportResult {
-  success: boolean;
-  inserted?: number;
-  skipped?: number;
-  total?: number;
-  limited?: boolean;
+interface ProgressState {
+  status: 'idle' | 'fetching' | 'importing' | 'complete' | 'error';
+  total: number;
+  processed: number;
+  inserted: number;
+  skipped: number;
+  progress: number;
   message?: string;
   error?: string;
 }
@@ -32,71 +35,137 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
   const queryClient = useQueryClient();
   const [m3uUrl, setM3uUrl] = useState('');
   const [m3uContent, setM3uContent] = useState('');
-  const [lastResult, setLastResult] = useState<ImportResult | null>(null);
-
-  // Import via URL - saves directly to iptv_channels
-  const importUrlMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const { data, error } = await supabase.functions.invoke<ImportResult>('fetch-m3u', {
-        body: { url }
-      });
-
-      if (error) throw new Error(error.message || 'Erro ao importar M3U');
-      if (data?.error) throw new Error(data.error);
-      if (!data?.success) throw new Error('Falha na importação');
-      
-      return data;
-    },
-    onSuccess: (data) => {
-      setLastResult(data);
-      toast.success(data.message || `Importados ${data.inserted} canais`);
-      setM3uUrl('');
-      queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
-      queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
-      onSuccess();
-    },
-    onError: (error) => {
-      toast.error(`Erro: ${error.message}`);
-    },
+  const [progressState, setProgressState] = useState<ProgressState>({
+    status: 'idle',
+    total: 0,
+    processed: 0,
+    inserted: 0,
+    skipped: 0,
+    progress: 0,
   });
 
-  // Import via pasted content - saves directly to iptv_channels
-  const importContentMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const { data, error } = await supabase.functions.invoke<ImportResult>('fetch-m3u', {
-        body: { content }
+  const importWithProgress = useCallback(async (payload: { url?: string; content?: string }) => {
+    setProgressState({
+      status: 'fetching',
+      total: 0,
+      processed: 0,
+      inserted: 0,
+      skipped: 0,
+      progress: 0,
+      message: 'Buscando e analisando M3U...',
+    });
+
+    try {
+      // Get the Supabase URL for the edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/fetch-m3u`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify({ ...payload, stream: true }),
       });
 
-      if (error) throw new Error(error.message || 'Erro ao importar M3U');
-      if (data?.error) throw new Error(data.error);
-      if (!data?.success) throw new Error('Falha na importação');
-      
-      return data;
-    },
-    onSuccess: (data) => {
-      setLastResult(data);
-      toast.success(data.message || `Importados ${data.inserted} canais`);
-      setM3uContent('');
-      queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
-      queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
-      onSuccess();
-    },
-    onError: (error) => {
-      toast.error(`Erro: ${error.message}`);
-    },
-  });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
 
-  const isLoading = importUrlMutation.isPending || importContentMutation.isPending;
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Não foi possível ler a resposta');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'start') {
+                setProgressState(prev => ({
+                  ...prev,
+                  status: 'importing',
+                  total: data.total,
+                  message: `Importando ${data.total.toLocaleString()} canais...`,
+                }));
+              } else if (data.type === 'progress') {
+                setProgressState(prev => ({
+                  ...prev,
+                  processed: data.processed,
+                  inserted: data.inserted,
+                  skipped: data.skipped,
+                  progress: data.progress,
+                  message: `${data.processed.toLocaleString()} de ${data.total.toLocaleString()} (${data.progress}%)`,
+                }));
+              } else if (data.type === 'complete') {
+                setProgressState({
+                  status: 'complete',
+                  total: data.total,
+                  processed: data.total,
+                  inserted: data.inserted,
+                  skipped: data.skipped,
+                  progress: 100,
+                  message: data.message,
+                });
+                toast.success(data.message);
+                queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
+                queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
+                if (payload.url) setM3uUrl('');
+                if (payload.content) setM3uContent('');
+                onSuccess();
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      setProgressState(prev => ({
+        ...prev,
+        status: 'error',
+        error: message,
+        message: `Erro: ${message}`,
+      }));
+      toast.error(`Erro: ${message}`);
+    }
+  }, [queryClient, onSuccess]);
+
+  const isLoading = progressState.status === 'fetching' || progressState.status === 'importing';
+
+  const handleReset = () => {
+    setProgressState({
+      status: 'idle',
+      total: 0,
+      processed: 0,
+      inserted: 0,
+      skipped: 0,
+      progress: 0,
+    });
+  };
 
   return (
     <div className="space-y-4">
       <Tabs defaultValue="url">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="url">
+          <TabsTrigger value="url" disabled={isLoading}>
             <Link className="h-4 w-4 mr-2" />
             URL
           </TabsTrigger>
-          <TabsTrigger value="paste">
+          <TabsTrigger value="paste" disabled={isLoading}>
             <FileText className="h-4 w-4 mr-2" />
             Colar M3U
           </TabsTrigger>
@@ -113,10 +182,10 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
                 disabled={isLoading}
               />
               <Button 
-                onClick={() => importUrlMutation.mutate(m3uUrl)}
+                onClick={() => importWithProgress({ url: m3uUrl })}
                 disabled={!m3uUrl.trim() || isLoading}
               >
-                {importUrlMutation.isPending ? (
+                {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
@@ -127,7 +196,7 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Suporta HTTP/HTTPS. Portas Xtream comuns (8880, 8000, etc.) usam HTTP automaticamente.
+              Suporta HTTP/HTTPS. Portas Xtream comuns usam HTTP automaticamente.
             </p>
           </div>
         </TabsContent>
@@ -143,14 +212,12 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
               disabled={isLoading}
               className="font-mono text-xs"
             />
-            <p className="text-xs text-muted-foreground">
-              Cole o conteúdo completo do arquivo M3U. Útil quando o servidor bloqueia requisições diretas.
-            </p>
             <Button 
-              onClick={() => importContentMutation.mutate(m3uContent)}
+              onClick={() => importWithProgress({ content: m3uContent })}
               disabled={!m3uContent.trim() || isLoading}
+              className="w-full"
             >
-              {importContentMutation.isPending ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Importando...
@@ -166,22 +233,63 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Import Result */}
-      {lastResult && (
-        <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Importação concluída!</span>
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground space-y-1">
-            <p>Inseridos: {lastResult.inserted}</p>
-            {lastResult.skipped && lastResult.skipped > 0 && (
-              <p>Duplicados ignorados: {lastResult.skipped}</p>
+      {/* Progress Section */}
+      {progressState.status !== 'idle' && (
+        <div className={`p-4 rounded-lg border ${
+          progressState.status === 'complete' ? 'bg-green-500/10 border-green-500/20' :
+          progressState.status === 'error' ? 'bg-red-500/10 border-red-500/20' :
+          'bg-muted/50 border-border'
+        }`}>
+          {/* Progress Bar */}
+          {(progressState.status === 'importing' || progressState.status === 'fetching') && (
+            <div className="space-y-2 mb-3">
+              <Progress value={progressState.progress} className="h-2" />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{progressState.processed.toLocaleString()} / {progressState.total.toLocaleString()}</span>
+                <span>{progressState.progress}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Status Icon and Message */}
+          <div className="flex items-center gap-2">
+            {progressState.status === 'complete' && (
+              <CheckCircle className="h-5 w-5 text-green-500" />
             )}
-            {lastResult.limited && (
-              <p className="text-amber-600">Limitado a 50.000 canais por importação</p>
+            {progressState.status === 'error' && (
+              <XCircle className="h-5 w-5 text-red-500" />
             )}
+            {isLoading && (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            )}
+            <span className={`font-medium ${
+              progressState.status === 'complete' ? 'text-green-600 dark:text-green-400' :
+              progressState.status === 'error' ? 'text-red-600 dark:text-red-400' :
+              'text-foreground'
+            }`}>
+              {progressState.message}
+            </span>
           </div>
+
+          {/* Stats */}
+          {(progressState.status === 'complete' || progressState.status === 'importing') && (
+            <div className="mt-2 text-sm text-muted-foreground grid grid-cols-2 gap-2">
+              <div>Inseridos: <span className="font-medium text-foreground">{progressState.inserted.toLocaleString()}</span></div>
+              <div>Duplicados: <span className="font-medium text-foreground">{progressState.skipped.toLocaleString()}</span></div>
+            </div>
+          )}
+
+          {/* Reset Button */}
+          {(progressState.status === 'complete' || progressState.status === 'error') && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleReset}
+              className="mt-3"
+            >
+              Nova Importação
+            </Button>
+          )}
         </div>
       )}
     </div>
