@@ -1462,28 +1462,46 @@ export type Database = {
       }
       ip_blacklist: {
         Row: {
+          auto_blocked: boolean | null
           blocked_until: string | null
           created_at: string | null
+          expires_at: string | null
+          failed_attempts: number | null
           id: string
           ip_address: string
           is_permanent: boolean | null
+          last_attempt_at: string | null
           reason: string | null
+          severity: string | null
+          unblocked_at: string | null
         }
         Insert: {
+          auto_blocked?: boolean | null
           blocked_until?: string | null
           created_at?: string | null
+          expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           ip_address: string
           is_permanent?: boolean | null
+          last_attempt_at?: string | null
           reason?: string | null
+          severity?: string | null
+          unblocked_at?: string | null
         }
         Update: {
+          auto_blocked?: boolean | null
           blocked_until?: string | null
           created_at?: string | null
+          expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           ip_address?: string
           is_permanent?: boolean | null
+          last_attempt_at?: string | null
           reason?: string | null
+          severity?: string | null
+          unblocked_at?: string | null
         }
         Relationships: []
       }
@@ -2379,6 +2397,81 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_tracking: {
+        Row: {
+          created_at: string | null
+          id: string
+          identifier: string
+          identifier_type: string
+          last_request_at: string | null
+          request_count: number | null
+          window_duration_seconds: number | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          identifier: string
+          identifier_type?: string
+          last_request_at?: string | null
+          request_count?: number | null
+          window_duration_seconds?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          identifier?: string
+          identifier_type?: string
+          last_request_at?: string | null
+          request_count?: number | null
+          window_duration_seconds?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
+      refresh_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          family_id: string
+          id: string
+          ip_address: string | null
+          is_revoked: boolean | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          token_hash: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          family_id: string
+          id?: string
+          ip_address?: string | null
+          is_revoked?: boolean | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          token_hash: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          family_id?: string
+          id?: string
+          ip_address?: string | null
+          is_revoked?: boolean | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          token_hash?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       remote_command_audit: {
         Row: {
           action: string
@@ -3156,6 +3249,56 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          device_info: Json | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          is_active: boolean | null
+          last_activity: string | null
+          refresh_token_id: string | null
+          session_token: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_info?: Json | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          refresh_token_id?: string | null
+          session_token: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_info?: Json | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          refresh_token_id?: string | null
+          session_token?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_refresh_token_id_fkey"
+            columns: ["refresh_token_id"]
+            isOneToOne: false
+            referencedRelation: "refresh_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -3286,6 +3429,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_block_identifier: {
+        Args: {
+          p_failed_attempts: number
+          p_identifier: string
+          p_reason?: string
+        }
+        Returns: undefined
+      }
+      check_rate_limit: {
+        Args: {
+          p_identifier: string
+          p_identifier_type?: string
+          p_limit?: number
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          reset_at: string
+        }[]
+      }
       check_suspicious_login: {
         Args: { _email: string; _ip_address: string }
         Returns: Json
@@ -3293,6 +3457,7 @@ export type Database = {
       cleanup_fase8_old_data:
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
+      cleanup_rate_limits: { Args: never; Returns: number }
       generate_stream_token: {
         Args: {
           p_channel_id: number
@@ -3319,6 +3484,11 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_master: { Args: { check_user_id?: string }; Returns: boolean }
+      is_blocked: { Args: { p_identifier: string }; Returns: boolean }
+      revoke_token_family: {
+        Args: { p_family_id: string; p_reason?: string }
+        Returns: number
+      }
       toggle_feature_flag: {
         Args: { enabled_param: boolean; flag_name_param: string }
         Returns: undefined

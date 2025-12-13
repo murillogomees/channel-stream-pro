@@ -5,11 +5,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
  * 
  * Routes requests to the appropriate edge function based on URL path.
  * For self-hosted Supabase with --main-service configuration.
+ * 
+ * Version: 2.4.0 - Added rate limiting and brute force protection
  */
+
+// Global configuration
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://supabase.iptvlink.com.br';
+const SELFHOSTED_URL = 'https://supabase.iptvlink.com.br';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-custom-token',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
 };
 
@@ -106,7 +112,24 @@ Deno.serve(async (req: Request) => {
 
 // ============================================================================
 // CUSTOM-AUTH HANDLER - Complete authentication implementation
+// With Rate Limiting, Brute Force Protection, Refresh Token Rotation
 // ============================================================================
+
+// Rate limit configuration per action
+const RATE_LIMITS = {
+  login: { limit: 5, windowSeconds: 60 },      // 5 attempts per minute
+  signup: { limit: 3, windowSeconds: 300 },    // 3 signups per 5 minutes
+  refresh: { limit: 10, windowSeconds: 60 },   // 10 refreshes per minute
+  default: { limit: 30, windowSeconds: 60 },   // 30 requests per minute
+};
+
+// Brute force thresholds
+const BRUTE_FORCE_THRESHOLDS = {
+  warnThreshold: 5,      // Log warning after 5 failed attempts
+  blockThreshold: 10,    // Auto-block after 10 failed attempts
+  hardBlockThreshold: 20, // Extended block after 20 attempts
+};
+
 async function handleCustomAuth(req: Request): Promise<Response> {
   const { encode } = await import("https://deno.land/std@0.168.0/encoding/base64.ts");
   
@@ -148,8 +171,281 @@ async function handleCustomAuth(req: Request): Promise<Response> {
     return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
   }
 
+  // Hash a token for storage (we never store raw tokens)
+  async function hashToken(token: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(token);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Check rate limit for an action
+  async function checkRateLimit(
+    client: any, 
+    identifier: string, 
+    action: string
+  ): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
+    const config = RATE_LIMITS[action as keyof typeof RATE_LIMITS] || RATE_LIMITS.default;
+    const windowStart = new Date(Date.now() - config.windowSeconds * 1000);
+    
+    try {
+      // Count requests in current window
+      const countResult = await client.queryObject(`
+        SELECT COALESCE(SUM(request_count), 0) as total
+        FROM public.rate_limit_tracking
+        WHERE identifier = $1 AND identifier_type = 'combined'
+          AND window_start > $2
+      `, [identifier, windowStart.toISOString()]);
+      
+      const currentCount = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      // Record this request
+      await client.queryObject(`
+        INSERT INTO public.rate_limit_tracking (identifier, identifier_type, request_count, window_start, window_duration_seconds)
+        VALUES ($1, 'combined', 1, NOW(), $2)
+        ON CONFLICT (identifier, identifier_type, window_start) 
+        DO UPDATE SET request_count = rate_limit_tracking.request_count + 1, last_request_at = NOW()
+      `, [identifier, config.windowSeconds]);
+      
+      return {
+        allowed: currentCount < config.limit,
+        remaining: Math.max(0, config.limit - currentCount - 1),
+        resetAt: new Date(Date.now() + config.windowSeconds * 1000),
+      };
+    } catch (e) {
+      console.error('[CustomAuth] Rate limit check error:', e);
+      // Fail open - allow request if rate limit check fails
+      return { allowed: true, remaining: config.limit, resetAt: new Date() };
+    }
+  }
+
+  // Check if identifier is blocked (brute force protection)
+  async function isBlocked(client: any, identifier: string): Promise<boolean> {
+    try {
+      const result = await client.queryObject(`
+        SELECT id FROM public.ip_blacklist
+        WHERE ip_address = $1
+          AND unblocked_at IS NULL
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `, [identifier]);
+      
+      return result.rows.length > 0;
+    } catch (e) {
+      console.error('[CustomAuth] Block check error:', e);
+      return false; // Fail open
+    }
+  }
+
+  // Count recent failed attempts
+  async function countFailedAttempts(client: any, identifier: string): Promise<number> {
+    try {
+      const result = await client.queryObject(`
+        SELECT COUNT(*) as count
+        FROM public.security_events
+        WHERE (ip_address = $1 OR event_details->>'email' = $1)
+          AND event_type = 'failed_login'
+          AND created_at > NOW() - INTERVAL '15 minutes'
+      `, [identifier]);
+      
+      return parseInt((result.rows[0] as any)?.count || '0');
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Log failed attempt and potentially auto-block
+  async function logFailedAttempt(
+    client: any, 
+    email: string, 
+    ipAddress: string,
+    reason: string
+  ): Promise<void> {
+    try {
+      // Log the failed attempt
+      await client.queryObject(`
+        INSERT INTO public.security_events (event_type, event_details, ip_address, severity)
+        VALUES ('failed_login', $1, $2, 'medium')
+      `, [JSON.stringify({ email, reason }), ipAddress]);
+      
+      // Count total failed attempts for this IP
+      const failedCount = await countFailedAttempts(client, ipAddress);
+      
+      console.log(`[CustomAuth] Failed attempts for ${ipAddress}: ${failedCount}`);
+      
+      // Check if we should auto-block
+      if (failedCount >= BRUTE_FORCE_THRESHOLDS.hardBlockThreshold) {
+        await autoBlock(client, ipAddress, failedCount, 'brute_force_hard');
+      } else if (failedCount >= BRUTE_FORCE_THRESHOLDS.blockThreshold) {
+        await autoBlock(client, ipAddress, failedCount, 'brute_force');
+      } else if (failedCount >= BRUTE_FORCE_THRESHOLDS.warnThreshold) {
+        console.warn(`[CustomAuth] WARNING: Multiple failed attempts from ${ipAddress}`);
+      }
+    } catch (e) {
+      console.error('[CustomAuth] Failed to log attempt:', e);
+    }
+  }
+
+  // Auto-block an IP
+  async function autoBlock(
+    client: any, 
+    ipAddress: string, 
+    failedAttempts: number, 
+    reason: string
+  ): Promise<void> {
+    try {
+      // Determine block duration
+      let blockDuration: string;
+      let severity: string;
+      
+      if (failedAttempts >= 50) {
+        blockDuration = '7 days';
+        severity = 'critical';
+      } else if (failedAttempts >= 20) {
+        blockDuration = '24 hours';
+        severity = 'high';
+      } else if (failedAttempts >= 10) {
+        blockDuration = '1 hour';
+        severity = 'medium';
+      } else {
+        blockDuration = '15 minutes';
+        severity = 'low';
+      }
+      
+      await client.queryObject(`
+        INSERT INTO public.ip_blacklist (ip_address, reason, auto_blocked, failed_attempts, last_attempt_at, expires_at, severity)
+        VALUES ($1, $2, true, $3, NOW(), NOW() + $4::INTERVAL, $5)
+        ON CONFLICT (ip_address) DO UPDATE SET
+          failed_attempts = EXCLUDED.failed_attempts,
+          last_attempt_at = NOW(),
+          expires_at = NOW() + $4::INTERVAL,
+          severity = EXCLUDED.severity
+      `, [ipAddress, reason, failedAttempts, blockDuration, severity]);
+      
+      console.log(`[CustomAuth] Auto-blocked ${ipAddress} for ${blockDuration} (${reason})`);
+    } catch (e) {
+      console.error('[CustomAuth] Auto-block error:', e);
+    }
+  }
+
+  // Store refresh token with rotation support
+  async function storeRefreshToken(
+    client: any,
+    userId: string,
+    tokenHash: string,
+    familyId: string,
+    ipAddress: string,
+    userAgent: string,
+    expiresAt: Date
+  ): Promise<void> {
+    try {
+      await client.queryObject(`
+        INSERT INTO public.refresh_tokens (user_id, token_hash, family_id, expires_at, ip_address, user_agent)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [userId, tokenHash, familyId, expiresAt.toISOString(), ipAddress, userAgent]);
+    } catch (e) {
+      console.error('[CustomAuth] Store refresh token error:', e);
+    }
+  }
+
+  // Validate and rotate refresh token
+  async function validateRefreshToken(
+    client: any,
+    tokenHash: string
+  ): Promise<{ valid: boolean; userId?: string; familyId?: string; reason?: string }> {
+    try {
+      const result = await client.queryObject(`
+        SELECT id, user_id, family_id, is_revoked, expires_at
+        FROM public.refresh_tokens
+        WHERE token_hash = $1
+      `, [tokenHash]);
+      
+      if (result.rows.length === 0) {
+        return { valid: false, reason: 'Token not found' };
+      }
+      
+      const token = result.rows[0] as any;
+      
+      if (token.is_revoked) {
+        // Token reuse detected! Revoke entire family
+        console.warn(`[CustomAuth] TOKEN REUSE DETECTED! Revoking family ${token.family_id}`);
+        
+        await client.queryObject(`
+          UPDATE public.refresh_tokens
+          SET is_revoked = true, revoked_at = NOW(), revoked_reason = 'token_reuse_detected'
+          WHERE family_id = $1 AND is_revoked = false
+        `, [token.family_id]);
+        
+        // Log security event
+        await client.queryObject(`
+          INSERT INTO public.security_events (event_type, event_details, user_id, severity)
+          VALUES ('token_reuse_detected', $1, $2, 'critical')
+        `, [JSON.stringify({ family_id: token.family_id }), token.user_id]);
+        
+        return { valid: false, reason: 'Token reuse detected - all sessions revoked' };
+      }
+      
+      if (new Date(token.expires_at) < new Date()) {
+        return { valid: false, reason: 'Token expired' };
+      }
+      
+      // Revoke current token (rotation)
+      await client.queryObject(`
+        UPDATE public.refresh_tokens
+        SET is_revoked = true, revoked_at = NOW(), revoked_reason = 'rotated'
+        WHERE id = $1
+      `, [token.id]);
+      
+      return { valid: true, userId: token.user_id, familyId: token.family_id };
+    } catch (e) {
+      console.error('[CustomAuth] Validate refresh token error:', e);
+      return { valid: false, reason: 'Validation error' };
+    }
+  }
+
+  // Create or update session
+  async function createSession(
+    client: any,
+    userId: string,
+    sessionToken: string,
+    ipAddress: string,
+    userAgent: string,
+    expiresAt: Date
+  ): Promise<void> {
+    try {
+      // Check active session count
+      const countResult = await client.queryObject(`
+        SELECT COUNT(*) as count FROM public.user_sessions
+        WHERE user_id = $1 AND is_active = true AND expires_at > NOW()
+      `, [userId]);
+      
+      const activeCount = parseInt((countResult.rows[0] as any)?.count || '0');
+      
+      // If too many active sessions, deactivate oldest
+      if (activeCount >= 5) {
+        await client.queryObject(`
+          UPDATE public.user_sessions
+          SET is_active = false
+          WHERE id = (
+            SELECT id FROM public.user_sessions
+            WHERE user_id = $1 AND is_active = true
+            ORDER BY created_at ASC
+            LIMIT 1
+          )
+        `, [userId]);
+      }
+      
+      // Create new session
+      await client.queryObject(`
+        INSERT INTO public.user_sessions (user_id, session_token, ip_address, user_agent, expires_at, device_info)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [userId, sessionToken, ipAddress, userAgent, expiresAt.toISOString(), JSON.stringify({ userAgent })]);
+    } catch (e) {
+      console.error('[CustomAuth] Create session error:', e);
+    }
+  }
+
   try {
-    const { action, email, password, userData } = await req.json();
+    const { action, email, password, userData, refreshToken: providedRefreshToken } = await req.json();
     
     const dbUrl = Deno.env.get('SELFHOSTED_DB_URL');
     const jwtSecret = Deno.env.get('JWT_SECRET') || 'super-secret-jwt-token-with-at-least-32-characters-long';
@@ -187,9 +483,43 @@ async function handleCustomAuth(req: Request): Promise<Response> {
     await client.connect();
     console.log('[CustomAuth] Database connected');
     
+    // Get IP and user agent for tracking
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                      req.headers.get('x-real-ip') || 'unknown';
+    const userAgent = req.headers.get('user-agent') || 'unknown';
+    
     try {
       if (action === 'login') {
-        console.log(`[CustomAuth] Login attempt for: ${email}`);
+        console.log(`[CustomAuth] Login attempt for: ${email} from IP: ${ipAddress}`);
+        
+        // Check if IP is blocked
+        if (await isBlocked(client, ipAddress)) {
+          console.warn(`[CustomAuth] Blocked IP attempted login: ${ipAddress}`);
+          return new Response(JSON.stringify({ 
+            error: 'Too many failed attempts. Please try again later.',
+            blocked: true
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check rate limit
+        const rateLimit = await checkRateLimit(client, `${ipAddress}:${email}`, 'login');
+        if (!rateLimit.allowed) {
+          console.warn(`[CustomAuth] Rate limit exceeded for: ${ipAddress}:${email}`);
+          return new Response(JSON.stringify({ 
+            error: 'Too many login attempts. Please wait before trying again.',
+            retryAfter: Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000)
+          }), {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Retry-After': String(Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000))
+            }
+          });
+        }
         
         const authResult = await client.queryObject(`
           SELECT id, email, email_confirmed_at, raw_user_meta_data,
@@ -200,9 +530,9 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         
         if (authResult.rows.length === 0) {
           console.log('[CustomAuth] User not found:', email);
+          await logFailedAttempt(client, email, ipAddress, 'user_not_found');
           return new Response(JSON.stringify({ 
-            error: 'Invalid login credentials',
-            details: 'User not found'
+            error: 'Invalid login credentials'
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -213,18 +543,9 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         
         if (!user.password_valid) {
           console.log('[CustomAuth] Invalid password for:', email);
-          try {
-            await client.queryObject(`
-              INSERT INTO public.security_events (event_type, event_details, ip_address)
-              VALUES ('failed_login', $1, $2)
-            `, [JSON.stringify({ email }), req.headers.get('x-forwarded-for') || 'unknown']);
-          } catch (e) {
-            console.log('[CustomAuth] Could not log failed attempt:', e);
-          }
-          
+          await logFailedAttempt(client, email, ipAddress, 'invalid_password');
           return new Response(JSON.stringify({ 
-            error: 'Invalid login credentials',
-            details: 'Invalid password'
+            error: 'Invalid login credentials'
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -244,15 +565,17 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         const profile = profileResult.rows.length > 0 ? profileResult.rows[0] : null;
         
         const now = Math.floor(Date.now() / 1000);
-        const expiresIn = 3600 * 24 * 7;
+        const accessExpiresIn = 3600; // 1 hour for access token
+        const refreshExpiresIn = 3600 * 24 * 30; // 30 days for refresh token
         
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        const sessionId = crypto.randomUUID();
+        const familyId = crypto.randomUUID(); // New token family for this login
         
         const accessToken = await createJWT({
           aud: 'authenticated',
-          exp: now + expiresIn,
+          exp: now + accessExpiresIn,
           iat: now,
-          iss: supabaseUrl + '/auth/v1',
+          iss: SUPABASE_URL + '/auth/v1',
           sub: user.id,
           email: user.email,
           phone: '',
@@ -261,33 +584,60 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           role: 'authenticated',
           aal: 'aal1',
           amr: [{ method: 'password', timestamp: now }],
-          session_id: crypto.randomUUID(),
+          session_id: sessionId,
           app_role: role
         }, jwtSecret);
         
-        const refreshToken = await createJWT({
+        // Create refresh token with family ID for rotation
+        const refreshTokenPayload = {
           sub: user.id,
           type: 'refresh',
+          family_id: familyId,
           iat: now,
-          exp: now + (expiresIn * 4),
-        }, jwtSecret);
+          exp: now + refreshExpiresIn,
+        };
+        const refreshToken = await createJWT(refreshTokenPayload, jwtSecret);
         
+        // Store refresh token hash for rotation tracking
+        const refreshTokenHash = await hashToken(refreshToken);
+        await storeRefreshToken(
+          client, 
+          user.id, 
+          refreshTokenHash, 
+          familyId, 
+          ipAddress, 
+          userAgent,
+          new Date(Date.now() + refreshExpiresIn * 1000)
+        );
+        
+        // Create session
+        await createSession(
+          client,
+          user.id,
+          sessionId,
+          ipAddress,
+          userAgent,
+          new Date(Date.now() + refreshExpiresIn * 1000)
+        );
+        
+        // Log successful login
         try {
           await client.queryObject(`
             INSERT INTO public.auth_sessions_log (user_id, user_email, event_type, ip_address, user_agent)
             VALUES ($1, $2, 'login', $3, $4)
-          `, [user.id, user.email, req.headers.get('x-forwarded-for') || 'unknown', req.headers.get('user-agent') || 'unknown']);
+          `, [user.id, user.email, ipAddress, userAgent]);
         } catch (e) {
           console.log('[CustomAuth] Could not log login:', e);
         }
         
-        console.log(`[CustomAuth] Login successful for: ${email}, role: ${role}`);
+        console.log(`[CustomAuth] Login successful for: ${email}, role: ${role}, session: ${sessionId}`);
         
         return new Response(JSON.stringify({
           access_token: accessToken,
           refresh_token: refreshToken,
           token_type: 'bearer',
-          expires_in: expiresIn,
+          expires_in: accessExpiresIn,
+          refresh_expires_in: refreshExpiresIn,
           user: {
             id: user.id,
             email: user.email,
@@ -301,7 +651,24 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         });
         
       } else if (action === 'signup') {
-        console.log(`[CustomAuth] Signup attempt for: ${email}`);
+        console.log(`[CustomAuth] Signup attempt for: ${email} from IP: ${ipAddress}`);
+        
+        // Check rate limit for signup
+        const rateLimit = await checkRateLimit(client, ipAddress, 'signup');
+        if (!rateLimit.allowed) {
+          console.warn(`[CustomAuth] Signup rate limit exceeded for: ${ipAddress}`);
+          return new Response(JSON.stringify({ 
+            error: 'Too many signup attempts. Please wait before trying again.',
+            retryAfter: Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000)
+          }), {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Retry-After': String(Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000))
+            }
+          });
+        }
         
         const existingUser = await client.queryObject(`
           SELECT id FROM auth.users WHERE email = $1
@@ -317,7 +684,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         }
         
         const userId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const nowDate = new Date().toISOString();
         
         await client.queryObject(`
           INSERT INTO auth.users (
@@ -331,7 +698,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
             $5, '{"provider": "email", "providers": ["email"]}',
             'authenticated', 'authenticated', ''
           )
-        `, [userId, email.toLowerCase(), password, now, JSON.stringify(userData || {})]);
+        `, [userId, email.toLowerCase(), password, nowDate, JSON.stringify(userData || {})]);
         
         await client.queryObject(`
           INSERT INTO auth.identities (
@@ -340,7 +707,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           ) VALUES (
             $1, $1, $2, 'email', $3, $4, $4, $4
           )
-        `, [userId, email.toLowerCase(), JSON.stringify({ sub: userId, email: email.toLowerCase() }), now]);
+        `, [userId, email.toLowerCase(), JSON.stringify({ sub: userId, email: email.toLowerCase() }), nowDate]);
         
         await client.queryObject(`
           INSERT INTO public.profiles (id, email, nome, contact_phone, origem_cadastro, data_vencimento, situacao, cliente_ativo)
@@ -355,15 +722,16 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         `, [userId]);
         
         const nowTs = Math.floor(Date.now() / 1000);
-        const expiresIn = 3600 * 24 * 7;
-        
-        const supabaseUrlSignup = Deno.env.get('SUPABASE_URL') || '';
+        const accessExpiresIn = 3600; // 1 hour
+        const refreshExpiresIn = 3600 * 24 * 30; // 30 days
+        const sessionId = crypto.randomUUID();
+        const familyId = crypto.randomUUID();
         
         const accessToken = await createJWT({
           aud: 'authenticated',
-          exp: nowTs + expiresIn,
+          exp: nowTs + accessExpiresIn,
           iat: nowTs,
-          iss: supabaseUrlSignup + '/auth/v1',
+          iss: SUPABASE_URL + '/auth/v1',
           sub: userId,
           email: email.toLowerCase(),
           phone: '',
@@ -372,16 +740,39 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           role: 'authenticated',
           aal: 'aal1',
           amr: [{ method: 'password', timestamp: nowTs }],
-          session_id: crypto.randomUUID(),
+          session_id: sessionId,
           app_role: 'client'
         }, jwtSecret);
         
         const refreshToken = await createJWT({
           sub: userId,
           type: 'refresh',
+          family_id: familyId,
           iat: nowTs,
-          exp: nowTs + (expiresIn * 4),
+          exp: nowTs + refreshExpiresIn,
         }, jwtSecret);
+        
+        // Store refresh token hash
+        const refreshTokenHash = await hashToken(refreshToken);
+        await storeRefreshToken(
+          client, 
+          userId, 
+          refreshTokenHash, 
+          familyId, 
+          ipAddress, 
+          userAgent,
+          new Date(Date.now() + refreshExpiresIn * 1000)
+        );
+        
+        // Create session
+        await createSession(
+          client,
+          userId,
+          sessionId,
+          ipAddress,
+          userAgent,
+          new Date(Date.now() + refreshExpiresIn * 1000)
+        );
         
         console.log(`[CustomAuth] Signup successful for: ${email}`);
         
@@ -389,7 +780,8 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           access_token: accessToken,
           refresh_token: refreshToken,
           token_type: 'bearer',
-          expires_in: expiresIn,
+          expires_in: accessExpiresIn,
+          refresh_expires_in: refreshExpiresIn,
           user: {
             id: userId,
             email: email.toLowerCase(),
@@ -400,21 +792,43 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         });
         
       } else if (action === 'refresh') {
-        const authHeader = req.headers.get('authorization');
-        if (!authHeader) {
-          return new Response(JSON.stringify({ error: 'No token provided' }), {
+        // Rate limit refresh requests
+        const rateLimit = await checkRateLimit(client, ipAddress, 'refresh');
+        if (!rateLimit.allowed) {
+          return new Response(JSON.stringify({ 
+            error: 'Too many refresh attempts',
+            retryAfter: Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000)
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Get refresh token from body or authorization header
+        const token = providedRefreshToken || req.headers.get('authorization')?.replace('Bearer ', '');
+        if (!token) {
+          return new Response(JSON.stringify({ error: 'No refresh token provided' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
         
-        const token = authHeader.replace('Bearer ', '');
-        const [, payloadBase64] = token.split('.');
-        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        // Validate refresh token with rotation
+        const tokenHash = await hashToken(token);
+        const validation = await validateRefreshToken(client, tokenHash);
         
+        if (!validation.valid) {
+          console.warn(`[CustomAuth] Invalid refresh token: ${validation.reason}`);
+          return new Response(JSON.stringify({ error: validation.reason }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Get user details
         const userResult = await client.queryObject(`
           SELECT id, email FROM auth.users WHERE id = $1
-        `, [payload.sub]);
+        `, [validation.userId]);
         
         if (userResult.rows.length === 0) {
           return new Response(JSON.stringify({ error: 'User not found' }), {
@@ -432,15 +846,15 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
         
         const nowTs = Math.floor(Date.now() / 1000);
-        const expiresIn = 3600 * 24 * 7;
-        
-        const supabaseUrlRefresh = Deno.env.get('SUPABASE_URL') || '';
+        const accessExpiresIn = 3600;
+        const refreshExpiresIn = 3600 * 24 * 30;
+        const sessionId = crypto.randomUUID();
         
         const accessToken = await createJWT({
           aud: 'authenticated',
-          exp: nowTs + expiresIn,
+          exp: nowTs + accessExpiresIn,
           iat: nowTs,
-          iss: supabaseUrlRefresh + '/auth/v1',
+          iss: SUPABASE_URL + '/auth/v1',
           sub: user.id,
           email: user.email,
           phone: '',
@@ -449,14 +863,33 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           role: 'authenticated',
           aal: 'aal1',
           amr: [{ method: 'password', timestamp: nowTs }],
-          session_id: crypto.randomUUID(),
+          session_id: sessionId,
           app_role: role
         }, jwtSecret);
         
+        // Issue new refresh token in same family (rotation)
+        const newRefreshToken = await createJWT({
+          sub: user.id,
+          type: 'refresh',
+          family_id: validation.familyId,
+          iat: nowTs,
+          exp: nowTs + refreshExpiresIn,
+        }, jwtSecret);
+        
+        const newTokenHash = await hashToken(newRefreshToken);
+        await storeRefreshToken(
+          client, user.id, newTokenHash, validation.familyId!, 
+          ipAddress, userAgent, new Date(Date.now() + refreshExpiresIn * 1000)
+        );
+        
+        console.log(`[CustomAuth] Token refreshed for user: ${user.email}`);
+        
         return new Response(JSON.stringify({
           access_token: accessToken,
+          refresh_token: newRefreshToken,
           token_type: 'bearer',
-          expires_in: expiresIn
+          expires_in: accessExpiresIn,
+          refresh_expires_in: refreshExpiresIn
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
