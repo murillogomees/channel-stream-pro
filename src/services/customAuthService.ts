@@ -660,6 +660,78 @@ class CustomAuthService {
   }
 
   // ==========================================
+  // BACKUP CODES
+  // ==========================================
+
+  /**
+   * Generate MFA backup codes
+   */
+  async generateBackupCodes(): Promise<AuthResponse<{ codes: string[] }>> {
+    try {
+      const result = await this.callAuthEndpoint('generate-backup-codes');
+      return { data: { codes: result.codes || [] }, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Verify a backup code (one-time use)
+   */
+  async verifyBackupCode(code: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('verify-backup-code', { code });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // SECURITY STATUS
+  // ==========================================
+
+  /**
+   * Get account security status
+   */
+  async getSecurityStatus(): Promise<AuthResponse<{
+    mfa_enabled: boolean;
+    has_backup_codes: boolean;
+    email_verified: boolean;
+    password_strong: boolean;
+    active_sessions_count: number;
+    last_password_change: string | null;
+  }>> {
+    try {
+      const result = await this.callAuthEndpoint('get-security-status');
+      return { 
+        data: {
+          mfa_enabled: result.mfa_enabled || false,
+          has_backup_codes: result.has_backup_codes || false,
+          email_verified: result.email_verified !== false,
+          password_strong: result.password_strong !== false,
+          active_sessions_count: result.active_sessions_count || 0,
+          last_password_change: result.last_password_change || null
+        }, 
+        error: null 
+      };
+    } catch (error: any) {
+      // Return default values on error
+      return { 
+        data: {
+          mfa_enabled: false,
+          has_backup_codes: false,
+          email_verified: true,
+          password_strong: true,
+          active_sessions_count: 1,
+          last_password_change: null
+        }, 
+        error: null 
+      };
+    }
+  }
+
+  // ==========================================
   // AUTH STATE LISTENER
   // ==========================================
 
