@@ -12,9 +12,9 @@ jobs:
 
       - name: Fix PostgREST and Database Configuration
         env:
-          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
-          VPS_USER: ${{ secrets.VPS_SSH_USER }}
-          VPS_PASS: ${{ secrets.VPS_SSH_PASS }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
             set -e
