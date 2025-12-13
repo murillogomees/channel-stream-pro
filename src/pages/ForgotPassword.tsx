@@ -1,6 +1,8 @@
 /**
  * PÁGINA DE RECUPERAÇÃO DE SENHA
- * @version 1.0.0
+ * @version 2.0.0
+ * 
+ * Usa Supabase GoTrue nativo
  */
 
 import { useState } from 'react';
@@ -10,7 +12,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { customAuthService } from '@/services/customAuthService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function ForgotPassword() {
@@ -30,7 +32,9 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      const { error } = await customAuthService.requestPasswordReset(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
       
       if (error) {
         toast.error(error.message || 'Erro ao enviar email');

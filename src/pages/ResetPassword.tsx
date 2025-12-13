@@ -1,25 +1,23 @@
 /**
  * PÁGINA DE REDEFINIÇÃO DE SENHA
- * @version 1.0.0
+ * @version 2.0.0
  * 
- * Acessada via link do email de recuperação
+ * Acessada via link do email de recuperação - Usa Supabase GoTrue
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
-import { customAuthService } from '@/services/customAuthService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,13 +26,33 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isPasswordStrong, setIsPasswordStrong] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      toast.error('Link inválido ou expirado');
-      navigate('/forgot-password');
-    }
-  }, [token, navigate]);
+    // Check if user came from a valid recovery link
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setHasSession(true);
+      } else {
+        // Check URL for recovery token
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const type = hashParams.get('type');
+        if (type !== 'recovery') {
+          toast.error('Link inválido ou expirado');
+          navigate('/forgot-password');
+        }
+      }
+    });
+
+    // Listen for auth state changes from recovery link
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setHasSession(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +75,7 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
-      const { error } = await customAuthService.confirmPasswordReset(token!, password);
+      const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
         if (error.message.includes('expired') || error.message.includes('invalid')) {

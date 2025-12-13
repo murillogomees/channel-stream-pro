@@ -1,24 +1,29 @@
 /**
- * CONTEXTO UNIFICADO DE AUTENTICAÇÃO - Custom Auth Wrapper
- * @version 4.0.0
+ * CONTEXTO UNIFICADO DE AUTENTICAÇÃO - Supabase GoTrue Native
+ * @version 5.0.0
  * 
- * Bypassa GoTrue completamente, usando autenticação direta via Edge Function
+ * Usa autenticação nativa do Supabase GoTrue (Cloud)
  */
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
-import { customAuthService, CustomAuthSession, CustomAuthUser } from '@/services/customAuthService';
-import { AuthContextType, UnifiedUser, AppRole, SubscriptionStatusType } from '@/types/auth';
-import { authLoggingService } from '@/services/authLoggingService';
-import { authCache } from '@/services/authCacheService';
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { AuthContextType, UnifiedUser, AppRole } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Converte CustomAuthUser para UnifiedUser
+ * Converte Supabase User para UnifiedUser
  */
-function convertToUnifiedUser(customUser: CustomAuthUser): UnifiedUser {
-  const profile = customUser.profile as any;
-  const role = customUser.role as AppRole;
+async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
+  // Buscar profile e role do banco
+  const [profileResult, roleResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('user_roles').select('role').eq('user_id', user.id).single()
+  ]);
+
+  const profile = profileResult.data;
+  const role = (roleResult.data?.role || 'client') as AppRole;
   
   // Calcular status de acesso
   let daysRemaining = 0;
@@ -36,9 +41,9 @@ function convertToUnifiedUser(customUser: CustomAuthUser): UnifiedUser {
   const hasValidAccess = profile?.cliente_ativo === true && !isExpired;
 
   return {
-    id: customUser.id,
-    nome: profile?.nome || customUser.email?.split('@')[0] || 'Usuário',
-    email: customUser.email,
+    id: user.id,
+    nome: profile?.nome || user.email?.split('@')[0] || 'Usuário',
+    email: user.email || '',
     telefone: profile?.contact_phone,
     telefone_whatsapp: profile?.contact_phone,
     origem_cadastro: profile?.origem_cadastro,
@@ -65,23 +70,23 @@ function convertToUnifiedUser(customUser: CustomAuthUser): UnifiedUser {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UnifiedUser | null>(null);
-  const [session, setSession] = useState<CustomAuthSession | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   /**
    * Atualiza estado de autenticação
    */
-  const updateAuthState = useCallback(async (currentSession: CustomAuthSession | null) => {
+  const updateAuthState = useCallback(async (currentSession: Session | null) => {
     if (currentSession?.user) {
-      const unifiedUser = convertToUnifiedUser(currentSession.user);
-      setUser(unifiedUser);
-      setSession(currentSession);
-      
-      // Log login
-      authLoggingService.logLogin(
-        currentSession.user.id,
-        currentSession.user.email
-      ).catch(() => {});
+      try {
+        const unifiedUser = await convertToUnifiedUser(currentSession.user);
+        setUser(unifiedUser);
+        setSession(currentSession);
+      } catch (e) {
+        console.error('[AuthContext] Error converting user:', e);
+        setUser(null);
+        setSession(null);
+      }
     } else {
       setUser(null);
       setSession(null);
@@ -94,9 +99,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    */
   const refreshUser = useCallback(async () => {
     try {
-      const { data, error } = await customAuthService.getUser();
-      if (data?.user && !error) {
-        const unifiedUser = convertToUnifiedUser(data.user);
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user) {
+        const unifiedUser = await convertToUnifiedUser(currentSession.user);
         setUser(unifiedUser);
       }
     } catch (e) {
@@ -108,21 +113,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * Logout
    */
   const signOut = useCallback(async () => {
-    if (user) {
-      await authLoggingService.logLogout(user.id, user.email || '').catch(console.error);
-    }
-    
-    authCache.clear();
-    localStorage.removeItem('iptv_remember_me');
-    await customAuthService.signOut();
+    await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-  }, [user]);
-
-  // Sincronizar com authCache global
-  useEffect(() => {
-    authCache.setAuthState(user, session as any);
-  }, [user, session]);
+  }, []);
 
   useEffect(() => {
     // Safety timeout
@@ -133,22 +127,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 10000);
 
-    // Listener de mudanças de autenticação
-    const { data: { subscription } } = customAuthService.onAuthStateChange(
+    // Listener de mudanças de autenticação - DEVE ser primeiro
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log('[AuthContext] Auth event:', event);
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSession(null);
-          setLoading(false);
-          return;
-        }
-        updateAuthState(currentSession);
+        
+        // Usar setTimeout para evitar deadlock
+        setTimeout(() => {
+          updateAuthState(currentSession);
+        }, 0);
       }
     );
 
     // Verificar sessão inicial
-    customAuthService.getSession()
+    supabase.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
         updateAuthState(currentSession);
       })

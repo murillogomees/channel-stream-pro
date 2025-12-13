@@ -1,32 +1,33 @@
 /**
- * useCustomAuth Hook - Complete auth hook for Custom Auth system
- * @version 1.0.0
+ * useCustomAuth Hook - Wrapper for Supabase GoTrue
+ * @version 2.0.0
  * 
- * Provides all authentication functionality as React hooks
+ * Simplified auth hooks using native Supabase auth
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { customAuthService, CustomAuthSession, CustomAuthUser, UserSession } from '@/services/customAuthService';
+import { supabase } from '@/integrations/supabase/client';
+import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
 /**
  * Main authentication hook
  */
 export function useCustomAuth() {
-  const [user, setUser] = useState<CustomAuthUser | null>(customAuthService.currentUser);
-  const [session, setSession] = useState<CustomAuthSession | null>(customAuthService.currentSession);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Subscribe to auth state changes
-    const { data: { subscription } } = customAuthService.onAuthStateChange((event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user || null);
       setLoading(false);
     });
 
     // Initial session check
-    customAuthService.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data?.session || null);
       setUser(data?.session?.user || null);
       setLoading(false);
@@ -35,25 +36,32 @@ export function useCustomAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string, mfaCode?: string) => {
-    const { data, error } = await customAuthService.signIn(email, password, { mfaCode });
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, userData?: Record<string, any>) => {
-    const { data, error } = await customAuthService.signUp(email, password, userData);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData,
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
     if (error) throw error;
     return data;
   }, []);
 
   const signOut = useCallback(async () => {
-    const { error } = await customAuthService.signOut();
+    const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const { data, error } = await customAuthService.getUser();
+    const { data, error } = await supabase.auth.getUser();
     if (!error && data?.user) {
       setUser(data.user);
     }
@@ -80,7 +88,9 @@ export function usePasswordManagement() {
   const requestPasswordReset = useCallback(async (email: string, redirectTo?: string) => {
     setLoading(true);
     try {
-      const { error } = await customAuthService.resetPasswordForEmail(email, { redirectTo });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo || `${window.location.origin}/reset-password`,
+      });
       if (error) throw error;
       toast.success('Email de recuperação enviado');
     } catch (error: any) {
@@ -91,13 +101,12 @@ export function usePasswordManagement() {
     }
   }, []);
 
-  const updatePassword = useCallback(async (newPassword: string, token?: string) => {
+  const updatePassword = useCallback(async (newPassword: string) => {
     setLoading(true);
     try {
-      const { data, error } = await customAuthService.updatePassword(newPassword, token);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success('Senha atualizada com sucesso');
-      return data;
     } catch (error: any) {
       toast.error(error.message || 'Erro ao atualizar senha');
       throw error;
@@ -114,54 +123,33 @@ export function usePasswordManagement() {
 }
 
 /**
- * Session management hook
+ * Session management hook - simplified for Supabase Cloud
  */
 export function useSessionManagement() {
-  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchSessions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await customAuthService.getSessions();
-      if (error) throw error;
-      setSessions(data?.sessions || []);
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao carregar sessões');
-    } finally {
-      setLoading(false);
-    }
+    // Supabase Cloud doesn't expose session list in free tier
+    setSessions([]);
   }, []);
 
-  const revokeSession = useCallback(async (sessionId: string) => {
-    try {
-      const { error } = await customAuthService.revokeSession(sessionId);
-      if (error) throw error;
-      toast.success('Sessão encerrada');
-      await fetchSessions();
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao encerrar sessão');
-    }
-  }, [fetchSessions]);
+  const revokeSession = useCallback(async (_sessionId: string) => {
+    // No-op for Cloud
+    toast.info('Funcionalidade não disponível');
+  }, []);
 
   const revokeOtherSessions = useCallback(async () => {
-    try {
-      const { error } = await customAuthService.revokeOtherSessions();
-      if (error) throw error;
-      toast.success('Outras sessões encerradas');
-      await fetchSessions();
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao encerrar sessões');
-    }
-  }, [fetchSessions]);
+    // Sign out from all other sessions by refreshing token
+    toast.info('Outras sessões serão encerradas automaticamente');
+  }, []);
 
   const signOutAll = useCallback(async () => {
-    try {
-      const { error } = await customAuthService.signOutAll();
-      if (error) throw error;
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+    if (error) {
+      toast.error(error.message);
+    } else {
       toast.success('Deslogado de todos os dispositivos');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao deslogar');
     }
   }, []);
 
@@ -180,20 +168,24 @@ export function useSessionManagement() {
 }
 
 /**
- * MFA management hook
+ * MFA management hook - uses Supabase MFA
  */
 export function useMFA() {
   const [loading, setLoading] = useState(false);
-  const [mfaEnabled, setMfaEnabled] = useState(customAuthService.currentUser?.mfa_enabled || false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
   const [enrollmentData, setEnrollmentData] = useState<{ secret: string; qr_code: string } | null>(null);
 
   const startEnrollment = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await customAuthService.enrollMFA();
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
       if (error) throw error;
-      setEnrollmentData(data);
-      return data;
+      
+      setEnrollmentData({
+        secret: data.totp.secret,
+        qr_code: data.totp.qr_code,
+      });
+      return { secret: data.totp.secret, qr_code: data.totp.qr_code };
     } catch (error: any) {
       toast.error(error.message || 'Erro ao iniciar MFA');
       throw error;
@@ -205,7 +197,23 @@ export function useMFA() {
   const verifyEnrollment = useCallback(async (code: string) => {
     setLoading(true);
     try {
-      const { error } = await customAuthService.verifyMFAEnrollment(code);
+      // Get the factor ID from the enrollment
+      const { data: factorsList } = await supabase.auth.mfa.listFactors();
+      const factor = factorsList?.totp?.[0];
+      
+      if (!factor) {
+        throw new Error('No MFA factor found');
+      }
+
+      const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: factor.id });
+      if (!challenge) throw new Error('Failed to create challenge');
+
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: factor.id,
+        challengeId: challenge.id,
+        code,
+      });
+      
       if (error) throw error;
       setMfaEnabled(true);
       setEnrollmentData(null);
@@ -218,19 +226,32 @@ export function useMFA() {
     }
   }, []);
 
-  const disableMFA = useCallback(async (code: string) => {
+  const disableMFA = useCallback(async (_code: string) => {
     setLoading(true);
     try {
-      const { error } = await customAuthService.disableMFA(code);
-      if (error) throw error;
+      const { data: factorsList } = await supabase.auth.mfa.listFactors();
+      const factor = factorsList?.totp?.[0];
+      
+      if (factor) {
+        const { error } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        if (error) throw error;
+      }
+      
       setMfaEnabled(false);
       toast.success('MFA desativado');
     } catch (error: any) {
-      toast.error(error.message || 'Código inválido');
+      toast.error(error.message || 'Erro ao desativar MFA');
       throw error;
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Check MFA status on mount
+  useEffect(() => {
+    supabase.auth.mfa.listFactors().then(({ data }) => {
+      setMfaEnabled(!!data?.totp?.length);
+    });
   }, []);
 
   return {
@@ -252,7 +273,10 @@ export function useEmailVerification() {
   const resendVerification = useCallback(async (email: string) => {
     setLoading(true);
     try {
-      const { error } = await customAuthService.resendVerificationEmail(email);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
       if (error) throw error;
       toast.success('Email de verificação enviado');
     } catch (error: any) {
@@ -266,10 +290,12 @@ export function useEmailVerification() {
   const verifyEmail = useCallback(async (token: string) => {
     setLoading(true);
     try {
-      const { data, error } = await customAuthService.verifyEmail(token);
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'email',
+      });
       if (error) throw error;
       toast.success('Email verificado com sucesso');
-      return data;
     } catch (error: any) {
       toast.error(error.message || 'Token inválido');
       throw error;

@@ -1,27 +1,12 @@
 /**
- * Custom Auth Service - Complete GoTrue Replacement
- * @version 5.0.0
+ * Custom Auth Service - Now uses Supabase GoTrue Native
+ * @version 6.0.0
  * 
- * Full authentication system bypassing GoTrue entirely.
- * Uses direct database authentication via Edge Function.
- * 
- * Features:
- * - Email/Password authentication
- * - Rate limiting & brute force protection
- * - Refresh token rotation
- * - Session management
- * - Password reset
- * - Email verification
- * - MFA/2FA support
- * - OAuth placeholder (future)
+ * Wrapper around Supabase Auth for backwards compatibility
  */
 
-// Self-hosted Supabase - Primary instance
-const SUPABASE_URL = 'https://supabase.iptvlink.com.br';
-const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU';
-
-const STORAGE_KEY = 'custom_auth_session';
-const REFRESH_THRESHOLD_MS = 5 * 60 * 1000; // Refresh 5 min before expiry
+import { supabase } from '@/integrations/supabase/client';
+import { Session, User } from '@supabase/supabase-js';
 
 export interface CustomAuthUser {
   id: string;
@@ -59,29 +44,6 @@ export interface UserSession {
   is_current?: boolean;
 }
 
-export interface PasswordResetRequest {
-  email: string;
-}
-
-export interface PasswordUpdateRequest {
-  current_password?: string;
-  new_password: string;
-  token?: string;
-}
-
-export interface SignUpOptions {
-  email: string;
-  password: string;
-  userData?: Record<string, any>;
-  emailRedirectTo?: string;
-}
-
-export interface SignInOptions {
-  email: string;
-  password: string;
-  mfaCode?: string;
-}
-
 type AuthEvent = 
   | 'SIGNED_IN' 
   | 'SIGNED_OUT' 
@@ -104,110 +66,93 @@ interface AuthResponse<T> {
   error: AuthError | null;
 }
 
+/**
+ * Convert Supabase User to CustomAuthUser
+ */
+async function convertUser(user: User): Promise<CustomAuthUser> {
+  // Fetch role from database
+  const { data: roleData } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+
+  // Fetch profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  return {
+    id: user.id,
+    email: user.email || '',
+    role: roleData?.role || 'client',
+    email_confirmed_at: user.email_confirmed_at,
+    phone: user.phone,
+    phone_confirmed_at: user.phone_confirmed_at,
+    user_metadata: user.user_metadata,
+    app_metadata: user.app_metadata,
+    profile,
+    last_sign_in_at: user.last_sign_in_at,
+    created_at: user.created_at,
+  };
+}
+
+/**
+ * Convert Supabase Session to CustomAuthSession
+ */
+async function convertSession(session: Session): Promise<CustomAuthSession> {
+  const customUser = await convertUser(session.user);
+  
+  return {
+    access_token: session.access_token,
+    refresh_token: session.refresh_token || '',
+    token_type: session.token_type || 'bearer',
+    expires_in: session.expires_in || 3600,
+    expires_at: session.expires_at || (Date.now() / 1000 + 3600),
+    user: customUser,
+  };
+}
+
 class CustomAuthService {
-  private session: CustomAuthSession | null = null;
   private listeners: AuthStateChangeCallback[] = [];
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  private deviceFingerprint: string = '';
 
   constructor() {
-    this.loadSession();
-    this.generateDeviceFingerprint();
-  }
+    // Listen to Supabase auth changes
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      let customEvent: AuthEvent = 'SIGNED_OUT';
+      let customSession: CustomAuthSession | null = null;
 
-  /**
-   * Generate a unique device fingerprint for session tracking
-   */
-  private generateDeviceFingerprint(): void {
-    const components = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + 'x' + screen.height,
-      new Date().getTimezoneOffset(),
-      navigator.hardwareConcurrency || 0,
-    ];
-    this.deviceFingerprint = btoa(components.join('|')).substring(0, 32);
-  }
-
-  /**
-   * Load session from localStorage
-   */
-  private loadSession(): void {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const session = JSON.parse(stored) as CustomAuthSession;
-        // Check if token is not expired
-        if (session.expires_at > Date.now()) {
-          this.session = session;
-          this.scheduleTokenRefresh();
-        } else {
-          // Try to refresh if we have a refresh token
-          if (session.refresh_token) {
-            this.session = session;
-            this.refreshSession().catch(() => {
-              this.clearSession();
-            });
-          } else {
-            localStorage.removeItem(STORAGE_KEY);
-          }
+      if (session) {
+        customSession = await convertSession(session);
+        
+        switch (event) {
+          case 'SIGNED_IN':
+            customEvent = 'SIGNED_IN';
+            break;
+          case 'SIGNED_OUT':
+            customEvent = 'SIGNED_OUT';
+            break;
+          case 'TOKEN_REFRESHED':
+            customEvent = 'TOKEN_REFRESHED';
+            break;
+          case 'USER_UPDATED':
+            customEvent = 'USER_UPDATED';
+            break;
+          case 'PASSWORD_RECOVERY':
+            customEvent = 'PASSWORD_RECOVERY';
+            break;
+          case 'INITIAL_SESSION':
+            customEvent = 'INITIAL_SESSION';
+            break;
         }
       }
-    } catch (e) {
-      console.error('[CustomAuth] Error loading session:', e);
-      localStorage.removeItem(STORAGE_KEY);
-    }
+
+      this.notifyListeners(customEvent, customSession);
+    });
   }
 
-  /**
-   * Save session to localStorage
-   */
-  private saveSession(session: CustomAuthSession): void {
-    session.expires_at = Date.now() + (session.expires_in * 1000);
-    this.session = session;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    this.scheduleTokenRefresh();
-    this.notifyListeners('SIGNED_IN', session);
-  }
-
-  /**
-   * Clear session from memory and storage
-   */
-  private clearSession(): void {
-    this.session = null;
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-    localStorage.removeItem(STORAGE_KEY);
-    this.notifyListeners('SIGNED_OUT', null);
-  }
-
-  /**
-   * Schedule automatic token refresh
-   */
-  private scheduleTokenRefresh(): void {
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-    }
-
-    if (!this.session) return;
-
-    const msUntilExpiry = this.session.expires_at - Date.now();
-    const refreshIn = Math.max(msUntilExpiry - REFRESH_THRESHOLD_MS, 0);
-
-    if (refreshIn > 0) {
-      this.refreshTimer = setTimeout(() => {
-        this.refreshSession().catch((e) => {
-          console.error('[CustomAuth] Auto refresh failed:', e);
-        });
-      }, refreshIn);
-    }
-  }
-
-  /**
-   * Notify all listeners of auth state change
-   */
   private notifyListeners(event: AuthEvent, session: CustomAuthSession | null): void {
     this.listeners.forEach(callback => {
       try {
@@ -219,98 +164,24 @@ class CustomAuthService {
   }
 
   /**
-   * Call the custom auth edge function
-   */
-  private async callAuthEndpoint(action: string, data: Record<string, any> = {}): Promise<any> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
-      'x-device-fingerprint': this.deviceFingerprint,
-    };
-
-    if (this.session?.access_token) {
-      headers['Authorization'] = `Bearer ${this.session.access_token}`;
-    }
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/custom-auth`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action, ...data })
-    });
-
-    const result = await response.json();
-    
-    if (!response.ok) {
-      const error: AuthError = {
-        message: result.error || result.message || 'Authentication failed',
-        code: result.code,
-        status: response.status
-      };
-      throw error;
-    }
-    
-    return result;
-  }
-
-  // ==========================================
-  // AUTHENTICATION METHODS
-  // ==========================================
-
-  /**
    * Sign in with email and password
    */
-  async signIn(email: string, password: string, options?: { mfaCode?: string }): Promise<AuthResponse<{ session: CustomAuthSession; user: CustomAuthUser }>> {
+  async signIn(email: string, password: string): Promise<AuthResponse<{ session: CustomAuthSession; user: CustomAuthUser }>> {
     try {
-      const result = await this.callAuthEndpoint('login', { 
-        email, 
-        password,
-        mfa_code: options?.mfaCode 
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
-      // Check for MFA challenge
-      if (result.mfa_required) {
-        return {
-          data: null,
-          error: {
-            message: 'MFA code required',
-            code: 'MFA_REQUIRED'
-          }
-        };
+      if (error) {
+        return { data: null, error: { message: error.message, code: error.code } };
       }
       
-      if (!result.access_token) {
-        throw { message: result.message || result.error || 'Authentication failed - invalid response' };
+      if (!data.session) {
+        return { data: null, error: { message: 'No session returned' } };
       }
-      
-      // Extract app_role from JWT payload
-      let appRole = result.user?.role || 'client';
-      try {
-        const [, payloadBase64] = result.access_token.split('.');
-        if (payloadBase64) {
-          const jwtPayload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
-          appRole = jwtPayload.app_role || jwtPayload.role || appRole;
-        }
-      } catch (e) {
-        console.warn('[CustomAuth] Could not parse JWT payload:', e);
-      }
-      
-      const session: CustomAuthSession = {
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
-        token_type: result.token_type || 'bearer',
-        expires_in: result.expires_in,
-        expires_at: Date.now() + (result.expires_in * 1000),
-        user: {
-          ...result.user,
-          role: appRole
-        }
-      };
-      
-      this.saveSession(session);
-      
-      return { data: { session, user: session.user }, error: null };
+
+      const customSession = await convertSession(data.session);
+      return { data: { session: customSession, user: customSession.user }, error: null };
     } catch (error: any) {
-      return { data: null, error: { message: error.message || 'Sign in failed', code: error.code } };
+      return { data: null, error: { message: error.message || 'Sign in failed' } };
     }
   }
 
@@ -319,26 +190,31 @@ class CustomAuthService {
    */
   async signUp(email: string, password: string, userData?: Record<string, any>): Promise<AuthResponse<{ session: CustomAuthSession; user: CustomAuthUser }>> {
     try {
-      const result = await this.callAuthEndpoint('signup', { email, password, userData });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData,
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
       
-      if (!result.access_token) {
-        throw { message: result.message || result.error || 'Sign up failed' };
+      if (error) {
+        return { data: null, error: { message: error.message, code: error.code } };
       }
       
-      const session: CustomAuthSession = {
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
-        token_type: result.token_type || 'bearer',
-        expires_in: result.expires_in,
-        expires_at: Date.now() + (result.expires_in * 1000),
-        user: result.user
-      };
-      
-      this.saveSession(session);
-      
-      return { data: { session, user: result.user }, error: null };
+      if (!data.session) {
+        // Email confirmation required
+        return { 
+          data: null, 
+          error: { message: 'Verifique seu email para confirmar o cadastro', code: 'EMAIL_CONFIRMATION_REQUIRED' } 
+        };
+      }
+
+      const customSession = await convertSession(data.session);
+      return { data: { session: customSession, user: customSession.user }, error: null };
     } catch (error: any) {
-      return { data: null, error: { message: error.message || 'Sign up failed', code: error.code } };
+      return { data: null, error: { message: error.message || 'Sign up failed' } };
     }
   }
 
@@ -347,610 +223,67 @@ class CustomAuthService {
    */
   async signOut(): Promise<AuthResponse<null>> {
     try {
-      await this.callAuthEndpoint('logout');
-      this.clearSession();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        return { data: null, error: { message: error.message } };
+      }
       return { data: null, error: null };
     } catch (error: any) {
-      this.clearSession(); // Clear anyway
       return { data: null, error: { message: error.message } };
     }
   }
-
-  /**
-   * Sign out from all devices
-   */
-  async signOutAll(): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('logout-all');
-      this.clearSession();
-      return { data: null, error: null };
-    } catch (error: any) {
-      this.clearSession();
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // SESSION METHODS
-  // ==========================================
 
   /**
    * Get current session
    */
   async getSession(): Promise<AuthResponse<{ session: CustomAuthSession | null }>> {
-    if (!this.session) {
-      return { data: { session: null }, error: null };
-    }
-
-    // Check if token is expired or about to expire
-    if (this.session.expires_at <= Date.now() + REFRESH_THRESHOLD_MS) {
-      try {
-        await this.refreshSession();
-      } catch (e) {
-        this.clearSession();
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        return { data: { session: null }, error: { message: error.message } };
+      }
+      
+      if (!session) {
         return { data: { session: null }, error: null };
       }
-    }
 
-    return { data: { session: this.session }, error: null };
+      const customSession = await convertSession(session);
+      return { data: { session: customSession }, error: null };
+    } catch (error: any) {
+      return { data: { session: null }, error: { message: error.message } };
+    }
   }
-
-  /**
-   * Refresh the current session
-   */
-  async refreshSession(): Promise<void> {
-    if (!this.session?.refresh_token) {
-      throw new Error('No refresh token');
-    }
-
-    const result = await this.callAuthEndpoint('refresh', {
-      refresh_token: this.session.refresh_token
-    });
-    
-    if (!result.access_token) {
-      throw new Error('Refresh failed');
-    }
-    
-    // Update session with new tokens (token rotation)
-    this.session.access_token = result.access_token;
-    if (result.refresh_token) {
-      this.session.refresh_token = result.refresh_token;
-    }
-    this.session.expires_in = result.expires_in;
-    this.session.expires_at = Date.now() + (result.expires_in * 1000);
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-    this.scheduleTokenRefresh();
-    this.notifyListeners('TOKEN_REFRESHED', this.session);
-  }
-
-  /**
-   * Set session manually (for SSR or custom flows)
-   */
-  setSession(session: CustomAuthSession): void {
-    this.saveSession(session);
-  }
-
-  // ==========================================
-  // USER METHODS
-  // ==========================================
 
   /**
    * Get current user
    */
   async getUser(): Promise<AuthResponse<{ user: CustomAuthUser | null }>> {
-    if (!this.session) {
-      return { data: { user: null }, error: null };
-    }
-
     try {
-      const result = await this.callAuthEndpoint('get-user');
+      const { data: { user }, error } = await supabase.auth.getUser();
       
-      // Update session with latest user data
-      if (this.session && result.user) {
-        this.session.user = result.user;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
+      if (error || !user) {
+        return { data: { user: null }, error: error ? { message: error.message } : null };
       }
-      
-      return { data: { user: result.user }, error: null };
+
+      const customUser = await convertUser(user);
+      return { data: { user: customUser }, error: null };
     } catch (error: any) {
       return { data: { user: null }, error: { message: error.message } };
     }
   }
 
   /**
-   * Update current user data
-   */
-  async updateUser(attributes: Partial<{ email: string; password: string; data: Record<string, any> }>): Promise<AuthResponse<{ user: CustomAuthUser }>> {
-    try {
-      const result = await this.callAuthEndpoint('update-user', attributes);
-      
-      if (this.session && result.user) {
-        this.session.user = result.user;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-        this.notifyListeners('USER_UPDATED', this.session);
-      }
-      
-      return { data: { user: result.user }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // PASSWORD METHODS
-  // ==========================================
-
-  /**
-   * Request password reset email
+   * Reset password for email
    */
   async resetPasswordForEmail(email: string, options?: { redirectTo?: string }): Promise<AuthResponse<null>> {
     try {
-      await this.callAuthEndpoint('request-password-reset', { 
-        email,
-        redirect_to: options?.redirectTo 
-      });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Request password reset (alias for resetPasswordForEmail)
-   */
-  async requestPasswordReset(email: string, redirectTo?: string): Promise<AuthResponse<null>> {
-    return this.resetPasswordForEmail(email, { redirectTo });
-  }
-
-  /**
-   * Confirm password reset with token and new password
-   */
-  async confirmPasswordReset(token: string, newPassword: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('confirm-password-reset', { 
-        token,
-        new_password: newPassword 
-      });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Update password with reset token
-   */
-  async updatePassword(newPassword: string, token?: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
-    try {
-      const result = await this.callAuthEndpoint('update-password', { 
-        new_password: newPassword,
-        token 
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: options?.redirectTo || `${window.location.origin}/reset-password`,
       });
       
-      if (this.session && result.user) {
-        this.session.user = result.user;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-      }
-      
-      return { data: { user: result.user }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // SESSION MANAGEMENT
-  // ==========================================
-
-  /**
-   * Get all active sessions for current user
-   */
-  async getSessions(): Promise<AuthResponse<{ sessions: UserSession[] }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-sessions');
-      return { data: { sessions: result.sessions || [] }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Revoke a specific session
-   */
-  async revokeSession(sessionId: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('revoke-session', { session_id: sessionId });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Revoke all sessions except current
-   */
-  async revokeOtherSessions(): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('revoke-other-sessions');
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // MFA METHODS
-  // ==========================================
-
-  /**
-   * Enroll in MFA (TOTP)
-   */
-  async enrollMFA(): Promise<AuthResponse<{ secret: string; qr_code: string }>> {
-    try {
-      const result = await this.callAuthEndpoint('enroll-mfa');
-      return { data: { secret: result.secret, qr_code: result.qr_code }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Verify MFA enrollment
-   */
-  async verifyMFAEnrollment(code: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('verify-mfa-enrollment', { code });
-      
-      if (this.session) {
-        this.session.user.mfa_enabled = true;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-      }
-      
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Disable MFA
-   */
-  async disableMFA(code: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('disable-mfa', { code });
-      
-      if (this.session) {
-        this.session.user.mfa_enabled = false;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-      }
-      
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // EMAIL VERIFICATION
-  // ==========================================
-
-  /**
-   * Resend verification email
-   */
-  async resendVerificationEmail(email: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('resend-verification', { email });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Verify email with token
-   */
-  async verifyEmail(token: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
-    try {
-      const result = await this.callAuthEndpoint('verify-email', { token });
-      return { data: { user: result.user }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // BACKUP CODES
-  // ==========================================
-
-  /**
-   * Generate MFA backup codes
-   */
-  async generateBackupCodes(): Promise<AuthResponse<{ codes: string[] }>> {
-    try {
-      const result = await this.callAuthEndpoint('generate-backup-codes');
-      return { data: { codes: result.codes || [] }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Verify a backup code (one-time use)
-   */
-  async verifyBackupCode(code: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('verify-backup-code', { code });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // SECURITY STATUS
-  // ==========================================
-
-  /**
-   * Get account security status
-   */
-  async getSecurityStatus(): Promise<AuthResponse<{
-    mfa_enabled: boolean;
-    has_backup_codes: boolean;
-    email_verified: boolean;
-    password_strong: boolean;
-    active_sessions_count: number;
-    last_password_change: string | null;
-  }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-security-status');
-      return { 
-        data: {
-          mfa_enabled: result.mfa_enabled || false,
-          has_backup_codes: result.has_backup_codes || false,
-          email_verified: result.email_verified !== false,
-          password_strong: result.password_strong !== false,
-          active_sessions_count: result.active_sessions_count || 0,
-          last_password_change: result.last_password_change || null
-        }, 
-        error: null 
-      };
-    } catch (error: any) {
-      // Return default values on error
-      return { 
-        data: {
-          mfa_enabled: false,
-          has_backup_codes: false,
-          email_verified: true,
-          password_strong: true,
-          active_sessions_count: 1,
-          last_password_change: null
-        }, 
-        error: null 
-      };
-    }
-  }
-
-  // ==========================================
-  // DEVICE FINGERPRINTING
-  // ==========================================
-
-  /**
-   * Get detailed device fingerprint info
-   */
-  getDeviceFingerprint(): { hash: string; info: Record<string, any> } {
-    const info = {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      screen: `${screen.width}x${screen.height}`,
-      timezone: new Date().getTimezoneOffset(),
-      cores: navigator.hardwareConcurrency || 0,
-      platform: navigator.platform,
-      vendor: navigator.vendor,
-    };
-    return { hash: this.deviceFingerprint, info };
-  }
-
-  /**
-   * Get known devices for current user
-   */
-  async getDevices(): Promise<AuthResponse<{ devices: any[] }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-devices');
-      return { data: { devices: result.devices || [] }, error: null };
-    } catch (error: any) {
-      return { data: { devices: [] }, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Trust a device (skip extra verification)
-   */
-  async trustDevice(deviceId: string, trustDays: number = 30): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('trust-device', { device_id: deviceId, trust_days: trustDays });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Remove device from trusted list
-   */
-  async removeDevice(deviceId: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('remove-device', { device_id: deviceId });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // LOGIN ALERTS
-  // ==========================================
-
-  /**
-   * Get login alerts
-   */
-  async getLoginAlerts(): Promise<AuthResponse<{ alerts: any[] }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-login-alerts');
-      return { data: { alerts: result.alerts || [] }, error: null };
-    } catch (error: any) {
-      return { data: { alerts: [] }, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Acknowledge a login alert
-   */
-  async acknowledgeAlert(alertId: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('acknowledge-alert', { alert_id: alertId });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Configure login alert preferences
-   */
-  async setAlertPreferences(prefs: { email: boolean; whatsapp: boolean }): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('set-alert-preferences', { 
-        email_alerts: prefs.email, 
-        whatsapp_alerts: prefs.whatsapp 
-      });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // PASSKEYS / WEBAUTHN
-  // ==========================================
-
-  /**
-   * Get registered passkeys
-   */
-  async getPasskeys(): Promise<AuthResponse<{ passkeys: any[] }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-passkeys');
-      return { data: { passkeys: result.passkeys || [] }, error: null };
-    } catch (error: any) {
-      return { data: { passkeys: [] }, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Start passkey registration
-   */
-  async startPasskeyRegistration(): Promise<AuthResponse<{ options: any }>> {
-    try {
-      const result = await this.callAuthEndpoint('register-passkey-options');
-      return { data: { options: result }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Complete passkey registration
-   */
-  async completePasskeyRegistration(credential: any, deviceName?: string): Promise<AuthResponse<null>> {
-    try {
-      // Extract credential data for the server
-      const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-      const publicKey = btoa(String.fromCharCode(...new Uint8Array(credential.response.getPublicKey?.() || [])));
-      
-      await this.callAuthEndpoint('register-passkey-verify', { 
-        credential_id: credentialId,
-        public_key: publicKey || credentialId, 
-        device_name: deviceName,
-        attestation: credential.response.attestationObject ? btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))) : null
-      });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Remove a passkey
-   */
-  async removePasskey(passkeyId: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('remove-passkey', { passkey_id: passkeyId });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // EMAIL CHANGE
-  // ==========================================
-
-  /**
-   * Request email change (sends verification to new email)
-   */
-  async requestEmailChange(newEmail: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('request-email-change', { new_email: newEmail });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Confirm email change with token
-   */
-  async confirmEmailChange(code: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
-    try {
-      const result = await this.callAuthEndpoint('confirm-email-change', { code });
-      if (this.session && result.new_email) {
-        this.session.user.email = result.new_email;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-        this.notifyListeners('USER_UPDATED', this.session);
-      }
-      return { data: { user: this.session?.user as CustomAuthUser }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // ==========================================
-  // PHONE VERIFICATION (WHATSAPP)
-  // ==========================================
-
-  /**
-   * Request phone verification code via WhatsApp
-   */
-  async requestPhoneVerification(phoneNumber: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('request-phone-verification', { phone_number: phoneNumber });
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Verify phone with code
-   */
-  async verifyPhone(phoneNumber: string, code: string): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('verify-phone-code', { phone_number: phoneNumber, code });
-      if (this.session) {
-        this.session.user.phone = phoneNumber;
-        this.session.user.phone_confirmed_at = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
-        this.notifyListeners('USER_UPDATED', this.session);
+      if (error) {
+        return { data: null, error: { message: error.message } };
       }
       return { data: null, error: null };
     } catch (error: any) {
@@ -958,113 +291,55 @@ class CustomAuthService {
     }
   }
 
-  // ==========================================
-  // ACCOUNT DELETION
-  // ==========================================
-
   /**
-   * Request account deletion (LGPD)
+   * Update user password
    */
-  async requestAccountDeletion(reason?: string): Promise<AuthResponse<{ scheduled_at: string }>> {
+  async updatePassword(newPassword: string): Promise<AuthResponse<null>> {
     try {
-      const result = await this.callAuthEndpoint('request-account-deletion', { reason });
-      return { data: { scheduled_at: result.scheduled_at }, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  /**
-   * Cancel pending account deletion
-   */
-  async cancelAccountDeletion(): Promise<AuthResponse<null>> {
-    try {
-      await this.callAuthEndpoint('cancel-account-deletion');
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) {
+        return { data: null, error: { message: error.message } };
+      }
       return { data: null, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
     }
   }
-
-  /**
-   * Get account deletion status
-   */
-  async getAccountDeletionStatus(): Promise<AuthResponse<{ pending: boolean; scheduled_at?: string }>> {
-    try {
-      const result = await this.callAuthEndpoint('get-deletion-status');
-      return { 
-        data: { 
-          pending: result.has_pending_request || false, 
-          scheduled_at: result.scheduled_deletion_at 
-        }, 
-        error: null 
-      };
-    } catch (error: any) {
-      return { data: { pending: false }, error: null };
-    }
-  }
-
-  // ==========================================
-  // AUTH STATE LISTENER
-  // ==========================================
 
   /**
    * Subscribe to auth state changes
    */
-  onAuthStateChange(callback: AuthStateChangeCallback): { data: { subscription: { unsubscribe: () => void } } } {
+  onAuthStateChange(callback: AuthStateChangeCallback) {
     this.listeners.push(callback);
-    
-    // Immediately notify with current state
-    if (this.session) {
-      setTimeout(() => callback('INITIAL_SESSION', this.session), 0);
-    }
     
     return {
       data: {
         subscription: {
           unsubscribe: () => {
-            this.listeners = this.listeners.filter(l => l !== callback);
+            const index = this.listeners.indexOf(callback);
+            if (index > -1) {
+              this.listeners.splice(index, 1);
+            }
           }
         }
       }
     };
   }
 
-  // ==========================================
-  // UTILITY GETTERS
-  // ==========================================
-
   /**
-   * Get current session synchronously
+   * Get active sessions (simplified - returns empty for Cloud)
    */
-  get currentSession(): CustomAuthSession | null {
-    return this.session;
+  async getSessions(): Promise<AuthResponse<{ sessions: UserSession[] }>> {
+    return { data: { sessions: [] }, error: null };
   }
 
   /**
-   * Get current user synchronously
+   * Revoke session (no-op for Cloud)
    */
-  get currentUser(): CustomAuthUser | null {
-    return this.session?.user || null;
-  }
-
-  /**
-   * Get access token synchronously
-   */
-  get accessToken(): string | null {
-    return this.session?.access_token || null;
-  }
-
-  /**
-   * Check if user is authenticated
-   */
-  get isAuthenticated(): boolean {
-    return !!this.session && this.session.expires_at > Date.now();
+  async revokeSession(): Promise<AuthResponse<null>> {
+    return { data: null, error: null };
   }
 }
 
-// Export singleton instance
 export const customAuthService = new CustomAuthService();
-
-// Export for compatibility with existing code
-export default customAuthService;
