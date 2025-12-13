@@ -240,19 +240,35 @@ export default function IPTVPlayer() {
     }
   }, [getStreamOrigin]);
 
-  // CDN Fallback
+  // CDN Fallback - Skip HTTP URLs to prevent Mixed Content errors
   const handleCdnFallback = useCallback(() => {
     if (!playbackInfo?.cdnList) return;
     
-    const nextIndex = state.currentCdnIndex + 1;
-    if (nextIndex < playbackInfo.cdnList.length) {
+    let nextIndex = state.currentCdnIndex + 1;
+    
+    // Skip any HTTP URLs (Mixed Content not allowed in browsers)
+    while (nextIndex < playbackInfo.cdnList.length) {
+      const candidateUrl = playbackInfo.cdnList[nextIndex].url;
+      
+      // Block HTTP URLs - browsers will reject them due to Mixed Content policy
+      if (candidateUrl.startsWith('http://')) {
+        console.warn('[CDN Fallback] Skipping HTTP URL (Mixed Content):', candidateUrl.substring(0, 50));
+        nextIndex++;
+        continue;
+      }
+      
+      // Found a valid HTTPS URL
       setState(prev => ({ ...prev, currentCdnIndex: nextIndex }));
-      const nextUrl = playbackInfo.cdnList[nextIndex].url;
       toast.info('Tentando servidor alternativo...');
-      initPlayer(nextUrl);
-    } else {
-      setState(prev => ({ ...prev, errorMessage: 'Não foi possível reproduzir o canal' }));
+      initPlayer(candidateUrl);
+      return;
     }
+    
+    // No valid HTTPS URLs found
+    setState(prev => ({ 
+      ...prev, 
+      errorMessage: 'Não foi possível reproduzir o canal. Servidor requer HTTPS.' 
+    }));
   }, [playbackInfo, state.currentCdnIndex, initPlayer]);
 
   // Update refs when callbacks change
