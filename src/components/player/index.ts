@@ -20,8 +20,18 @@ export { GestureIndicator } from './GestureIndicator';
 export { DoubleTapIndicator } from './DoubleTapIndicator';
 export { ThumbnailPreview } from './ThumbnailPreview';
 
-// White-label IPTV Player
-export { IPTVPlayerWhiteLabel } from './IPTVPlayerWhiteLabel';
+// White-label IPTV Player (Legacy)
+export { IPTVPlayerWhiteLabel as IPTVPlayerWhiteLabelLegacy } from './IPTVPlayerWhiteLabel';
+
+// NEW: Modular IPTV Player System
+export { TokenManager, tokenManager } from './modules/TokenManager'
+export { StreamResolver, streamResolver } from './modules/StreamResolver'
+export { BufferManager } from './modules/BufferManager'
+export { ErrorManager } from './modules/ErrorManager'
+export { MetricsCollector } from './modules/MetricsCollector'
+export { PlayerController } from './modules/PlayerController'
+export { useIPTVPlayer } from './hooks/useIPTVPlayer'
+export { IPTVPlayerWhiteLabel } from './ui/IPTVPlayerWhiteLabel'
 
 // Core Engine
 export * from './core';
