@@ -1,5 +1,5 @@
 /**
- * IPTV Play Endpoint
+ * IPTV Play Endpoint - Supabase Cloud
  * 
  * Returns signed streaming URL with CDN list for a channel.
  * Endpoint: /api/iptv/play?channelId=XXX
@@ -7,16 +7,21 @@
  * Features:
  * - Batch metrics collection (reduces DB writes by 80%)
  * - Circuit breaker for CDN domains
- * - Uses fetch directly to avoid SDK import issues in self-hosted
  */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-custom-token',
 };
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('SELFHOSTED_DB_URL')?.replace(/:\d+\/postgres$/, '') || '';
-const SERVICE_ROLE_KEY = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Create Supabase client with service role
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 // Circuit breaker state per CDN domain
 interface CircuitBreakerState {

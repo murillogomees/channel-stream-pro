@@ -285,33 +285,29 @@ class IPTVService {
    */
   async getPlaybackUrl(channelId: number): Promise<PlaybackInfo | null> {
     try {
-      // Use custom auth service for self-hosted Supabase
-      const { data } = await customAuthService.getSession();
-      const accessToken = data.session?.access_token;
+      // Get session from Supabase GoTrue
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
       
       if (!accessToken) {
         console.error('[IPTVService] No auth session');
         return null;
       }
 
-      const response = await fetch(
-        `${SUPABASE_FUNCTIONS_URL}/iptv-play?channelId=${channelId}`,
-        {
-          headers: {
-            // Use custom header instead of Authorization to avoid Supabase JWT validation
-            'X-Custom-Token': accessToken,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      // Use supabase.functions.invoke for Cloud
+      const { data, error } = await supabase.functions.invoke('iptv-play', {
+        body: { channelId },
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
 
-      if (!response.ok) {
-        const error = await response.json();
+      if (error) {
         console.error('[IPTVService] Playback error:', error);
         return null;
       }
 
-      return await response.json();
+      return data as PlaybackInfo;
     } catch (error) {
       console.error('[IPTVService] Error getting playback URL:', error);
       return null;

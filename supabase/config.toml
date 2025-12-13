@@ -398,60 +398,6 @@ verify_jwt = false
 # ==========================================
 # COOLIFY INTEGRATION & SSH MANAGEMENT
 # ==========================================
-
-# Coolify API proxy - public with internal auth verification
-[functions.coolify-api]
-verify_jwt = false
-
-# Remote command execution via Coolify - requires master role
-[functions.remote-command]
-verify_jwt = false
-
-# ==========================================
-# SELF-HOSTED MIGRATION UTILITIES
-# ==========================================
-
-# Clean self-hosted tables before dump - admin only
-[functions.clean-selfhosted-tables]
-verify_jwt = false
-
-# Full migration dump from Cloud to Self-hosted
-[functions.full-migration-dump]
-verify_jwt = false
-
-# Self-hosted DB Admin - direct PostgreSQL access for trigger management
-[functions.selfhosted-db-admin]
-verify_jwt = false
-
-# Generate JWT keys for self-hosted Supabase - public utility
-[functions.generate-jwt-keys]
-verify_jwt = false
-
-# Test self-hosted auth - debugging utility
-[functions.test-selfhosted-auth]
-verify_jwt = false
-
-[functions.check-gotrue-config]
-verify_jwt = false
-
-[functions.gotrue-admin]
-verify_jwt = false
-
-[functions.diagnose-gotrue]
-verify_jwt = false
-
-[functions.fix-gotrue-auth]
-verify_jwt = false
-
-# ==========================================
-# CUSTOM AUTH WRAPPER (BYPASSES GOTRUE)
-# ==========================================
-
-# Custom auth - direct database authentication
-[functions.custom-auth]
-verify_jwt = false
-
-# ==========================================
 # MAINTENANCE & OPTIMIZATION
 # ==========================================
 
@@ -467,17 +413,7 @@ verify_jwt = false
 # DEPLOY AUTOMATION
 # ==========================================
 
-# Deploy webhook - triggers restart/deploy via Coolify API
-[functions.deploy-webhook]
-verify_jwt = false
-
-# Coolify secrets manager - manage environment variables
-[functions.coolify-secrets]
-verify_jwt = false
-
-# Edge Functions sync - sync functions from GitHub
-[functions.edge-functions-sync]
-verify_jwt = false
+# Deploy webhook removed - using Supabase Cloud auto-deploy
 
 # ==========================================
 # IPTV PERFORMANCE OPTIMIZATION
