@@ -1,0 +1,28 @@
+name = "transcode-worker"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# Queue bindings
+[[queues.producers]]
+queue = "transcode-jobs"
+binding = "TRANSCODE_QUEUE"
+
+[[queues.consumers]]
+queue = "transcode-jobs"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "iptvlink-cdn"
+
+[vars]
+# Non-sensitive variables
+
+# Secrets (configure via wrangler secret put)
+# SUPABASE_URL
+# SUPABASE_SERVICE_ROLE_KEY
+# WORKER_SECRET
+# FFMPEG_ENDPOINT
