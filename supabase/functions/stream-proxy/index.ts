@@ -358,16 +358,16 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 // HTTP FETCHING
 // =============================================================================
 
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false): Headers {
+function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false): Headers {
   const headers = new Headers();
   
-  // For Xtream live streams, use minimal headers to avoid 405 errors
-  // Many Xtream servers reject requests with certain headers
-  if (isLiveStream) {
+  // For Xtream live streams AND segments, use minimal headers to avoid 403/405 errors
+  // Many Xtream servers reject requests with certain headers or require specific User-Agent
+  if (isLiveStream || isSegment) {
     headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
     headers.set('Accept', '*/*');
     headers.set('Connection', 'keep-alive');
-    // Don't set Origin/Referer/Accept-Encoding for live streams
+    // Don't set Origin/Referer/Accept-Encoding for live streams and segments
   } else {
     headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     headers.set('Accept', '*/*');
@@ -551,7 +551,7 @@ async function handler(req: Request): Promise<Response> {
 
     const rangeHeader = req.headers.get('Range');
     const acceptEncoding = req.headers.get('Accept-Encoding');
-    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding, isLiveStream);
+    const upstreamHeaders = createUpstreamHeaders(origin, rangeHeader, acceptEncoding, isLiveStream, isVideoSegment);
 
     let timeout: number;
     let maxRetries: number;
