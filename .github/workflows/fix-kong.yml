@@ -26,7 +26,7 @@ jobs:
           # Validate with Kong in DB-less mode
           docker run --rm -e KONG_DATABASE=off -v /tmp/kong.yml:/kong.yml kong:2.8.1 kong config parse /kong.yml
 
-      - name: Deploy to VPS and fix Kong permissions
+      - name: Deploy to VPS and fix Kong
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -35,7 +35,7 @@ jobs:
           # Copy kong.yml to VPS
           sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
 
-          # On VPS: fix /home/kong permissions via helper container and update declarative config
+          # On VPS: fix permissions, copy to all locations, restart
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
             set -e
 
@@ -48,7 +48,13 @@ jobs:
               exit 1
             fi
 
-            # Use a helper container with --volumes-from to repair permissions even if Kong is restarting
+            echo "=== Copying kong.yml to host volume path ./volumes/api/ ==="
+            mkdir -p ./volumes/api
+            cp /tmp/kong.yml ./volumes/api/kong.yml
+            chmod 644 ./volumes/api/kong.yml
+            echo "Written to: $(pwd)/volumes/api/kong.yml"
+            cat ./volumes/api/kong.yml
+
             echo "=== Fixing /home/kong permissions via helper container ==="
             docker run --rm --volumes-from $KONG_CONTAINER alpine sh -c '
               mkdir -p /home/kong && 
@@ -56,7 +62,7 @@ jobs:
               rm -f /home/kong/kong.yml || true
             '
 
-            echo "=== Copying kong.yml into declarative path ==="
+            echo "=== Copying kong.yml into container declarative path ==="
             docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
 
             echo "=== Restarting Kong container ==="
