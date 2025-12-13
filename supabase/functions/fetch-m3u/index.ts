@@ -5,8 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Max content size: 10MB (to stay within memory limits)
-const MAX_CONTENT_SIZE = 10 * 1024 * 1024;
+// Max content size: 100MB (increased for large playlists)
+const MAX_CONTENT_SIZE = 100 * 1024 * 1024;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -60,7 +60,7 @@ serve(async (req) => {
     const contentLength = response.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > MAX_CONTENT_SIZE) {
       const sizeMB = Math.round(parseInt(contentLength) / 1024 / 1024);
-      throw new Error(`Arquivo muito grande (${sizeMB}MB). Use 'Colar M3U' para playlists grandes.`);
+      throw new Error(`Arquivo muito grande (${sizeMB}MB). Limite máximo: 100MB.`);
     }
 
     // Stream response and check size
@@ -72,6 +72,8 @@ serve(async (req) => {
     const chunks: Uint8Array[] = [];
     let totalSize = 0;
 
+    console.log("[fetch-m3u] Starting stream read...");
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -80,11 +82,18 @@ serve(async (req) => {
       if (totalSize > MAX_CONTENT_SIZE) {
         reader.cancel();
         const sizeMB = Math.round(totalSize / 1024 / 1024);
-        throw new Error(`Arquivo muito grande (>${sizeMB}MB). Use 'Colar M3U' para playlists grandes.`);
+        throw new Error(`Arquivo muito grande (>${sizeMB}MB). Limite máximo: 100MB.`);
       }
       
       chunks.push(value);
+      
+      // Log progress for large files
+      if (chunks.length % 100 === 0) {
+        console.log(`[fetch-m3u] Progress: ${Math.round(totalSize / 1024 / 1024)}MB`);
+      }
     }
+
+    console.log(`[fetch-m3u] Download complete: ${Math.round(totalSize / 1024 / 1024)}MB`);
 
     const allChunks = new Uint8Array(totalSize);
     let position = 0;
@@ -94,7 +103,7 @@ serve(async (req) => {
     }
 
     const content = new TextDecoder().decode(allChunks);
-    console.log("[fetch-m3u] Content length:", content.length);
+    console.log("[fetch-m3u] Content length:", content.length, "chars");
 
     // Basic validation
     if (!content.includes('#EXTM3U') && !content.includes('#EXTINF')) {
