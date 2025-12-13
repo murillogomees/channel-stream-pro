@@ -204,7 +204,8 @@ function addMetric(channelId: number): void {
 Deno.serve(async (req) => {
   console.log('[iptv-play] Function start', { 
     url: req.url, 
-    hasToken: !!req.headers.get('X-Custom-Token'),
+    method: req.method,
+    hasAuthHeader: !!req.headers.get('Authorization'),
     supabaseUrl: SUPABASE_URL ? 'configured' : 'missing',
     serviceKey: SERVICE_ROLE_KEY ? 'configured' : 'missing'
   });
@@ -215,7 +216,19 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const channelId = url.searchParams.get('channelId');
+    
+    // Support both query params (GET) and body (POST from supabase.functions.invoke)
+    let channelId = url.searchParams.get('channelId');
+    
+    if (!channelId && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        channelId = body.channelId?.toString() || null;
+        console.log('[iptv-play] Parsed channelId from body:', channelId);
+      } catch (e) {
+        console.error('[iptv-play] Failed to parse body:', e);
+      }
+    }
 
     if (!channelId) {
       return new Response(
@@ -224,9 +237,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify authentication using custom auth token from X-Custom-Token header
-    const customToken = req.headers.get('X-Custom-Token');
+    // Verify authentication - support both Authorization header and X-Custom-Token
+    const authHeader = req.headers.get('Authorization');
+    const customToken = req.headers.get('X-Custom-Token') || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null);
+    
     if (!customToken) {
+      console.error('[iptv-play] No auth token found');
       return new Response(
         JSON.stringify({ error: 'Unauthorized - No token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
