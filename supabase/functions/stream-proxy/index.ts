@@ -415,36 +415,25 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers {
   const headers = new Headers();
   
-  // For Xtream live streams AND segments, use minimal headers with proper Referer
-  // Many Xtream servers validate the Referer to match the original stream request
-  if (isLiveStream || isSegment) {
-    headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
-    headers.set('Accept', '*/*');
-    headers.set('Connection', 'keep-alive');
-    
-    // For segments, set Referer to the origin to help with session validation
-    if (isSegment && origin) {
-      headers.set('Referer', `${origin}/`);
-    }
-  } else {
-    headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    headers.set('Accept', '*/*');
-    headers.set('Accept-Language', 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7');
-    headers.set('Connection', 'keep-alive');
-    
-    if (acceptEncoding) {
-      headers.set('Accept-Encoding', acceptEncoding);
-    }
-    
-    if (origin) {
-      headers.set('Referer', `${origin}/`);
-      headers.set('Origin', origin);
-    }
+  // CRITICAL: For Xtream servers, use MINIMAL headers
+  // Many Xtream servers return 406 (Not Acceptable) if they receive unexpected headers
+  // VLC-style User-Agent is most compatible with IPTV servers
+  headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
+  headers.set('Accept', '*/*');
+  headers.set('Connection', 'keep-alive');
+  
+  // Only add Referer for segments (helps with session validation on some servers)
+  if (isSegment && origin) {
+    headers.set('Referer', `${origin}/`);
   }
   
+  // Range header for seeking
   if (rangeHeader) {
     headers.set('Range', rangeHeader);
   }
+  
+  // NOTE: Do NOT add Accept-Encoding, Accept-Language, Origin for Xtream
+  // These can cause 406 errors on strict IPTV servers
   
   return headers;
 }
