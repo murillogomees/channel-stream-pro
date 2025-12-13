@@ -1,47 +1,24 @@
 /**
- * Supabase Client Wrapper - 100% Self-Hosted
+ * Supabase Client - Self-Hosted Only
  * 
- * Este arquivo redireciona TODAS as operações para o Supabase Self-Hosted.
+ * Este arquivo aponta exclusivamente para o Supabase Self-Hosted.
  * URL: https://supabase.iptvlink.com.br
- * 
- * Para migrar um arquivo, altere o import de:
- *   import { supabase } from '@/integrations/supabase/client';
- * Para:
- *   import { supabase } from '@/integrations/supabase-client';
  */
 
-import { selfHostedSupabase, selfHostedConfig } from './selfhosted/client';
-import { supabase as cloudSupabase } from './supabase/client';
+import { supabase, supabaseConfig, getFunctionUrl } from './supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './supabase/types';
 
-// ============================================
-// CONFIGURAÇÃO: USAR CLOUD ATÉ MIGRAÇÃO COMPLETA
-// ============================================
-// Self-hosted ainda não tem as tabelas migradas (404 errors)
-// Usar Cloud por enquanto, mudar para true após migração completa
-const USE_SELFHOSTED = true;
-
-// Export principal - aponta para cloud até migração completa
-export const supabase: SupabaseClient<Database> = USE_SELFHOSTED 
-  ? selfHostedSupabase 
-  : cloudSupabase;
+// Export principal - sempre self-hosted
+export { supabase };
 
 // Função getter para uso dinâmico
 export const getSupabaseClient = (): SupabaseClient<Database> => {
-  return USE_SELFHOSTED ? selfHostedSupabase : cloudSupabase;
+  return supabase;
 };
 
 // Export configuration
-export const getSupabaseConfig = () => {
-  if (USE_SELFHOSTED) {
-    return selfHostedConfig;
-  }
-  return {
-    url: import.meta.env.VITE_SUPABASE_URL,
-    anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-  };
-};
+export const getSupabaseConfig = () => supabaseConfig;
 
 // Constantes para uso em Edge Functions e configs
 export const SELFHOSTED_URL = "https://supabase.iptvlink.com.br";
@@ -52,4 +29,3 @@ export const supabaseClient = supabase;
 
 // Re-exports para compatibilidade
 export { selfHostedSupabase } from './selfhosted/client';
-export { supabase as cloudSupabase } from './supabase/client';

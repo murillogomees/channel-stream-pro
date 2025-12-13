@@ -6,12 +6,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import SelfHostedMigrationDashboard from '@/components/admin/SelfHostedMigrationDashboard';
 import { SelfHostedDeploymentPanel } from '@/components/admin/SelfHostedDeploymentPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Server, Database, Rocket, Settings, Terminal } from 'lucide-react';
+import { ArrowLeft, Server, Rocket, Settings, Terminal } from 'lucide-react';
 
 const AdminSelfHostedPage = () => {
   const { user, isMaster } = useAuth();
@@ -57,14 +56,10 @@ const AdminSelfHostedPage = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="deployment" className="flex items-center gap-2">
             <Rocket className="h-4 w-4" />
             <span className="hidden sm:inline">Deployment</span>
-          </TabsTrigger>
-          <TabsTrigger value="migration" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            <span className="hidden sm:inline">Migration</span>
           </TabsTrigger>
           <TabsTrigger value="commands" className="flex items-center gap-2">
             <Terminal className="h-4 w-4" />
@@ -78,10 +73,6 @@ const AdminSelfHostedPage = () => {
 
         <TabsContent value="deployment">
           <SelfHostedDeploymentPanel />
-        </TabsContent>
-
-        <TabsContent value="migration">
-          <SelfHostedMigrationDashboard />
         </TabsContent>
 
         <TabsContent value="commands">
