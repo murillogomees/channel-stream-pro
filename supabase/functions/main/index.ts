@@ -2,7 +2,7 @@
  * Main Edge Function Router
  * 
  * Routes requests to the appropriate edge function based on URL path.
- * Used when edge-runtime is configured with --main-service.
+ * For self-hosted Supabase with --main-service configuration.
  */
 
 const corsHeaders = {
@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        version: '2.2.0',
+        version: '2.3.0',
         message: 'Edge Functions Router Active'
       }),
       { 
@@ -46,56 +46,44 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Dynamic import of the target function
+  // Route to inline handlers for critical functions
   try {
-    const functionPath = `/home/deno/functions/${functionName}/index.ts`;
-    console.log(`[Router] Loading function from: ${functionPath}`);
-    
-    // Import the function module dynamically
-    const module = await import(functionPath);
-    
-    // If the module exports a handler, use it
-    if (typeof module.default === 'function') {
-      return await module.default(req);
+    switch (functionName) {
+      case 'custom-auth':
+        return await handleCustomAuth(req);
+      
+      default:
+        // For other functions, return not implemented
+        return new Response(
+          JSON.stringify({ 
+            error: `Function '${functionName}' not implemented in router`,
+            hint: 'This function needs to be added to the main router or called directly'
+          }),
+          { 
+            status: 501, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
     }
-    
-    // Otherwise, assume the function uses Deno.serve pattern
-    // In this case, we need to forward the request to the function's URL
-    // Since we can't directly invoke Deno.serve handlers, we'll inline the logic
-    
-    // For custom-auth specifically, inline the handler
-    if (functionName === 'custom-auth') {
-      return await handleCustomAuth(req);
-    }
-
-    // For other functions, return error (they need to be handled individually)
+  } catch (error) {
+    console.error(`[Router] Error in function ${functionName}:`, error);
     return new Response(
       JSON.stringify({ 
-        error: 'Function found but no compatible handler',
-        function: functionName
+        error: error.message,
+        function: functionName,
+        stack: error.stack
       }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
-
-  } catch (error) {
-    console.error(`[Router] Error loading function ${functionName}:`, error);
-    return new Response(
-      JSON.stringify({ 
-        error: `Function '${functionName}' not found or failed to load`,
-        details: error.message
-      }),
-      { 
-        status: 404, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
   }
 });
 
-// Inline custom-auth handler to avoid import issues
+// ============================================================================
+// CUSTOM-AUTH HANDLER - Complete authentication implementation
+// ============================================================================
 async function handleCustomAuth(req: Request): Promise<Response> {
   const { encode } = await import("https://deno.land/std@0.168.0/encoding/base64.ts");
   
@@ -144,7 +132,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
     const jwtSecret = Deno.env.get('JWT_SECRET') || 'super-secret-jwt-token-with-at-least-32-characters-long';
     
     console.log('[CustomAuth] Action:', action, 'Email:', email);
-    console.log('[CustomAuth] DB URL preview:', dbUrl?.substring(0, 30) + '...');
+    console.log('[CustomAuth] DB URL configured:', !!dbUrl);
     
     if (!dbUrl) {
       throw new Error('SELFHOSTED_DB_URL not configured');
@@ -153,7 +141,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
     const dbUrlMatch = dbUrl.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
     
     if (!dbUrlMatch) {
-      console.error('[CustomAuth] Failed to parse DB URL:', dbUrl.substring(0, 50));
+      console.error('[CustomAuth] Failed to parse DB URL');
       throw new Error('Invalid database URL format');
     }
 
@@ -174,6 +162,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
     });
     
     await client.connect();
+    console.log('[CustomAuth] Database connected');
     
     try {
       if (action === 'login') {
@@ -187,6 +176,7 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         `, [email.toLowerCase(), password]);
         
         if (authResult.rows.length === 0) {
+          console.log('[CustomAuth] User not found:', email);
           return new Response(JSON.stringify({ 
             error: 'Invalid login credentials',
             details: 'User not found'
@@ -199,10 +189,15 @@ async function handleCustomAuth(req: Request): Promise<Response> {
         const user = authResult.rows[0] as any;
         
         if (!user.password_valid) {
-          await client.queryObject(`
-            INSERT INTO public.security_events (event_type, event_details, ip_address)
-            VALUES ('failed_login', $1, $2)
-          `, [JSON.stringify({ email }), req.headers.get('x-forwarded-for') || 'unknown']);
+          console.log('[CustomAuth] Invalid password for:', email);
+          try {
+            await client.queryObject(`
+              INSERT INTO public.security_events (event_type, event_details, ip_address)
+              VALUES ('failed_login', $1, $2)
+            `, [JSON.stringify({ email }), req.headers.get('x-forwarded-for') || 'unknown']);
+          } catch (e) {
+            console.log('[CustomAuth] Could not log failed attempt:', e);
+          }
           
           return new Response(JSON.stringify({ 
             error: 'Invalid login credentials',
@@ -254,10 +249,14 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           exp: now + (expiresIn * 4),
         }, jwtSecret);
         
-        await client.queryObject(`
-          INSERT INTO public.auth_sessions_log (user_id, user_email, event_type, ip_address, user_agent)
-          VALUES ($1, $2, 'login', $3, $4)
-        `, [user.id, user.email, req.headers.get('x-forwarded-for') || 'unknown', req.headers.get('user-agent') || 'unknown']);
+        try {
+          await client.queryObject(`
+            INSERT INTO public.auth_sessions_log (user_id, user_email, event_type, ip_address, user_agent)
+            VALUES ($1, $2, 'login', $3, $4)
+          `, [user.id, user.email, req.headers.get('x-forwarded-for') || 'unknown', req.headers.get('user-agent') || 'unknown']);
+        } catch (e) {
+          console.log('[CustomAuth] Could not log login:', e);
+        }
         
         console.log(`[CustomAuth] Login successful for: ${email}, role: ${role}`);
         
