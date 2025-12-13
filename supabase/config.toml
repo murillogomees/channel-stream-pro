@@ -458,3 +458,11 @@ verify_jwt = false
 # Read Replica Router - intelligent query routing with failover
 [functions.iptv-read-replica]
 verify_jwt = false
+
+# ==========================================
+# STREAM TOKEN REFRESH
+# ==========================================
+
+# Refresh stream token - public for player access
+[functions.refresh-stream-token]
+verify_jwt = false
