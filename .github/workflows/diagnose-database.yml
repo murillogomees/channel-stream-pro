@@ -1,0 +1,98 @@
+name: Diagnose Self-Hosted Database
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Diagnose Database
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASS }}
+        run: |
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
+            set -e
+            
+            echo "=============================================="
+            echo "   DIAGNÓSTICO DO BANCO DE DADOS SELF-HOSTED"
+            echo "=============================================="
+            echo ""
+            
+            # 1. Encontrar container do PostgreSQL
+            echo "📦 [1/6] Encontrando container PostgreSQL..."
+            DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'db|postgres' | grep -i supabase | head -1)
+            if [ -z "$DB_CONTAINER" ]; then
+              DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'postgres' | head -1)
+            fi
+            echo "Container encontrado: $DB_CONTAINER"
+            echo ""
+            
+            if [ -z "$DB_CONTAINER" ]; then
+              echo "❌ ERRO: Nenhum container PostgreSQL encontrado!"
+              docker ps --format "table {{.Names}}\t{{.Image}}" | head -20
+              exit 1
+            fi
+            
+            # 2. Listar todos os databases
+            echo "📋 [2/6] Listando todos os databases..."
+            docker exec $DB_CONTAINER psql -U postgres -c "\l" 2>/dev/null || \
+            docker exec $DB_CONTAINER psql -U supabase_admin -c "\l" 2>/dev/null || \
+            docker exec $DB_CONTAINER psql -U supabase -c "\l" 2>/dev/null
+            echo ""
+            
+            # 3. Verificar tabelas no database 'postgres'
+            echo "📋 [3/6] Tabelas no database 'postgres' (schema public)..."
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
+              "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 30;" 2>/dev/null || \
+            docker exec $DB_CONTAINER psql -U supabase_admin -d postgres -c \
+              "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 30;" 2>/dev/null || \
+            echo "Não foi possível listar tabelas em 'postgres'"
+            echo ""
+            
+            # 4. Verificar se existe database 'supabase' ou 'app'
+            echo "📋 [4/6] Verificando outros databases comuns..."
+            for db in supabase app main iptvlink; do
+              echo "-- Tentando database '$db':"
+              docker exec $DB_CONTAINER psql -U postgres -d $db -c \
+                "SELECT COUNT(*) as total_tables FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || \
+              echo "   Database '$db' não existe ou sem acesso"
+            done
+            echo ""
+            
+            # 5. Verificar configuração do PostgREST
+            echo "⚙️ [5/6] Configuração atual do PostgREST..."
+            REST_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'rest|postgrest' | head -1)
+            if [ -n "$REST_CONTAINER" ]; then
+              echo "Container REST: $REST_CONTAINER"
+              docker exec $REST_CONTAINER printenv | grep -Ei "PGRST|DB" || true
+            else
+              echo "Container REST não encontrado"
+            fi
+            echo ""
+            
+            # 6. Verificar usuário authenticator
+            echo "👤 [6/6] Verificando usuário 'authenticator' e grants..."
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
+              "SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename IN ('authenticator', 'anon', 'authenticated', 'service_role');" 2>/dev/null || \
+            docker exec $DB_CONTAINER psql -U supabase_admin -d postgres -c \
+              "SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename IN ('authenticator', 'anon', 'authenticated', 'service_role');" 2>/dev/null || \
+            echo "Não foi possível verificar usuários"
+            echo ""
+            
+            # 7. Verificar se tabela profiles existe
+            echo "🔍 [EXTRA] Verificando tabela 'profiles'..."
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
+              "SELECT COUNT(*) as profiles_count FROM public.profiles;" 2>/dev/null || \
+            echo "Tabela 'profiles' NÃO EXISTE no database 'postgres'"
+            echo ""
+            
+            echo "=============================================="
+            echo "   DIAGNÓSTICO COMPLETO"
+            echo "=============================================="
+          ENDSSH
