@@ -686,6 +686,263 @@ serve(async (req) => {
           };
         }
       },
+
+      // ==========================================
+      // SECRETS AUDIT - FULL PLATFORM AUDIT
+      // ==========================================
+      
+      'audit-all-secrets': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const audit: {
+          global: any[];
+          projects: any[];
+          services: any[];
+          applications: any[];
+          databases: any[];
+          duplicates: any[];
+          conflicts: any[];
+          missing: any[];
+          invalid: any[];
+          recommendations: string[];
+        } = {
+          global: [],
+          projects: [],
+          services: [],
+          applications: [],
+          databases: [],
+          duplicates: [],
+          conflicts: [],
+          missing: [],
+          invalid: [],
+          recommendations: [],
+        };
+
+        // Standard naming convention
+        const STANDARD_NAMES: Record<string, string[]> = {
+          'SUPABASE_URL': ['SUPABASE_URL', 'SUPABASEURL', 'SB_URL', 'SUPA_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'VITE_SUPABASE_URL'],
+          'SUPABASE_ANON_KEY': ['SUPABASE_ANON_KEY', 'SUPABASE_KEY', 'SB_ANON_KEY', 'SUPA_ANON', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY'],
+          'SUPABASE_SERVICE_ROLE_KEY': ['SUPABASE_SERVICE_ROLE_KEY', 'SB_SERVICE_KEY', 'SERVICE_ROLE_KEY', 'SUPA_SERVICE'],
+          'JWT_SECRET': ['JWT_SECRET', 'JWTSECRET', 'JWT_KEY', 'SECRET_JWT'],
+          'DATABASE_URL': ['DATABASE_URL', 'DB_URL', 'POSTGRES_URL', 'PG_URL', 'PGRST_DB_URI'],
+          'REDIS_URL': ['REDIS_URL', 'REDIS_URI', 'REDIS_CONNECTION'],
+          'MERCADO_PAGO_ACCESS_TOKEN': ['MERCADO_PAGO_ACCESS_TOKEN', 'MP_ACCESS_TOKEN', 'MERCADOPAGO_TOKEN'],
+          'WHATSAPP_APPKEY': ['WHATSAPP_APPKEY', 'WA_APPKEY', 'WHATSAPP_APP_KEY'],
+          'WHATSAPP_AUTHKEY': ['WHATSAPP_AUTHKEY', 'WA_AUTHKEY', 'WHATSAPP_AUTH_KEY'],
+        };
+
+        const hashValue = (value: string): string => {
+          if (!value) return 'EMPTY';
+          if (value.length < 10) return `SHORT:${value.length}`;
+          return `${value.substring(0, 4)}...${value.substring(value.length - 4)}:${value.length}`;
+        };
+
+        const validateSecret = (key: string, value: string): { valid: boolean; issue?: string } => {
+          if (!value) return { valid: false, issue: 'Empty value' };
+          
+          // JWT validation
+          if (key.includes('JWT') || key.includes('KEY') || key.includes('TOKEN')) {
+            if (key.includes('JWT') && !value.includes('.')) {
+              return { valid: false, issue: 'Invalid JWT format (missing dots)' };
+            }
+          }
+          
+          // URL validation
+          if (key.includes('URL') || key.includes('URI')) {
+            if (!value.startsWith('http') && !value.startsWith('postgres://') && !value.startsWith('redis://')) {
+              return { valid: false, issue: 'Invalid URL format' };
+            }
+          }
+          
+          return { valid: true };
+        };
+
+        const allSecrets: Map<string, { value: string; locations: string[] }> = new Map();
+
+        try {
+          // 1. List all services
+          const servicesRes = await fetch(`${COOLIFY_URL}/api/v1/services`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          const services = servicesRes.ok ? await servicesRes.json() : [];
+
+          for (const service of services) {
+            // Get service envs
+            const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${service.uuid}/envs`, {
+              headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+            });
+            
+            if (envsRes.ok) {
+              const envs = await envsRes.json();
+              for (const env of envs) {
+                const hash = hashValue(env.value);
+                const validation = validateSecret(env.key, env.value);
+                
+                const secretEntry = {
+                  key: env.key,
+                  hash,
+                  scope: 'service',
+                  service: service.name,
+                  serviceUuid: service.uuid,
+                  valid: validation.valid,
+                  issue: validation.issue,
+                };
+                
+                audit.services.push(secretEntry);
+                
+                // Track for duplicates
+                const existing = allSecrets.get(hash);
+                if (existing) {
+                  existing.locations.push(`service:${service.name}:${env.key}`);
+                } else {
+                  allSecrets.set(hash, { value: env.value, locations: [`service:${service.name}:${env.key}`] });
+                }
+                
+                if (!validation.valid) {
+                  audit.invalid.push({ ...secretEntry, issue: validation.issue });
+                }
+              }
+            }
+          }
+
+          // 2. List all applications
+          const appsRes = await fetch(`${COOLIFY_URL}/api/v1/applications`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          const applications = appsRes.ok ? await appsRes.json() : [];
+
+          for (const app of applications) {
+            const envsRes = await fetch(`${COOLIFY_URL}/api/v1/applications/${app.uuid}/envs`, {
+              headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+            });
+            
+            if (envsRes.ok) {
+              const envs = await envsRes.json();
+              for (const env of envs) {
+                const hash = hashValue(env.value);
+                const validation = validateSecret(env.key, env.value);
+                
+                const secretEntry = {
+                  key: env.key,
+                  hash,
+                  scope: 'application',
+                  application: app.name,
+                  applicationUuid: app.uuid,
+                  valid: validation.valid,
+                  issue: validation.issue,
+                };
+                
+                audit.applications.push(secretEntry);
+                
+                const existing = allSecrets.get(hash);
+                if (existing) {
+                  existing.locations.push(`app:${app.name}:${env.key}`);
+                } else {
+                  allSecrets.set(hash, { value: env.value, locations: [`app:${app.name}:${env.key}`] });
+                }
+                
+                if (!validation.valid) {
+                  audit.invalid.push({ ...secretEntry, issue: validation.issue });
+                }
+              }
+            }
+          }
+
+          // 3. List all databases
+          const dbsRes = await fetch(`${COOLIFY_URL}/api/v1/databases`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          const databases = dbsRes.ok ? await dbsRes.json() : [];
+
+          for (const db of databases) {
+            audit.databases.push({
+              name: db.name,
+              uuid: db.uuid,
+              type: db.type,
+              status: db.status,
+            });
+          }
+
+          // 4. Find duplicates (same hash, different locations)
+          for (const [hash, data] of allSecrets.entries()) {
+            if (data.locations.length > 1) {
+              audit.duplicates.push({
+                hash,
+                count: data.locations.length,
+                locations: data.locations,
+              });
+            }
+          }
+
+          // 5. Find naming conflicts (same conceptual secret, different names)
+          for (const [standard, variants] of Object.entries(STANDARD_NAMES)) {
+            const found: { name: string; location: string; hash: string }[] = [];
+            
+            for (const secret of [...audit.services, ...audit.applications]) {
+              if (variants.includes(secret.key) || secret.key.includes(standard.replace('_', ''))) {
+                found.push({ name: secret.key, location: secret.service || secret.application, hash: secret.hash });
+              }
+            }
+            
+            if (found.length > 1) {
+              const uniqueHashes = new Set(found.map(f => f.hash));
+              if (uniqueHashes.size > 1) {
+                audit.conflicts.push({
+                  standardName: standard,
+                  found,
+                  issue: 'Same secret type with different values',
+                });
+              }
+            }
+          }
+
+          // 6. Generate recommendations
+          if (audit.duplicates.length > 0) {
+            audit.recommendations.push(`${audit.duplicates.length} secrets duplicadas encontradas - consolidar para fonte única`);
+          }
+          if (audit.conflicts.length > 0) {
+            audit.recommendations.push(`${audit.conflicts.length} conflitos de valor detectados - escolher valor canônico`);
+          }
+          if (audit.invalid.length > 0) {
+            audit.recommendations.push(`${audit.invalid.length} secrets inválidas ou malformadas - corrigir ou remover`);
+          }
+
+          return {
+            success: true,
+            data: {
+              summary: {
+                total_services: services.length,
+                total_applications: applications.length,
+                total_databases: databases.length,
+                total_secrets: audit.services.length + audit.applications.length,
+                duplicates: audit.duplicates.length,
+                conflicts: audit.conflicts.length,
+                invalid: audit.invalid.length,
+              },
+              services: audit.services,
+              applications: audit.applications,
+              databases: audit.databases,
+              duplicates: audit.duplicates,
+              conflicts: audit.conflicts,
+              invalid: audit.invalid,
+              recommendations: audit.recommendations,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      },
+
+      'normalize-secrets': async () => {
+        // This will be used after audit approval to actually fix secrets
+        return {
+          success: false,
+          error: 'Execute audit-all-secrets primeiro e confirme o plano de ação',
+        };
+      },
     };
 
     // Check if action is a custom function
