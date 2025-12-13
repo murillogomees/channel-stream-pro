@@ -14,7 +14,7 @@ jobs:
 
       - name: Create and validate kong.yml
         run: |
-          # Base64 encoded kong.yml to avoid YAML parsing issues
+          # Base64 encoded kong.yml
           KONG_YML_B64="X2Zvcm1hdF92ZXJzaW9uOiAiMS4xIgpfdHJhbnNmb3JtOiB0cnVlCgpzZXJ2aWNlczoKICAtIG5hbWU6IHJlc3QtdjEKICAgIHVybDogaHR0cDovL3N1cGFiYXNlLXJlc3Q6MzAwMC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiByZXN0LXYxCiAgICAgICAgc3RyaXBfcGF0aDogdHJ1ZQogICAgICAgIHBhdGhzOgogICAgICAgICAgLSAvcmVzdC92MS8KCiAgLSBuYW1lOiBhdXRoLXYxCiAgICB1cmw6IGh0dHA6Ly9zdXBhYmFzZS1hdXRoOjk5OTkvCiAgICByb3V0ZXM6CiAgICAgIC0gbmFtZTogYXV0aC12MQogICAgICAgIHN0cmlwX3BhdGg6IHRydWUKICAgICAgICBwYXRoczoKICAgICAgICAgIC0gL2F1dGgvdjEvCgogIC0gbmFtZTogc3RvcmFnZS12MQogICAgdXJsOiBodHRwOi8vc3VwYWJhc2Utc3RvcmFnZTo1MDAwLwogICAgcm91dGVzOgogICAgICAtIG5hbWU6IHN0b3JhZ2UtdjEKICAgICAgICBzdHJpcF9wYXRoOiB0cnVlCiAgICAgICAgcGF0aHM6CiAgICAgICAgICAtIC9zdG9yYWdlL3YxLwoKICAtIG5hbWU6IGZ1bmN0aW9ucy12MQogICAgdXJsOiBodHRwOi8vc3VwYWJhc2UtZWRnZS1mdW5jdGlvbnM6OTAwMC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiBmdW5jdGlvbnMtdjEKICAgICAgICBzdHJpcF9wYXRoOiB0cnVlCiAgICAgICAgcGF0aHM6CiAgICAgICAgICAtIC9mdW5jdGlvbnMvdjEvCgogIC0gbmFtZTogcmVhbHRpbWUtdjEKICAgIHVybDogaHR0cDovL3JlYWx0aW1lLWRldi5zdXBhYmFzZS1yZWFsdGltZTo0MDAwL3NvY2tldC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiByZWFsdGltZS12MQogICAgICAgIHN0cmlwX3BhdGg6IHRydWUKICAgICAgICBwYXRoczoKICAgICAgICAgIC0gL3JlYWx0aW1lL3YxLwoKICAtIG5hbWU6IG1ldGEKICAgIHVybDogaHR0cDovL3N1cGFiYXNlLW1ldGE6ODA4MC8KICAgIHJvdXRlczoKICAgICAgLSBuYW1lOiBtZXRhCiAgICAgICAgc3RyaXBfcGF0aDogdHJ1ZQogICAgICAgIHBhdGhzOgogICAgICAgICAgLSAvcGcvCg=="
           
           echo "$KONG_YML_B64" | base64 -d > /tmp/kong.yml
@@ -23,8 +23,8 @@ jobs:
           cat /tmp/kong.yml
           echo "========================"
           
-          # Validate with Kong image
-          docker run --rm -v /tmp/kong.yml:/kong.yml kong:2.8.1 kong config parse /kong.yml
+          # Validate with Kong in DB-less mode
+          docker run --rm -e KONG_DATABASE=off -v /tmp/kong.yml:/kong.yml kong:2.8.1 kong config parse /kong.yml
 
       - name: Deploy to VPS and configure Kong
         env:
