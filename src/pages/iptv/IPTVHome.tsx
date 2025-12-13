@@ -5,11 +5,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService, IPTVChannel, ChannelGroup } from '@/services/iptvService';
-import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 import { TVContentRow } from '@/components/iptv/TVContentRow';
 import { TVHeroSection } from '@/components/iptv/TVHeroSection';
 import { TVSearchOverlay } from '@/components/iptv/TVSearchOverlay';
@@ -19,7 +17,6 @@ import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Filter, X } from 'lucide-react';
 
 export default function IPTVHome() {
   const navigate = useNavigate();
@@ -152,101 +149,131 @@ export default function IPTVHome() {
         />
       )}
 
-      {/* Navigation Bar */}
+      {/* Navigation Bar - Full Width Netflix Style */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setSelectedCategory(null); }}>
-              <TabsList className="bg-muted/50">
-                <TabsTrigger value="all" className="gap-2">
-                  <Grid3X3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Todos</span>
+        <div className="w-full">
+          <div className="flex items-center justify-between w-full">
+            {/* Tabs - Full Width */}
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(v) => { setActiveTab(v as any); setSelectedCategory(null); }}
+              className="flex-1"
+            >
+              <TabsList className="w-full h-12 sm:h-14 lg:h-16 2xl:h-20 bg-muted/30 rounded-none justify-start sm:justify-center gap-0 p-0">
+                <TabsTrigger 
+                  value="all" 
+                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
+                >
+                  <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  <span className="hidden xs:inline sm:inline">Todos</span>
                 </TabsTrigger>
-                <TabsTrigger value="live" className="gap-2">
-                  <Tv className="h-4 w-4" />
-                  <span className="hidden sm:inline">Ao Vivo</span>
+                <TabsTrigger 
+                  value="live" 
+                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
+                >
+                  <Tv className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  <span className="hidden xs:inline sm:inline">Ao Vivo</span>
                 </TabsTrigger>
-                <TabsTrigger value="vod" className="gap-2">
-                  <Film className="h-4 w-4" />
-                  <span className="hidden sm:inline">Filmes</span>
+                <TabsTrigger 
+                  value="vod" 
+                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
+                >
+                  <Film className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  <span className="hidden xs:inline sm:inline">Filmes</span>
                 </TabsTrigger>
-                <TabsTrigger value="series" className="gap-2">
-                  <Radio className="h-4 w-4" />
-                  <span className="hidden sm:inline">Séries</span>
+                <TabsTrigger 
+                  value="series" 
+                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
+                >
+                  <Radio className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  <span className="hidden xs:inline sm:inline">Séries</span>
                 </TabsTrigger>
-                <TabsTrigger value="favorites" className="gap-2">
-                  <Heart className="h-4 w-4" />
-                  <span className="hidden sm:inline">Favoritos</span>
+                <TabsTrigger 
+                  value="favorites" 
+                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
+                >
+                  <Heart className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  <span className="hidden xs:inline sm:inline">Favoritos</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 w-full lg:w-auto">
-              {/* Category Filter */}
-              {categories.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={selectedCategory || 'all'}
-                    onValueChange={(value) => setSelectedCategory(value === 'all' ? null : value)}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4" />
-                        <SelectValue placeholder="Categoria" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as categorias</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {/* Search Icon - End of tabs bar */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsSearchOpen(true)}
+              className="h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 2xl:h-20 2xl:w-20 rounded-none hover:bg-primary/10 shrink-0"
+            >
+              <Search className="h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 2xl:h-8 2xl:w-8" />
+            </Button>
+          </div>
 
-                  {selectedCategory && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedCategory(null)}
-                      className="gap-1 h-8"
+          {/* Secondary Controls - Categories & View Mode */}
+          {(categories.length > 0 || true) && (
+            <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 border-t border-border/50 bg-muted/20">
+              {/* Category Filter */}
+              <div className="flex items-center gap-2">
+                {categories.length > 0 && (
+                  <>
+                    <Select
+                      value={selectedCategory || 'all'}
+                      onValueChange={(value) => setSelectedCategory(value === 'all' ? null : value)}
                     >
-                      <X className="h-3 w-3" />
-                      Limpar
-                    </Button>
-                  )}
-                </div>
-              )}
+                      <SelectTrigger className="w-[140px] sm:w-[180px] h-8 sm:h-9 text-xs sm:text-sm">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <SelectValue placeholder="Categoria" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {selectedCategory && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedCategory(null)}
+                        className="gap-1 h-8 text-xs"
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="hidden sm:inline">Limpar</span>
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
 
               {/* View Mode Toggle */}
-              <div className="hidden md:flex items-center border rounded-lg overflow-hidden">
+              <div className="flex items-center border rounded-lg overflow-hidden">
                 <Button
                   variant={viewMode === 'rows' ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('rows')}
-                  className="rounded-none"
+                  className="rounded-none h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
                 >
-                  Linhas
+                  <span className="hidden sm:inline">Linhas</span>
+                  <span className="sm:hidden">≡</span>
                 </Button>
                 <Button
                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="rounded-none"
+                  className="rounded-none h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
                 >
-                  Grade
+                  <span className="hidden sm:inline">Grade</span>
+                  <span className="sm:hidden">⊞</span>
                 </Button>
               </div>
-
-              {/* Search */}
-              <Button variant="outline" size="icon" onClick={() => setIsSearchOpen(true)}>
-                <Search className="h-4 w-4" />
-              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
