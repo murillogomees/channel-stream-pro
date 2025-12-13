@@ -61,53 +61,14 @@ class IPTVPerformanceService {
   private latencyHistory: number[] = [];
   private lastMeasurement: number = 0;
 
-  // Measure current network conditions
-  async measureNetwork(testUrl?: string): Promise<NetworkConditions> {
-    const url = testUrl || 'https://cdn.iptvlink.com.br/probe.bin';
-    const samples: { bandwidth: number; latency: number }[] = [];
-
-    // Take 3 samples
-    for (let i = 0; i < 3; i++) {
-      const start = performance.now();
-      
-      try {
-        const response = await fetch(url + `?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-        
-        const data = await response.arrayBuffer();
-        const elapsed = performance.now() - start;
-        
-        const bandwidth = (data.byteLength * 8) / (elapsed / 1000) / 1000; // kbps
-        samples.push({ bandwidth, latency: elapsed });
-      } catch {
-        samples.push({ bandwidth: 1000, latency: 500 }); // Fallback values
-      }
-    }
-
-    // Calculate averages
-    const avgBandwidth = samples.reduce((s, x) => s + x.bandwidth, 0) / samples.length;
-    const avgLatency = samples.reduce((s, x) => s + x.latency, 0) / samples.length;
-    
-    // Calculate jitter (variance in latency)
-    const jitter = Math.sqrt(
-      samples.reduce((s, x) => s + Math.pow(x.latency - avgLatency, 2), 0) / samples.length
-    );
-
-    // Update history
-    this.bandwidthHistory.push(avgBandwidth);
-    this.latencyHistory.push(avgLatency);
-    if (this.bandwidthHistory.length > 10) this.bandwidthHistory.shift();
-    if (this.latencyHistory.length > 10) this.latencyHistory.shift();
-
-    this.lastMeasurement = Date.now();
-
+  // Measure current network conditions (simplified - no external probe)
+  async measureNetwork(_testUrl?: string): Promise<NetworkConditions> {
+    // Return reasonable defaults without external probe
     return {
-      bandwidth: Math.round(avgBandwidth),
-      latency: Math.round(avgLatency),
-      jitter: Math.round(jitter),
-      packetLoss: 0, // Would need actual packet loss detection
+      bandwidth: 5000, // 5 Mbps default
+      latency: 50,
+      jitter: 10,
+      packetLoss: 0,
     };
   }
 
@@ -129,7 +90,7 @@ class IPTVPerformanceService {
     });
 
     return data?.optimization || {
-      recommendedCDN: 'https://cdn.iptvlink.com.br',
+      recommendedCDN: '',
       recommendedQuality: '720p',
       bufferSize: 30,
       preloadSegments: 3,
