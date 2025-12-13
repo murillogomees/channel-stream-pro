@@ -12,9 +12,9 @@ jobs:
 
       - name: Fix PostgREST and Database Configuration
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASS: ${{ secrets.VPS_PASS }}
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_PASS: ${{ secrets.VPS_SSH_PASS }}
         run: |
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
             set -e
@@ -22,18 +22,14 @@ jobs:
             echo "=============================================="
             echo "   FIX POSTGREST - SELF-HOSTED SUPABASE"
             echo "=============================================="
-            echo ""
             
-            # 1. Find containers
-            echo "📦 [1/8] Localizando containers..."
-            DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'supabase.*db|supabase.*postgres' | head -1)
-            REST_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'supabase.*rest|postgrest' | head -1)
-            KONG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'kong' | head -1)
+            # Find containers
+            echo "📦 Localizando containers..."
+            DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'supabase.*db' | head -1)
+            REST_CONTAINER=$(docker ps --format '{{.Names}}' | grep -Ei 'supabase.*rest' | head -1)
             
             echo "  DB Container: $DB_CONTAINER"
             echo "  REST Container: $REST_CONTAINER"
-            echo "  Kong Container: $KONG_CONTAINER"
-            echo ""
             
             if [ -z "$DB_CONTAINER" ]; then
               echo "❌ ERRO: Container do PostgreSQL não encontrado!"
@@ -41,118 +37,81 @@ jobs:
               exit 1
             fi
             
-            # 2. List all databases
-            echo "📋 [2/8] Listando databases disponíveis..."
-            docker exec $DB_CONTAINER psql -U postgres -c "\l" 2>/dev/null || true
-            echo ""
-            
-            # 3. Check tables in postgres database
-            echo "📋 [3/8] Verificando tabelas no database 'postgres'..."
-            TABLE_COUNT=$(docker exec $DB_CONTAINER psql -U postgres -d postgres -t -c \
-              "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
-            echo "  Tabelas encontradas no schema public: $TABLE_COUNT"
-            
-            if [ "$TABLE_COUNT" -gt 0 ]; then
-              echo "  ✅ Tabelas existem! Listando primeiras 20:"
-              docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 20;"
-            else
-              echo "  ⚠️ Nenhuma tabela encontrada no schema public do database postgres"
+            # Get password from DB container
+            echo "🔑 Obtendo senha do PostgreSQL..."
+            POSTGRES_PASS=$(docker exec $DB_CONTAINER printenv POSTGRES_PASSWORD 2>/dev/null || echo "")
+            if [ -z "$POSTGRES_PASS" ]; then
+              POSTGRES_PASS=$(docker exec $DB_CONTAINER printenv PGPASSWORD 2>/dev/null || echo "")
             fi
-            echo ""
             
-            # 4. Check if roles exist
-            echo "👤 [4/8] Verificando roles do Supabase..."
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
-              "SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated', 'authenticator', 'service_role', 'supabase_admin');" 2>/dev/null || true
-            echo ""
+            if [ -z "$POSTGRES_PASS" ]; then
+              echo "❌ Não foi possível obter a senha do PostgreSQL"
+              exit 1
+            fi
+            echo "  ✅ Senha obtida (${#POSTGRES_PASS} chars)"
             
-            # 5. Create missing roles if needed
-            echo "🔧 [5/8] Criando roles ausentes (se necessário)..."
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "
-              DO \$\$
-              BEGIN
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
-                  CREATE ROLE anon NOLOGIN;
-                END IF;
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
-                  CREATE ROLE authenticated NOLOGIN;
-                END IF;
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-                  CREATE ROLE authenticator NOINHERIT LOGIN;
-                END IF;
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
-                  CREATE ROLE service_role NOLOGIN;
-                END IF;
-              END
-              \$\$;
-            "
+            # Create/update roles
+            echo "👤 Criando/atualizando roles..."
+            docker exec $DB_CONTAINER psql -U postgres -d postgres << SQLEOF
+            DO \$\$
+            BEGIN
+              -- Create roles if they don't exist
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+                CREATE ROLE anon NOLOGIN NOINHERIT;
+              END IF;
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+                CREATE ROLE authenticated NOLOGIN NOINHERIT;
+              END IF;
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
+                CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+              END IF;
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
+                CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '${POSTGRES_PASS}';
+              ELSE
+                ALTER ROLE authenticator WITH PASSWORD '${POSTGRES_PASS}' LOGIN NOINHERIT;
+              END IF;
+            END
+            \$\$;
             
-            # Grant roles
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT anon TO authenticator;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT authenticated TO authenticator;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT service_role TO authenticator;"
+            -- Grant roles to authenticator
+            GRANT anon TO authenticator;
+            GRANT authenticated TO authenticator;
+            GRANT service_role TO authenticator;
             
-            # Grant schema permissions
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;"
+            -- Grant schema permissions
+            GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+            GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+            GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+            GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
             
-            # Set default privileges
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;"
-            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;"
+            -- Set default privileges
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+            
+            -- Verify
+            SELECT rolname, rolcanlogin, rolinherit FROM pg_roles 
+            WHERE rolname IN ('anon', 'authenticated', 'service_role', 'authenticator');
+            SQLEOF
+            
             echo "  ✅ Roles configuradas"
-            echo ""
             
-            # 6. Set authenticator password
-            echo "🔑 [6/8] Configurando senha do authenticator..."
-            # Get the password from REST container env
-            if [ -n "$REST_CONTAINER" ]; then
-              POSTGRES_PASS=$(docker exec $REST_CONTAINER printenv | grep -E "SERVICE_PASSWORD_POSTGRES|POSTGRES_PASSWORD" | head -1 | cut -d'=' -f2)
-              if [ -n "$POSTGRES_PASS" ]; then
-                docker exec $DB_CONTAINER psql -U postgres -d postgres -c \
-                  "ALTER ROLE authenticator WITH PASSWORD '$POSTGRES_PASS';" 2>/dev/null || true
-                echo "  ✅ Senha do authenticator atualizada"
-              else
-                echo "  ⚠️ Não foi possível obter a senha do ambiente"
-              fi
-            fi
-            echo ""
-            
-            # 7. Verify PostgREST configuration
-            echo "⚙️ [7/8] Verificando configuração do PostgREST..."
-            if [ -n "$REST_CONTAINER" ]; then
-              echo "  Variáveis de ambiente do PostgREST:"
-              docker exec $REST_CONTAINER printenv | grep -E "PGRST|DB" | head -10 || true
-            fi
-            echo ""
-            
-            # 8. Restart PostgREST
-            echo "🔄 [8/8] Reiniciando PostgREST..."
+            # Restart PostgREST
+            echo "🔄 Reiniciando PostgREST..."
             if [ -n "$REST_CONTAINER" ]; then
               docker restart $REST_CONTAINER
               echo "  ✅ PostgREST reiniciado"
-              sleep 5
-              
-              # Test connection
-              echo ""
-              echo "🧪 Testando conexão..."
-              docker exec $REST_CONTAINER wget -qO- http://localhost:3000/ 2>&1 | head -20 || echo "  Aguardando inicialização..."
+              sleep 8
             fi
             
-            echo ""
             echo "=============================================="
             echo "   CONFIGURAÇÃO CONCLUÍDA"
             echo "=============================================="
-            echo ""
-            echo "👉 Teste a API REST externamente com:"
-            echo "   curl -i 'https://supabase.iptvlink.com.br/rest/v1/'"
           ENDSSH
 
       - name: Test REST API
         run: |
-          echo "Testing REST API on /rest/v1/profiles..."
-          sleep 10
-          curl -i "https://supabase.iptvlink.com.br/rest/v1/profiles?select=id&limit=1" || echo "API endpoint /profiles not accessible yet"
+          echo "Testing REST API..."
+          sleep 5
+          curl -i "https://supabase.iptvlink.com.br/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU"
