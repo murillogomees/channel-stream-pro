@@ -133,6 +133,8 @@ export function IPTVSeriesTab() {
         'filme', 'filmes', 'movie', 'movies', 'film', 'cinema', 'lançamento', 'lancamento',
         'aberto', '24 h', '24h', 'canais', 'canal', 'tv ', ' tv', 'ao vivo', 'aovivo', 'live',
         'esporte', 'sport', 'futebol', 'football', 'news', 'noticia', 'jornalismo',
+        'fhd', 'premiere', 'reality', 'pay per view', 'ppv', 'pay-per-view',
+        'combate', 'ufc', 'luta', 'boxe',
         'adulto', 'adult', 'xxx', '18+', '+18'
       ];
       
