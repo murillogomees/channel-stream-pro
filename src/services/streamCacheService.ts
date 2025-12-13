@@ -91,8 +91,6 @@ class StreamCacheService {
     // Clean expired items on init
     await this.cleanExpired();
     await this.updateStats();
-
-    console.log('[StreamCache] Initialized, manifests:', this.stats.manifestsCached, 'segments:', this.stats.segmentsCached);
   }
 
   /**
@@ -121,8 +119,6 @@ class StreamCacheService {
 
       await cache.put(url, response);
       this.stats.manifestsCached++;
-      
-      console.log('[StreamCache] Cached manifest:', url.substring(0, 50));
     } catch (err) {
       console.error('[StreamCache] Failed to cache manifest:', err);
     }
@@ -157,7 +153,6 @@ class StreamCacheService {
       this.stats.hits++;
       this.updateHitRate();
       
-      console.log('[StreamCache] Cache hit for manifest:', url.substring(0, 50));
       return await response.text();
     } catch (err) {
       this.stats.misses++;
@@ -198,8 +193,6 @@ class StreamCacheService {
       await cache.put(url, response);
       this.stats.segmentsCached++;
       this.stats.totalSize += data.byteLength;
-      
-      console.log('[StreamCache] Cached segment:', url.substring(0, 50), 'size:', data.byteLength);
     } catch (err) {
       console.error('[StreamCache] Failed to cache segment:', err);
     }
@@ -252,8 +245,6 @@ class StreamCacheService {
     // Parse manifest for segment URLs
     const segmentUrls = this.parseSegmentUrls(manifestUrl, manifest);
     const toPrefetch = segmentUrls.slice(0, count);
-
-    console.log('[StreamCache] Prefetching', toPrefetch.length, 'segments');
 
     await Promise.all(toPrefetch.map(async (url) => {
       try {
@@ -343,7 +334,7 @@ class StreamCacheService {
       console.error('[StreamCache] Error cleaning segments:', err);
     }
 
-    console.log('[StreamCache] Cleaned expired items');
+    // Expired items cleaned
   }
 
   /**
@@ -438,8 +429,6 @@ class StreamCacheService {
         hits: 0,
         misses: 0,
       };
-      
-      console.log('[StreamCache] Cleared all caches');
     } catch (err) {
       console.error('[StreamCache] Error clearing caches:', err);
     }

@@ -96,7 +96,6 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
   
   // HTTP URLs MUST use proxy for Mixed Content compliance
   if (isHttpUrl(url)) {
-    console.log('[SmartResolver] HTTP URL - using stream-proxy');
     const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
     return {
       url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
@@ -108,7 +107,6 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
   
   // HLS manifest with HTTPS - use proxy for URL rewriting (manifests are tiny)
   if (isHlsManifest(url) && !isVodContent(url)) {
-    console.log('[SmartResolver] HLS manifest, using proxy for URL rewriting');
     return {
       url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
       type: 'proxy',
@@ -119,7 +117,6 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
   
   // HTTPS URLs - direct access
   const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
-  console.log(`[SmartResolver] Using direct URL for ${contentType} (HTTPS)`);
   return {
     url: url,
     type: 'direct',

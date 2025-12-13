@@ -62,7 +62,6 @@ export function useNetworkAdaptation(options: UseNetworkAdaptationOptions = {}) 
 
       // Notify quality change
       if (newQuality !== previousQualityRef.current) {
-        console.log(`[NetworkAdaptation] Quality changed: ${previousQualityRef.current} → ${newQuality}`);
         onQualityChange?.(newQuality, previousQualityRef.current);
         previousQualityRef.current = newQuality;
       }
@@ -93,7 +92,6 @@ export function useNetworkAdaptation(options: UseNetworkAdaptationOptions = {}) 
           const lowestLevel = hls.levels.findIndex((l: any) => l.height <= 480);
           if (lowestLevel >= 0) {
             hls.nextLevel = lowestLevel;
-            console.log(`[NetworkAdaptation] Forcing quality level ${lowestLevel} (poor connection)`);
           }
         }
       } else if (quality === 'fair') {
@@ -102,15 +100,12 @@ export function useNetworkAdaptation(options: UseNetworkAdaptationOptions = {}) 
           const maxLevel = hls.levels.findIndex((l: any) => l.height <= 720);
           if (maxLevel >= 0) {
             hls.autoLevelCapping = maxLevel;
-            console.log(`[NetworkAdaptation] Capping quality at level ${maxLevel} (fair connection)`);
           }
         }
       } else {
         // Remove quality cap
         hls.autoLevelCapping = -1;
       }
-
-      console.log(`[NetworkAdaptation] HLS settings adapted for ${quality} connection`);
     } catch (e) {
       console.warn('[NetworkAdaptation] Failed to adapt HLS settings:', e);
     }
@@ -133,14 +128,12 @@ export function useNetworkAdaptation(options: UseNetworkAdaptationOptions = {}) 
     if (!enabled || typeof window === 'undefined') return;
 
     const handleOnline = () => {
-      console.log('[NetworkAdaptation] Back online');
       setNetworkState(prev => ({ ...prev, isOnline: true }));
       onOnline?.();
       updateNetworkState();
     };
 
     const handleOffline = () => {
-      console.log('[NetworkAdaptation] Gone offline');
       setNetworkState(prev => ({ ...prev, isOnline: false }));
       onOffline?.();
     };
@@ -164,7 +157,6 @@ export function useNetworkAdaptation(options: UseNetworkAdaptationOptions = {}) 
     if (!connection) return;
 
     const handleChange = () => {
-      console.log('[NetworkAdaptation] Connection changed');
       updateNetworkState();
       
       // Adapt HLS if attached

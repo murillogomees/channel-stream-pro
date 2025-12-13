@@ -23,7 +23,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     registrations.forEach(registration => {
       registration.unregister();
-      console.log('[SW] Unregistered:', registration.scope);
+      // Intencionalmente sem console.log para evitar ruído no console
     });
   });
 }
@@ -55,9 +55,9 @@ const queryClient = new QueryClient({
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
 
-// Initialize Web Vitals monitoring
-webVitalsService.init((report) => {
-  console.log('[WebVitals] Report:', report.score, 'score');
+// Initialize Web Vitals monitoring sem logs verbosos
+webVitalsService.init(() => {
+  // Relatórios disponíveis via webVitalsService.getReport(), sem console.log
 });
 
 // Suprimir ruídos de console para melhor experiência de desenvolvimento
@@ -99,7 +99,8 @@ console.warn = (...args: unknown[]) => {
   if (
     /WebSocket.*realtime/i.test(warnMessage) ||
     /websocket.*failed/i.test(warnMessage) ||
-    /chrome-extension/i.test(warnMessage)
+    /chrome-extension/i.test(warnMessage) ||
+    /Unrecognized feature/i.test(warnMessage)
   ) {
     return;
   }
