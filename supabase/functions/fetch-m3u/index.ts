@@ -1,3 +1,11 @@
+/**
+ * Fetch M3U - Unified Import to iptv_channels
+ * 
+ * SEMPRE grava direto em iptv_channels (streaming mode).
+ * Retorna apenas resumo { inserted, skipped, total } para o frontend.
+ * Otimizado para mínimo egress e máxima performance.
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -6,259 +14,259 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// For large playlists, we process in streaming mode and save directly to DB
-// For small playlists (<5MB), we return the content directly
-const STREAMING_THRESHOLD = 5 * 1024 * 1024; // 5MB
+const DB_BATCH_SIZE = 100;
+const MAX_CHANNELS = 50000; // Limite de segurança por import
+
+interface ParsedChannel {
+  name: string;
+  url: string;
+  logo?: string;
+  group?: string;
+  tvgId?: string;
+  tvgName?: string;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    const { url, sourceId, sourceName } = await req.json();
+    const { url, content } = await req.json();
 
-    if (!url) {
-      return new Response(
-        JSON.stringify({ error: "URL is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!url && !content) {
+      throw new Error("URL ou conteúdo M3U é obrigatório");
     }
 
-    console.log("[fetch-m3u] Fetching M3U from:", url);
+    let m3uContent = content || '';
 
-    // Normalize URL - force HTTP for common Xtream ports
-    let fetchUrl = url;
-    try {
-      const urlObj = new URL(url);
-      const httpPorts = ['8880', '8000', '25461', '25462', '8080'];
-      if (urlObj.protocol === 'https:' && httpPorts.includes(urlObj.port)) {
-        fetchUrl = url.replace('https://', 'http://');
-        console.log("[fetch-m3u] Using HTTP for port:", urlObj.port);
-      }
-    } catch (e) {
-      console.log("[fetch-m3u] URL parse warning:", e.message);
-    }
-
-    const response = await fetch(fetchUrl, {
-      method: 'GET',
-      headers: {
-        "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
-        "Accept": "*/*",
-      },
-    });
-
-    console.log("[fetch-m3u] Response status:", response.status);
-
-    if (!response.ok) {
-      if (response.status === 404 || response.status === 403) {
-        throw new Error("Servidor bloqueou a requisição. Use 'Colar M3U' para importar.");
-      }
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    // Check content-length to decide processing mode
-    const contentLength = response.headers.get('content-length');
-    const estimatedSize = contentLength ? parseInt(contentLength) : 0;
-    
-    console.log("[fetch-m3u] Estimated size:", Math.round(estimatedSize / 1024 / 1024), "MB");
-
-    // For large files, process in streaming mode and save directly to DB
-    if (estimatedSize > STREAMING_THRESHOLD || !contentLength) {
-      console.log("[fetch-m3u] Large file detected, using streaming mode");
+    // Fetch from URL if provided
+    if (url && !m3uContent) {
+      console.log("[fetch-m3u] Fetching from URL:", url.substring(0, 80));
       
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      // Create or get source
-      let actualSourceId = sourceId;
-      if (!actualSourceId) {
-        const { data: source, error: sourceError } = await supabase
-          .from('m3u_sources')
-          .insert({
-            name: sourceName || `Imported ${new Date().toISOString()}`,
-            url: url,
-            source_type: 'url',
-            sync_status: 'syncing'
-          })
-          .select()
-          .single();
-        
-        if (sourceError) throw new Error(`Failed to create source: ${sourceError.message}`);
-        actualSourceId = source.id;
-      } else {
-        await supabase
-          .from('m3u_sources')
-          .update({ sync_status: 'syncing', last_sync_at: new Date().toISOString() })
-          .eq('id', actualSourceId);
+      // Normalize URL - force HTTP for common Xtream ports
+      let fetchUrl = url;
+      try {
+        const urlObj = new URL(url);
+        const httpPorts = ['8880', '8000', '25461', '25462', '8080'];
+        if (urlObj.protocol === 'https:' && httpPorts.includes(urlObj.port)) {
+          fetchUrl = url.replace('https://', 'http://');
+          console.log("[fetch-m3u] Using HTTP for port:", urlObj.port);
+        }
+      } catch (e) {
+        console.log("[fetch-m3u] URL parse warning:", e.message);
       }
 
-      // Process stream line by line
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Não foi possível ler a resposta");
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
+          "Accept": "*/*",
+        },
+      });
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEntry: any = null;
-      let entries: any[] = [];
-      let totalEntries = 0;
-      const BATCH_SIZE = 500;
-
-      const flushEntries = async () => {
-        if (entries.length === 0) return;
-        
-        const { error } = await supabase
-          .from('m3u_sync_entries')
-          .upsert(entries, { onConflict: 'source_id,stream_url' });
-        
-        if (error) {
-          console.error("[fetch-m3u] Batch insert error:", error.message);
+      if (!response.ok) {
+        // Try HTTP fallback if HTTPS fails
+        if (fetchUrl.startsWith('https://')) {
+          const httpUrl = fetchUrl.replace('https://', 'http://');
+          console.log('[fetch-m3u] HTTPS failed, trying HTTP fallback');
+          const httpResponse = await fetch(httpUrl, {
+            method: 'GET',
+            headers: {
+              "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
+              "Accept": "*/*",
+            },
+          });
+          if (!httpResponse.ok) {
+            throw new Error(`Failed to fetch M3U: HTTP ${httpResponse.status}`);
+          }
+          m3uContent = await httpResponse.text();
         } else {
-          totalEntries += entries.length;
-          console.log(`[fetch-m3u] Inserted batch: ${entries.length} entries (total: ${totalEntries})`);
+          throw new Error(`Failed to fetch M3U: HTTP ${response.status}`);
         }
-        entries = [];
-      };
+      } else {
+        m3uContent = await response.text();
+      }
+    }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) {
-          // Process remaining buffer
-          if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-              processLine(line.trim(), currentEntry, entries, actualSourceId);
+    if (!m3uContent) {
+      throw new Error('Nenhum conteúdo M3U fornecido');
+    }
+
+    // Validate M3U content
+    if (!m3uContent.includes('#EXTM3U') && !m3uContent.includes('#EXTINF')) {
+      throw new Error('Conteúdo não parece ser M3U válido');
+    }
+
+    console.log("[fetch-m3u] Content size:", Math.round(m3uContent.length / 1024), "KB");
+
+    // Parse M3U content
+    const channels = parseM3U(m3uContent);
+    console.log(`[fetch-m3u] Parsed ${channels.length} channels`);
+
+    if (channels.length === 0) {
+      throw new Error('Nenhum canal encontrado no conteúdo M3U');
+    }
+
+    // Limit channels per import
+    const channelsToImport = channels.slice(0, MAX_CHANNELS);
+    if (channels.length > MAX_CHANNELS) {
+      console.log(`[fetch-m3u] Limiting to ${MAX_CHANNELS} channels`);
+    }
+
+    // Insert directly into iptv_channels in batches
+    let inserted = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < channelsToImport.length; i += DB_BATCH_SIZE) {
+      const batch = channelsToImport.slice(i, i + DB_BATCH_SIZE);
+      
+      const records = batch.map(ch => ({
+        name: ch.name,
+        slug: generateSlug(ch.name),
+        original_url: ch.url,
+        logo_url: ch.logo || null,
+        category: ch.group || null,
+        content_type: detectContentType(ch.url, ch.group),
+        is_healthy: true,
+        health_score: 100,
+        transcode_status: 'none',
+        shard_id: 0,
+        metadata: {
+          tvg_id: ch.tvgId || null,
+          tvg_name: ch.tvgName || null,
+          imported_at: new Date().toISOString(),
+        }
+      }));
+
+      const { error } = await supabase
+        .from('iptv_channels')
+        .upsert(records, { 
+          onConflict: 'slug',
+          ignoreDuplicates: true 
+        });
+
+      if (error) {
+        console.error('[fetch-m3u] Batch upsert error:', error.message);
+        // Try inserting one by one for this batch
+        for (const record of records) {
+          const { error: singleError } = await supabase
+            .from('iptv_channels')
+            .insert(record);
+          
+          if (singleError) {
+            if (singleError.code === '23505') { // Duplicate
+              skipped++;
+            } else {
+              console.error('[fetch-m3u] Single insert error:', singleError.message);
             }
-          }
-          await flushEntries();
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        
-        // Keep the last incomplete line in buffer
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
-
-          if (trimmedLine.startsWith('#EXTINF:')) {
-            // Parse EXTINF line
-            currentEntry = parseExtinfLine(trimmedLine);
-            currentEntry.source_id = actualSourceId;
-          } else if (trimmedLine.startsWith('#')) {
-            // Skip other directives
-            continue;
-          } else if (currentEntry && (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://'))) {
-            // This is the stream URL
-            currentEntry.stream_url = trimmedLine;
-            entries.push(currentEntry);
-            currentEntry = null;
-
-            if (entries.length >= BATCH_SIZE) {
-              await flushEntries();
-            }
+          } else {
+            inserted++;
           }
         }
+      } else {
+        inserted += batch.length;
       }
 
-      // Update source status
-      await supabase
-        .from('m3u_sources')
-        .update({ 
-          sync_status: 'completed', 
-          entry_count: totalEntries,
-          last_sync_at: new Date().toISOString()
-        })
-        .eq('id', actualSourceId);
-
-      console.log(`[fetch-m3u] Streaming complete: ${totalEntries} entries saved`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          mode: 'streaming',
-          sourceId: actualSourceId,
-          entryCount: totalEntries,
-          message: `Importados ${totalEntries} canais com sucesso`
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Log progress every 1000 channels
+      if ((i + DB_BATCH_SIZE) % 1000 === 0) {
+        console.log(`[fetch-m3u] Progress: ${Math.min(i + DB_BATCH_SIZE, channelsToImport.length)}/${channelsToImport.length}`);
+      }
     }
 
-    // For small files, return content directly (original behavior)
-    console.log("[fetch-m3u] Small file, returning content directly");
-    
-    const content = await response.text();
-    console.log("[fetch-m3u] Content length:", content.length, "chars");
-
-    if (!content.includes('#EXTM3U') && !content.includes('#EXTINF')) {
-      throw new Error("Conteúdo não parece ser M3U válido");
-    }
+    console.log(`[fetch-m3u] Complete: ${inserted} inserted, ${skipped} skipped`);
 
     return new Response(
-      JSON.stringify({ content, mode: 'direct' }),
+      JSON.stringify({ 
+        success: true,
+        inserted,
+        skipped,
+        total: channels.length,
+        limited: channels.length > MAX_CHANNELS,
+        message: `Importados ${inserted} canais com sucesso${skipped > 0 ? ` (${skipped} duplicados ignorados)` : ''}`
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+
+  } catch (error: any) {
     console.error("[fetch-m3u] Error:", error.message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
-function parseExtinfLine(line: string): any {
-  const entry: any = {
-    title: 'Unknown',
-    tvg_id: null,
-    tvg_name: null,
-    tvg_logo: null,
-    group_title: null,
-    stream_type: 'live',
-    is_active: true
-  };
+function parseM3U(content: string): ParsedChannel[] {
+  const lines = content.split('\n');
+  const channels: ParsedChannel[] = [];
+  let currentChannel: Partial<ParsedChannel> = {};
 
-  // Extract attributes
-  const tvgIdMatch = line.match(/tvg-id="([^"]*)"/i);
-  const tvgNameMatch = line.match(/tvg-name="([^"]*)"/i);
-  const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/i);
-  const groupMatch = line.match(/group-title="([^"]*)"/i);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
 
-  if (tvgIdMatch) entry.tvg_id = tvgIdMatch[1];
-  if (tvgNameMatch) entry.tvg_name = tvgNameMatch[1];
-  if (tvgLogoMatch) entry.tvg_logo = tvgLogoMatch[1];
-  if (groupMatch) entry.group_title = groupMatch[1];
+    if (line.startsWith('#EXTINF:')) {
+      // Parse EXTINF line
+      const logoMatch = line.match(/tvg-logo="([^"]+)"/i);
+      const groupMatch = line.match(/group-title="([^"]+)"/i);
+      const tvgIdMatch = line.match(/tvg-id="([^"]+)"/i);
+      const tvgNameMatch = line.match(/tvg-name="([^"]+)"/i);
+      const nameMatch = line.match(/,(.+)$/);
 
-  // Extract title (after the last comma)
-  const commaIndex = line.lastIndexOf(',');
-  if (commaIndex !== -1) {
-    entry.title = line.substring(commaIndex + 1).trim() || entry.tvg_name || 'Unknown';
+      currentChannel = {
+        logo: logoMatch?.[1],
+        group: groupMatch?.[1],
+        tvgId: tvgIdMatch?.[1],
+        tvgName: tvgNameMatch?.[1],
+        name: nameMatch?.[1]?.trim() || 'Unknown',
+      };
+    } else if (line && !line.startsWith('#') && currentChannel.name) {
+      // This is the URL line
+      if (line.startsWith('http://') || line.startsWith('https://')) {
+        currentChannel.url = line;
+        channels.push(currentChannel as ParsedChannel);
+      }
+      currentChannel = {};
+    }
   }
 
-  // Detect stream type from group
-  const group = (entry.group_title || '').toLowerCase();
-  if (group.includes('vod') || group.includes('filme') || group.includes('movie') || group.includes('série') || group.includes('series')) {
-    entry.stream_type = 'vod';
-  }
-
-  return entry;
+  return channels;
 }
 
-function processLine(line: string, currentEntry: any, entries: any[], sourceId: string) {
-  if (!line) return;
+function generateSlug(name: string): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 6);
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .substring(0, 50);
+  return `${base}-${timestamp}-${random}`;
+}
+
+function detectContentType(url: string, group?: string): string {
+  const urlLower = url.toLowerCase();
+  const groupLower = (group || '').toLowerCase();
   
-  if (line.startsWith('#EXTINF:')) {
-    return parseExtinfLine(line);
-  } else if (!line.startsWith('#') && currentEntry && (line.startsWith('http://') || line.startsWith('https://'))) {
-    currentEntry.stream_url = line;
-    entries.push(currentEntry);
-    return null;
+  // Check URL patterns
+  if (urlLower.includes('/movie/') || urlLower.includes('.mp4') || urlLower.includes('.mkv')) {
+    return 'vod';
   }
-  return currentEntry;
+  if (urlLower.includes('/series/')) {
+    return 'series';
+  }
+  
+  // Check group patterns
+  if (groupLower.includes('vod') || groupLower.includes('filme') || groupLower.includes('movie')) {
+    return 'vod';
+  }
+  if (groupLower.includes('série') || groupLower.includes('series')) {
+    return 'series';
+  }
+  
+  return 'live';
 }
