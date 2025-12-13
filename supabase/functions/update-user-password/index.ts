@@ -51,17 +51,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user is super_admin
+    // Check if user is admin or master
     const { data: userRoles } = await anonClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
-    const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+    const isMasterOrAdmin = userRoles?.some(r => r.role === 'master' || r.role === 'admin');
     
-    if (!isSuperAdmin) {
+    if (!isMasterOrAdmin) {
       return new Response(
-        JSON.stringify({ error: 'Forbidden: Only super admins can update passwords' }),
+        JSON.stringify({ error: 'Forbidden: Only admins can update passwords' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

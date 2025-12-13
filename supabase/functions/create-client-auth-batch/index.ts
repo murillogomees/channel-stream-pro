@@ -52,7 +52,7 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .in("role", ["admin", "super_admin", "master"]);
+      .in("role", ["admin", "master"]);
 
     if (roleError || !roleData || roleData.length === 0) {
       console.error("Permission check failed:", roleError);

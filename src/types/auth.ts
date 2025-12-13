@@ -5,7 +5,7 @@
  * Sistema baseado em:
  * - auth.users (Supabase Auth) - identidade
  * - public.profiles - dados de perfil
- * - public.user_roles - permissões (client, admin, super_admin)
+ * - public.user_roles - permissões (client, admin, master)
  * - public.clientes - dados de cliente e vencimento
  * - public.user_subscriptions - status de assinatura
  */

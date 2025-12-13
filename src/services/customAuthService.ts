@@ -70,12 +70,22 @@ interface AuthResponse<T> {
  * Convert Supabase User to CustomAuthUser
  */
 async function convertUser(user: User): Promise<CustomAuthUser> {
-  // Fetch role from database
-  const { data: roleData } = await supabase
+  // Fetch ALL roles from database
+  const { data: rolesData } = await supabase
     .from('user_roles')
     .select('role')
-    .eq('user_id', user.id)
-    .single();
+    .eq('user_id', user.id);
+  
+  // Priority: master > admin > client
+  const allRoles = (rolesData || []).map(r => r.role);
+  let role = 'client';
+  if (allRoles.includes('master')) {
+    role = 'master';
+  } else if (allRoles.includes('admin')) {
+    role = 'admin';
+  } else if (allRoles.includes('client')) {
+    role = 'client';
+  }
 
   // Fetch profile
   const { data: profile } = await supabase
@@ -87,7 +97,7 @@ async function convertUser(user: User): Promise<CustomAuthUser> {
   return {
     id: user.id,
     email: user.email || '',
-    role: roleData?.role || 'client',
+    role,
     email_confirmed_at: user.email_confirmed_at,
     phone: user.phone,
     phone_confirmed_at: user.phone_confirmed_at,
