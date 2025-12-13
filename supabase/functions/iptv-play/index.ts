@@ -322,8 +322,9 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[iptv-play] Error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
