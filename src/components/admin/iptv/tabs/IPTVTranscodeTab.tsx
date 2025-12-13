@@ -21,8 +21,20 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Zap, RefreshCw, Loader2, CheckCircle, XCircle, 
-  Clock, Search, Plus, Trash2, Settings, Play, StopCircle
+  Clock, Search, Plus, Trash2, Settings, Play, StopCircle,
+  Square, RotateCcw, Eraser
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const RESOLUTION_OPTIONS = ['1080p', '720p', '480p', '360p', '240p'];
 
@@ -120,6 +132,51 @@ export function IPTVTranscodeTab() {
     },
     onSuccess: () => {
       toast.success('Job removido');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Stop all processing jobs
+  const stopAllMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('iptv_transcode_jobs')
+        .update({ status: 'cancelled' })
+        .in('status', ['pending', 'processing']);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Todos os jobs foram parados');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Restart failed jobs
+  const restartAllMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('iptv_transcode_jobs')
+        .update({ status: 'pending', progress: 0, error_message: null })
+        .in('status', ['failed', 'cancelled']);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Jobs reiniciados');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
+  });
+
+  // Clear all jobs
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('iptv_transcode_jobs').delete().neq('id', 0);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Todos os jobs foram removidos');
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
     },
     onError: (error) => toast.error(`Erro: ${error.message}`),
@@ -241,6 +298,89 @@ export function IPTVTranscodeTab() {
             <Button variant="outline" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
+
+            {/* Bulk Actions */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-yellow-600 border-yellow-600/50 hover:bg-yellow-600/10">
+                  <Square className="h-4 w-4 mr-1" />
+                  Parar Todos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Parar todos os jobs?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso irá cancelar todos os jobs pendentes e em processamento.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => stopAllMutation.mutate()}
+                    className="bg-yellow-600 hover:bg-yellow-700"
+                  >
+                    {stopAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    Parar Todos
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-blue-600 border-blue-600/50 hover:bg-blue-600/10">
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Reiniciar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reiniciar jobs falhados?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso irá reagendar todos os jobs que falharam ou foram cancelados.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => restartAllMutation.mutate()}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {restartAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    Reiniciar Jobs
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10">
+                  <Eraser className="h-4 w-4 mr-1" />
+                  Limpar Todos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar todos os jobs?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso irá remover permanentemente todos os jobs da fila. Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => clearAllMutation.mutate()}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {clearAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    Limpar Todos
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button>
