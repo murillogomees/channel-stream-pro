@@ -70,17 +70,17 @@ function isManifest(url: string): boolean {
 
 function isSegment(url: string): boolean {
   const urlLower = url.toLowerCase();
-  return urlLower.includes('.ts') || 
-         urlLower.includes('.aac') || 
-         urlLower.includes('.mp4') ||
-         urlLower.includes('.m4s') ||
-         urlLower.includes('.fmp4');
+  return urlLower.endsWith('.ts') || 
+         urlLower.endsWith('.aac') || 
+         urlLower.endsWith('.m4s') ||
+         urlLower.endsWith('.fmp4');
 }
 
-function isKeyFile(url: string): boolean {
+function isMp4(url: string): boolean {
   const urlLower = url.toLowerCase();
-  return urlLower.includes('.key') || urlLower.includes('key=');
+  return urlLower.endsWith('.mp4');
 }
+
 
 // =============================================================================
 // URL UTILITIES
@@ -219,6 +219,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const isM3u8 = isManifest(decodedUrl);
     const isTs = isSegment(decodedUrl);
+    const isMp4File = isMp4(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
 
     // Validate stream type
@@ -227,7 +228,7 @@ serve(async (req: Request): Promise<Response> => {
       console.log(`[Proxy] Non-standard media type: ${decodedUrl.substring(0, 50)}...`);
     }
 
-    const reqType = isM3u8 ? 'M3U8' : isTs ? 'TS' : isKey ? 'KEY' : 'OTHER';
+    const reqType = isM3u8 ? 'M3U8' : isTs ? 'TS' : isMp4File ? 'MP4' : isKey ? 'KEY' : 'OTHER';
     console.log(`[Proxy] ${reqType}: ${decodedUrl.substring(0, 60)}...`);
 
     // Build upstream headers - preserve session context
@@ -305,6 +306,8 @@ serve(async (req: Request): Promise<Response> => {
         contentType = 'application/vnd.apple.mpegurl';
       } else if (isTs) {
         contentType = 'video/mp2t';
+      } else if (isMp4File) {
+        contentType = 'video/mp4';
       } else if (isKey) {
         contentType = 'application/octet-stream';
       } else {
