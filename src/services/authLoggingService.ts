@@ -34,9 +34,10 @@ export const authLoggingService = {
           metadata
         });
       
-      // Silently ignore RLS errors on self-hosted (non-critical feature)
-      if (error && error.code !== '42501') {
-        console.warn('[AuthLogging] Erro ao registrar evento:', error.message);
+      // Silently ignore all errors - auth logging is non-critical
+      // RLS errors (42501) are expected on self-hosted with custom auth
+      if (error) {
+        // Silent fail - don't log to console to avoid spam
       }
     } catch (error) {
       // Silently fail - logging is non-critical
