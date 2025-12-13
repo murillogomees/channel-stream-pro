@@ -246,8 +246,10 @@ export default function UnifiedProfile() {
 
     setSavingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: novaSenha });
-      if (error) throw error;
+      // Usar Custom Auth para atualizar senha
+      const { customAuthService } = await import('@/services/customAuthService');
+      const { error } = await customAuthService.updateUser({ password: novaSenha });
+      if (error) throw new Error(error.message);
 
       shadcnToast({
         title: "Senha atualizada",

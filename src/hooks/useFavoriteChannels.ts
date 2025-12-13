@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { authCache } from '@/services/authCacheService';
 import { toast } from 'sonner';
 
@@ -9,12 +8,8 @@ export function useFavoriteChannels() {
 
   const loadFavorites = useCallback(async () => {
     try {
-      // Usar cache primeiro
-      let userId = authCache.getUserId();
-      if (!userId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id || null;
-      }
+      // Usar apenas cache - Custom Auth
+      const userId = authCache.getUserId();
       if (!userId) return;
 
       // Get from localStorage for now (can be migrated to Supabase table later)
@@ -35,12 +30,8 @@ export function useFavoriteChannels() {
 
   const toggleFavorite = useCallback(async (channelId: string) => {
     try {
-      // Usar cache primeiro
-      let userId = authCache.getUserId();
-      if (!userId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id || null;
-      }
+      // Usar apenas cache - Custom Auth
+      const userId = authCache.getUserId();
       if (!userId) {
         toast.error('Usuário não autenticado');
         return;

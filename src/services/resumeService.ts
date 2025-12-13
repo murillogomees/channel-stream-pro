@@ -1,6 +1,8 @@
 /**
  * Resume Service
  * Uses watch_progress table with local storage fallback
+ * 
+ * USES CUSTOM AUTH - GoTrue removed
  */
 
 import { authCache } from '@/services/authCacheService';
@@ -71,11 +73,8 @@ class ResumeService {
   }
 
   private async getUserId(): Promise<string | null> {
-    const cachedId = authCache.getUserId();
-    if (cachedId) return cachedId;
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.id || null;
+    // Sempre usar cache - sem fallback para supabase.auth
+    return authCache.getUserId();
   }
 
   /**

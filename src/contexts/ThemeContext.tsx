@@ -36,28 +36,30 @@ export const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Evitar múltiplas subscrições
     if (authSubscription) return;
     
-    // Listener único para mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      const newUserId = session?.user?.id || null;
-      if (newUserId !== cachedUserId) {
-        cachedUserId = newUserId;
-        setUserId(newUserId);
-        setHasLoadedFromDb(false); // Reset para recarregar tema
-      }
-    });
-    
-    authSubscription = () => subscription.unsubscribe();
-    
-    // Apenas verificar sessão inicial se não temos userId
-    if (!cachedUserId) {
-      supabase.auth.getSession().then(({ data }) => {
-        const newUserId = data.session?.user?.id || null;
+    // Usar Custom Auth - importar dinamicamente
+    import('@/services/customAuthService').then(({ customAuthService }) => {
+      const { data: { subscription } } = customAuthService.onAuthStateChange((_, session) => {
+        const newUserId = session?.user?.id || null;
         if (newUserId !== cachedUserId) {
           cachedUserId = newUserId;
           setUserId(newUserId);
+          setHasLoadedFromDb(false);
         }
       });
-    }
+      
+      authSubscription = () => subscription.unsubscribe();
+      
+      // Verificar sessão inicial
+      if (!cachedUserId) {
+        customAuthService.getSession().then(({ data }) => {
+          const newUserId = data.session?.user?.id || null;
+          if (newUserId !== cachedUserId) {
+            cachedUserId = newUserId;
+            setUserId(newUserId);
+          }
+        });
+      }
+    });
     
     return () => {
       // Não limpar subscription global - manter ativa

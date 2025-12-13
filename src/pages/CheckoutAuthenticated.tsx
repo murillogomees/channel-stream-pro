@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
 import { useCoupons, Coupon } from "@/hooks/useCoupons";
 import { supabase } from "@/lib/supabase";
+import { authHelper, getAuthHeaders } from "@/services/authHelper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,10 +183,10 @@ export default function CheckoutAuthenticated() {
 
     setIsProcessing(true);
     try {
-      // Get session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get auth headers for custom auth
+      const headers = await getAuthHeaders();
       
-      if (!session) {
+      if (!headers['Authorization']) {
         toast.error("Sessão expirada. Faça login novamente.");
         navigate("/login");
         return;

@@ -1,10 +1,13 @@
 /**
  * Mercado Pago Integration Service - Simplified
  * Handles checkout and subscription management
+ * 
+ * USES CUSTOM AUTH - GoTrue removed
  */
 
 import { supabase } from "@/lib/supabase";
 import { SUPABASE_FUNCTIONS_URL } from "@/config/supabase";
+import { authHelper, getAuthHeaders, requireAuth } from "./authHelper";
 
 export interface CheckoutResponse {
   preference_id: string;
@@ -41,17 +44,14 @@ class MercadoPagoService {
     failureUrl?: string;
     pendingUrl?: string;
   }): Promise<CheckoutResponse & { original_price?: number; final_price?: number; discount_applied?: number }> {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.access_token) {
-      throw new Error("User not authenticated");
-    }
+    const { token } = await requireAuth();
 
     const response = await fetch(`${this.functionUrl}/mercado-pago-checkout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
+        "Authorization": `Bearer ${token}`,
+        "X-Custom-Token": token,
       },
       body: JSON.stringify({
         plan_id: planId,
@@ -74,14 +74,14 @@ class MercadoPagoService {
    * Get current user's subscription status from profiles table
    */
   async getSubscriptionStatus(): Promise<SubscriptionStatus | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = authHelper.getUserId();
     
-    if (!user) return null;
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from('profiles')
       .select('plano, situacao, data_vencimento')
-      .eq('id', user.id)
+      .eq('id', userId)
       .maybeSingle();
 
     if (error || !data) {
@@ -108,9 +108,9 @@ class MercadoPagoService {
    * Get current user's subscription details
    */
   async getSubscription() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = authHelper.getUserId();
     
-    if (!user) return null;
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from("user_subscriptions")
@@ -118,7 +118,7 @@ class MercadoPagoService {
         *,
         plan:subscription_plans(*)
       `)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (error) {
@@ -133,14 +133,14 @@ class MercadoPagoService {
    * Get user's payment history
    */
   async getPaymentHistory(): Promise<Payment[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = authHelper.getUserId();
     
-    if (!user) return [];
+    if (!userId) return [];
 
     const { data, error } = await supabase
       .from("payments")
       .select("id, amount, status, payment_method, created_at, paid_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -156,16 +156,16 @@ class MercadoPagoService {
    * Cancel subscription at period end
    */
   async cancelSubscription(): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = authHelper.getUserId();
     
-    if (!user) return false;
+    if (!userId) return false;
 
     const { error } = await supabase
       .from("user_subscriptions")
       .update({
         cancel_at_period_end: true,
       })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) {
       console.error("[MercadoPago] Error canceling subscription:", error);
@@ -179,16 +179,16 @@ class MercadoPagoService {
    * Reactivate canceled subscription
    */
   async reactivateSubscription(): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = authHelper.getUserId();
     
-    if (!user) return false;
+    if (!userId) return false;
 
     const { error } = await supabase
       .from("user_subscriptions")
       .update({
         cancel_at_period_end: false,
       })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) {
       console.error("[MercadoPago] Error reactivating subscription:", error);
