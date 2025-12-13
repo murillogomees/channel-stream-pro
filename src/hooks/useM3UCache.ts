@@ -119,8 +119,6 @@ export async function setCachedEntries(sourceId: string, entries: any[]): Promis
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-
-    console.log(`[M3UCache] Cached ${entries.length} entries for source ${sourceId}`);
   } catch (error) {
     console.warn('[M3UCache] Error writing cache:', error);
   }
