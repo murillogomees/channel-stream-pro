@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { customAuthService } from "@/services/customAuthService";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -92,12 +92,15 @@ export default function Login() {
     try {
       const validatedData = loginSchema.parse({ email, password });
 
-      console.log("[Login] Tentando login com Custom Auth:", validatedData.email);
+      console.log("[Login] Tentando login com Supabase GoTrue:", validatedData.email);
 
-      // Use Custom Auth Service (bypasses GoTrue)
-      const { data, error } = await customAuthService.signIn(validatedData.email, validatedData.password);
+      // Use Supabase Auth directly (native GoTrue)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validatedData.email,
+        password: validatedData.password,
+      });
 
-      console.log("[Login] Resposta Custom Auth:", {
+      console.log("[Login] Resposta Supabase Auth:", {
         hasUser: !!data?.user,
         hasSession: !!data?.session,
         error: error?.message,
