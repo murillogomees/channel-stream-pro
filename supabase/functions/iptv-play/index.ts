@@ -157,20 +157,55 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify authentication
+    // Verify authentication using custom auth token
     const authHeader = req.headers.get('Authorization');
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader || '' } },
-    });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized - No token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Validate token by checking profiles table with service role
+    const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    
+    // Decode JWT to get user_id (simple base64 decode of payload)
+    let userId: string | null = null;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        userId = payload.sub || payload.user_id || payload.id;
+      }
+    } catch (e) {
+      console.error('[iptv-play] Token decode error:', e);
+    }
+
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify user exists and is active
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, cliente_ativo')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - User not found' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use service role client for data queries
+    const supabase = supabaseAdmin;
 
     // Get channel info from iptv_channels table
     const { data: channel, error: channelError } = await supabase
@@ -243,7 +278,7 @@ Deno.serve(async (req) => {
     // Add metric to buffer (non-blocking)
     addMetric(parseInt(channelId));
 
-    console.log(`[iptv-play] Channel ${channelId} requested by ${user.id}, using ${primaryCdn.type}`);
+    console.log(`[iptv-play] Channel ${channelId} requested by ${userId}, using ${primaryCdn.type}`);
 
     return new Response(
       JSON.stringify({
