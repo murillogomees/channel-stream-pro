@@ -271,9 +271,11 @@ serve(async (req) => {
         for (const channel of channels || []) {
           const cacheKey = `channel:${channel.id}:manifest`;
           const manifestUrl = channel.transcode_manifest_url || channel.original_url;
+          const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+          const now = new Date().toISOString();
 
-          // Set in cache
-          await supabase
+          // Try upsert first
+          const { error: upsertError } = await supabase
             .from('iptv_cdn_cache')
             .upsert({
               cache_key: cacheKey,
@@ -281,11 +283,30 @@ serve(async (req) => {
               manifest_url: manifestUrl,
               cdn_provider: 'warmup',
               is_warm: true,
-              expires_at: new Date(Date.now() + ttl * 1000).toISOString(),
-              last_access_at: new Date().toISOString(),
+              expires_at: expiresAt,
+              last_access_at: now,
             }, {
               onConflict: 'cache_key',
             });
+
+          if (upsertError) {
+            console.log(`[warmup] Upsert error for ${channel.id}, trying update:`, upsertError.message);
+            // Fallback to update existing
+            const { error: updateError } = await supabase
+              .from('iptv_cdn_cache')
+              .update({
+                manifest_url: manifestUrl,
+                is_warm: true,
+                expires_at: expiresAt,
+                last_access_at: now,
+              })
+              .eq('cache_key', cacheKey);
+            
+            if (updateError) {
+              console.log(`[warmup] Update also failed for ${channel.id}:`, updateError.message);
+              continue;
+            }
+          }
 
           warmed.push(channel.id);
         }
