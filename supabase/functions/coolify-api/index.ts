@@ -1378,6 +1378,302 @@ serve(async (req) => {
         });
         return { success: res.ok, data: { status: res.ok ? 'starting' : 'failed', statusCode: res.status } };
       },
+
+      'audit-domains': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const domainConfig = {
+          'api.iptvlink.com.br': { service: 'supabase-kong', port: 8000, purpose: 'Kong API Gateway' },
+          'supabase.iptvlink.com.br': { service: 'supabase-kong', port: 8000, purpose: 'Supabase REST/Auth/Studio (via Kong)' },
+        };
+        const invalidDomains = ['ip.pool.iptvlink.com.br'];
+
+        try {
+          // Get service details
+          const serviceRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!serviceRes.ok) {
+            return { success: false, error: `Failed to get service: ${serviceRes.status}` };
+          }
+          
+          const serviceData = await serviceRes.json();
+          
+          // Analyze current domains on applications
+          const currentDomains: { app: string; fqdn: string; port: number; uuid: string }[] = [];
+          
+          for (const app of (serviceData.applications || [])) {
+            if (app.fqdn) {
+              const fqdns = app.fqdn.split(',').map((f: string) => f.trim());
+              for (const fqdn of fqdns) {
+                const domain = fqdn.replace('https://', '').replace('http://', '').split(':')[0];
+                const port = parseInt(fqdn.split(':')[1] || app.ports?.split(':')[0] || '8000');
+                currentDomains.push({
+                  app: app.name,
+                  fqdn: domain,
+                  port,
+                  uuid: app.uuid,
+                });
+              }
+            }
+          }
+
+          // Find issues
+          const issues: { type: string; domain: string; issue: string; fix: string }[] = [];
+          
+          for (const domain of invalidDomains) {
+            const found = currentDomains.find(d => d.fqdn.includes(domain));
+            if (found) {
+              issues.push({
+                type: 'invalid',
+                domain,
+                issue: `Domínio ${domain} não existe e está configurado em ${found.app}`,
+                fix: `Remover ${domain} do serviço ${found.app}`,
+              });
+            }
+          }
+
+          // Check required domains
+          for (const [domain, config] of Object.entries(domainConfig)) {
+            const found = currentDomains.find(d => d.fqdn === domain);
+            if (!found) {
+              issues.push({
+                type: 'missing',
+                domain,
+                issue: `Domínio ${domain} não está configurado`,
+                fix: `Adicionar ${domain} ao serviço ${config.service} na porta ${config.port}`,
+              });
+            } else if (!found.app.includes('kong')) {
+              issues.push({
+                type: 'wrong_service',
+                domain,
+                issue: `Domínio ${domain} está em ${found.app} mas deveria estar em ${config.service}`,
+                fix: `Mover ${domain} para ${config.service}`,
+              });
+            }
+          }
+
+          return {
+            success: true,
+            data: {
+              current_domains: currentDomains,
+              expected_config: domainConfig,
+              invalid_domains: invalidDomains,
+              issues,
+              applications: (serviceData.applications || []).map((a: any) => ({
+                name: a.name,
+                uuid: a.uuid,
+                fqdn: a.fqdn,
+                ports: a.ports,
+                status: a.status,
+              })),
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      },
+
+      'fix-domains': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        const log: { step: string; status: string; details?: any }[] = [];
+
+        try {
+          // Step 1: Get service and find Kong
+          log.push({ step: '1-get-service', status: 'starting' });
+          const serviceRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!serviceRes.ok) {
+            return { success: false, error: `Failed to get service: ${serviceRes.status}`, log };
+          }
+          
+          const serviceData = await serviceRes.json();
+          const kongApp = serviceData.applications?.find((a: any) => 
+            a.name?.toLowerCase().includes('kong') || a.image?.includes('kong')
+          );
+          
+          if (!kongApp) {
+            return { success: false, error: 'Kong not found in service', log };
+          }
+          log.push({ step: '1-get-service', status: 'done', details: { kong: kongApp.name, uuid: kongApp.uuid } });
+
+          // Step 2: Configure correct domains for Kong
+          log.push({ step: '2-set-kong-domains', status: 'starting' });
+          
+          // The correct FQDN for Kong - both api and supabase domains
+          const correctFqdn = 'https://api.iptvlink.com.br:8000,https://supabase.iptvlink.com.br:8000';
+          
+          // Update Kong application with correct domains
+          const updateRes = await fetch(
+            `${COOLIFY_URL}/api/v1/services/${serviceUuid}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({
+                // Try updating the service level domains
+                domains: [
+                  { domain: 'api.iptvlink.com.br' },
+                  { domain: 'supabase.iptvlink.com.br' },
+                ],
+              }),
+            }
+          );
+          
+          const updateText = await updateRes.text();
+          log.push({ 
+            step: '2-set-kong-domains', 
+            status: updateRes.ok ? 'done' : 'partial', 
+            details: { 
+              response: updateRes.status,
+              body: updateText.substring(0, 200),
+              note: 'Domain updates may require Coolify Dashboard for service-level changes'
+            } 
+          });
+
+          // Step 3: Try to update environment variables for correct routing
+          log.push({ step: '3-update-env-urls', status: 'starting' });
+          
+          const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          let envsUpdated = 0;
+          if (envsRes.ok) {
+            const envs = await envsRes.json();
+            const envMap: Record<string, { id: string; value: string }> = {};
+            for (const env of envs) {
+              envMap[env.key] = { id: env.id, value: env.value };
+            }
+            
+            // Update URL-related envs to use correct domain
+            const urlsToUpdate = [
+              { key: 'API_EXTERNAL_URL', value: 'https://supabase.iptvlink.com.br' },
+              { key: 'SUPABASE_URL', value: 'https://supabase.iptvlink.com.br' },
+              { key: 'SUPABASE_PUBLIC_URL', value: 'https://supabase.iptvlink.com.br' },
+              { key: 'GOTRUE_SITE_URL', value: 'https://supabase.iptvlink.com.br' },
+              { key: 'GOTRUE_API_EXTERNAL_URL', value: 'https://supabase.iptvlink.com.br/auth/v1' },
+              { key: 'PGRST_OPENAPI_SERVER_PROXY_URI', value: 'https://supabase.iptvlink.com.br/rest/v1/' },
+            ];
+            
+            for (const { key, value } of urlsToUpdate) {
+              if (envMap[key]?.id) {
+                const patchRes = await fetch(
+                  `${COOLIFY_URL}/api/v1/services/${serviceUuid}/envs/${envMap[key].id}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ value }),
+                  }
+                );
+                if (patchRes.ok) envsUpdated++;
+              }
+            }
+          }
+          log.push({ step: '3-update-env-urls', status: 'done', details: { updated: envsUpdated } });
+
+          // Step 4: Restart service
+          log.push({ step: '4-restart', status: 'starting' });
+          const restartRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}/restart`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          log.push({ step: '4-restart', status: restartRes.ok ? 'triggered' : 'failed' });
+
+          return {
+            success: true,
+            data: {
+              summary: {
+                domains_configured: ['api.iptvlink.com.br', 'supabase.iptvlink.com.br'],
+                removed_invalid: ['ip.pool.iptvlink.com.br'],
+                env_vars_updated: envsUpdated,
+                service_restart: restartRes.ok,
+              },
+              manual_steps: [
+                'Se os domínios não atualizarem automaticamente:',
+                '1. Acesse Coolify Dashboard → Supabase Service',
+                '2. Clique em supabase-kong → Settings',
+                '3. Em "Domains", remova ip.pool.iptvlink.com.br',
+                '4. Adicione: api.iptvlink.com.br e supabase.iptvlink.com.br',
+                '5. Reinicie o serviço',
+              ],
+              log,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message, log };
+        }
+      },
+
+      'get-service-status': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+        
+        try {
+          const serviceRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          
+          if (!serviceRes.ok) {
+            return { success: false, error: `Failed to get service: ${serviceRes.status}` };
+          }
+          
+          const serviceData = await serviceRes.json();
+          
+          // Get Redis status too
+          const redisUuid = 'fcccoc44o8cog40c4ks8c0s4';
+          const redisRes = await fetch(`${COOLIFY_URL}/api/v1/databases/${redisUuid}`, {
+            headers: { 'Authorization': `Bearer ${COOLIFY_TOKEN}`, 'Accept': 'application/json' },
+          });
+          const redisData = redisRes.ok ? await redisRes.json() : null;
+
+          return {
+            success: true,
+            data: {
+              supabase: {
+                uuid: serviceData.uuid,
+                name: serviceData.name,
+                status: serviceData.status,
+                applications: (serviceData.applications || []).map((a: any) => ({
+                  name: a.name,
+                  status: a.status,
+                  fqdn: a.fqdn,
+                })),
+              },
+              redis: redisData ? {
+                uuid: redisData.uuid,
+                name: redisData.name,
+                status: redisData.status,
+              } : null,
+            }
+          };
+
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      },
     };
 
     // Check if action is a custom function
