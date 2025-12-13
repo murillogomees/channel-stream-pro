@@ -90,6 +90,21 @@ export function IPTVSeriesTab() {
   const [newSeriesName, setNewSeriesName] = useState('');
   const [targetSeriesName, setTargetSeriesName] = useState('');
   const [targetCategory, setTargetCategory] = useState('');
+  
+  // Auto-organize progress state
+  const [organizeProgress, setOrganizeProgress] = useState<{
+    isRunning: boolean;
+    totalToProcess: number;
+    processed: number;
+    organized: number;
+    seriesFound: number;
+  }>({
+    isRunning: false,
+    totalToProcess: 0,
+    processed: 0,
+    organized: 0,
+    seriesFound: 0,
+  });
 
   // Fetch all series channels
   const { data: seriesChannels, isLoading, refetch } = useQuery({
@@ -326,21 +341,75 @@ export function IPTVSeriesTab() {
     });
   }, [categoryGroups]);
 
-  // Auto-organize mutation
-  const autoOrganizeMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('auto_organize_series_channels');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      const result = data?.[0];
-      toast.success(`Organizados ${result?.organized_count || 0} canais em ${result?.series_found || 0} séries`);
+  // Auto-organize with progress
+  const startAutoOrganize = useCallback(async () => {
+    // Get total count of eligible channels to process
+    const totalToProcess = unorganizedCount || 0;
+    
+    if (totalToProcess === 0) {
+      toast.info('Não há canais para organizar');
+      return;
+    }
+    
+    setOrganizeProgress({
+      isRunning: true,
+      totalToProcess,
+      processed: 0,
+      organized: 0,
+      seriesFound: 0,
+    });
+    
+    let totalOrganized = 0;
+    let totalSeriesFound = 0;
+    let batchNumber = 0;
+    const batchSize = 5000; // Matches the SQL LIMIT
+    
+    try {
+      // Process in batches until no more items are organized
+      while (true) {
+        batchNumber++;
+        const { data, error } = await supabase.rpc('auto_organize_series_channels');
+        
+        if (error) throw error;
+        
+        const result = data?.[0];
+        const organizedInBatch = result?.organized_count || 0;
+        totalSeriesFound = result?.series_found || 0;
+        totalOrganized += organizedInBatch;
+        
+        // Update progress
+        setOrganizeProgress(prev => ({
+          ...prev,
+          processed: Math.min(prev.processed + batchSize, totalToProcess),
+          organized: totalOrganized,
+          seriesFound: totalSeriesFound,
+        }));
+        
+        // If no items were organized in this batch, we're done
+        if (organizedInBatch === 0) {
+          break;
+        }
+        
+        // Small delay between batches to prevent overwhelming the database
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      toast.success(`Organizados ${totalOrganized.toLocaleString()} canais em ${totalSeriesFound} séries`);
       setIsAutoOrganizeOpen(false);
       queryClient.invalidateQueries({ queryKey: ['iptv-series-channels'] });
       queryClient.invalidateQueries({ queryKey: ['iptv-unorganized-count'] });
+    } catch (error: any) {
+      toast.error(`Erro: ${error.message}`);
+    } finally {
+      setOrganizeProgress(prev => ({ ...prev, isRunning: false }));
+    }
+  }, [unorganizedCount, queryClient]);
+
+  // Auto-organize mutation (kept for compatibility)
+  const autoOrganizeMutation = useMutation({
+    mutationFn: async () => {
+      await startAutoOrganize();
     },
-    onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
   // Delete episodes mutation
@@ -632,34 +701,92 @@ export function IPTVSeriesTab() {
       )}
 
       {/* Auto-Organize Dialog */}
-      <Dialog open={isAutoOrganizeOpen} onOpenChange={setIsAutoOrganizeOpen}>
-        <DialogContent>
+      <Dialog open={isAutoOrganizeOpen} onOpenChange={(open) => !organizeProgress.isRunning && setIsAutoOrganizeOpen(open)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Organizar Séries Automaticamente</DialogTitle>
             <DialogDescription>
-              O sistema irá analisar {stats.unorganized.toLocaleString()} canais e detectar automaticamente
-              séries, temporadas e episódios baseado nos nomes (ex: S01E01, 1x01, etc.)
+              {organizeProgress.isRunning 
+                ? 'Organizando canais em séries...'
+                : `O sistema irá analisar ${stats.unorganized.toLocaleString()} canais e detectar automaticamente séries, temporadas e episódios.`
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Padrões detectados: S01E01, 1x01, Temporada X Episódio Y, EP01
-            </p>
+          
+          <div className="py-4 space-y-4">
+            {organizeProgress.isRunning ? (
+              <>
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Progresso</span>
+                    <span className="font-medium">
+                      {organizeProgress.totalToProcess > 0 
+                        ? Math.round((organizeProgress.processed / organizeProgress.totalToProcess) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="h-3 bg-secondary rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300 ease-out"
+                      style={{ 
+                        width: `${organizeProgress.totalToProcess > 0 
+                          ? Math.round((organizeProgress.processed / organizeProgress.totalToProcess) * 100) 
+                          : 0}%` 
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{organizeProgress.processed.toLocaleString()} / {organizeProgress.totalToProcess.toLocaleString()}</span>
+                    <span>processados</span>
+                  </div>
+                </div>
+                
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-primary">{organizeProgress.organized.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Canais Organizados</p>
+                  </div>
+                  <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-purple-500">{organizeProgress.seriesFound.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Séries Detectadas</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Padrões detectados: S01E01, 1x01, Temporada X Episódio Y, EP01
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Os nomes dos episódios serão padronizados para: <span className="font-mono text-foreground">Nome da Série | T1 - E4</span>
+                </p>
+              </div>
+            )}
           </div>
+          
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAutoOrganizeOpen(false)}>
-              Cancelar
-            </Button>
+            {!organizeProgress.isRunning && (
+              <Button variant="outline" onClick={() => setIsAutoOrganizeOpen(false)}>
+                Cancelar
+              </Button>
+            )}
             <Button 
-              onClick={() => autoOrganizeMutation.mutate()} 
-              disabled={autoOrganizeMutation.isPending}
+              onClick={() => startAutoOrganize()} 
+              disabled={organizeProgress.isRunning}
             >
-              {autoOrganizeMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              {organizeProgress.isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Processando...
+                </>
               ) : (
-                <Wand2 className="h-4 w-4 mr-1" />
+                <>
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  Organizar
+                </>
               )}
-              Organizar
             </Button>
           </DialogFooter>
         </DialogContent>
