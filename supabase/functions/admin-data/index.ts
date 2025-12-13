@@ -41,7 +41,9 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const jwtSecret = Deno.env.get('JWT_SECRET')!;
+    
+    // Use service role client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // Validate JWT from Authorization header
     const authHeader = req.headers.get('authorization');
@@ -71,19 +73,36 @@ serve(async (req) => {
       });
     }
     
-    // Check user role - must be admin or master
-    const appRole = payload.app_role as string;
-    if (!['admin', 'master'].includes(appRole)) {
+    const userId = payload.sub as string;
+    
+    // Buscar role diretamente do banco (não confiar no JWT app_role)
+    const { data: userRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    
+    if (rolesError) {
+      console.error('[admin-data] Error fetching roles:', rolesError);
+      return new Response(JSON.stringify({ error: 'Failed to verify permissions' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Verificar se é admin ou master
+    const roles = userRoles?.map(r => r.role) || [];
+    const isMaster = roles.includes('master');
+    const isAdmin = roles.includes('admin') || isMaster;
+    
+    if (!isAdmin) {
+      console.log('[admin-data] Access denied for user:', userId, 'roles:', roles);
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
     
-    console.log('[admin-data] Authorized user:', payload.email, 'role:', appRole);
-    
-    // Use service role to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('[admin-data] Authorized user:', payload.email, 'roles:', roles);
 
     const body: AdminDataRequest = await req.json();
     console.log('[admin-data] Request:', body.action);
