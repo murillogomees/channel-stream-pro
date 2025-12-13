@@ -61,7 +61,34 @@ serve(async (req) => {
   }
 
   try {
-    const { action, endpoint, method = 'GET', body, params } = await req.json() as CoolifyRequest;
+    // Support both POST body and GET query params
+    let requestData: CoolifyRequest = { action: '' };
+    
+    if (req.method === 'POST') {
+      try {
+        requestData = await req.json() as CoolifyRequest;
+      } catch {
+        // Empty body for POST, continue with defaults
+      }
+    } else {
+      // Parse query params for GET requests
+      const url = new URL(req.url);
+      requestData.action = url.searchParams.get('action') || '';
+      requestData.endpoint = url.searchParams.get('endpoint') || undefined;
+      requestData.method = url.searchParams.get('method') || 'GET';
+      
+      // Parse params from query string
+      const paramsStr = url.searchParams.get('params');
+      if (paramsStr) {
+        try {
+          requestData.params = JSON.parse(paramsStr);
+        } catch {
+          // Invalid params JSON, ignore
+        }
+      }
+    }
+    
+    const { action, endpoint, method = 'GET', body, params } = requestData;
 
     // Build URL with params
     let url = `${COOLIFY_URL}/api/v1${endpoint || ''}`;
