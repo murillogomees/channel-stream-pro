@@ -23,7 +23,7 @@ export const authLoggingService = {
     metadata?: Record<string, any>;
   }) {
     try {
-      await supabase
+      const { error } = await supabase
         .from('auth_sessions_log')
         .insert({
           user_id: userId,
@@ -33,8 +33,13 @@ export const authLoggingService = {
           user_agent: userAgent,
           metadata
         });
+      
+      // Silently ignore RLS errors on self-hosted (non-critical feature)
+      if (error && error.code !== '42501') {
+        console.warn('[AuthLogging] Erro ao registrar evento:', error.message);
+      }
     } catch (error) {
-      console.error('[AuthLogging] Erro ao registrar evento:', error);
+      // Silently fail - logging is non-critical
     }
   },
 
