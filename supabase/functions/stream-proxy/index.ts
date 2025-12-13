@@ -356,22 +356,19 @@ function getXtreamOrigin(url: string): string | null {
 }
 
 /**
- * Rewrite HLS manifest with intelligent segment handling
+ * Rewrite HLS manifest - ALWAYS proxy all URLs
  * 
- * CRITICAL: For Xtream servers, we DO NOT proxy segment URLs because:
- * 1. Xtream generates temporary session tokens in /hls/{token}/
- * 2. These tokens are tied to the original .m3u8 request IP/session
- * 3. Proxying breaks the session validation, resulting in 403
+ * We proxy ALL segment URLs to avoid:
+ * 1. Mixed Content errors (HTTPS page loading HTTP resources)
+ * 2. CORS errors when fetching cross-origin segments
  * 
- * Instead, we let HLS.js fetch segments directly with proper headers
+ * The proxy handles session/auth by maintaining request flow
  */
 function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string, originalUrl: string): string {
   const lines = content.split('\n');
   const isXtream = isXtreamUrl(originalUrl);
-  const xtreamOrigin = getXtreamOrigin(originalUrl);
   
-  // Log for debugging
-  console.log(`[Manifest] Rewriting for ${isXtream ? 'XTREAM' : 'STANDARD'} stream: ${originalUrl.substring(0, 80)}...`);
+  console.log(`[Manifest] Rewriting ALL URLs for: ${originalUrl.substring(0, 80)}...`);
   
   return lines.map(line => {
     const trimmedLine = line.trim();
@@ -381,7 +378,7 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
       return line;
     }
     
-    // Handle encryption key URIs (always proxy these)
+    // Handle encryption key URIs
     if (trimmedLine.includes('URI="')) {
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
         const fullUrl = resolveUrl(uri, baseUrl);
@@ -389,18 +386,9 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
       });
     }
     
-    // Handle segment URLs
+    // Handle ALL segment URLs - proxy everything to avoid CORS/Mixed Content
     if (!trimmedLine.startsWith('#')) {
       const fullUrl = resolveUrl(trimmedLine, baseUrl);
-      
-      // FOR XTREAM: Return original URL - let HLS.js fetch directly
-      // The player will be configured with xhrSetup to add proper headers
-      if (isXtream) {
-        console.log(`[Manifest] XTREAM: Keeping original segment URL (no proxy)`);
-        return fullUrl; // Return absolute URL without proxy
-      }
-      
-      // FOR STANDARD: Proxy the segment
       return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
     }
     
