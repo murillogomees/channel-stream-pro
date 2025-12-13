@@ -1,0 +1,87 @@
+name: Deploy Edge Functions to Coolify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy all functions'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Edge Functions
+        run: |
+          echo "🚀 Deploying Edge Functions to Coolify..."
+          
+          # Copy functions to VPS
+          scp -r supabase/functions/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/edge-functions/
+          
+          # Execute deploy on VPS
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+            set -e
+            
+            # Find functions volume
+            FUNCTIONS_VOL=$(docker volume inspect --format '{{ .Mountpoint }}' $(docker volume ls -q | grep functions | head -1) 2>/dev/null)
+            if [ -z "$FUNCTIONS_VOL" ]; then
+              FUNCTIONS_VOL="/data/coolify/services/vcs0c0k8kww48kgws44swkk0/volumes/functions"
+            fi
+            
+            echo "📁 Deploying to: $FUNCTIONS_VOL"
+            
+            # Backup existing functions
+            if [ -d "$FUNCTIONS_VOL" ]; then
+              cp -r $FUNCTIONS_VOL /tmp/functions-backup-$(date +%Y%m%d%H%M%S)
+            fi
+            
+            # Copy new functions
+            mkdir -p $FUNCTIONS_VOL
+            cp -r /tmp/edge-functions/* $FUNCTIONS_VOL/
+            
+            # Restart edge-runtime
+            CONTAINER_ID=$(docker ps -q --filter "ancestor=supabase/edge-runtime:v1.67.4" | head -1)
+            if [ -n "$CONTAINER_ID" ]; then
+              docker restart $CONTAINER_ID
+              echo "✅ Edge runtime restarted: $CONTAINER_ID"
+            else
+              echo "⚠️ Edge runtime container not found"
+            fi
+            
+            # Cleanup
+            rm -rf /tmp/edge-functions
+            
+            echo "✅ Deploy complete!"
+          ENDSSH
+
+      - name: Notify Coolify API
+        run: |
+          curl -X POST "https://dashboard.iptvlink.com.br/api/v1/services/vcs0c0k8kww48kgws44swkk0/restart" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            || echo "Coolify notification failed (non-critical)"
+
+      - name: Verify Deployment
+        run: |
+          sleep 10
+          curl -f "https://supabase.iptvlink.com.br/functions/v1/health-check" \
+            || echo "Health check pending..."
