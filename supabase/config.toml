@@ -470,3 +470,11 @@ verify_jwt = false
 # Deploy webhook - triggers restart/deploy via Coolify API
 [functions.deploy-webhook]
 verify_jwt = false
+
+# Coolify secrets manager - manage environment variables
+[functions.coolify-secrets]
+verify_jwt = false
+
+# Edge Functions sync - sync functions from GitHub
+[functions.edge-functions-sync]
+verify_jwt = false
