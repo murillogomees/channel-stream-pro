@@ -238,12 +238,25 @@ serve(async (req: Request): Promise<Response> => {
     upstreamHeaders.set('Accept', '*/*');
     upstreamHeaders.set('Connection', 'keep-alive');
     
-    // Forward important headers from client
-    const headersToForward = ['range', 'authorization', 'cookie', 'x-stream-token'];
+    // Inject stream token if provided (dynamic token system for auto-refresh)
+    const streamToken = req.headers.get('x-stream-token');
+    if (streamToken) {
+      console.log('[Proxy] Injecting stream token from x-stream-token header');
+      upstreamHeaders.set('Authorization', `Bearer ${streamToken}`);
+    }
+    
+    // Forward important headers from client (except authorization if we set it via token)
+    const headersToForward = ['range', 'cookie'];
     headersToForward.forEach(header => {
       const value = req.headers.get(header);
       if (value) upstreamHeaders.set(header, value);
     });
+    
+    // Only forward authorization if no stream token was provided
+    if (!streamToken) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader) upstreamHeaders.set('Authorization', authHeader);
+    }
     
     // Set referer from original URL origin
     try {

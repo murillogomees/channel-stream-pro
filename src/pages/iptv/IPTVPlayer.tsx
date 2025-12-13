@@ -1,12 +1,12 @@
 /**
- * IPTV Player Page - Enterprise V2
- * Uses stream-proxy for all requests
+ * IPTV Player Page - Enterprise V3
+ * Uses stream-proxy with auto token refresh
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService } from '@/services/iptvService';
-import { IPTVPlayerWhiteLabelV2 } from '@/components/player/IPTVPlayerWhiteLabelV2';
+import { IPTVPlayerWhiteLabelV3 } from '@/components/player/IPTVPlayerWhiteLabelV3';
 import { Loader2 } from 'lucide-react';
 
 export default function IPTVPlayer() {
@@ -23,10 +23,6 @@ export default function IPTVPlayer() {
     navigate('/app/home');
   };
 
-  const handleError = (error: string) => {
-    console.error('[IPTVPlayer] Error:', error);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -38,7 +34,14 @@ export default function IPTVPlayer() {
     );
   }
 
-  const streamUrl = channel?.original_url;
+  // Build proxied URL - token will be injected by PlayerEngineV3
+  const getProxiedUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
+    const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy`;
+    return `${proxyBase}?url=${encodeURIComponent(url)}`;
+  };
+
+  const streamUrl = getProxiedUrl(channel?.original_url);
 
   if (!streamUrl) {
     return (
@@ -51,17 +54,15 @@ export default function IPTVPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      <IPTVPlayerWhiteLabelV2
-        url={streamUrl}
-        channelName={channel?.name}
-        channelLogo={channel?.logo_url}
-        category={channel?.category}
-        isLive={channel?.content_type === 'live'}
+    <div className="h-screen w-screen bg-black">
+      <IPTVPlayerWhiteLabelV3
+        streamUrl={streamUrl}
+        title={channel?.name}
+        brand={{
+          name: 'IPTV Link',
+          primaryColor: '#3b82f6'
+        }}
         onBack={handleBack}
-        onError={handleError}
-        autoPlay
-        lowLatency
       />
     </div>
   );
