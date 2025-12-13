@@ -157,20 +157,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify authentication using custom auth token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Verify authentication using custom auth token from X-Custom-Token header
+    const customToken = req.headers.get('X-Custom-Token');
+    if (!customToken) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized - No token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = customToken;
     
     // Validate token by checking profiles table with service role
     const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    
+
     // Decode JWT to get user_id (simple base64 decode of payload)
     let userId: string | null = null;
     try {
