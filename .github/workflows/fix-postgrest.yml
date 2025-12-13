@@ -69,48 +69,40 @@ jobs:
             
             # 5. Create missing roles if needed
             echo "🔧 [5/8] Criando roles ausentes (se necessário)..."
-            docker exec $DB_CONTAINER psql -U postgres -d postgres << 'SQLEOF'
-              -- Create roles if they don't exist
-              DO $$
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "
+              DO \$\$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
                   CREATE ROLE anon NOLOGIN;
-                  RAISE NOTICE 'Created role: anon';
                 END IF;
-                
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
                   CREATE ROLE authenticated NOLOGIN;
-                  RAISE NOTICE 'Created role: authenticated';
                 END IF;
-                
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
                   CREATE ROLE authenticator NOINHERIT LOGIN;
-                  RAISE NOTICE 'Created role: authenticator';
                 END IF;
-                
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
                   CREATE ROLE service_role NOLOGIN;
-                  RAISE NOTICE 'Created role: service_role';
                 END IF;
               END
-              $$;
-              
-              -- Grant roles
-              GRANT anon TO authenticator;
-              GRANT authenticated TO authenticator;
-              GRANT service_role TO authenticator;
-              
-              -- Grant usage on schema
-              GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-              GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-              GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-              GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-              
-              -- Set default privileges
-              ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-              ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-              ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
-SQLEOF
+              \$\$;
+            "
+            
+            # Grant roles
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT anon TO authenticator;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT authenticated TO authenticator;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT service_role TO authenticator;"
+            
+            # Grant schema permissions
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;"
+            
+            # Set default privileges
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;"
+            docker exec $DB_CONTAINER psql -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;"
             echo "  ✅ Roles configuradas"
             echo ""
             
