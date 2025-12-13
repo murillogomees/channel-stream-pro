@@ -18,61 +18,58 @@ jobs:
         run: |
           # Create kong.yml content
           cat <<'KONGEOF' > /tmp/kong.yml
-          _format_version: "2.1"
-          _transform: true
+_format_version: "2.1"
+_transform: true
 
-          services:
-            - name: rest-v1
-              url: http://supabase-rest:3000/
-              routes:
-                - name: rest-v1
-                  strip_path: true
-                  paths:
-                    - /rest/v1/
+services:
+  - name: rest-v1
+    url: http://supabase-rest:3000/
+    routes:
+      - name: rest-v1
+        strip_path: true
+        paths:
+          - /rest/v1/
 
-            - name: auth-v1
-              url: http://supabase-auth:9999/
-              routes:
-                - name: auth-v1
-                  strip_path: true
-                  paths:
-                    - /auth/v1/
+  - name: auth-v1
+    url: http://supabase-auth:9999/
+    routes:
+      - name: auth-v1
+        strip_path: true
+        paths:
+          - /auth/v1/
 
-            - name: storage-v1
-              url: http://supabase-storage:5000/
-              routes:
-                - name: storage-v1
-                  strip_path: true
-                  paths:
-                    - /storage/v1/
+  - name: storage-v1
+    url: http://supabase-storage:5000/
+    routes:
+      - name: storage-v1
+        strip_path: true
+        paths:
+          - /storage/v1/
 
-            - name: functions-v1
-              url: http://supabase-edge-functions:9000/
-              routes:
-                - name: functions-v1
-                  strip_path: true
-                  paths:
-                    - /functions/v1/
+  - name: functions-v1
+    url: http://supabase-edge-functions:9000/
+    routes:
+      - name: functions-v1
+        strip_path: true
+        paths:
+          - /functions/v1/
 
-            - name: realtime-v1
-              url: http://realtime-dev.supabase-realtime:4000/socket/
-              routes:
-                - name: realtime-v1
-                  strip_path: true
-                  paths:
-                    - /realtime/v1/
+  - name: realtime-v1
+    url: http://realtime-dev.supabase-realtime:4000/socket/
+    routes:
+      - name: realtime-v1
+        strip_path: true
+        paths:
+          - /realtime/v1/
 
-            - name: meta
-              url: http://supabase-meta:8080/
-              routes:
-                - name: meta
-                  strip_path: true
-                  paths:
-                    - /pg/
-          KONGEOF
-
-          # Remove leading spaces (heredoc adds them)
-          sed -i 's/^          //' /tmp/kong.yml
+  - name: meta
+    url: http://supabase-meta:8080/
+    routes:
+      - name: meta
+        strip_path: true
+        paths:
+          - /pg/
+KONGEOF
           
           echo "=== kong.yml content ==="
           cat /tmp/kong.yml
