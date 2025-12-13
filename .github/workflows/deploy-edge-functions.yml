@@ -120,6 +120,61 @@ jobs:
             echo "✅ Deploy complete!"
           ENDSSH
 
+      - name: Restart Edge Functions via Coolify API
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          EDGE_FUNCTIONS_UUID: ${{ secrets.EDGE_FUNCTIONS_UUID }}
+        run: |
+          echo "🔄 Restarting Edge Functions via Coolify API..."
+          
+          # Default Coolify URL if not set
+          API_URL="${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
+          
+          if [ -z "$COOLIFY_API_TOKEN" ]; then
+            echo "⚠️ COOLIFY_API_TOKEN not set, skipping API restart"
+            exit 0
+          fi
+          
+          # Get service UUID if not explicitly set
+          SERVICE_UUID="${EDGE_FUNCTIONS_UUID}"
+          
+          if [ -z "$SERVICE_UUID" ]; then
+            echo "🔍 Finding Edge Functions service UUID..."
+            SERVICES=$(curl -s -X GET "${API_URL}/api/v1/services" \
+              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              -H "Content-Type: application/json")
+            
+            # Try to find edge-runtime or functions service
+            SERVICE_UUID=$(echo "$SERVICES" | jq -r '.[] | select(.name | test("edge|function"; "i")) | .uuid' | head -1)
+          fi
+          
+          if [ -z "$SERVICE_UUID" ] || [ "$SERVICE_UUID" = "null" ]; then
+            echo "⚠️ Could not find Edge Functions service UUID"
+            echo "Falling back to Docker restart (already done in previous step)"
+            exit 0
+          fi
+          
+          echo "📡 Restarting service: $SERVICE_UUID"
+          
+          # Restart the service via Coolify API
+          RESPONSE=$(curl -s -X POST "${API_URL}/api/v1/services/${SERVICE_UUID}/restart" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json")
+          
+          echo "Response: $RESPONSE"
+          
+          # Check if restart was successful
+          if echo "$RESPONSE" | grep -qi "error"; then
+            echo "⚠️ Coolify API restart may have failed, but Docker restart was done"
+          else
+            echo "✅ Edge Functions service restart initiated via Coolify API"
+          fi
+          
+          # Wait for service to come back up
+          echo "⏳ Waiting for service to restart..."
+          sleep 15
+
       - name: Verify Deployment
         env:
           SUPABASE_URL: ${{ secrets.SELFHOSTED_SUPABASE_URL }}
@@ -142,3 +197,5 @@ jobs:
           # Check main router
           ROUTER_RESPONSE=$(curl -s "${CHECK_URL}/functions/v1/main" || echo "{}")
           echo "Router response: $ROUTER_RESPONSE"
+          
+          echo "✅ Deployment verification complete"
