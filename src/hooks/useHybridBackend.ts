@@ -1,5 +1,5 @@
 /**
- * Hook for Backend Operations - Self-Hosted Only
+ * Hook for Backend Operations - Supabase Cloud
  * Provides React-friendly interface for calling Edge Functions
  */
 
@@ -95,7 +95,7 @@ export function useBackendHealth() {
     health,
     checking,
     refresh,
-    isSelfHostedConfigured: true, // Always true - only self-hosted
+    isCloudConfigured: true,
     stats: getBackendStats(),
   };
 }
@@ -117,16 +117,16 @@ export function useHybridBackendInit() {
 }
 
 /**
- * Hook to check operation routing (always self-hosted)
+ * Hook to check operation routing (always Cloud)
  */
 export function useOperationRouting(_functionName: string) {
   const health = getHealthStatus();
   
   return {
-    isHeavy: true,
-    selfHostedConfigured: true,
-    selfHostedHealthy: health.healthy,
-    willUseSelfHosted: true,
-    currentBackend: 'selfhosted',
+    isHeavy: false,
+    cloudConfigured: true,
+    cloudHealthy: health.healthy,
+    willUseCloud: true,
+    currentBackend: 'cloud',
   };
 }
