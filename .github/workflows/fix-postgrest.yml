@@ -37,18 +37,9 @@ jobs:
               exit 1
             fi
             
-            # Get password from DB container
-            echo "🔑 Obtendo senha do PostgreSQL..."
-            POSTGRES_PASS=$(docker exec $DB_CONTAINER printenv POSTGRES_PASSWORD 2>/dev/null || echo "")
-            if [ -z "$POSTGRES_PASS" ]; then
-              POSTGRES_PASS=$(docker exec $DB_CONTAINER printenv PGPASSWORD 2>/dev/null || echo "")
-            fi
-            
-            if [ -z "$POSTGRES_PASS" ]; then
-              echo "❌ Não foi possível obter a senha do PostgreSQL"
-              exit 1
-            fi
-            echo "  ✅ Senha obtida (${#POSTGRES_PASS} chars)"
+            # Use the correct password
+            POSTGRES_PASS="p72qeBb4xpFYLvg8dggpeJW08Q4xgR9A"
+            echo "  ✅ Usando senha conhecida"
             
             # Create/update roles
             echo "👤 Criando/atualizando roles..."
