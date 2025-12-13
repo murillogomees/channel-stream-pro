@@ -35,28 +35,36 @@ export default function IPTVPlayer() {
     navigate('/app/home');
   };
 
-  // Get list of available URLs (proxy + origin fallback)
+  // Get list of available URLs (prioritize origin over proxy)
   const getStreamUrls = useCallback(() => {
     const urls: string[] = [];
-    
-    // Add CDN list URLs if available (ordered by priority)
+
+    // Add CDN list URLs if available, but prefer type "origin" first
     if (playbackInfo?.cdnList && Array.isArray(playbackInfo.cdnList)) {
-      const sortedCdns = [...playbackInfo.cdnList].sort((a, b) => (a.priority || 0) - (b.priority || 0));
-      sortedCdns.forEach(cdn => {
-        if (cdn.url) urls.push(cdn.url);
+      const sortedCdns = [...playbackInfo.cdnList].sort((a, b) => {
+        // Origin first, then others by priority
+        if (a.type === 'origin' && b.type !== 'origin') return -1;
+        if (a.type !== 'origin' && b.type === 'origin') return 1;
+        return (a.priority || 0) - (b.priority || 0);
+      });
+
+      sortedCdns.forEach((cdn) => {
+        if (cdn.url && !urls.includes(cdn.url)) {
+          urls.push(cdn.url);
+        }
       });
     }
-    
-    // Fallback to primary URL
+
+    // Fallback to primary playback URL (only if not already added)
     if (playbackInfo?.url && !urls.includes(playbackInfo.url)) {
-      urls.unshift(playbackInfo.url);
+      urls.push(playbackInfo.url);
     }
-    
+
     // Last resort: original channel URL
     if (channel?.original_url && !urls.includes(channel.original_url)) {
-      urls.push(channel.original_url);
+      urls.unshift(channel.original_url);
     }
-    
+
     return urls;
   }, [playbackInfo, channel]);
 
