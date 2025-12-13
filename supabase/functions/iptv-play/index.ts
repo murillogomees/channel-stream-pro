@@ -18,6 +18,8 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+// Prefer self-hosted service role key but fall back to default if needed
+const SERVICE_ROLE_KEY = Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const R2_CDN_URL = 'https://pub-iptvlink.r2.dev';
 
 // Metrics buffer for batch inserts
@@ -97,7 +99,12 @@ async function flushMetrics(): Promise<void> {
   lastFlushTime = Date.now();
   
   try {
-    const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    if (!SERVICE_ROLE_KEY) {
+      console.error('[iptv-play] Metrics flush skipped - missing service role key');
+      return;
+    }
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     
     // Aggregate metrics by channel_id
     const aggregated = new Map<number, number>();
@@ -169,7 +176,15 @@ Deno.serve(async (req) => {
     const token = customToken;
     
     // Validate token by checking profiles table with service role
-    const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    if (!SERVICE_ROLE_KEY) {
+      console.error('[iptv-play] No service role key configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error - missing service role key' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     // Decode JWT to get user_id (simple base64 decode of payload)
     let userId: string | null = null;
