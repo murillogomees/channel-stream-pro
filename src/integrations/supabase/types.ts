@@ -2673,6 +2673,9 @@ export type Database = {
           plano: string | null
           situacao: string | null
           theme: string | null
+          totp_enabled: boolean | null
+          totp_secret: string | null
+          totp_verified_at: string | null
           updated_at: string | null
           valor_pago: number | null
         }
@@ -2697,6 +2700,9 @@ export type Database = {
           plano?: string | null
           situacao?: string | null
           theme?: string | null
+          totp_enabled?: boolean | null
+          totp_secret?: string | null
+          totp_verified_at?: string | null
           updated_at?: string | null
           valor_pago?: number | null
         }
@@ -2721,6 +2727,9 @@ export type Database = {
           plano?: string | null
           situacao?: string | null
           theme?: string | null
+          totp_enabled?: boolean | null
+          totp_secret?: string | null
+          totp_verified_at?: string | null
           updated_at?: string | null
           valor_pago?: number | null
         }
