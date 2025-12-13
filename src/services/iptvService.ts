@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { customAuthService } from './customAuthService';
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 
 export interface IPTVChannel {
   id: number;
@@ -96,7 +97,6 @@ class CacheManager {
 }
 
 class IPTVService {
-  private baseUrl = import.meta.env.VITE_SUPABASE_URL;
   private cache = new CacheManager();
   
   // Cache TTLs
@@ -295,7 +295,7 @@ class IPTVService {
       }
 
       const response = await fetch(
-        `${this.baseUrl}/functions/v1/iptv-play?channelId=${channelId}`,
+        `${SUPABASE_FUNCTIONS_URL}/iptv-play?channelId=${channelId}`,
         {
           headers: {
             // Use custom header instead of Authorization to avoid Supabase JWT validation
@@ -382,7 +382,7 @@ class IPTVService {
       return null;
     }
 
-    let url = `${this.baseUrl}/functions/v1/iptv-playlist?type=m3u`;
+    let url = `${SUPABASE_FUNCTIONS_URL}/iptv-playlist?type=m3u`;
     if (playlistId) {
       url += `&playlistId=${playlistId}`;
     }
