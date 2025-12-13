@@ -15,7 +15,6 @@ const corsHeaders = {
 };
 
 const DB_BATCH_SIZE = 100;
-const MAX_CHANNELS = 50000;
 
 interface ParsedChannel {
   name: string;
@@ -93,8 +92,7 @@ serve(async (req) => {
 
     if (channels.length === 0) throw new Error('Nenhum canal encontrado no conteúdo M3U');
 
-    const channelsToImport = channels.slice(0, MAX_CHANNELS);
-    const total = channelsToImport.length;
+    const total = channels.length;
 
     // If streaming mode requested, use SSE
     if (stream) {
@@ -105,42 +103,55 @@ serve(async (req) => {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
           };
 
-          send({ type: 'start', total, limited: channels.length > MAX_CHANNELS });
+          send({ type: 'start', total });
 
           let inserted = 0;
           let skipped = 0;
 
-          for (let i = 0; i < channelsToImport.length; i += DB_BATCH_SIZE) {
-            const batch = channelsToImport.slice(i, i + DB_BATCH_SIZE);
-            const records = batch.map(ch => ({
-              name: ch.name,
-              slug: generateSlug(ch.name),
-              original_url: ch.url,
-              logo_url: ch.logo || null,
-              category: ch.group || null,
-              content_type: detectContentType(ch.url, ch.group),
-              is_healthy: true,
-              health_score: 100,
-              transcode_status: 'none',
-              shard_id: 0,
-              metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-            }));
-
-            const { error } = await supabase
+          for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
+            const batch = channels.slice(i, i + DB_BATCH_SIZE);
+            
+            // Check existing URLs to skip duplicates
+            const urls = batch.map(ch => ch.url);
+            const { data: existing } = await supabase
               .from('iptv_channels')
-              .upsert(records, { onConflict: 'slug', ignoreDuplicates: true });
+              .select('original_url')
+              .in('original_url', urls);
+            
+            const existingUrls = new Set((existing || []).map(e => e.original_url));
+            const newChannels = batch.filter(ch => !existingUrls.has(ch.url));
+            const batchSkipped = batch.length - newChannels.length;
+            skipped += batchSkipped;
+            
+            if (newChannels.length > 0) {
+              const records = newChannels.map(ch => ({
+                name: ch.name,
+                slug: generateSlug(ch.name),
+                original_url: ch.url,
+                logo_url: ch.logo || null,
+                category: ch.group || null,
+                content_type: detectContentType(ch.url, ch.group),
+                is_healthy: true,
+                health_score: 100,
+                transcode_status: 'none',
+                shard_id: 0,
+                metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
+              }));
 
-            if (error) {
-              for (const record of records) {
-                const { error: singleError } = await supabase.from('iptv_channels').insert(record);
-                if (singleError) {
-                  if (singleError.code === '23505') skipped++;
-                } else {
-                  inserted++;
+              const { error } = await supabase
+                .from('iptv_channels')
+                .insert(records);
+
+              if (error) {
+                // Fallback: insert one by one for any errors
+                for (const record of records) {
+                  const { error: singleError } = await supabase.from('iptv_channels').insert(record);
+                  if (!singleError) inserted++;
+                  else skipped++;
                 }
+              } else {
+                inserted += newChannels.length;
               }
-            } else {
-              inserted += batch.length;
             }
 
             const processed = Math.min(i + DB_BATCH_SIZE, total);
@@ -167,44 +178,54 @@ serve(async (req) => {
     let inserted = 0;
     let skipped = 0;
 
-    for (let i = 0; i < channelsToImport.length; i += DB_BATCH_SIZE) {
-      const batch = channelsToImport.slice(i, i + DB_BATCH_SIZE);
-      const records = batch.map(ch => ({
-        name: ch.name,
-        slug: generateSlug(ch.name),
-        original_url: ch.url,
-        logo_url: ch.logo || null,
-        category: ch.group || null,
-        content_type: detectContentType(ch.url, ch.group),
-        is_healthy: true,
-        health_score: 100,
-        transcode_status: 'none',
-        shard_id: 0,
-        metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-      }));
-
-      const { error } = await supabase
+    for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
+      const batch = channels.slice(i, i + DB_BATCH_SIZE);
+      
+      // Check existing URLs to skip duplicates
+      const urls = batch.map(ch => ch.url);
+      const { data: existing } = await supabase
         .from('iptv_channels')
-        .upsert(records, { onConflict: 'slug', ignoreDuplicates: true });
+        .select('original_url')
+        .in('original_url', urls);
+      
+      const existingUrls = new Set((existing || []).map(e => e.original_url));
+      const newChannels = batch.filter(ch => !existingUrls.has(ch.url));
+      skipped += batch.length - newChannels.length;
+      
+      if (newChannels.length > 0) {
+        const records = newChannels.map(ch => ({
+          name: ch.name,
+          slug: generateSlug(ch.name),
+          original_url: ch.url,
+          logo_url: ch.logo || null,
+          category: ch.group || null,
+          content_type: detectContentType(ch.url, ch.group),
+          is_healthy: true,
+          health_score: 100,
+          transcode_status: 'none',
+          shard_id: 0,
+          metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
+        }));
 
-      if (error) {
-        for (const record of records) {
-          const { error: singleError } = await supabase.from('iptv_channels').insert(record);
-          if (singleError) {
-            if (singleError.code === '23505') skipped++;
-          } else {
-            inserted++;
+        const { error } = await supabase
+          .from('iptv_channels')
+          .insert(records);
+
+        if (error) {
+          for (const record of records) {
+            const { error: singleError } = await supabase.from('iptv_channels').insert(record);
+            if (!singleError) inserted++;
+            else skipped++;
           }
+        } else {
+          inserted += newChannels.length;
         }
-      } else {
-        inserted += batch.length;
       }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, inserted, skipped, total: channels.length,
-        limited: channels.length > MAX_CHANNELS,
         message: `Importados ${inserted} canais${skipped > 0 ? ` (${skipped} duplicados)` : ''}`
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
