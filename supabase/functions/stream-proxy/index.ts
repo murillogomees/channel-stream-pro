@@ -400,20 +400,28 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 // HTTP FETCHING
 // =============================================================================
 
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers | undefined {
-  // CRITICAL FIX: For Xtream servers, return undefined to let Deno use default headers
-  // Many Xtream servers return 406 (Not Acceptable) for ANY custom headers
-  // The safest approach is to not set any headers at all
+function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers {
+  // Create headers with minimal but essential settings for Xtream compatibility
+  const headers = new Headers();
   
-  // Only add Range header if needed for seeking (this is universally accepted)
+  // CRITICAL: User-Agent is required by most Xtream servers
+  // VLC is universally accepted by all IPTV providers
+  headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
+  
+  // Accept all content types
+  headers.set('Accept', '*/*');
+  
+  // Add Range header if needed for seeking
   if (rangeHeader) {
-    const headers = new Headers();
     headers.set('Range', rangeHeader);
-    return headers;
   }
   
-  // Return undefined = no custom headers = Deno defaults
-  return undefined;
+  // Add origin as Referer for some servers that check it
+  if (origin) {
+    headers.set('Referer', origin + '/');
+  }
+  
+  return headers;
 }
 
 function getJitter(): number {
@@ -441,10 +449,8 @@ async function fetchWithRetry(
         redirect: 'follow',
       };
       
-      // Only add headers if provided (undefined = use Deno defaults)
-      if (headers) {
-        fetchOptions.headers = headers;
-      }
+      // Add headers (always provided now with VLC User-Agent)
+      fetchOptions.headers = headers;
       
       const response = await fetch(urlToFetch, fetchOptions);
       
@@ -658,12 +664,35 @@ async function handler(req: Request): Promise<Response> {
       const baseUrl = getBaseUrl(usedUrl);
       const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
       
+      // Debug: Log manifest content
+      console.log(`[Proxy] Manifest content length: ${manifestContent.length}`);
+      console.log(`[Proxy] Manifest preview: ${manifestContent.substring(0, 200)}`);
+      
+      // Check if manifest is empty or not valid HLS
+      if (!manifestContent || manifestContent.length === 0) {
+        console.error(`[Proxy] Empty manifest received from upstream`);
+        return new Response(
+          JSON.stringify({ error: 'Empty manifest from upstream' }),
+          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Validate HLS format
+      if (!manifestContent.includes('#EXTM3U')) {
+        console.error(`[Proxy] Invalid HLS manifest - missing #EXTM3U`);
+        console.log(`[Proxy] Full content: ${manifestContent}`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid HLS manifest format' }),
+          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl, decodedUrl);
       
       setCache(cacheKey, rewrittenManifest, 'application/vnd.apple.mpegurl', CONFIG.MANIFEST_CACHE_SECONDS);
       
       const duration = Date.now() - startTime;
-      console.log(`[Proxy] M3U served in ${duration}ms`);
+      console.log(`[Proxy] M3U served in ${duration}ms, size: ${rewrittenManifest.length}`);
       
       return new Response(rewrittenManifest, { status: 200, headers: responseHeaders });
     }
