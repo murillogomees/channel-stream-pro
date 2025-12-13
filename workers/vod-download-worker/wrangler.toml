@@ -1,0 +1,17 @@
+name = "vod-download-worker"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "iptvlink-cdn"
+
+[vars]
+CDN_BASE_URL = "https://vod.iptvlink.com.br"
+
+# Secrets (configure via wrangler secret put)
+# SUPABASE_URL
+# SUPABASE_SERVICE_ROLE_KEY
+# WORKER_SECRET
+# JWT_SECRET
