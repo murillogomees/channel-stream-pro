@@ -974,6 +974,576 @@ async function handleCustomAuth(req: Request): Promise<Response> {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
         
+      } else if (action === 'logout-all') {
+        // Logout from all devices
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Revoke all refresh tokens
+        await client.queryObject(`
+          UPDATE public.refresh_tokens
+          SET is_revoked = true, revoked_at = NOW(), revoked_reason = 'logout_all'
+          WHERE user_id = $1 AND is_revoked = false
+        `, [payload.sub]);
+        
+        // Deactivate all sessions
+        await client.queryObject(`
+          UPDATE public.user_sessions
+          SET is_active = false
+          WHERE user_id = $1
+        `, [payload.sub]);
+        
+        // Log event
+        await client.queryObject(`
+          INSERT INTO public.auth_sessions_log (user_id, event_type, ip_address)
+          VALUES ($1, 'logout_all', $2)
+        `, [payload.sub, ipAddress]);
+        
+        console.log(`[CustomAuth] Logout all for user: ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'get-sessions') {
+        // Get all active sessions for user
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        const currentSessionId = payload.session_id;
+        
+        const sessionsResult = await client.queryObject(`
+          SELECT id, device_info, ip_address, user_agent, is_active, last_activity, expires_at, created_at
+          FROM public.user_sessions
+          WHERE user_id = $1 AND is_active = true AND expires_at > NOW()
+          ORDER BY last_activity DESC
+        `, [payload.sub]);
+        
+        const sessions = (sessionsResult.rows as any[]).map(s => ({
+          ...s,
+          is_current: s.session_token === currentSessionId
+        }));
+        
+        return new Response(JSON.stringify({ sessions }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'revoke-session') {
+        const { session_id } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        await client.queryObject(`
+          UPDATE public.user_sessions
+          SET is_active = false
+          WHERE id = $1 AND user_id = $2
+        `, [session_id, payload.sub]);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'revoke-other-sessions') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        const currentSessionId = payload.session_id;
+        
+        // Revoke all sessions except current
+        await client.queryObject(`
+          UPDATE public.user_sessions
+          SET is_active = false
+          WHERE user_id = $1 AND session_token != $2
+        `, [payload.sub, currentSessionId]);
+        
+        // Revoke refresh tokens from other families
+        await client.queryObject(`
+          UPDATE public.refresh_tokens
+          SET is_revoked = true, revoked_at = NOW(), revoked_reason = 'revoke_other_sessions'
+          WHERE user_id = $1 AND is_revoked = false
+        `, [payload.sub]);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'request-password-reset') {
+        const { email: resetEmail, redirect_to } = await req.json();
+        
+        if (!resetEmail) {
+          return new Response(JSON.stringify({ error: 'Email required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check if user exists
+        const userResult = await client.queryObject(`
+          SELECT id, email FROM auth.users WHERE email = $1
+        `, [resetEmail.toLowerCase()]);
+        
+        if (userResult.rows.length === 0) {
+          // Don't reveal if user exists
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const resetUser = userResult.rows[0] as any;
+        
+        // Generate reset token
+        const resetToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+        
+        // Store token in confirmation_token field
+        await client.queryObject(`
+          UPDATE auth.users
+          SET confirmation_token = $1, confirmation_sent_at = NOW()
+          WHERE id = $2
+        `, [resetToken, resetUser.id]);
+        
+        // Log the event (in production, send email)
+        console.log(`[CustomAuth] Password reset requested for ${resetEmail}, token: ${resetToken}`);
+        
+        // TODO: Send email with reset link
+        // For now, log the reset URL
+        const resetUrl = `${redirect_to || SUPABASE_URL}/reset-password?token=${resetToken}`;
+        console.log(`[CustomAuth] Reset URL: ${resetUrl}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'confirm-password-reset') {
+        const { token: resetToken, new_password } = await req.json();
+        
+        if (!resetToken || !new_password) {
+          return new Response(JSON.stringify({ error: 'Token and new password required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Find user by reset token
+        const userResult = await client.queryObject(`
+          SELECT id, email, confirmation_sent_at
+          FROM auth.users
+          WHERE confirmation_token = $1
+        `, [resetToken]);
+        
+        if (userResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const resetUser = userResult.rows[0] as any;
+        
+        // Check if token is expired (1 hour)
+        const sentAt = new Date(resetUser.confirmation_sent_at);
+        if (Date.now() - sentAt.getTime() > 3600000) {
+          return new Response(JSON.stringify({ error: 'Token expired' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Update password and clear token
+        await client.queryObject(`
+          UPDATE auth.users
+          SET encrypted_password = crypt($1, gen_salt('bf', 6)),
+              confirmation_token = NULL,
+              updated_at = NOW()
+          WHERE id = $2
+        `, [new_password, resetUser.id]);
+        
+        // Revoke all sessions (security)
+        await client.queryObject(`
+          UPDATE public.refresh_tokens
+          SET is_revoked = true, revoked_at = NOW(), revoked_reason = 'password_reset'
+          WHERE user_id = $1
+        `, [resetUser.id]);
+        
+        await client.queryObject(`
+          UPDATE public.user_sessions
+          SET is_active = false
+          WHERE user_id = $1
+        `, [resetUser.id]);
+        
+        console.log(`[CustomAuth] Password reset completed for ${resetUser.email}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'update-password') {
+        const { new_password, current_password } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Verify current password if provided
+        if (current_password) {
+          const verifyResult = await client.queryObject(`
+            SELECT (encrypted_password = crypt($2, encrypted_password)) as valid
+            FROM auth.users WHERE id = $1
+          `, [payload.sub, current_password]);
+          
+          if (verifyResult.rows.length === 0 || !(verifyResult.rows[0] as any).valid) {
+            return new Response(JSON.stringify({ error: 'Current password is incorrect' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // Update password
+        await client.queryObject(`
+          UPDATE auth.users
+          SET encrypted_password = crypt($1, gen_salt('bf', 6)), updated_at = NOW()
+          WHERE id = $2
+        `, [new_password, payload.sub]);
+        
+        // Get updated user
+        const userResult = await client.queryObject(`
+          SELECT id, email, raw_user_meta_data FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        console.log(`[CustomAuth] Password updated for user: ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          user: userResult.rows[0]
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'verify-email') {
+        const { token: verifyToken } = await req.json();
+        
+        if (!verifyToken) {
+          return new Response(JSON.stringify({ error: 'Token required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Find user by confirmation token
+        const userResult = await client.queryObject(`
+          SELECT id, email FROM auth.users
+          WHERE confirmation_token = $1 AND email_confirmed_at IS NULL
+        `, [verifyToken]);
+        
+        if (userResult.rows.length === 0) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const verifyUser = userResult.rows[0] as any;
+        
+        // Confirm email
+        await client.queryObject(`
+          UPDATE auth.users
+          SET email_confirmed_at = NOW(), confirmation_token = NULL
+          WHERE id = $1
+        `, [verifyUser.id]);
+        
+        console.log(`[CustomAuth] Email verified for ${verifyUser.email}`);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          user: verifyUser
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'resend-verification') {
+        const { email: verifyEmail } = await req.json();
+        
+        if (!verifyEmail) {
+          return new Response(JSON.stringify({ error: 'Email required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Find user
+        const userResult = await client.queryObject(`
+          SELECT id, email FROM auth.users
+          WHERE email = $1 AND email_confirmed_at IS NULL
+        `, [verifyEmail.toLowerCase()]);
+        
+        if (userResult.rows.length === 0) {
+          // Don't reveal if user exists or is already verified
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const verifyUser = userResult.rows[0] as any;
+        
+        // Generate new token
+        const newToken = crypto.randomUUID();
+        
+        await client.queryObject(`
+          UPDATE auth.users
+          SET confirmation_token = $1, confirmation_sent_at = NOW()
+          WHERE id = $2
+        `, [newToken, verifyUser.id]);
+        
+        // TODO: Send email
+        console.log(`[CustomAuth] Verification email resent for ${verifyEmail}, token: ${newToken}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'enroll-mfa') {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Generate TOTP secret
+        const secret = Array.from(crypto.getRandomValues(new Uint8Array(20)))
+          .map(b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[b % 32])
+          .join('');
+        
+        // Store secret temporarily
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET totp_secret = $1, totp_enabled = false
+          WHERE id = $2
+        `, [secret, payload.sub]);
+        
+        // Generate QR code URL
+        const userResult = await client.queryObject(`
+          SELECT email FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        const userEmail = (userResult.rows[0] as any)?.email || 'user';
+        
+        const qrUrl = `otpauth://totp/IPTVLink:${userEmail}?secret=${secret}&issuer=IPTVLink`;
+        
+        return new Response(JSON.stringify({ 
+          secret,
+          qr_code: qrUrl
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'verify-mfa-enrollment') {
+        const { code } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !code) {
+          return new Response(JSON.stringify({ error: 'Token and code required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Get secret
+        const profileResult = await client.queryObject(`
+          SELECT totp_secret FROM public.profiles WHERE id = $1
+        `, [payload.sub]);
+        
+        if (profileResult.rows.length === 0 || !(profileResult.rows[0] as any).totp_secret) {
+          return new Response(JSON.stringify({ error: 'MFA not enrolled' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // TODO: Verify TOTP code
+        // For now, accept any 6-digit code for testing
+        if (!/^\d{6}$/.test(code)) {
+          return new Response(JSON.stringify({ error: 'Invalid code format' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Enable MFA
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET totp_enabled = true, totp_verified_at = NOW()
+          WHERE id = $1
+        `, [payload.sub]);
+        
+        console.log(`[CustomAuth] MFA enabled for user: ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'disable-mfa') {
+        const { code } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !code) {
+          return new Response(JSON.stringify({ error: 'Token and code required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // TODO: Verify TOTP code before disabling
+        if (!/^\d{6}$/.test(code)) {
+          return new Response(JSON.stringify({ error: 'Invalid code' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Disable MFA
+        await client.queryObject(`
+          UPDATE public.profiles
+          SET totp_enabled = false, totp_secret = NULL, totp_verified_at = NULL
+          WHERE id = $1
+        `, [payload.sub]);
+        
+        console.log(`[CustomAuth] MFA disabled for user: ${payload.sub}`);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } else if (action === 'update-user') {
+        const { email: newEmail, data: userData } = await req.json();
+        
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'No token provided' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const [, payloadBase64] = token.split('.');
+        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        
+        // Update auth.users if email changed
+        if (newEmail) {
+          await client.queryObject(`
+            UPDATE auth.users SET email = $1, updated_at = NOW() WHERE id = $2
+          `, [newEmail.toLowerCase(), payload.sub]);
+        }
+        
+        // Update profile if userData provided
+        if (userData) {
+          const updates: string[] = [];
+          const values: any[] = [];
+          let paramIndex = 1;
+          
+          if (userData.nome) {
+            updates.push(`nome = $${paramIndex++}`);
+            values.push(userData.nome);
+          }
+          if (userData.contact_phone) {
+            updates.push(`contact_phone = $${paramIndex++}`);
+            values.push(userData.contact_phone);
+          }
+          
+          if (updates.length > 0) {
+            values.push(payload.sub);
+            await client.queryObject(`
+              UPDATE public.profiles SET ${updates.join(', ')}, updated_at = NOW()
+              WHERE id = $${paramIndex}
+            `, values);
+          }
+        }
+        
+        // Get updated user
+        const userResult = await client.queryObject(`
+          SELECT id, email, raw_user_meta_data FROM auth.users WHERE id = $1
+        `, [payload.sub]);
+        
+        const profileResult = await client.queryObject(`
+          SELECT * FROM public.profiles WHERE id = $1
+        `, [payload.sub]);
+        
+        const roleResult = await client.queryObject(`
+          SELECT role FROM public.user_roles WHERE user_id = $1
+        `, [payload.sub]);
+        
+        const updatedUser = userResult.rows[0] as any;
+        const role = roleResult.rows.length > 0 ? (roleResult.rows[0] as any).role : 'client';
+        
+        return new Response(JSON.stringify({
+          user: {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            role,
+            user_metadata: updatedUser.raw_user_meta_data || {},
+            profile: profileResult.rows[0] || null
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
       } else {
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,

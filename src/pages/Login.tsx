@@ -267,15 +267,25 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remember-me"
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked === true)}
-            />
-            <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
-              Continuar conectado por 30 dias
-            </Label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
+                Continuar conectado por 30 dias
+              </Label>
+            </div>
+            <Button 
+              variant="link" 
+              type="button"
+              onClick={() => navigate('/forgot-password')}
+              className="text-xs text-primary hover:underline p-0 h-auto"
+            >
+              Esqueceu a senha?
+            </Button>
           </div>
 
           <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
