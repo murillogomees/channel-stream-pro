@@ -1,7 +1,6 @@
 /**
- * Hook for Hybrid Backend Operations
+ * Hook for Backend Operations - Self-Hosted Only
  * Provides React-friendly interface for calling Edge Functions
- * with intelligent routing between Cloud and Self-Hosted
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -11,12 +10,9 @@ import {
   checkBackendHealth,
   getBackendStats,
   initHybridBackend,
-  isHeavyOperation,
 } from '@/services/hybridBackendService';
-import { isSelfHostedConfigured } from '@/integrations/supabase/selfHostedClient';
 
 interface UseHybridFunctionOptions {
-  forceBackend?: 'cloud' | 'selfhosted';
   onSuccess?: (data: unknown) => void;
   onError?: (error: Error) => void;
 }
@@ -30,7 +26,7 @@ interface UseHybridFunctionResult<T> {
 }
 
 /**
- * Hook for calling Edge Functions with hybrid routing
+ * Hook for calling Edge Functions
  */
 export function useHybridFunction<T = unknown>(
   functionName: string,
@@ -46,9 +42,7 @@ export function useHybridFunction<T = unknown>(
     setError(null);
     
     try {
-      const result = await callHybridFunction<T>(functionName, body, {
-        forceBackend: options?.forceBackend,
-      });
+      const result = await callHybridFunction<T>(functionName, body);
       
       setData(result.data);
       setBackend(result.backend);
@@ -101,13 +95,13 @@ export function useBackendHealth() {
     health,
     checking,
     refresh,
-    isSelfHostedConfigured: isSelfHostedConfigured(),
+    isSelfHostedConfigured: true, // Always true - only self-hosted
     stats: getBackendStats(),
   };
 }
 
 /**
- * Hook for hybrid backend initialization
+ * Hook for backend initialization
  */
 export function useHybridBackendInit() {
   const [initialized, setInitialized] = useState(false);
@@ -123,20 +117,16 @@ export function useHybridBackendInit() {
 }
 
 /**
- * Hook to check if operation will go to self-hosted
+ * Hook to check operation routing (always self-hosted)
  */
-export function useOperationRouting(functionName: string) {
-  const isHeavy = isHeavyOperation(functionName);
-  const selfHostedConfigured = isSelfHostedConfigured();
+export function useOperationRouting(_functionName: string) {
   const health = getHealthStatus();
   
-  const willUseSelfHosted = isHeavy && selfHostedConfigured && health.selfHosted.healthy;
-  
   return {
-    isHeavy,
-    selfHostedConfigured,
-    selfHostedHealthy: health.selfHosted.healthy,
-    willUseSelfHosted,
-    currentBackend: willUseSelfHosted ? 'selfhosted' : 'cloud',
+    isHeavy: true,
+    selfHostedConfigured: true,
+    selfHostedHealthy: health.healthy,
+    willUseSelfHosted: true,
+    currentBackend: 'selfhosted',
   };
 }

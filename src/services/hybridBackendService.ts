@@ -1,20 +1,11 @@
 /**
- * Backend Service
- * Todas as operações vão para o Self-Hosted (único backend)
+ * Backend Service - Self-Hosted Only
+ * 
+ * Todas as operações vão exclusivamente para o Supabase Self-Hosted.
+ * URL: https://supabase.iptvlink.com.br
  */
 
 import { supabase, supabaseConfig, getFunctionUrl } from "@/integrations/supabase/client";
-
-// Operation categories (mantido para compatibilidade)
-type OperationType = 
-  | 'heavy-m3u'      // M3U processing, sync, generation
-  | 'heavy-stream'   // Stream proxy, transcoding
-  | 'heavy-cdn'      // CDN operations, bulk downloads
-  | 'light-auth'     // Authentication
-  | 'light-payment'  // MercadoPago operations
-  | 'light-notify'   // WhatsApp notifications
-  | 'light-db'       // Simple database queries
-  | 'auto';          // Auto-detect based on function name
 
 // Track backend health status
 interface BackendHealth {
@@ -33,32 +24,18 @@ let healthStatus: BackendHealth = {
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000;
 
 /**
- * Todas as operações vão para self-hosted (único backend)
- */
-export const isHeavyOperation = (_functionName: string): boolean => true;
-
-/**
- * Sempre retorna 'selfhosted' (único backend)
- */
-export const getBackendForOperation = (
-  _functionName: string,
-  _forceBackend?: 'cloud' | 'selfhosted'
-): 'selfhosted' => 'selfhosted';
-
-/**
- * Call Edge Function 
+ * Call Edge Function on Self-Hosted
  */
 export const callHybridFunction = async <T = unknown>(
   functionName: string,
   body?: Record<string, unknown>,
   _options?: {
-    forceBackend?: 'cloud' | 'selfhosted';
     timeout?: number;
   }
 ): Promise<{ data: T | null; error: Error | null; backend: string }> => {
   const startTime = performance.now();
   
-  console.log(`[Backend] Calling ${functionName}`);
+  console.log(`[Backend] Calling ${functionName} on self-hosted`);
   
   try {
     const { data, error } = await supabase.functions.invoke<T>(functionName, {
@@ -90,7 +67,7 @@ export const callHybridFunction = async <T = unknown>(
 /**
  * Health check
  */
-export const checkBackendHealth = async (): Promise<{ selfHosted: BackendHealth; cloud: BackendHealth }> => {
+export const checkBackendHealth = async (): Promise<BackendHealth> => {
   const now = Date.now();
   
   try {
@@ -106,7 +83,7 @@ export const checkBackendHealth = async (): Promise<{ selfHosted: BackendHealth;
   }
   
   console.log('[Backend] Health check:', healthStatus);
-  return { selfHosted: healthStatus, cloud: healthStatus };
+  return healthStatus;
 };
 
 /**
@@ -116,13 +93,13 @@ export const getHealthStatus = () => {
   if (Date.now() - healthStatus.lastCheck > HEALTH_CHECK_INTERVAL) {
     checkBackendHealth();
   }
-  return { selfHosted: healthStatus, cloud: healthStatus };
+  return healthStatus;
 };
 
 /**
  * Get backend URL
  */
-export const getBackendUrl = (_backend?: 'cloud' | 'selfhosted'): string => {
+export const getBackendUrl = (): string => {
   return supabaseConfig.url;
 };
 
@@ -130,7 +107,7 @@ export const getBackendUrl = (_backend?: 'cloud' | 'selfhosted'): string => {
  * Initialize backend
  */
 export const initHybridBackend = async (): Promise<void> => {
-  console.log('[Backend] Initializing...');
+  console.log('[Backend] Initializing Self-Hosted...');
   console.log('[Backend] URL:', supabaseConfig.url);
   
   await checkBackendHealth();
@@ -139,33 +116,21 @@ export const initHybridBackend = async (): Promise<void> => {
 
 // Statistics for monitoring
 interface BackendStats {
-  cloudCalls: number;
-  selfHostedCalls: number;
-  fallbacks: number;
-  avgCloudLatency: number;
-  avgSelfHostedLatency: number;
+  calls: number;
+  avgLatency: number;
 }
 
 let stats: BackendStats = {
-  cloudCalls: 0,
-  selfHostedCalls: 0,
-  fallbacks: 0,
-  avgCloudLatency: 0,
-  avgSelfHostedLatency: 0,
+  calls: 0,
+  avgLatency: 0,
 };
 
 export const getBackendStats = (): BackendStats => stats;
 
 export const resetBackendStats = (): void => {
-  stats = {
-    cloudCalls: 0,
-    selfHostedCalls: 0,
-    fallbacks: 0,
-    avgCloudLatency: 0,
-    avgSelfHostedLatency: 0,
-  };
+  stats = { calls: 0, avgLatency: 0 };
 };
 
-// Compatibilidade legada
+// Backward compatibility
 export const isSelfHostedConfigured = (): boolean => true;
 export const SELF_HOSTED_BASE_URL = supabaseConfig.url;

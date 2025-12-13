@@ -1,6 +1,6 @@
 /**
- * Hybrid Backend Dashboard
- * Monitors and manages Cloud + Self-Hosted backends
+ * Self-Hosted Backend Dashboard
+ * Monitors the Self-Hosted Supabase backend
  */
 
 import { useState } from "react";
@@ -11,14 +11,11 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Activity, 
-  Cloud, 
   Server, 
   RefreshCw, 
   Zap, 
-  AlertTriangle,
   CheckCircle2,
   XCircle,
-  ArrowRightLeft,
   Database,
   Cpu,
   HardDrive,
@@ -27,7 +24,7 @@ import { useBackendHealth } from "@/hooks/useHybridBackend";
 import { toast } from "sonner";
 
 export function HybridBackendDashboard() {
-  const { health, checking, refresh, isSelfHostedConfigured, stats } = useBackendHealth();
+  const { health, checking, refresh, stats } = useBackendHealth();
   const [activeTab, setActiveTab] = useState("overview");
 
   const handleRefresh = async () => {
@@ -53,11 +50,11 @@ export function HybridBackendDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <ArrowRightLeft className="h-6 w-6 text-primary" />
-            Backend Híbrido
+            <Server className="h-6 w-6 text-primary" />
+            Backend Self-Hosted
           </h2>
           <p className="text-muted-foreground">
-            Monitoramento Cloud + Self-Hosted
+            Supabase Self-Hosted • supabase.iptvlink.com.br
           </p>
         </div>
         <Button 
@@ -71,149 +68,77 @@ export function HybridBackendDashboard() {
         </Button>
       </div>
 
-      {/* Backend Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Lovable Cloud */}
-        <Card className={health.cloud.healthy ? 'border-green-500/50' : 'border-red-500/50'}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Cloud className="h-5 w-5 text-blue-500" />
-                Lovable Cloud
-              </CardTitle>
-              <Badge variant={health.cloud.healthy ? "default" : "destructive"}>
-                {health.cloud.healthy ? (
-                  <><CheckCircle2 className="h-3 w-3 mr-1" /> Online</>
-                ) : (
-                  <><XCircle className="h-3 w-3 mr-1" /> Offline</>
-                )}
-              </Badge>
-            </div>
-            <CardDescription>Operações leves (Auth, Pagamentos, Notificações)</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Latência:</span>
-              <span className="font-mono">{formatLatency(health.cloud.latency)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Último check:</span>
-              <span>{formatTime(health.cloud.lastCheck)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Chamadas:</span>
-              <span className="font-mono">{stats.cloudCalls}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Self-Hosted VPS */}
-        <Card className={
-          !isSelfHostedConfigured 
-            ? 'border-yellow-500/50' 
-            : health.selfHosted.healthy 
-              ? 'border-green-500/50' 
-              : 'border-red-500/50'
-        }>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Server className="h-5 w-5 text-purple-500" />
-                Self-Hosted VPS
-              </CardTitle>
-              {!isSelfHostedConfigured ? (
-                <Badge variant="outline" className="text-yellow-600">
-                  <AlertTriangle className="h-3 w-3 mr-1" /> Não Configurado
-                </Badge>
+      {/* Backend Status Card */}
+      <Card className={health.healthy ? 'border-green-500/50' : 'border-red-500/50'}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Server className="h-5 w-5 text-purple-500" />
+              Self-Hosted VPS
+            </CardTitle>
+            <Badge variant={health.healthy ? "default" : "destructive"}>
+              {health.healthy ? (
+                <><CheckCircle2 className="h-3 w-3 mr-1" /> Online</>
               ) : (
-                <Badge variant={health.selfHosted.healthy ? "default" : "destructive"}>
-                  {health.selfHosted.healthy ? (
-                    <><CheckCircle2 className="h-3 w-3 mr-1" /> Online</>
-                  ) : (
-                    <><XCircle className="h-3 w-3 mr-1" /> Offline</>
-                  )}
-                </Badge>
+                <><XCircle className="h-3 w-3 mr-1" /> Offline</>
               )}
-            </div>
-            <CardDescription>Operações pesadas (M3U, Streaming, CDN)</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isSelfHostedConfigured ? (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Latência:</span>
-                  <span className="font-mono">{formatLatency(health.selfHosted.latency)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Último check:</span>
-                  <span>{formatTime(health.selfHosted.lastCheck)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Chamadas:</span>
-                  <span className="font-mono">{stats.selfHostedCalls}</span>
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                Configure as variáveis de ambiente:
-                <code className="block mt-2 p-2 bg-muted rounded text-xs">
-                  VITE_SUPABASE_SELFHOSTED_URL<br/>
-                  VITE_SUPABASE_SELFHOSTED_KEY
-                </code>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </Badge>
+          </div>
+          <CardDescription>Todas as operações (Auth, DB, Storage, Edge Functions)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Latência:</span>
+            <span className="font-mono">{formatLatency(health.latency)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Último check:</span>
+            <span>{formatTime(health.lastCheck)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Chamadas:</span>
+            <span className="font-mono">{stats.calls}</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="routing">Roteamento</TabsTrigger>
+          <TabsTrigger value="functions">Edge Functions</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Cloud className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm text-muted-foreground">Cloud Calls</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.cloudCalls}</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Server className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm text-muted-foreground">Self-Hosted Calls</span>
+                  <span className="text-sm text-muted-foreground">Total Calls</span>
                 </div>
-                <p className="text-2xl font-bold mt-2">{stats.selfHostedCalls}</p>
+                <p className="text-2xl font-bold mt-2">{stats.calls}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
-                  <ArrowRightLeft className="h-4 w-4 text-orange-500" />
-                  <span className="text-sm text-muted-foreground">Fallbacks</span>
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm text-muted-foreground">Latência Média</span>
                 </div>
-                <p className="text-2xl font-bold mt-2">{stats.fallbacks}</p>
+                <p className="text-2xl font-bold mt-2">{formatLatency(stats.avgLatency)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-green-500" />
-                  <span className="text-sm text-muted-foreground">Eficiência</span>
+                  <span className="text-sm text-muted-foreground">Status</span>
                 </div>
                 <p className="text-2xl font-bold mt-2">
-                  {stats.cloudCalls + stats.selfHostedCalls > 0
-                    ? Math.round((stats.selfHostedCalls / (stats.cloudCalls + stats.selfHostedCalls)) * 100)
-                    : 0}%
+                  {health.healthy ? '100%' : '0%'}
                 </p>
               </CardContent>
             </Card>
@@ -222,78 +147,58 @@ export function HybridBackendDashboard() {
           {/* Architecture Diagram */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Arquitetura Híbrida</CardTitle>
+              <CardTitle className="text-lg">Arquitetura Self-Hosted</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row items-center justify-around gap-4 p-4 bg-muted/50 rounded-lg">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto">
-                    <Cloud className="h-8 w-8 text-blue-500" />
-                  </div>
-                  <p className="mt-2 font-medium">Lovable Cloud</p>
-                  <p className="text-xs text-muted-foreground">Auth, Pagamentos</p>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <ArrowRightLeft className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Roteamento Inteligente</span>
-                </div>
-                
-                <div className="text-center">
                   <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto">
                     <Server className="h-8 w-8 text-purple-500" />
                   </div>
-                  <p className="mt-2 font-medium">Self-Hosted VPS</p>
-                  <p className="text-xs text-muted-foreground">M3U, Streaming</p>
+                  <p className="mt-2 font-medium">Supabase Self-Hosted</p>
+                  <p className="text-xs text-muted-foreground">supabase.iptvlink.com.br</p>
+                </div>
+                
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto">
+                    <Database className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <p className="mt-2 font-medium">PostgreSQL</p>
+                  <p className="text-xs text-muted-foreground">Database</p>
+                </div>
+
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
+                    <Zap className="h-8 w-8 text-green-500" />
+                  </div>
+                  <p className="mt-2 font-medium">Edge Runtime</p>
+                  <p className="text-xs text-muted-foreground">Functions</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="routing" className="space-y-4">
+        <TabsContent value="functions" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Regras de Roteamento</CardTitle>
-              <CardDescription>Funções e seus backends designados</CardDescription>
+              <CardTitle className="text-lg">Edge Functions Disponíveis</CardTitle>
+              <CardDescription>Todas as funções deployadas no Self-Hosted</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium flex items-center gap-2 mb-2">
-                    <Server className="h-4 w-4 text-purple-500" />
-                    Self-Hosted (Operações Pesadas)
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'fetch-m3u', 'm3u-sync', 'generate-m3u-from-sync',
-                      'stream-proxy', 'transcode-processor', 'cdn-bulk-downloader',
-                      'iptv-m3u-generator', 'r2-migration-worker'
-                    ].map(fn => (
-                      <Badge key={fn} variant="secondary" className="font-mono text-xs">
-                        {fn}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium flex items-center gap-2 mb-2">
-                    <Cloud className="h-4 w-4 text-blue-500" />
-                    Lovable Cloud (Operações Leves)
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'mercado-pago-checkout', 'mercado-pago-webhook',
-                      'whatsapp-webhook', 'create-admin-user', 'list-users',
-                      'generate-totp-secret', 'verify-totp-token'
-                    ].map(fn => (
-                      <Badge key={fn} variant="outline" className="font-mono text-xs">
-                        {fn}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'fetch-m3u', 'm3u-sync', 'generate-m3u-from-sync',
+                  'stream-proxy', 'iptv-transcode', 'iptv-redis-cache',
+                  'mercado-pago-checkout', 'mercado-pago-webhook',
+                  'whatsapp-webhook', 'create-admin-user', 'list-users',
+                  'generate-totp-secret', 'verify-totp-token', 'health-check',
+                  'custom-auth', 'scheduled-backup', 'cleanup-old-logs'
+                ].map(fn => (
+                  <Badge key={fn} variant="secondary" className="font-mono text-xs">
+                    {fn}
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -337,23 +242,16 @@ export function HybridBackendDashboard() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Activity className="h-5 w-5" />
-                  Latência Média
+                  Latência por Serviço
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Cloud className="h-4 w-4 text-blue-500" />
-                    <span>Cloud</span>
-                  </div>
-                  <span className="font-mono">{formatLatency(stats.avgCloudLatency)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-purple-500" />
-                    <span>Self-Hosted</span>
+                    <span>Edge Functions</span>
                   </div>
-                  <span className="font-mono">{formatLatency(stats.avgSelfHostedLatency)}</span>
+                  <span className="font-mono">{formatLatency(stats.avgLatency)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -365,9 +263,9 @@ export function HybridBackendDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <HardDrive className="h-4 w-4 text-orange-500" />
-                    <span>Redis Cache</span>
+                    <span>Storage</span>
                   </div>
-                  <span className="font-mono">~2ms</span>
+                  <span className="font-mono">~50ms</span>
                 </div>
               </CardContent>
             </Card>

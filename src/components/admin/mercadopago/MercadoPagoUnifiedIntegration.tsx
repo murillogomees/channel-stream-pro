@@ -444,8 +444,8 @@ export function MercadoPagoUnifiedIntegration() {
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium mb-2">Como configurar Secrets</h4>
                 <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Acesse o painel do Lovable Cloud</li>
-                  <li>Vá em Secrets</li>
+                  <li>Acesse o Coolify Dashboard</li>
+                  <li>Vá em Services → Edge Runtime → Environment</li>
                   <li>Adicione MERCADO_PAGO_ACCESS_TOKEN com seu token de produção</li>
                   <li>Opcionalmente, adicione MERCADO_PAGO_WEBHOOK_SECRET</li>
                 </ol>
