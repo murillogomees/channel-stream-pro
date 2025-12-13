@@ -144,11 +144,12 @@ export function IPTVSeriesTab() {
       if (!data) return 0;
       
       // Exclude categories that are not eligible for series detection
+      // Note: removed 'reality' since many series (documentaries, etc.) are in reality category
       const excludedPatterns = [
         'filme', 'filmes', 'movie', 'movies', 'film', 'cinema', 'lançamento', 'lancamento',
         'aberto', '24 h', '24h', 'canais', 'canal', 'tv ', ' tv', 'ao vivo', 'aovivo', 'live',
         'esporte', 'sport', 'futebol', 'football', 'news', 'noticia', 'jornalismo',
-        'fhd', 'premiere', 'reality', 'pay per view', 'ppv', 'pay-per-view',
+        'fhd', 'premiere', 'pay per view', 'ppv', 'pay-per-view',
         'combate', 'ufc', 'luta', 'boxe',
         'adulto', 'adult', 'xxx', '18+', '+18'
       ];
