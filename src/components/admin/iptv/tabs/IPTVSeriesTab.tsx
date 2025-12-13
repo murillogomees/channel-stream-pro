@@ -114,17 +114,35 @@ export function IPTVSeriesTab() {
     },
   });
 
-  // Fetch non-organized channels (potential series)
+  // Fetch non-organized channels (potential series - only in eligible categories)
   const { data: unorganizedCount } = useQuery({
     queryKey: ['iptv-unorganized-count'],
     queryFn: async () => {
-      const { count, error } = await supabase
+      // Get all channels that haven't been processed yet and are in eligible categories
+      const { data, error } = await supabase
         .from('iptv_channels')
-        .select('*', { count: 'exact', head: true })
+        .select('id, category', { count: 'exact' })
         .or('is_series.is.null,is_series.eq.false')
         .is('series_name', null);
+      
       if (error) throw error;
-      return count || 0;
+      if (!data) return 0;
+      
+      // Exclude categories that are not eligible for series detection
+      const excludedPatterns = [
+        'filme', 'filmes', 'movie', 'movies', 'film', 'cinema', 'lançamento', 'lancamento',
+        'aberto', '24 h', '24h', 'canais', 'canal', 'tv ', ' tv', 'ao vivo', 'aovivo', 'live',
+        'esporte', 'sport', 'futebol', 'football', 'news', 'noticia', 'jornalismo',
+        'adulto', 'adult', 'xxx', '18+', '+18'
+      ];
+      
+      const eligibleChannels = data.filter(channel => {
+        if (!channel.category) return true; // Null category is eligible
+        const catLower = channel.category.toLowerCase();
+        return !excludedPatterns.some(pattern => catLower.includes(pattern));
+      });
+      
+      return eligibleChannels.length;
     },
   });
 
