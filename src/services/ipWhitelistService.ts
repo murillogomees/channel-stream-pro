@@ -1,12 +1,9 @@
 /**
  * IP Whitelist Service - Simplified
  * Uses ip_whitelist table (existing schema only)
- * 
- * USES CUSTOM AUTH - GoTrue removed
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { authHelper } from './authHelper';
 
 export interface IPWhitelist {
   id: string;
@@ -45,14 +42,14 @@ export const ipWhitelistService = {
    */
   async addToWhitelist(ipAddress: string, description?: string): Promise<boolean> {
     try {
-      const userId = authHelper.getUserId();
+      const { data: { user } } = await supabase.auth.getUser();
       
       const { error } = await supabase
         .from('ip_whitelist')
         .insert({
           ip_address: ipAddress,
           description: description || null,
-          added_by: userId,
+          added_by: user?.id || null,
           is_active: true,
         });
 

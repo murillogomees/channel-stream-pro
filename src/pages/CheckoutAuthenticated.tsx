@@ -8,8 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionPlans, SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
 import { useCoupons, Coupon } from "@/hooks/useCoupons";
-import { supabase } from "@/lib/supabase";
-import { authHelper, getAuthHeaders } from "@/services/authHelper";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -183,15 +182,6 @@ export default function CheckoutAuthenticated() {
 
     setIsProcessing(true);
     try {
-      // Get auth headers for custom auth
-      const headers = await getAuthHeaders();
-      
-      if (!headers['Authorization']) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        navigate("/login");
-        return;
-      }
-
       const response = await supabase.functions.invoke("mercado-pago-checkout", {
         body: {
           plan_id: selectedPlanId,
