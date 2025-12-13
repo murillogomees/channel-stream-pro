@@ -57,7 +57,8 @@ export const OptimizedImage = memo(function OptimizedImage({
           src={src}
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : 'auto'}
+          // @ts-ignore - fetchpriority is valid HTML attribute
+          fetchpriority={priority ? 'high' : 'auto'}
           decoding={priority ? 'sync' : 'async'}
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('error')}
