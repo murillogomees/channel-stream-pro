@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { ResponsivePageHeader } from '@/components/admin/ResponsivePageHeader';
 import { Button } from '@/components/ui/button';
@@ -122,8 +123,7 @@ export default function AdminIPTVPlaylists() {
   });
 
   const getM3UUrl = (playlist: Playlist) => {
-    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-    return `${baseUrl}/functions/v1/iptv-m3u-generator?playlist_id=${playlist.id}`;
+    return `${SUPABASE_FUNCTIONS_URL}/iptv-m3u-generator?playlist_id=${playlist.id}`;
   };
 
   const copyM3UUrl = (playlist: Playlist) => {

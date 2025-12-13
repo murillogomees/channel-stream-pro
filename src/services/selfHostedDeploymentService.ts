@@ -28,6 +28,8 @@ export interface SecretsStatus {
   all_configured: boolean;
 }
 
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
+
 export interface MigrationTableCounts {
   [tableName: string]: number;
 }
@@ -36,8 +38,8 @@ class SelfHostedDeploymentService {
   private cloudFunctionsUrl: string;
 
   constructor() {
-    // Use Cloud functions to manage self-hosted deployment
-    this.cloudFunctionsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+    // Use self-hosted functions directly
+    this.cloudFunctionsUrl = `${SUPABASE_FUNCTIONS_URL}`;
   }
 
   /**

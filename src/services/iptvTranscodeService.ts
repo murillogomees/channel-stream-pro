@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 
 // Types
 export interface TranscodeJob {
@@ -48,7 +49,7 @@ export interface ProbeResult {
 }
 
 class IPTVTranscodeService {
-  private baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  private baseUrl = `${SUPABASE_FUNCTIONS_URL}`;
 
   private async invokeFunction<T>(
     functionName: string,

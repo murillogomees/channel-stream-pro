@@ -7,7 +7,7 @@
  * - Live streams: Through CDN Router or direct
  */
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+import { SUPABASE_URL } from '@/config/supabase';
 
 export interface StreamResolution {
   url: string;
