@@ -7,66 +7,74 @@ jobs:
   fix-kong:
     runs-on: ubuntu-latest
     steps:
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Install sshpass and Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
 
       - name: Create kong.yml file
         run: |
-          echo '_format_version: "2.1"' > /tmp/kong.yml
-          echo '_transform: true' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo 'services:' >> /tmp/kong.yml
-          echo '  - name: rest-v1' >> /tmp/kong.yml
-          echo '    url: http://supabase-rest:3000/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: rest-v1' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /rest/v1/' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo '  - name: auth-v1' >> /tmp/kong.yml
-          echo '    url: http://supabase-auth:9999/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: auth-v1' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /auth/v1/' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo '  - name: storage-v1' >> /tmp/kong.yml
-          echo '    url: http://supabase-storage:5000/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: storage-v1' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /storage/v1/' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo '  - name: functions-v1' >> /tmp/kong.yml
-          echo '    url: http://supabase-edge-functions:9000/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: functions-v1' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /functions/v1/' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo '  - name: realtime-v1' >> /tmp/kong.yml
-          echo '    url: http://realtime-dev.supabase-realtime:4000/socket/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: realtime-v1' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /realtime/v1/' >> /tmp/kong.yml
-          echo '' >> /tmp/kong.yml
-          echo '  - name: meta' >> /tmp/kong.yml
-          echo '    url: http://supabase-meta:8080/' >> /tmp/kong.yml
-          echo '    routes:' >> /tmp/kong.yml
-          echo '      - name: meta' >> /tmp/kong.yml
-          echo '        strip_path: true' >> /tmp/kong.yml
-          echo '        paths:' >> /tmp/kong.yml
-          echo '          - /pg/' >> /tmp/kong.yml
-          
-          echo "=== kong.yml content ==="
+          cat > /tmp/kong.yml << 'EOF'
+_format_version: "1.1"
+_transform: true
+
+services:
+  - name: rest-v1
+    url: http://supabase-rest:3000/
+    routes:
+      - name: rest-v1
+        strip_path: true
+        paths:
+          - /rest/v1/
+
+  - name: auth-v1
+    url: http://supabase-auth:9999/
+    routes:
+      - name: auth-v1
+        strip_path: true
+        paths:
+          - /auth/v1/
+
+  - name: storage-v1
+    url: http://supabase-storage:5000/
+    routes:
+      - name: storage-v1
+        strip_path: true
+        paths:
+          - /storage/v1/
+
+  - name: functions-v1
+    url: http://supabase-edge-functions:9000/
+    routes:
+      - name: functions-v1
+        strip_path: true
+        paths:
+          - /functions/v1/
+
+  - name: realtime-v1
+    url: http://realtime-dev.supabase-realtime:4000/socket/
+    routes:
+      - name: realtime-v1
+        strip_path: true
+        paths:
+          - /realtime/v1/
+
+  - name: meta
+    url: http://supabase-meta:8080/
+    routes:
+      - name: meta
+        strip_path: true
+        paths:
+          - /pg/
+EOF
+
+          echo "=== kong.yml content (local) ==="
           cat /tmp/kong.yml
-          echo "========================"
+          echo "================================"
+
+      - name: Validate kong.yml syntax with Kong image
+        run: |
+          docker run --rm -v /tmp/kong.yml:/kong.yml kong:2.8.1 kong config parse /kong.yml
 
       - name: Deploy kong.yml to VPS
         env:
@@ -76,7 +84,7 @@ jobs:
         run: |
           sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
 
-      - name: Configure Kong container
+      - name: Apply configuration in Kong container
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -84,64 +92,44 @@ jobs:
         run: |
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
             set -e
-            
+
             echo "=== Finding Kong container ==="
             KONG_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -i kong | head -1)
             echo "Kong container: $KONG_CONTAINER"
-            
+
             if [ -z "$KONG_CONTAINER" ]; then
               echo "ERROR: Kong container not found!"
               exit 1
             fi
-            
-            echo "=== Stopping Kong container ==="
+
+            echo "=== Stopping Kong container (if running) ==="
             docker stop $KONG_CONTAINER || true
-            sleep 2
-            
-            echo "=== Copying kong.yml to container ==="
-            docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml
+            sleep 3
+
+            echo "=== Copying kong.yml into container ==="
             docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
-            
+            docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml || true
+
             echo "=== Starting Kong container ==="
             docker start $KONG_CONTAINER
-            sleep 3
-            
-            echo "=== Setting permissions ==="
-            docker exec $KONG_CONTAINER chmod 644 /home/kong/kong.yml || true
-            docker exec $KONG_CONTAINER chmod 644 /usr/local/kong/declarative/kong.yml || true
-            
-            echo "=== Validating kong.yml inside container ==="
-            docker exec $KONG_CONTAINER cat /home/kong/kong.yml
-            
-            echo "=== Restarting Kong ==="
-            docker restart $KONG_CONTAINER
-            
-            echo "=== Waiting for Kong to start ==="
-            sleep 10
-            
+
+            echo "=== Waiting for Kong to initialize ==="
+            sleep 15
+
             echo "=== Kong status ==="
             docker ps | grep -i kong || true
-            
-            echo "=== Kong logs (last 30 lines) ==="
-            docker logs $KONG_CONTAINER --tail 30 2>&1 || true
+
+            echo "=== Kong logs (last 40 lines) ==="
+            docker logs $KONG_CONTAINER --tail 40 2>&1 || true
           ENDSSH
 
-      - name: Verify Kong is running
+      - name: Final verification
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
-          sleep 5
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
-            echo "=== Final Kong status ==="
-            docker ps | grep -i kong
-            
-            KONG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i kong | head -1)
-            if [ -n "$KONG_CONTAINER" ]; then
-              echo "SUCCESS: Kong is running!"
-              docker logs $KONG_CONTAINER --tail 10 2>&1
-            else
-              echo "WARNING: Kong may still be restarting. Check Coolify dashboard."
-            fi
+            echo "=== Final Kong containers ==="
+            docker ps | grep -i kong || true
           ENDSSH
