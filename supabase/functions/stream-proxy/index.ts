@@ -328,8 +328,35 @@ function isKeyFile(url: string): boolean {
 // HLS MANIFEST REWRITING
 // =============================================================================
 
-function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string): string {
+// Extract Xtream credentials from URL pattern: /live/username/password/channelid.m3u8
+function extractXtreamCredentials(url: string): { username: string; password: string; host: string } | null {
+  try {
+    const urlObj = new URL(url);
+    const pathMatch = urlObj.pathname.match(/\/live\/([^\/]+)\/([^\/]+)\/\d+\.m3u8/);
+    if (pathMatch) {
+      return {
+        username: pathMatch[1],
+        password: pathMatch[2],
+        host: urlObj.origin
+      };
+    }
+  } catch {
+    // Not a valid URL
+  }
+  return null;
+}
+
+// Rewrite segment URL to use Xtream credentials format if available
+function rewriteSegmentUrl(segmentUrl: string, credentials: { username: string; password: string; host: string } | null): string {
+  // If we have Xtream credentials and the segment is from /hls/ path (token-based)
+  // We need to keep the original URL as-is because Xtream servers validate the session token
+  // The token in /hls/{token}/{segment}.ts is tied to the original .m3u8 request session
+  return segmentUrl;
+}
+
+function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: string, originalUrl: string): string {
   const lines = content.split('\n');
+  const credentials = extractXtreamCredentials(originalUrl);
   
   return lines.map(line => {
     const trimmedLine = line.trim();
@@ -341,13 +368,15 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
     if (trimmedLine.includes('URI="')) {
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
         const fullUrl = resolveUrl(uri, baseUrl);
-        return `URI="${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}"`;
+        const finalUrl = rewriteSegmentUrl(fullUrl, credentials);
+        return `URI="${proxyBaseUrl}?url=${encodeURIComponent(finalUrl)}"`;
       });
     }
     
     if (!trimmedLine.startsWith('#')) {
       const fullUrl = resolveUrl(trimmedLine, baseUrl);
-      return `${proxyBaseUrl}?url=${encodeURIComponent(fullUrl)}`;
+      const finalUrl = rewriteSegmentUrl(fullUrl, credentials);
+      return `${proxyBaseUrl}?url=${encodeURIComponent(finalUrl)}`;
     }
     
     return line;
@@ -358,16 +387,20 @@ function rewriteHlsManifest(content: string, baseUrl: string, proxyBaseUrl: stri
 // HTTP FETCHING
 // =============================================================================
 
-function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false): Headers {
+function createUpstreamHeaders(origin: string, rangeHeader: string | null, acceptEncoding: string | null, isLiveStream: boolean = false, isSegment: boolean = false, originalStreamUrl: string | null = null): Headers {
   const headers = new Headers();
   
-  // For Xtream live streams AND segments, use minimal headers to avoid 403/405 errors
-  // Many Xtream servers reject requests with certain headers or require specific User-Agent
+  // For Xtream live streams AND segments, use minimal headers with proper Referer
+  // Many Xtream servers validate the Referer to match the original stream request
   if (isLiveStream || isSegment) {
     headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
     headers.set('Accept', '*/*');
     headers.set('Connection', 'keep-alive');
-    // Don't set Origin/Referer/Accept-Encoding for live streams and segments
+    
+    // For segments, set Referer to the origin to help with session validation
+    if (isSegment && origin) {
+      headers.set('Referer', `${origin}/`);
+    }
   } else {
     headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     headers.set('Accept', '*/*');
@@ -626,7 +659,7 @@ async function handler(req: Request): Promise<Response> {
       const baseUrl = getBaseUrl(usedUrl);
       const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
       
-      const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl);
+      const rewrittenManifest = rewriteHlsManifest(manifestContent, baseUrl, proxyBaseUrl, decodedUrl);
       
       setCache(cacheKey, rewrittenManifest, 'application/vnd.apple.mpegurl', CONFIG.MANIFEST_CACHE_SECONDS);
       
