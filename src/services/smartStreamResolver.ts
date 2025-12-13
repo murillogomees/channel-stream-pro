@@ -4,7 +4,9 @@
  * Determines the optimal way to play video content:
  * - VOD (movies, series): Direct URL (no proxy)
  * - HLS manifests: Through proxy for URL rewriting
- * - Live streams: Through CDN Router or direct
+ * - Live streams: Through stream-proxy for HTTP URLs
+ * 
+ * Uses Supabase Cloud for edge functions.
  */
 
 import { SUPABASE_URL } from '@/config/supabase';
@@ -27,7 +29,6 @@ function isVodContent(url: string): boolean {
          urlLower.includes('.mp4') ||
          urlLower.includes('.mkv') ||
          urlLower.includes('.avi') ||
-         urlLower.includes('.ts') ||
          urlLower.includes('.webm');
 }
 
@@ -47,6 +48,13 @@ function isDirectLiveStream(url: string): boolean {
   // Pattern: /live/user/pass/123 or /user/pass/123
   const xtreamPattern = /\/(?:live\/)?[^\/]+\/[^\/]+\/\d+$/;
   return xtreamPattern.test(urlLower) && !isHlsManifest(urlLower);
+}
+
+/**
+ * Check if URL is HTTP (needs proxy for HTTPS pages)
+ */
+function isHttpUrl(url: string): boolean {
+  return url.startsWith('http://');
 }
 
 /**
@@ -78,19 +86,29 @@ function extractOriginalUrl(url: string): string {
  * Resolve the optimal streaming URL for given content
  * 
  * Strategy:
+ * - HTTP URLs: Always use proxy (Mixed Content policy)
  * - VOD content: Use direct URL (Edge Functions timeout on large files)
  * - HLS manifests: Use proxy for URL rewriting (manifests are small/fast)
- * - Live streams: Direct or CDN Router
+ * - Live streams: Direct or CDN Router for HTTPS, proxy for HTTP
  */
 export function resolveStreamUrl(originalUrl: string): StreamResolution {
   const url = extractOriginalUrl(originalUrl);
   
-  // ALWAYS use direct URL for everything except HLS manifests
-  // Edge Functions have timeout limits that break video streaming
+  // HTTP URLs MUST use proxy for Mixed Content compliance
+  if (isHttpUrl(url)) {
+    console.log('[SmartResolver] HTTP URL - using stream-proxy');
+    const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
+    return {
+      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
+      type: 'proxy',
+      contentType,
+      fallbackUrl: url, // Keep original as fallback (for native apps)
+    };
+  }
   
-  // HLS manifest ONLY - use proxy for URL rewriting (manifests are tiny)
+  // HLS manifest with HTTPS - use proxy for URL rewriting (manifests are tiny)
   if (isHlsManifest(url) && !isVodContent(url)) {
-    console.log('[SmartResolver] HLS manifest only, using proxy');
+    console.log('[SmartResolver] HLS manifest, using proxy for URL rewriting');
     return {
       url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
       type: 'proxy',
@@ -99,9 +117,9 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
     };
   }
   
-  // EVERYTHING ELSE - direct URL (VOD, live, unknown)
+  // HTTPS URLs - direct access
   const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
-  console.log(`[SmartResolver] Using direct URL for ${contentType}`);
+  console.log(`[SmartResolver] Using direct URL for ${contentType} (HTTPS)`);
   return {
     url: url,
     type: 'direct',
@@ -123,4 +141,12 @@ export function getFallbackUrl(resolution: StreamResolution): string | undefined
   }
   
   return undefined;
+}
+
+/**
+ * Get optimized stream URL - convenience wrapper
+ */
+export function getOptimizedStreamUrl(originalUrl: string): string {
+  const resolution = resolveStreamUrl(originalUrl);
+  return resolution.url;
 }

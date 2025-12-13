@@ -2080,6 +2080,90 @@ export type Database = {
           },
         ]
       }
+      m3u_sources: {
+        Row: {
+          created_at: string | null
+          entry_count: number | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          name: string
+          source_type: string | null
+          sync_status: string | null
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entry_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          name: string
+          source_type?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entry_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          name?: string
+          source_type?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
+      m3u_sync_entries: {
+        Row: {
+          created_at: string | null
+          group_title: string | null
+          id: string
+          is_active: boolean | null
+          source_id: string | null
+          stream_type: string | null
+          stream_url: string
+          title: string
+          tvg_id: string | null
+          tvg_logo: string | null
+          tvg_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          group_title?: string | null
+          id?: string
+          is_active?: boolean | null
+          source_id?: string | null
+          stream_type?: string | null
+          stream_url: string
+          title: string
+          tvg_id?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          group_title?: string | null
+          id?: string
+          is_active?: boolean | null
+          source_id?: string | null
+          stream_type?: string | null
+          stream_url?: string
+          title?: string
+          tvg_id?: string | null
+          tvg_logo?: string | null
+          tvg_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       mercado_pago_config: {
         Row: {
           created_at: string | null
