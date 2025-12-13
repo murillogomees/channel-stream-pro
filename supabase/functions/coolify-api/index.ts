@@ -506,6 +506,148 @@ serve(async (req) => {
           },
         };
       },
+      'fix-kong-routing': async () => {
+        if (!COOLIFY_TOKEN) {
+          return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
+        }
+
+        try {
+          const serviceUuid = 'vcs0c0k8kww48kgws44swkk0';
+          
+          // Get current service configuration
+          const serviceRes = await fetch(`${COOLIFY_URL}/api/v1/services/${serviceUuid}`, {
+            headers: {
+              'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+              'Accept': 'application/json',
+            },
+          });
+          
+          if (!serviceRes.ok) {
+            return { success: false, error: `Failed to get service (${serviceRes.status})` };
+          }
+          
+          const serviceData = await serviceRes.json();
+          
+          // Find Kong application in the service
+          const kongApp = serviceData.applications?.find((app: any) => 
+            app.name === 'supabase-kong' || app.image?.includes('kong')
+          );
+          
+          if (!kongApp) {
+            return {
+              success: false,
+              error: 'Kong application not found in Supabase service',
+              data: { available_apps: serviceData.applications?.map((a: any) => a.name) }
+            };
+          }
+          
+          // For Coolify service applications, we need to use the service application update endpoint
+          // PATCH /services/{serviceUuid}/applications/{applicationUuid}
+          const updateRes = await fetch(
+            `${COOLIFY_URL}/api/v1/services/${serviceUuid}/applications/${kongApp.uuid}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({
+                ports: '8000',
+                container_port: 8000,
+              }),
+            }
+          );
+          
+          const updateText = await updateRes.text();
+          
+          if (!updateRes.ok) {
+            // Alternative: try to restart just Kong to force proper routing
+            const restartRes = await fetch(
+              `${COOLIFY_URL}/api/v1/services/${serviceUuid}/restart`,
+              {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+                  'Accept': 'application/json',
+                },
+              }
+            );
+            
+            return {
+              success: false,
+              error: `Update failed (${updateRes.status}), service restart triggered instead`,
+              data: {
+                update_error: updateText,
+                kong_info: {
+                  uuid: kongApp.uuid,
+                  fqdn: kongApp.fqdn,
+                  ports: kongApp.ports,
+                  status: kongApp.status,
+                },
+                restart_triggered: restartRes.ok,
+                manual_fix: 'In Coolify Dashboard: Supabase Service → Kong → Advanced Settings → Set container port to 8000'
+              }
+            };
+          }
+          
+          return {
+            success: true,
+            data: {
+              message: 'Kong routing updated',
+              update_response: updateText,
+            }
+          };
+
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          };
+        }
+      },
+
+      'test-api-routing': async () => {
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || 
+                        Deno.env.get('SELFHOSTED_SERVICE_ROLE_KEY') || 
+                        'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU';
+        
+        const results: Record<string, any> = {};
+        
+        // Test different endpoints
+        const endpoints = [
+          { name: 'api_root', url: 'https://api.iptvlink.com.br/' },
+          { name: 'api_rest', url: 'https://api.iptvlink.com.br/rest/v1/' },
+          { name: 'api_rest_profiles', url: 'https://api.iptvlink.com.br/rest/v1/profiles?select=id&limit=1' },
+          { name: 'supabase_rest', url: 'https://supabase.iptvlink.com.br/rest/v1/' },
+        ];
+        
+        for (const ep of endpoints) {
+          try {
+            const response = await fetch(ep.url, {
+              headers: {
+                'apikey': anonKey,
+                'Authorization': `Bearer ${anonKey}`,
+              }
+            });
+            results[ep.name] = {
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok,
+            };
+          } catch (error) {
+            results[ep.name] = { error: error.message };
+          }
+        }
+        
+        return {
+          success: results.api_rest_profiles?.ok || false,
+          data: {
+            endpoints: results,
+            anonKey_present: !!anonKey,
+          }
+        };
+      },
 
       'get-migration-status': async () => {
         try {
