@@ -1,7 +1,8 @@
 /**
- * IPTV Player Page - Uses White-Label Player
+ * IPTV Player Page - Uses White-Label Player with CDN Fallback
  */
 
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService } from '@/services/iptvService';
@@ -11,6 +12,9 @@ import { Loader2 } from 'lucide-react';
 export default function IPTVPlayer() {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
+  
+  // Track current stream URL index for fallback
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
 
   // Fetch channel info
   const { data: channel, isLoading: isLoadingChannel } = useQuery({
@@ -20,7 +24,7 @@ export default function IPTVPlayer() {
   });
 
   // Fetch playback URL
-  const { data: playbackInfo, isLoading: isLoadingPlayback, refetch: refetchPlayback } = useQuery({
+  const { data: playbackInfo, isLoading: isLoadingPlayback } = useQuery({
     queryKey: ['iptv-playback', channelId],
     queryFn: () => iptvService.getPlaybackUrl(Number(channelId)),
     enabled: !!channelId,
@@ -31,9 +35,44 @@ export default function IPTVPlayer() {
     navigate('/app/home');
   };
 
-  const handleError = (error: string) => {
+  // Get list of available URLs (proxy + origin fallback)
+  const getStreamUrls = useCallback(() => {
+    const urls: string[] = [];
+    
+    // Add CDN list URLs if available (ordered by priority)
+    if (playbackInfo?.cdnList && Array.isArray(playbackInfo.cdnList)) {
+      const sortedCdns = [...playbackInfo.cdnList].sort((a, b) => (a.priority || 0) - (b.priority || 0));
+      sortedCdns.forEach(cdn => {
+        if (cdn.url) urls.push(cdn.url);
+      });
+    }
+    
+    // Fallback to primary URL
+    if (playbackInfo?.url && !urls.includes(playbackInfo.url)) {
+      urls.unshift(playbackInfo.url);
+    }
+    
+    // Last resort: original channel URL
+    if (channel?.original_url && !urls.includes(channel.original_url)) {
+      urls.push(channel.original_url);
+    }
+    
+    return urls;
+  }, [playbackInfo, channel]);
+
+  // Handle player error - try next URL in list
+  const handleError = useCallback((error: string) => {
     console.error('[IPTVPlayer] Error:', error);
-  };
+    
+    const urls = getStreamUrls();
+    const nextIndex = currentUrlIndex + 1;
+    
+    // If there are more URLs to try, switch to next
+    if (nextIndex < urls.length) {
+      console.log(`[IPTVPlayer] Trying fallback URL ${nextIndex + 1}/${urls.length}`);
+      setCurrentUrlIndex(nextIndex);
+    }
+  }, [currentUrlIndex, getStreamUrls]);
 
   if (isLoadingChannel || isLoadingPlayback) {
     return (
@@ -46,8 +85,9 @@ export default function IPTVPlayer() {
     );
   }
 
-  // Get stream URL - prefer proxy URL, fallback to original
-  const streamUrl = playbackInfo?.url || channel?.original_url;
+  // Get current stream URL from ordered list
+  const streamUrls = getStreamUrls();
+  const streamUrl = streamUrls[currentUrlIndex];
 
   if (!streamUrl) {
     return (
@@ -61,6 +101,7 @@ export default function IPTVPlayer() {
 
   return (
     <IPTVPlayerWhiteLabel
+      key={currentUrlIndex} // Force remount on URL change
       url={streamUrl}
       branding={{
         name: channel?.name || 'IPTV Link',
