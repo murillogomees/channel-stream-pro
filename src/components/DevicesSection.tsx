@@ -1,8 +1,9 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { supabase } from "@/lib/supabase";
 import devicesImageWebP from "@/assets/devices-mockup-opt.webp";
-// Usando versões otimizadas de 160px para melhor performance
 import androidIcon160 from "@/assets/icons/android-device-160.webp";
 import iosIcon160 from "@/assets/icons/ios-device-160.webp";
 import windowsIcon160 from "@/assets/icons/windows-device-160.webp";
@@ -10,22 +11,47 @@ import macIcon160 from "@/assets/icons/mac-device-160.webp";
 import tabletIcon160 from "@/assets/icons/tablet-device-160.webp";
 import smarttvIcon160 from "@/assets/icons/smarttv-device-160.webp";
 
+interface DevicesContent {
+  title: string;
+  subtitle: string;
+  description: string;
+}
+
 const DevicesSection = () => {
-  const devicesConfig = {
+  const [content, setContent] = useState<DevicesContent>({
     title: "Assista em Qualquer Dispositivo",
     subtitle: "Compatível com todas as plataformas",
-    description: "Acesse seu conteúdo favorito em smartphones, tablets, Smart TVs e computadores",
-    platforms: [
-      { id: "android", name: "Android", enabled: true, downloadUrl: "https://play.google.com" },
-      { id: "ios", name: "iOS", enabled: true, downloadUrl: "https://apps.apple.com" },
-      { id: "windows", name: "Windows", enabled: true, downloadUrl: "#" },
-      { id: "mac", name: "Mac", enabled: true, downloadUrl: "#" },
-      { id: "tablet", name: "Tablet", enabled: true, downloadUrl: "#" },
-      { id: "smarttv", name: "Smart TV", enabled: true, downloadUrl: "#" }
-    ]
-  };
+    description: "Acesse seu conteúdo favorito em smartphones, tablets, Smart TVs e computadores"
+  });
 
-  // Mapa de imagens otimizadas (160x160 - ideal para display 80px em 2x DPR)
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data } = await supabase
+        .from('homepage_content')
+        .select('content')
+        .eq('section_key', 'devices')
+        .single();
+      if (data?.content && typeof data.content === 'object') {
+        const contentData = data.content as Record<string, unknown>;
+        setContent({
+          title: (contentData.title as string) || content.title,
+          subtitle: (contentData.subtitle as string) || content.subtitle,
+          description: (contentData.description as string) || content.description,
+        });
+      }
+    };
+    fetchContent();
+  }, []);
+
+  const platforms = [
+    { id: "android", name: "Android", enabled: true, downloadUrl: "https://play.google.com" },
+    { id: "ios", name: "iOS", enabled: true, downloadUrl: "https://apps.apple.com" },
+    { id: "windows", name: "Windows", enabled: true, downloadUrl: "#" },
+    { id: "mac", name: "Mac", enabled: true, downloadUrl: "#" },
+    { id: "tablet", name: "Tablet", enabled: true, downloadUrl: "#" },
+    { id: "smarttv", name: "Smart TV", enabled: true, downloadUrl: "#" }
+  ];
+
   const deviceImageMap: Record<string, string> = {
     android: androidIcon160,
     ios: iosIcon160,
@@ -41,13 +67,13 @@ const DevicesSection = () => {
         {/* Header */}
         <div className="text-center mb-8 sm:mb-10 lg:mb-12">
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent px-4">
-            {devicesConfig.title}
+            {content.title}
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-2 px-4">
-            {devicesConfig.subtitle}
+            {content.subtitle}
           </p>
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-4">
-            {devicesConfig.description}
+            {content.description}
           </p>
         </div>
 
@@ -69,8 +95,8 @@ const DevicesSection = () => {
 
         {/* Platform Icons Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-          {devicesConfig.platforms
-            ?.filter((platform: any) => platform.enabled)
+          {platforms
+            .filter((platform) => platform.enabled)
             .map((platform: any) => {
               const deviceImage = deviceImageMap[platform.id];
               

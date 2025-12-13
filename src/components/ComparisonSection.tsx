@@ -1,28 +1,43 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, TrendingDown, TrendingUp } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface ComparisonContent {
+  title: string;
+  subtitle: string;
+}
 
 const ComparisonSection = () => {
+  const [content, setContent] = useState<ComparisonContent>({
+    title: "Compare e Economize",
+    subtitle: "Veja quanto você economiza escolhendo planos de maior duração"
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data } = await supabase
+        .from('homepage_content')
+        .select('content')
+        .eq('section_key', 'comparison')
+        .single();
+      if (data?.content && typeof data.content === 'object') {
+        const contentData = data.content as Record<string, unknown>;
+        setContent({
+          title: (contentData.title as string) || content.title,
+          subtitle: (contentData.subtitle as string) || content.subtitle,
+        });
+      }
+    };
+    fetchContent();
+  }, []);
+
   const monthlyPrice = 30.00;
   
   const plans = [
-    {
-      name: "Trimestral",
-      price: 79.90,
-      months: 3,
-      highlighted: false
-    },
-    {
-      name: "Semestral",
-      price: 149.90,
-      months: 6,
-      highlighted: true
-    },
-    {
-      name: "Anual",
-      price: 279.90,
-      months: 12,
-      highlighted: false
-    }
+    { name: "Trimestral", price: 79.90, months: 3, highlighted: false },
+    { name: "Semestral", price: 149.90, months: 6, highlighted: true },
+    { name: "Anual", price: 279.90, months: 12, highlighted: false }
   ];
 
   const calculateSavings = (planPrice: number, months: number) => {
@@ -38,10 +53,10 @@ const ComparisonSection = () => {
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
-            Compare e Economize
+            {content.title}
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto px-4">
-            Veja quanto você economiza escolhendo planos de maior duração
+            {content.subtitle}
           </p>
         </div>
 
