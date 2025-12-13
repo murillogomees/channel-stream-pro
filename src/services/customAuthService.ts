@@ -732,6 +732,261 @@ class CustomAuthService {
   }
 
   // ==========================================
+  // DEVICE FINGERPRINTING
+  // ==========================================
+
+  /**
+   * Get detailed device fingerprint info
+   */
+  getDeviceFingerprint(): { hash: string; info: Record<string, any> } {
+    const info = {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      screen: `${screen.width}x${screen.height}`,
+      timezone: new Date().getTimezoneOffset(),
+      cores: navigator.hardwareConcurrency || 0,
+      platform: navigator.platform,
+      vendor: navigator.vendor,
+    };
+    return { hash: this.deviceFingerprint, info };
+  }
+
+  /**
+   * Get known devices for current user
+   */
+  async getDevices(): Promise<AuthResponse<{ devices: any[] }>> {
+    try {
+      const result = await this.callAuthEndpoint('get-devices');
+      return { data: { devices: result.devices || [] }, error: null };
+    } catch (error: any) {
+      return { data: { devices: [] }, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Trust a device (skip extra verification)
+   */
+  async trustDevice(deviceId: string, trustDays: number = 30): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('trust-device', { device_id: deviceId, trust_days: trustDays });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Remove device from trusted list
+   */
+  async removeDevice(deviceId: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('remove-device', { device_id: deviceId });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // LOGIN ALERTS
+  // ==========================================
+
+  /**
+   * Get login alerts
+   */
+  async getLoginAlerts(): Promise<AuthResponse<{ alerts: any[] }>> {
+    try {
+      const result = await this.callAuthEndpoint('get-login-alerts');
+      return { data: { alerts: result.alerts || [] }, error: null };
+    } catch (error: any) {
+      return { data: { alerts: [] }, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Acknowledge a login alert
+   */
+  async acknowledgeAlert(alertId: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('acknowledge-alert', { alert_id: alertId });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Configure login alert preferences
+   */
+  async setAlertPreferences(prefs: { email: boolean; whatsapp: boolean }): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('set-alert-preferences', prefs);
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // PASSKEYS / WEBAUTHN
+  // ==========================================
+
+  /**
+   * Get registered passkeys
+   */
+  async getPasskeys(): Promise<AuthResponse<{ passkeys: any[] }>> {
+    try {
+      const result = await this.callAuthEndpoint('get-passkeys');
+      return { data: { passkeys: result.passkeys || [] }, error: null };
+    } catch (error: any) {
+      return { data: { passkeys: [] }, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Start passkey registration
+   */
+  async startPasskeyRegistration(): Promise<AuthResponse<{ options: any }>> {
+    try {
+      const result = await this.callAuthEndpoint('start-passkey-registration');
+      return { data: { options: result.options }, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Complete passkey registration
+   */
+  async completePasskeyRegistration(credential: any, deviceName?: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('complete-passkey-registration', { credential, device_name: deviceName });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Remove a passkey
+   */
+  async removePasskey(passkeyId: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('remove-passkey', { passkey_id: passkeyId });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // EMAIL CHANGE
+  // ==========================================
+
+  /**
+   * Request email change (sends verification to new email)
+   */
+  async requestEmailChange(newEmail: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('request-email-change', { new_email: newEmail });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Confirm email change with token
+   */
+  async confirmEmailChange(token: string): Promise<AuthResponse<{ user: CustomAuthUser }>> {
+    try {
+      const result = await this.callAuthEndpoint('confirm-email-change', { token });
+      if (this.session && result.user) {
+        this.session.user = result.user;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
+        this.notifyListeners('USER_UPDATED', this.session);
+      }
+      return { data: { user: result.user }, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // PHONE VERIFICATION (WHATSAPP)
+  // ==========================================
+
+  /**
+   * Request phone verification code via WhatsApp
+   */
+  async requestPhoneVerification(phoneNumber: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('request-phone-verification', { phone_number: phoneNumber });
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Verify phone with code
+   */
+  async verifyPhone(phoneNumber: string, code: string): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('verify-phone', { phone_number: phoneNumber, code });
+      if (this.session) {
+        this.session.user.phone = phoneNumber;
+        this.session.user.phone_confirmed_at = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
+        this.notifyListeners('USER_UPDATED', this.session);
+      }
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  // ==========================================
+  // ACCOUNT DELETION
+  // ==========================================
+
+  /**
+   * Request account deletion (LGPD)
+   */
+  async requestAccountDeletion(reason?: string): Promise<AuthResponse<{ scheduled_at: string }>> {
+    try {
+      const result = await this.callAuthEndpoint('request-account-deletion', { reason });
+      return { data: { scheduled_at: result.scheduled_at }, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Cancel pending account deletion
+   */
+  async cancelAccountDeletion(): Promise<AuthResponse<null>> {
+    try {
+      await this.callAuthEndpoint('cancel-account-deletion');
+      return { data: null, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  }
+
+  /**
+   * Get account deletion status
+   */
+  async getAccountDeletionStatus(): Promise<AuthResponse<{ pending: boolean; scheduled_at?: string }>> {
+    try {
+      const result = await this.callAuthEndpoint('get-deletion-status');
+      return { data: { pending: result.pending || false, scheduled_at: result.scheduled_at }, error: null };
+    } catch (error: any) {
+      return { data: { pending: false }, error: null };
+    }
+  }
+
+  // ==========================================
   // AUTH STATE LISTENER
   // ==========================================
 

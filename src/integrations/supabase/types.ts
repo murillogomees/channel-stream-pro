@@ -91,6 +91,39 @@ export type Database = {
           },
         ]
       }
+      account_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          confirmation_token: string | null
+          created_at: string | null
+          id: string
+          reason: string | null
+          scheduled_deletion_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmation_token?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          scheduled_deletion_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmation_token?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          scheduled_deletion_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_logs: {
         Row: {
           action: string
@@ -1247,6 +1280,54 @@ export type Database = {
         }
         Relationships: []
       }
+      device_fingerprints: {
+        Row: {
+          browser: string | null
+          created_at: string | null
+          device_name: string | null
+          device_type: string | null
+          fingerprint_hash: string
+          first_seen_at: string | null
+          id: string
+          is_trusted: boolean | null
+          last_seen_at: string | null
+          login_count: number | null
+          os: string | null
+          trust_expires_at: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          fingerprint_hash: string
+          first_seen_at?: string | null
+          id?: string
+          is_trusted?: boolean | null
+          last_seen_at?: string | null
+          login_count?: number | null
+          os?: string | null
+          trust_expires_at?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          fingerprint_hash?: string
+          first_seen_at?: string | null
+          id?: string
+          is_trusted?: boolean | null
+          last_seen_at?: string | null
+          login_count?: number | null
+          os?: string | null
+          trust_expires_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       discount_coupons: {
         Row: {
           active: boolean | null
@@ -1916,6 +1997,53 @@ export type Database = {
           },
         ]
       }
+      login_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          alert_sent_via: string[] | null
+          alert_type: string | null
+          created_at: string | null
+          device_fingerprint_id: string | null
+          id: string
+          ip_address: string | null
+          location_info: Json | null
+          sent_at: string | null
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          alert_sent_via?: string[] | null
+          alert_type?: string | null
+          created_at?: string | null
+          device_fingerprint_id?: string | null
+          id?: string
+          ip_address?: string | null
+          location_info?: Json | null
+          sent_at?: string | null
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          alert_sent_via?: string[] | null
+          alert_type?: string | null
+          created_at?: string | null
+          device_fingerprint_id?: string | null
+          id?: string
+          ip_address?: string | null
+          location_info?: Json | null
+          sent_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "login_alerts_device_fingerprint_id_fkey"
+            columns: ["device_fingerprint_id"]
+            isOneToOne: false
+            referencedRelation: "device_fingerprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mercado_pago_config: {
         Row: {
           created_at: string | null
@@ -2138,6 +2266,42 @@ export type Database = {
         }
         Relationships: []
       }
+      passkey_credentials: {
+        Row: {
+          counter: number | null
+          created_at: string | null
+          credential_id: string
+          device_name: string | null
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+          public_key: string
+          user_id: string
+        }
+        Insert: {
+          counter?: number | null
+          created_at?: string | null
+          credential_id: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          public_key: string
+          user_id: string
+        }
+        Update: {
+          counter?: number | null
+          created_at?: string | null
+          credential_id?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          public_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_history: {
         Row: {
           created_at: string | null
@@ -2235,6 +2399,75 @@ export type Database = {
           },
         ]
       }
+      pending_email_changes: {
+        Row: {
+          created_at: string | null
+          current_email: string
+          expires_at: string
+          id: string
+          new_email: string
+          user_id: string
+          verification_token: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_email: string
+          expires_at: string
+          id?: string
+          new_email: string
+          user_id: string
+          verification_token: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_email?: string
+          expires_at?: string
+          id?: string
+          new_email?: string
+          user_id?: string
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
+      phone_verification_codes: {
+        Row: {
+          attempts: number | null
+          code: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          phone_number: string
+          purpose: string | null
+          user_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          code: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          phone_number: string
+          purpose?: string | null
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          code?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          phone_number?: string
+          purpose?: string | null
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       playback_tokens: {
         Row: {
           content_id: string | null
@@ -2309,6 +2542,8 @@ export type Database = {
           id: string
           nome: string | null
           origem_cadastro: string | null
+          phone_verified: boolean | null
+          phone_verified_at: string | null
           plano: string | null
           situacao: string | null
           theme: string | null
@@ -2325,6 +2560,8 @@ export type Database = {
           id: string
           nome?: string | null
           origem_cadastro?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           plano?: string | null
           situacao?: string | null
           theme?: string | null
@@ -2341,6 +2578,8 @@ export type Database = {
           id?: string
           nome?: string | null
           origem_cadastro?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           plano?: string | null
           situacao?: string | null
           theme?: string | null
