@@ -143,8 +143,14 @@ function addMetric(channelId: number): void {
   
   // Flush if buffer is full or timeout reached
   if (metricsBuffer.length >= BUFFER_FLUSH_SIZE || Date.now() - lastFlushTime > BUFFER_FLUSH_INTERVAL) {
-    // Use EdgeRuntime.waitUntil for background processing
-    EdgeRuntime.waitUntil(flushMetrics());
+    // Use EdgeRuntime.waitUntil for background processing when available
+    if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+      // @ts-ignore - EdgeRuntime is provided by the edge runtime in some environments
+      EdgeRuntime.waitUntil(flushMetrics());
+    } else {
+      // Fallback for runtimes without EdgeRuntime helper
+      flushMetrics();
+    }
   }
 }
 
