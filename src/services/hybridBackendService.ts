@@ -34,8 +34,6 @@ export const callHybridFunction = async <T = unknown>(
 ): Promise<{ data: T | null; error: Error | null; backend: string }> => {
   const startTime = performance.now();
   
-  console.log(`[Backend] Calling ${functionName} on Supabase Cloud`);
-  
   try {
     const { data, error } = await supabase.functions.invoke<T>(functionName, {
       body,
@@ -81,7 +79,7 @@ export const checkBackendHealth = async (): Promise<BackendHealth> => {
     healthStatus = { healthy: false, lastCheck: now, latency: 0 };
   }
   
-  console.log('[Backend] Health check:', healthStatus);
+  
   return healthStatus;
 };
 
@@ -106,9 +104,6 @@ export const getBackendUrl = (): string => {
  * Initialize backend
  */
 export const initHybridBackend = async (): Promise<void> => {
-  console.log('[Backend] Initializing Supabase Cloud...');
-  console.log('[Backend] URL:', supabaseConfig.url);
-  
   await checkBackendHealth();
   setInterval(checkBackendHealth, HEALTH_CHECK_INTERVAL);
 };

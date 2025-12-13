@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Listener de mudanças de autenticação - DEVE ser primeiro
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log('[AuthContext] Auth event:', event);
+        
         
         // Usar setTimeout para evitar deadlock
         setTimeout(() => {

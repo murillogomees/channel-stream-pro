@@ -65,18 +65,6 @@ const AdminAffiliates = lazy(() => import("./pages/AdminAffiliates"));
 const UnifiedProfile = lazy(() => import("./pages/UnifiedProfile"));
 const AppInstall = lazy(() => import("./pages/AppInstall"));
 
-// Initialize Web Vitals
-if (typeof window !== 'undefined') {
-  webVitalsService.init((report) => {
-    console.log('[WebVitals] Report:', {
-      score: report.score,
-      lcp: report.metrics.LCP?.value,
-      fid: report.metrics.FID?.value,
-      cls: report.metrics.CLS?.value,
-    });
-  });
-}
-
 // Inner component to use hooks
 function AppContent() {
   // Global portrait lock - app always stays vertical
