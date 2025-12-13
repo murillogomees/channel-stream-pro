@@ -454,9 +454,9 @@ serve(async (req) => {
         }
 
         // Build correct PGRST_DB_URI pointing to LOCAL supabase-db container
-        // PostgREST needs to connect as "authenticator" role
+        // PostgREST must connect as postgres user in this environment
         const pgPassword = encodeURIComponent(postgresPasswordEnv.value);
-        const dbUri = `postgres://authenticator:${pgPassword}@supabase-db:5432/postgres`;
+        const dbUri = `postgres://postgres:${pgPassword}@supabase-db:5432/postgres`;
 
         // Update PGRST_DB_URI via bulk envs API for the Supabase service
         const updateEnvsBody = {
