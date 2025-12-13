@@ -35,8 +35,46 @@ jobs:
           # Copy to VPS
           sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
           
-          # Configure Kong
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'KONG_CONTAINER=$(docker ps -a --format "{{.Names}}" | grep -i kong | head -1); echo "Kong container: $KONG_CONTAINER"; docker stop $KONG_CONTAINER || true; sleep 3; docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml; docker cp /tmp/kong.yml $KONG_CONTAINER:/home/kong/kong.yml || true; docker start $KONG_CONTAINER; sleep 15; docker ps | grep -i kong; docker logs $KONG_CONTAINER --tail 40 2>&1'
+          # Configure Kong (fix ownership of /home/kong so entrypoint can write)
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
+            set -e
+
+            echo "=== Finding Kong container ==="
+            KONG_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -i kong | head -1)
+            echo "Kong container: $KONG_CONTAINER"
+
+            if [ -z "$KONG_CONTAINER" ]; then
+              echo "ERROR: Kong container not found!"
+              exit 1
+            fi
+
+            echo "=== Stopping Kong container (if running) ==="
+            docker stop $KONG_CONTAINER || true
+            sleep 3
+
+            echo "=== Copying kong.yml into declarative path ==="
+            docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
+
+            echo "=== Fixing ownership and permissions of /home/kong ==="
+            # Ensure directory exists and is owned by kong user so entrypoint can overwrite kong.yml there
+            docker start $KONG_CONTAINER || true
+            sleep 3
+            docker exec $KONG_CONTAINER mkdir -p /home/kong || true
+            docker exec $KONG_CONTAINER sh -c 'chown -R kong:kong /home/kong && chmod 755 /home/kong' || true
+            docker stop $KONG_CONTAINER || true
+
+            echo "=== Starting Kong container cleanly ==="
+            docker start $KONG_CONTAINER
+            
+            echo "=== Waiting for Kong to initialize ==="
+            sleep 20
+
+            echo "=== Kong status ==="
+            docker ps | grep -i kong || true
+
+            echo "=== Kong logs (last 60 lines) ==="
+            docker logs $KONG_CONTAINER --tail 60 2>&1 || true
+          ENDSSH
 
       - name: Final verification
         env:
@@ -44,4 +82,4 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASS: ${{ secrets.VPS_PASS }}
         run: |
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'docker ps | grep -i kong'
+          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'docker ps | grep -i kong || echo "Kong container not running"'
