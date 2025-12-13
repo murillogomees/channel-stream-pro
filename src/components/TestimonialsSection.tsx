@@ -1,8 +1,38 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, Quote } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface TestimonialsContent {
+  title: string;
+  subtitle: string;
+}
 
 const TestimonialsSection = () => {
+  const [content, setContent] = useState<TestimonialsContent>({
+    title: "O Que Nossos Clientes Dizem",
+    subtitle: "Milhares de clientes satisfeitos em todo o Brasil"
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data } = await supabase
+        .from('homepage_content')
+        .select('content')
+        .eq('section_key', 'testimonials')
+        .single();
+      if (data?.content && typeof data.content === 'object') {
+        const contentData = data.content as Record<string, unknown>;
+        setContent({
+          title: (contentData.title as string) || content.title,
+          subtitle: (contentData.subtitle as string) || content.subtitle,
+        });
+      }
+    };
+    fetchContent();
+  }, []);
+
   const testimonials = [
     {
       name: "Carlos Mendes",
@@ -81,11 +111,11 @@ const TestimonialsSection = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Quote className="h-8 w-8 text-primary" />
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">
-              O Que Nossos Clientes Dizem
+              {content.title}
             </h2>
           </div>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Milhares de clientes satisfeitos em todo o Brasil
+            {content.subtitle}
           </p>
         </div>
 

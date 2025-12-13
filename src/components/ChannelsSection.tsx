@@ -1,8 +1,38 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tv, Film, Trophy, Globe, Heart, Gamepad2, Music, GraduationCap } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface ChannelsContent {
+  title: string;
+  subtitle: string;
+}
 
 const ChannelsSection = () => {
+  const [content, setContent] = useState<ChannelsContent>({
+    title: "Mais de 10.000 canais disponíveis",
+    subtitle: "Entretenimento para toda família. Esportes, filmes, séries, desenhos, documentários e muito mais, tudo em alta qualidade."
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data } = await supabase
+        .from('homepage_content')
+        .select('content')
+        .eq('section_key', 'channels')
+        .single();
+      if (data?.content && typeof data.content === 'object') {
+        const contentData = data.content as Record<string, unknown>;
+        setContent({
+          title: (contentData.title as string) || content.title,
+          subtitle: (contentData.subtitle as string) || content.subtitle,
+        });
+      }
+    };
+    fetchContent();
+  }, []);
+
   const channelCategories = [
     {
       name: "Esportes",
@@ -100,13 +130,10 @@ const ChannelsSection = () => {
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
-            Mais de{" "}
-            <span className="text-gradient-primary">10.000 canais</span>{" "}
-            disponíveis
+            {content.title}
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto px-4">
-            Entretenimento para toda família. Esportes, filmes, séries, desenhos,
-            documentários e muito mais, tudo em alta qualidade.
+            {content.subtitle}
           </p>
         </div>
 

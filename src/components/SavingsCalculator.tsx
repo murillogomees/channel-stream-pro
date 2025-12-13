@@ -1,12 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calculator, TrendingDown, Sparkles } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
+import { supabase } from "@/lib/supabase";
+
+interface CalculatorContent {
+  title: string;
+  subtitle: string;
+}
 
 const SavingsCalculator = () => {
   const [selectedPlan, setSelectedPlan] = useState("trimestral");
+  const [content, setContent] = useState<CalculatorContent>({
+    title: "Calculadora de Economia",
+    subtitle: "Escolha a duração do seu plano e veja quanto você economiza"
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data } = await supabase
+        .from('homepage_content')
+        .select('content')
+        .eq('section_key', 'calculator')
+        .single();
+      if (data?.content && typeof data.content === 'object') {
+        const contentData = data.content as Record<string, unknown>;
+        setContent({
+          title: (contentData.title as string) || content.title,
+          subtitle: (contentData.subtitle as string) || content.subtitle,
+        });
+      }
+    };
+    fetchContent();
+  }, []);
 
   const monthlyPrice = 30.00;
 
@@ -39,11 +67,11 @@ const SavingsCalculator = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Calculator className="h-8 w-8 text-primary" />
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">
-              Calculadora de Economia
+              {content.title}
             </h2>
           </div>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Escolha a duração do seu plano e veja quanto você economiza
+            {content.subtitle}
           </p>
         </div>
 

@@ -55,6 +55,38 @@ export default function AdminHomepageEditor() {
     copyright: "",
   });
 
+  // Estados para novas seções
+  const [devicesData, setDevicesData] = useState({
+    title: "",
+    subtitle: "",
+    description: "",
+  });
+
+  const [comparisonData, setComparisonData] = useState({
+    title: "",
+    subtitle: "",
+  });
+
+  const [calculatorData, setCalculatorData] = useState({
+    title: "",
+    subtitle: "",
+  });
+
+  const [testimonialsData, setTestimonialsData] = useState({
+    title: "",
+    subtitle: "",
+  });
+
+  const [channelsData, setChannelsData] = useState({
+    title: "",
+    subtitle: "",
+  });
+
+  const [moviesData, setMoviesData] = useState({
+    title: "",
+    description: "",
+  });
+
   // FAQ Dialog
   const [faqDialogOpen, setFaqDialogOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState<HomepageFAQ | null>(null);
@@ -81,6 +113,24 @@ export default function AdminHomepageEditor() {
     }
     if (content.footer) {
       setFooterData(content.footer.content as typeof footerData);
+    }
+    if (content.devices) {
+      setDevicesData(content.devices.content as typeof devicesData);
+    }
+    if (content.comparison) {
+      setComparisonData(content.comparison.content as typeof comparisonData);
+    }
+    if (content.calculator) {
+      setCalculatorData(content.calculator.content as typeof calculatorData);
+    }
+    if (content.testimonials) {
+      setTestimonialsData(content.testimonials.content as typeof testimonialsData);
+    }
+    if (content.channels) {
+      setChannelsData(content.channels.content as typeof channelsData);
+    }
+    if (content.movies) {
+      setMoviesData(content.movies.content as typeof moviesData);
     }
     fetchFAQs(true);
   }, [content]);
@@ -160,8 +210,14 @@ export default function AdminHomepageEditor() {
         <ScrollArea className="w-full whitespace-nowrap">
           <TabsList className="inline-flex h-auto min-w-full p-1">
             <TabsTrigger value="hero" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Hero</TabsTrigger>
+            <TabsTrigger value="devices" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Dispositivos</TabsTrigger>
             <TabsTrigger value="plans" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Planos</TabsTrigger>
+            <TabsTrigger value="comparison" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Comparação</TabsTrigger>
+            <TabsTrigger value="calculator" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Calculadora</TabsTrigger>
             <TabsTrigger value="faqs" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">FAQs</TabsTrigger>
+            <TabsTrigger value="testimonials" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Depoimentos</TabsTrigger>
+            <TabsTrigger value="channels" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Canais</TabsTrigger>
+            <TabsTrigger value="movies" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Filmes</TabsTrigger>
             <TabsTrigger value="contact" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Contato</TabsTrigger>
             <TabsTrigger value="footer" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm">Rodapé</TabsTrigger>
           </TabsList>
@@ -241,6 +297,91 @@ export default function AdminHomepageEditor() {
                 <Save className="h-4 w-4 mr-2" />
                 Salvar Hero
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* DEVICES SECTION */}
+        <TabsContent value="devices">
+          <Card>
+            <CardHeader>
+              <CardTitle>Seção Dispositivos</CardTitle>
+              <CardDescription>Configure os textos da seção de dispositivos compatíveis</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Título</Label>
+                <Input value={devicesData.title} onChange={e => setDevicesData({ ...devicesData, title: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Subtítulo</Label>
+                <Input value={devicesData.subtitle} onChange={e => setDevicesData({ ...devicesData, subtitle: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea value={devicesData.description} onChange={e => setDevicesData({ ...devicesData, description: e.target.value })} />
+              </div>
+              <Button onClick={() => saveSection('devices', devicesData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* COMPARISON SECTION */}
+        <TabsContent value="comparison">
+          <Card>
+            <CardHeader><CardTitle>Seção Comparação</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Título</Label><Input value={comparisonData.title} onChange={e => setComparisonData({ ...comparisonData, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Subtítulo</Label><Input value={comparisonData.subtitle} onChange={e => setComparisonData({ ...comparisonData, subtitle: e.target.value })} /></div>
+              <Button onClick={() => saveSection('comparison', comparisonData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* CALCULATOR SECTION */}
+        <TabsContent value="calculator">
+          <Card>
+            <CardHeader><CardTitle>Seção Calculadora</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Título</Label><Input value={calculatorData.title} onChange={e => setCalculatorData({ ...calculatorData, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Subtítulo</Label><Input value={calculatorData.subtitle} onChange={e => setCalculatorData({ ...calculatorData, subtitle: e.target.value })} /></div>
+              <Button onClick={() => saveSection('calculator', calculatorData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TESTIMONIALS SECTION */}
+        <TabsContent value="testimonials">
+          <Card>
+            <CardHeader><CardTitle>Seção Depoimentos</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Título</Label><Input value={testimonialsData.title} onChange={e => setTestimonialsData({ ...testimonialsData, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Subtítulo</Label><Input value={testimonialsData.subtitle} onChange={e => setTestimonialsData({ ...testimonialsData, subtitle: e.target.value })} /></div>
+              <Button onClick={() => saveSection('testimonials', testimonialsData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* CHANNELS SECTION */}
+        <TabsContent value="channels">
+          <Card>
+            <CardHeader><CardTitle>Seção Canais</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Título</Label><Input value={channelsData.title} onChange={e => setChannelsData({ ...channelsData, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Subtítulo</Label><Textarea value={channelsData.subtitle} onChange={e => setChannelsData({ ...channelsData, subtitle: e.target.value })} /></div>
+              <Button onClick={() => saveSection('channels', channelsData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* MOVIES SECTION */}
+        <TabsContent value="movies">
+          <Card>
+            <CardHeader><CardTitle>Seção Filmes e Séries</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Título</Label><Input value={moviesData.title} onChange={e => setMoviesData({ ...moviesData, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Descrição</Label><Textarea value={moviesData.description} onChange={e => setMoviesData({ ...moviesData, description: e.target.value })} /></div>
+              <Button onClick={() => saveSection('movies', moviesData)}><Save className="h-4 w-4 mr-2" />Salvar</Button>
             </CardContent>
           </Card>
         </TabsContent>
