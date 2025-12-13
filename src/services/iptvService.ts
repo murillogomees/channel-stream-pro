@@ -298,7 +298,8 @@ class IPTVService {
         `${this.baseUrl}/functions/v1/iptv-play?channelId=${channelId}`,
         {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            // Use custom header instead of Authorization to avoid Supabase JWT validation
+            'X-Custom-Token': accessToken,
             'Content-Type': 'application/json',
           },
         }
