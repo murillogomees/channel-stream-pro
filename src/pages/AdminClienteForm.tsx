@@ -158,11 +158,7 @@ export default function AdminClienteForm() {
               data_vencimento: data.data_vencimento,
               data_contratacao: data.data_contratacao,
               valor_pago: data.valor_pago,
-              data_ultimo_pagamento: data.data_ultimo_pagamento,
-              forma_ultimo_pagamento: data.forma_ultimo_pagamento,
               cliente_ativo: data.cliente_ativo,
-              is_recorrente: data.is_recorrente,
-              dispositivo_contratado: data.dispositivo_contratado,
             };
 
             setClienteOriginal(cliente);
@@ -176,11 +172,8 @@ export default function AdminClienteForm() {
             setValue('dataVencimento', cliente.data_vencimento || '');
             setValue('plano', cliente.plano as any || 'Mensal');
             setValue('valorPago', cliente.valor_pago || 0);
-            setValue('dataUltimoPagamento', cliente.data_ultimo_pagamento || '');
-            setValue('formaUltimoPagamento', cliente.forma_ultimo_pagamento as any || '');
             setValue('clienteAtivo', cliente.cliente_ativo ?? false);
             setValue('origemCadastro', cliente.origem_cadastro as any || '');
-            setValue('dispositivoContratado', cliente.dispositivo_contratado as any || '');
 
             // M3U lists management removed - now using unified m3u_sync_entries
 
