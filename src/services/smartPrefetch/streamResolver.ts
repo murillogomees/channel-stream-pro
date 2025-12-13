@@ -55,30 +55,21 @@ export async function resolveStream(
   }
   
   try {
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token || '';
-    
-    // Fetch single channel stream from server
-    const response = await fetch('https://supabase.iptvlink.com.br/functions/v1/fetch-m3u-url', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    // Use Supabase SDK to call edge function
+    const { data, error } = await supabase.functions.invoke('fetch-m3u-url', {
+      body: {
         url: playlistUrl,
         channelId,
-        streamOnly: true, // Signal we only want the stream URL
+        streamOnly: true,
         limit: 1,
-      }),
+      },
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    if (error) {
+      throw new Error(error.message);
     }
     
-    const data = await response.json();
-    const channel = data.channels?.[0] || data.channel;
+    const channel = data?.channels?.[0] || data?.channel;
     
     if (!channel?.stream_url) {
       console.warn(`[StreamResolver] No stream found for ${channelId}`);

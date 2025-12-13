@@ -1,9 +1,8 @@
 /**
- * Deployment Service - Simplified for Supabase Cloud
+ * Deployment Service - Supabase Cloud Only
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { SUPABASE_FUNCTIONS_URL } from '@/config/supabase';
 
 export interface DeploymentStatus {
   success: boolean;
@@ -31,15 +30,9 @@ export interface MigrationTableCounts {
   [tableName: string]: number;
 }
 
-class SelfHostedDeploymentService {
-  private cloudFunctionsUrl: string;
-
-  constructor() {
-    this.cloudFunctionsUrl = SUPABASE_FUNCTIONS_URL;
-  }
-
+class CloudDeploymentService {
   /**
-   * Test connection to Supabase
+   * Test connection to Supabase Cloud
    */
   async testConnection(): Promise<DeploymentStatus> {
     try {
@@ -95,8 +88,12 @@ class SelfHostedDeploymentService {
     return [
       'mercado-pago-checkout',
       'mercado-pago-webhook',
-      'send-whatsapp',
+      'whatsapp-webhook',
       'process-auto-notifications',
+      'trigger-event-notification',
+      'health-check',
+      'stream-proxy',
+      'iptv-play',
     ];
   }
 
@@ -115,12 +112,12 @@ class SelfHostedDeploymentService {
   }
 
   /**
-   * Deploy Edge Functions (no-op for Cloud)
+   * Deploy Edge Functions (managed by Cloud)
    */
   async deployFunctions(): Promise<DeploymentStatus> {
     return {
       success: true,
-      message: 'Edge Functions are managed automatically by Supabase Cloud',
+      message: 'Edge Functions são gerenciadas automaticamente pelo Supabase Cloud',
     };
   }
 
@@ -168,7 +165,7 @@ class SelfHostedDeploymentService {
   async restartService(_uuid: string): Promise<DeploymentStatus> {
     return {
       success: true,
-      message: 'Services are managed automatically by Supabase Cloud',
+      message: 'Serviços são gerenciados automaticamente pelo Supabase Cloud',
     };
   }
 
@@ -185,11 +182,12 @@ class SelfHostedDeploymentService {
         return { success: false, message: error.message };
       }
 
-      return { success: true, message: `Function ${functionName} is working` };
+      return { success: true, message: `Function ${functionName} está funcionando` };
     } catch (error: any) {
       return { success: false, message: error.message };
     }
   }
 }
 
-export const selfHostedDeploymentService = new SelfHostedDeploymentService();
+// Export with original name for backward compatibility
+export const selfHostedDeploymentService = new CloudDeploymentService();

@@ -1,42 +1,23 @@
 /**
  * useProfiles - Hook unificado para gerenciar profiles/clientes
- * Usa Edge Function com autenticação JWT custom
+ * Usa Supabase Cloud SDK
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-
-const SUPABASE_URL = 'https://supabase.iptvlink.com.br';
-const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTIyMDgyMCwiZXhwIjo0OTIwODk0NDIwLCJyb2xlIjoiYW5vbiJ9.55tQdiEEa0mlCvveFpQZwMHqDZt0DzAgUQOPpLCNDLU';
-
-function getAuthToken(): string | null {
-  try {
-    const storedSession = localStorage.getItem('custom_auth_session');
-    return storedSession ? JSON.parse(storedSession).access_token : null;
-  } catch {
-    return null;
-  }
-}
+import { supabase } from '@/integrations/supabase/client';
 
 async function callAdminData(action: string, data?: Record<string, unknown>): Promise<any> {
-  const accessToken = getAuthToken();
-  if (!accessToken) {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session?.access_token) {
     throw new Error('Not authenticated');
   }
   
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-data`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-      'apikey': SUPABASE_ANON_KEY
-    },
-    body: JSON.stringify({ action, ...data })
+  const { data: result, error } = await supabase.functions.invoke('admin-data', {
+    body: { action, ...data }
   });
 
-  const result = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(result.error || 'Request failed');
+  if (error) {
+    throw new Error(error.message || 'Request failed');
   }
   
   return result;
