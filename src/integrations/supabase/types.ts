@@ -1735,10 +1735,13 @@ export type Database = {
           codec_hint: string | null
           content_type: string | null
           created_at: string | null
+          episode_number: number | null
+          episode_title: string | null
           fallback_channel_id: number | null
           health_score: number | null
           id: number
           is_healthy: boolean | null
+          is_series: boolean | null
           last_probe_at: string | null
           logo_url: string | null
           metadata: Json | null
@@ -1747,6 +1750,8 @@ export type Database = {
           priority: number | null
           probe_error: string | null
           resolution: string | null
+          season_number: number | null
+          series_name: string | null
           shard_id: number
           slug: string
           transcode_manifest_url: string | null
@@ -1759,10 +1764,13 @@ export type Database = {
           codec_hint?: string | null
           content_type?: string | null
           created_at?: string | null
+          episode_number?: number | null
+          episode_title?: string | null
           fallback_channel_id?: number | null
           health_score?: number | null
           id?: number
           is_healthy?: boolean | null
+          is_series?: boolean | null
           last_probe_at?: string | null
           logo_url?: string | null
           metadata?: Json | null
@@ -1771,6 +1779,8 @@ export type Database = {
           priority?: number | null
           probe_error?: string | null
           resolution?: string | null
+          season_number?: number | null
+          series_name?: string | null
           shard_id?: number
           slug: string
           transcode_manifest_url?: string | null
@@ -1783,10 +1793,13 @@ export type Database = {
           codec_hint?: string | null
           content_type?: string | null
           created_at?: string | null
+          episode_number?: number | null
+          episode_title?: string | null
           fallback_channel_id?: number | null
           health_score?: number | null
           id?: number
           is_healthy?: boolean | null
+          is_series?: boolean | null
           last_probe_at?: string | null
           logo_url?: string | null
           metadata?: Json | null
@@ -1795,6 +1808,8 @@ export type Database = {
           priority?: number | null
           probe_error?: string | null
           resolution?: string | null
+          season_number?: number | null
+          series_name?: string | null
           shard_id?: number
           slug?: string
           transcode_manifest_url?: string | null
@@ -3823,6 +3838,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_organize_series_channels: {
+        Args: never
+        Returns: {
+          organized_count: number
+          series_found: number
+        }[]
+      }
       check_rate_limit: {
         Args: {
           p_identifier: string
@@ -3871,6 +3893,16 @@ export type Database = {
       }
       is_admin_or_master: { Args: { check_user_id?: string }; Returns: boolean }
       is_blocked: { Args: { p_identifier: string }; Returns: boolean }
+      parse_series_info_from_name: {
+        Args: { channel_name: string }
+        Returns: {
+          episode_number: number
+          episode_title: string
+          is_series: boolean
+          season_number: number
+          series_name: string
+        }[]
+      }
       revoke_token_family: {
         Args: { p_family_id: string; p_reason?: string }
         Returns: number

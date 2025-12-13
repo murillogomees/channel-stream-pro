@@ -8,10 +8,11 @@ import { useSearchParams } from 'react-router-dom';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { ResponsivePageHeader } from '@/components/admin/ResponsivePageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tv, ListVideo, Calendar, Zap, Database, FlaskConical } from 'lucide-react';
+import { Tv, ListVideo, Calendar, Zap, Database, FlaskConical, Clapperboard } from 'lucide-react';
 
 // Tab Components
 import { IPTVChannelsTab } from '@/components/admin/iptv/tabs/IPTVChannelsTab';
+import { IPTVSeriesTab } from '@/components/admin/iptv/tabs/IPTVSeriesTab';
 import { IPTVPlaylistsTab } from '@/components/admin/iptv/tabs/IPTVPlaylistsTab';
 import { IPTVEPGTab } from '@/components/admin/iptv/tabs/IPTVEPGTab';
 import { IPTVTranscodeTab } from '@/components/admin/iptv/tabs/IPTVTranscodeTab';
@@ -20,6 +21,7 @@ import { IPTVLoadTestTab } from '@/components/admin/iptv/tabs/IPTVLoadTestTab';
 
 const TABS = [
   { id: 'channels', label: 'Canais', icon: Tv },
+  { id: 'series', label: 'Séries', icon: Clapperboard },
   { id: 'playlists', label: 'Playlists', icon: ListVideo },
   { id: 'epg', label: 'EPG', icon: Calendar },
   { id: 'transcode', label: 'Transcode', icon: Zap },
@@ -40,7 +42,7 @@ export default function AdminIPTVPage() {
       <div className="space-y-4 md:space-y-6">
         <ResponsivePageHeader
           title="IPTV Management"
-          description="Canais, playlists, EPG, transcode e cache"
+          description="Canais, séries, playlists, EPG, transcode e cache"
         />
 
         <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
@@ -49,7 +51,7 @@ export default function AdminIPTVPage() {
               <TabsTrigger
                 key={id}
                 value={id}
-                className="flex-1 min-w-[100px] gap-2 data-[state=active]:bg-background"
+                className="flex-1 min-w-[80px] gap-2 data-[state=active]:bg-background"
               >
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{label}</span>
@@ -60,6 +62,10 @@ export default function AdminIPTVPage() {
           <div className="mt-4">
             <TabsContent value="channels" className="m-0">
               <IPTVChannelsTab />
+            </TabsContent>
+
+            <TabsContent value="series" className="m-0">
+              <IPTVSeriesTab />
             </TabsContent>
 
             <TabsContent value="playlists" className="m-0">
