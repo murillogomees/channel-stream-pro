@@ -462,3 +462,11 @@ verify_jwt = false
 # Cleanup old logs - runs weekly, removes old logs and creates summaries
 [functions.cleanup-old-logs]
 verify_jwt = false
+
+# ==========================================
+# DEPLOY AUTOMATION
+# ==========================================
+
+# Deploy webhook - triggers restart/deploy via Coolify API
+[functions.deploy-webhook]
+verify_jwt = false
