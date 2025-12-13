@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
             title="Player IPTV"
             description="Canais ao vivo, filmes e séries"
             icon={<Play className="h-5 w-5" />}
-            path="/app/player"
+            path="/app/home"
             isNew
             isHighlighted
           />
