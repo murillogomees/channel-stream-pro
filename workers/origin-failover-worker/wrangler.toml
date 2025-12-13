@@ -1,0 +1,31 @@
+name = "iptv-origin-failover"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespaces for origin management
+[[kv_namespaces]]
+binding = "ORIGINS_KV"
+id = "YOUR_ORIGINS_KV_ID"
+preview_id = "YOUR_ORIGINS_KV_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "HEALTH_KV"
+id = "YOUR_HEALTH_KV_ID"
+preview_id = "YOUR_HEALTH_KV_PREVIEW_ID"
+
+# Scheduled health checks every 30 seconds
+[triggers]
+crons = ["*/30 * * * *"]
+
+# Environment variables (set via wrangler secret put)
+# SUPABASE_URL - Self-hosted Supabase URL
+# SUPABASE_SERVICE_ROLE_KEY - Service role key
+# WORKER_SECRET - Shared secret for worker authentication
+
+[vars]
+ENVIRONMENT = "production"
+
+# Routes - adjust domain as needed
+# routes = [
+#   { pattern = "cdn.iptvlink.com.br/*", zone_name = "iptvlink.com.br" }
+# ]

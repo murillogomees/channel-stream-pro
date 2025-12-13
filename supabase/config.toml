@@ -506,3 +506,15 @@ verify_jwt = false
 # Probe Service - channel health checking
 [functions.iptv-probe]
 verify_jwt = false
+
+# ==========================================
+# IPTV HIGH-SCALE INFRASTRUCTURE (Phase 1)
+# ==========================================
+
+# Connection Pool Manager - application-level connection pooling
+[functions.iptv-connection-pool]
+verify_jwt = false
+
+# Read Replica Router - intelligent query routing with failover
+[functions.iptv-read-replica]
+verify_jwt = false

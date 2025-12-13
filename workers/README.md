@@ -2,6 +2,54 @@
 
 ## Workers Overview
 
+### 0. Rate Limiter Worker (`rate-limiter-worker/`)
+Distributed rate limiting with token bucket algorithm for high-scale traffic control.
+
+**Features:**
+- Token bucket rate limiting via Cloudflare KV
+- Per-endpoint rate configurations (API, manifests, segments)
+- IP blacklist integration with Supabase sync
+- Automatic abuse detection and blocking
+- Circuit breaker for overload protection
+
+**Rate Limits:**
+| Endpoint Type | Limit | Window |
+|---------------|-------|--------|
+| Manifest (.m3u8) | 500/s | 1s |
+| Segment (.ts) | 1000/s | 1s |
+| API | 100/s | 1s |
+| Auth | 10/min | 60s |
+
+**Endpoints:**
+- `GET /check?path=` - Check rate limit for path
+- `GET /health` - Health check
+- `POST /manage/block` - Block IP (requires secret)
+- `POST /manage/unblock` - Unblock IP
+- `GET /manage/stats` - Get rate limit stats
+
+---
+
+### 0.5 Origin Failover Worker (`origin-failover-worker/`)
+Multi-origin failover with health checks, geo-routing, and weighted load balancing.
+
+**Features:**
+- 3+ origins with health probes every 30s
+- Automatic failover < 2 seconds
+- Geo-routing for optimal latency
+- Weighted random selection
+- Circuit breaker pattern
+
+**Endpoints:**
+- `GET /health` - Worker health
+- `GET /select` - Select best origin for client
+- `GET /proxy/*` - Proxy request with failover
+- `GET /manage/origins` - List origins
+- `POST /manage/origins` - Add/update origin
+- `POST /manage/healthcheck` - Force health check
+- `POST /manage/reset` - Reset circuit breakers
+
+---
+
 ### 1. Transcode Worker (`transcode-worker/`)
 Manages video transcoding jobs with queue-based processing.
 

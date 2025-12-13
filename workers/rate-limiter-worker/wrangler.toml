@@ -1,0 +1,27 @@
+name = "iptv-rate-limiter"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespaces for rate limiting
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "YOUR_RATE_LIMIT_KV_ID"
+preview_id = "YOUR_RATE_LIMIT_KV_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "BLOCKED_IPS_KV"
+id = "YOUR_BLOCKED_IPS_KV_ID"
+preview_id = "YOUR_BLOCKED_IPS_KV_PREVIEW_ID"
+
+# Environment variables (set via wrangler secret put)
+# SUPABASE_URL - Self-hosted Supabase URL
+# SUPABASE_SERVICE_ROLE_KEY - Service role key
+# WORKER_SECRET - Shared secret for worker authentication
+
+[vars]
+ENVIRONMENT = "production"
+
+# Routes - adjust domain as needed
+# routes = [
+#   { pattern = "api.iptvlink.com.br/*", zone_name = "iptvlink.com.br" }
+# ]
