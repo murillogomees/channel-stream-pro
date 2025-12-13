@@ -35,7 +35,7 @@ jobs:
           # Copy kong.yml to VPS
           sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/kong.yml $VPS_USER@$VPS_HOST:/tmp/kong.yml
 
-          # On VPS: fix permissions, copy to all locations, restart
+          # On VPS: copy to volume path and restart Kong
           sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VPS_USER@$VPS_HOST 'bash -s' << 'ENDSSH'
             set -e
 
@@ -48,22 +48,21 @@ jobs:
               exit 1
             fi
 
-            echo "=== Copying kong.yml to host volume path ./volumes/api/ ==="
-            mkdir -p ./volumes/api
-            cp /tmp/kong.yml ./volumes/api/kong.yml
-            chmod 644 ./volumes/api/kong.yml
-            echo "Written to: $(pwd)/volumes/api/kong.yml"
-            cat ./volumes/api/kong.yml
-
+            echo "=== Copying kong.yml to host volume path ./volume/api/ ==="
+            mkdir -p ./volume/api
+            cp /tmp/kong.yml ./volume/api/kong.yml
+            chmod 644 ./volume/api/kong.yml
+            echo "Written to: $(pwd)/volume/api/kong.yml"
+            
+            echo "=== Content of ./volume/api/kong.yml ==="
+            cat ./volume/api/kong.yml
+            
             echo "=== Fixing /home/kong permissions via helper container ==="
             docker run --rm --volumes-from $KONG_CONTAINER alpine sh -c '
               mkdir -p /home/kong && 
               chmod 777 /home/kong && 
               rm -f /home/kong/kong.yml || true
-            '
-
-            echo "=== Copying kong.yml into container declarative path ==="
-            docker cp /tmp/kong.yml $KONG_CONTAINER:/usr/local/kong/declarative/kong.yml
+            ' || true
 
             echo "=== Restarting Kong container ==="
             docker stop $KONG_CONTAINER || true
