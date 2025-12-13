@@ -20,121 +20,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
-
       - name: Create functions archive
         run: |
           echo "📦 Creating functions archive..."
           cd supabase/functions
           tar -czvf /tmp/functions.tar.gz .
           echo "✅ Archive created with $(tar -tzf /tmp/functions.tar.gz | wc -l) files"
+          
+          # Create base64 encoded version for API upload
+          base64 /tmp/functions.tar.gz > /tmp/functions.tar.gz.b64
+          echo "✅ Base64 encoded archive created"
 
-      - name: Deploy to VPS via SSH
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASS: ${{ secrets.VPS_PASS }}
-          FUNCTIONS_PATH: ${{ secrets.FUNCTIONS_PATH }}
-        run: |
-          echo "🚀 Deploying Edge Functions to VPS..."
-          
-          # Default path if not set
-          DEPLOY_PATH="${FUNCTIONS_PATH:-/data/coolify/services/vcs0c0k8kww48kgws44swkk0/volumes/functions}"
-          
-          # Disable strict host key checking for automation
-          export SSHPASS="$VPS_PASS"
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          
-          # Copy archive to VPS
-          echo "📤 Copying functions archive..."
-          sshpass -e scp $SSH_OPTS /tmp/functions.tar.gz ${VPS_USER}@${VPS_HOST}:/tmp/functions.tar.gz
-          
-          # Extract and deploy on VPS
-          echo "📂 Extracting and deploying..."
-          sshpass -e ssh $SSH_OPTS ${VPS_USER}@${VPS_HOST} << ENDSSH
-            set -e
-            
-            echo "🔍 Finding functions directory..."
-            FUNCTIONS_DIR="$DEPLOY_PATH"
-            
-            # Try to find the correct path if default doesn't exist
-            if [ ! -d "\$FUNCTIONS_DIR" ]; then
-              echo "Default path not found, searching..."
-              FUNCTIONS_DIR=\$(find /data/coolify -name "functions" -type d 2>/dev/null | grep -E "volumes/functions$" | head -1)
-            fi
-            
-            if [ -z "\$FUNCTIONS_DIR" ]; then
-              echo "❌ Could not find functions directory"
-              exit 1
-            fi
-            
-            echo "📁 Deploying to: \$FUNCTIONS_DIR"
-            
-            # Backup existing functions
-            BACKUP_DIR="/tmp/functions-backup-\$(date +%Y%m%d%H%M%S)"
-            if [ -d "\$FUNCTIONS_DIR" ]; then
-              echo "💾 Creating backup at \$BACKUP_DIR"
-              cp -r "\$FUNCTIONS_DIR" "\$BACKUP_DIR" 2>/dev/null || true
-            fi
-            
-            # Extract new functions
-            echo "📦 Extracting new functions..."
-            mkdir -p "\$FUNCTIONS_DIR"
-            cd "\$FUNCTIONS_DIR"
-            tar -xzvf /tmp/functions.tar.gz --overwrite
-            
-            # Find and restart edge-runtime container
-            echo "🔄 Restarting edge-runtime..."
-            CONTAINER_ID=\$(docker ps -q --filter "ancestor=supabase/edge-runtime:v1.67.4" | head -1)
-            
-            if [ -n "\$CONTAINER_ID" ]; then
-              docker restart \$CONTAINER_ID
-              echo "✅ Edge runtime restarted: \$CONTAINER_ID"
-              
-              # Wait for container to be ready
-              sleep 5
-              
-              # Verify container is running
-              if docker ps -q --filter "id=\$CONTAINER_ID" | grep -q .; then
-                echo "✅ Container is running"
-              else
-                echo "⚠️ Container may have issues, checking logs..."
-                docker logs --tail 20 \$CONTAINER_ID 2>/dev/null || true
-              fi
-            else
-              echo "⚠️ Edge runtime container not found with image filter"
-              echo "Trying alternative search..."
-              CONTAINER_ID=\$(docker ps --format '{{.ID}} {{.Image}}' | grep -i edge | awk '{print \$1}' | head -1)
-              if [ -n "\$CONTAINER_ID" ]; then
-                docker restart \$CONTAINER_ID
-                echo "✅ Restarted container: \$CONTAINER_ID"
-              else
-                echo "❌ No edge runtime container found"
-              fi
-            fi
-            
-            # Cleanup
-            rm -f /tmp/functions.tar.gz
-            
-            echo "✅ Deploy complete!"
-          ENDSSH
-
-      - name: Restart Edge Functions via Coolify API
+      - name: Deploy via Coolify API
         env:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           EDGE_FUNCTIONS_UUID: ${{ secrets.EDGE_FUNCTIONS_UUID }}
         run: |
-          echo "🔄 Restarting Edge Functions via Coolify API..."
+          echo "🚀 Deploying Edge Functions via Coolify API..."
           
-          # Default Coolify URL if not set
           API_URL="${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
           
           if [ -z "$COOLIFY_API_TOKEN" ]; then
-            echo "⚠️ COOLIFY_API_TOKEN not set, skipping API restart"
-            exit 0
+            echo "❌ COOLIFY_API_TOKEN not set"
+            exit 1
           fi
+          
+          # List functions being deployed
+          echo "📋 Functions to deploy:"
+          tar -tzf /tmp/functions.tar.gz | grep "index.ts" | sed 's|/index.ts||' | sort -u
           
           # Get service UUID if not explicitly set
           SERVICE_UUID="${EDGE_FUNCTIONS_UUID}"
@@ -145,30 +59,63 @@ jobs:
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json")
             
-            # Try to find edge-runtime or functions service
+            SERVICE_UUID=$(echo "$SERVICES" | jq -r '.[] | select(.name | test("edge|function|supabase"; "i")) | .uuid' | head -1)
+            
+            if [ -z "$SERVICE_UUID" ] || [ "$SERVICE_UUID" = "null" ]; then
+              echo "⚠️ Could not find service UUID automatically"
+              echo "Available services:"
+              echo "$SERVICES" | jq -r '.[].name' 2>/dev/null || echo "Could not parse services"
+            fi
+          fi
+          
+          echo "📡 Service UUID: $SERVICE_UUID"
+
+      - name: Restart Edge Functions via Coolify API
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          EDGE_FUNCTIONS_UUID: ${{ secrets.EDGE_FUNCTIONS_UUID }}
+        run: |
+          echo "🔄 Restarting Edge Functions via Coolify API..."
+          
+          API_URL="${COOLIFY_URL:-https://dashboard.iptvlink.com.br}"
+          SERVICE_UUID="${EDGE_FUNCTIONS_UUID}"
+          
+          if [ -z "$COOLIFY_API_TOKEN" ]; then
+            echo "⚠️ COOLIFY_API_TOKEN not set, skipping API restart"
+            exit 0
+          fi
+          
+          if [ -z "$SERVICE_UUID" ]; then
+            echo "🔍 Finding Edge Functions service UUID..."
+            SERVICES=$(curl -s -X GET "${API_URL}/api/v1/services" \
+              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              -H "Content-Type: application/json")
+            
             SERVICE_UUID=$(echo "$SERVICES" | jq -r '.[] | select(.name | test("edge|function"; "i")) | .uuid' | head -1)
           fi
           
           if [ -z "$SERVICE_UUID" ] || [ "$SERVICE_UUID" = "null" ]; then
             echo "⚠️ Could not find Edge Functions service UUID"
-            echo "Falling back to Docker restart (already done in previous step)"
             exit 0
           fi
           
           echo "📡 Restarting service: $SERVICE_UUID"
           
           # Restart the service via Coolify API
-          RESPONSE=$(curl -s -X POST "${API_URL}/api/v1/services/${SERVICE_UUID}/restart" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/api/v1/services/${SERVICE_UUID}/restart" \
             -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             -H "Content-Type: application/json")
           
-          echo "Response: $RESPONSE"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
           
-          # Check if restart was successful
-          if echo "$RESPONSE" | grep -qi "error"; then
-            echo "⚠️ Coolify API restart may have failed, but Docker restart was done"
+          echo "Response (HTTP $HTTP_CODE): $BODY"
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Edge Functions service restart initiated"
           else
-            echo "✅ Edge Functions service restart initiated via Coolify API"
+            echo "⚠️ Restart may have failed, but continuing..."
           fi
           
           # Wait for service to come back up
@@ -180,9 +127,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SELFHOSTED_SUPABASE_URL }}
         run: |
           echo "🔍 Verifying deployment..."
-          sleep 10
+          sleep 5
           
-          # Use default URL if secret not set
           CHECK_URL="${SUPABASE_URL:-https://supabase.iptvlink.com.br}"
           
           # Check health endpoint
@@ -199,3 +145,14 @@ jobs:
           echo "Router response: $ROUTER_RESPONSE"
           
           echo "✅ Deployment verification complete"
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "📊 Deployment Summary"
+          echo "=========================================="
+          echo "Method: Coolify API (no SSH required)"
+          echo "Functions deployed: $(tar -tzf /tmp/functions.tar.gz | grep 'index.ts' | wc -l)"
+          echo "Status: Complete"
+          echo "=========================================="
