@@ -528,16 +528,15 @@ export default function AdminUserList() {
                   <TableHead className="min-w-[180px]">Usuário</TableHead>
                   <TableHead className="min-w-[120px] hidden sm:table-cell">Contato</TableHead>
                   <TableHead className="min-w-[80px]">Role</TableHead>
-                  <TableHead className="min-w-[80px]">Status</TableHead>
                   <TableHead className="min-w-[100px] hidden md:table-cell">Plano</TableHead>
-                  <TableHead className="min-w-[100px] hidden lg:table-cell">Cadastro</TableHead>
+                  <TableHead className="min-w-[100px] hidden lg:table-cell">Vencimento</TableHead>
                   <TableHead className="text-right min-w-[80px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -563,13 +562,14 @@ export default function AdminUserList() {
                         </div>
                       </TableCell>
                       <TableCell>{getRoleBadge(user.roles)}</TableCell>
-                      <TableCell>{getStatusBadge(user.situacao)}</TableCell>
                       <TableCell className="hidden md:table-cell">
                         <span className="text-sm">{user.plano || '-'}</span>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <span className="text-sm text-muted-foreground">
-                          {format(new Date(user.created_at), 'dd/MM/yy', { locale: ptBR })}
+                          {user.data_vencimento 
+                            ? format(new Date(user.data_vencimento), 'dd/MM/yy', { locale: ptBR })
+                            : '-'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
