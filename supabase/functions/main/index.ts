@@ -69,6 +69,10 @@ Deno.serve(async (req: Request) => {
       
       case 'iptv-admin':
         return await handleIptvAdmin(req);
+      
+      case 'iptv-play':
+        return await handleIptvPlay(req);
+      
       default:
         // For other functions, return not implemented
         return new Response(
@@ -86,9 +90,9 @@ Deno.serve(async (req: Request) => {
     console.error(`[Router] Error in function ${functionName}:`, error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: (error as Error).message,
         function: functionName,
-        stack: error.stack
+        stack: (error as Error).stack
       }),
       { 
         status: 500, 
@@ -1293,5 +1297,130 @@ async function handleIptvAdmin(req: Request): Promise<Response> {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
+  }
+}
+
+// ============================================================================
+// IPTV-PLAY HANDLER - Signed playback URL for channels
+// ============================================================================
+async function handleIptvPlay(req: Request): Promise<Response> {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const channelId = url.searchParams.get('channelId');
+
+    if (!channelId) {
+      return new Response(
+        JSON.stringify({ error: 'channelId is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify authentication using custom auth token from X-Custom-Token header
+    const customToken = req.headers.get('X-Custom-Token');
+    if (!customToken) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - No token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = customToken;
+
+    const supabaseAdmin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Decode JWT to get user_id
+    let userId: string | null = null;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        userId = payload.sub || payload.user_id || payload.id;
+      }
+    } catch (e) {
+      console.error('[iptv-play] Token decode error (router):', e);
+    }
+
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, cliente_ativo')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - User not found' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: channel, error: channelError } = await supabaseAdmin
+      .from('iptv_channels')
+      .select('id, name, slug, original_url, transcode_manifest_url, transcode_status, content_type')
+      .eq('id', channelId)
+      .single();
+
+    if (channelError || !channel) {
+      return new Response(
+        JSON.stringify({ error: 'Channel not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const cdnList: Array<{ url: string; priority: number; type: string; region?: string }> = [];
+
+    if (channel.transcode_status === 'ready' && channel.transcode_manifest_url) {
+      cdnList.push({
+        url: channel.transcode_manifest_url,
+        priority: 1,
+        type: 'transcode',
+        region: 'global',
+      });
+    }
+
+    if (channel.original_url.startsWith('http://')) {
+      const proxyUrl = `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(channel.original_url)}`;
+      cdnList.push({
+        url: proxyUrl,
+        priority: 2,
+        type: 'proxy',
+      });
+    }
+
+    // Origin as fallback
+    cdnList.push({
+      url: channel.original_url,
+      priority: 3,
+      type: 'origin',
+    });
+
+    const primary = cdnList[0];
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    return new Response(
+      JSON.stringify({
+        url: primary?.url,
+        cdnList,
+        expiresAt,
+        channel: { id: channel.id, name: channel.name },
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('[iptv-play] Router handler error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 }
