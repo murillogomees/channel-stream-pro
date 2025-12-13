@@ -407,29 +407,6 @@ serve(async (req) => {
           return { success: false, error: 'COOLIFY_API_TOKEN not configured' };
         }
 
-        // Use SELFHOSTED_DB_URL (banco correto do Supabase self-hosted)
-        const selfHostedDbUrl = Deno.env.get('SELFHOSTED_DB_URL') || '';
-        const dbUrl = selfHostedDbUrl;
-
-        if (!dbUrl) {
-          return { success: false, error: 'SELFHOSTED_DB_URL is not configured' };
-        }
-
-        let dbUri = '';
-        try {
-          const url = new URL(dbUrl);
-          const host = url.hostname;
-          const port = url.port || '5432';
-          const database = url.pathname.replace('/', '') || 'postgres';
-
-          // We always use the "authenticator" role for PostgREST and only reuse the host/port/database
-          // from the DB URL. The authenticator password must already be configured in the database.
-          const password = encodeURIComponent(url.password);
-          dbUri = `postgres://authenticator:${password}@${host}:${port}/${database}`;
-        } catch (e) {
-          return { success: false, error: `Invalid DB URL: ${e.message}`, data: { dbUrl } };
-        }
-
         // Find Supabase service in Coolify
         const servicesRes = await fetch(`${COOLIFY_URL}/api/v1/services`, {
           headers: {
@@ -454,8 +431,35 @@ serve(async (req) => {
           };
         }
 
+        // Fetch current envs to get SERVICE_PASSWORD_POSTGRES
+        const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${supabaseService.uuid}/envs`, {
+          headers: {
+            'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+            'Accept': 'application/json',
+          },
+        });
+        if (!envsRes.ok) {
+          return { success: false, error: `Failed to get service envs (${envsRes.status})` };
+        }
+        const envs = await envsRes.json();
+        
+        // Find SERVICE_PASSWORD_POSTGRES
+        const postgresPasswordEnv = envs.find((e: any) => e.key === 'SERVICE_PASSWORD_POSTGRES');
+        if (!postgresPasswordEnv || !postgresPasswordEnv.value) {
+          return { 
+            success: false, 
+            error: 'SERVICE_PASSWORD_POSTGRES not found in service envs',
+            data: { available_keys: envs.map((e: any) => e.key) }
+          };
+        }
+
+        // Build correct PGRST_DB_URI pointing to LOCAL supabase-db container
+        // PostgREST needs to connect as "authenticator" role
+        const pgPassword = encodeURIComponent(postgresPasswordEnv.value);
+        const dbUri = `postgres://authenticator:${pgPassword}@supabase-db:5432/postgres`;
+
         // Update PGRST_DB_URI via bulk envs API for the Supabase service
-        const envsBody = {
+        const updateEnvsBody = {
           data: [
             {
               key: 'PGRST_DB_URI',
@@ -468,19 +472,19 @@ serve(async (req) => {
           ],
         };
 
-        const envsRes = await fetch(`${COOLIFY_URL}/api/v1/services/${supabaseService.uuid}/envs/bulk`, {
+        const updateRes = await fetch(`${COOLIFY_URL}/api/v1/services/${supabaseService.uuid}/envs/bulk`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${COOLIFY_TOKEN}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-          body: JSON.stringify(envsBody),
+          body: JSON.stringify(updateEnvsBody),
         });
 
-        if (!envsRes.ok) {
-          const text = await envsRes.text();
-          return { success: false, error: `Failed to update envs (${envsRes.status})`, data: text };
+        if (!updateRes.ok) {
+          const text = await updateRes.text();
+          return { success: false, error: `Failed to update envs (${updateRes.status})`, data: text };
         }
 
         // Restart Supabase service so PostgREST picks up new DB URI
@@ -495,11 +499,10 @@ serve(async (req) => {
         return {
           success: restartRes.ok,
           data: {
-            message: 'PGRST_DB_URI updated and Supabase service restart triggered',
-            service: { name: supabaseService.name, uuid: supabaseService.uuid, fqdn: supabaseService.fqdn, type: supabaseService.type },
+            message: 'PGRST_DB_URI updated to local supabase-db container and service restart triggered',
+            service: { name: supabaseService.name, uuid: supabaseService.uuid },
             db_uri: dbUri,
             restart_status: restartRes.ok ? 'triggered' : `failed (${restartRes.status})`,
-            db_url_source: 'SELFHOSTED_DB_URL',
           },
         };
       },
