@@ -34,38 +34,38 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   const queryClient = useQueryClient();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  // Fetch ALL categories using RPC or direct query with distinct
-  const { data: allCategories, isLoading: loadingCategories, refetch: refetchCategories } = useQuery({
+  // 1) Buscar TODAS as categorias com contagem em UMA query agregada (leve)
+  const {
+    data: allCategories,
+    isLoading: loadingCategories,
+    refetch: refetchCategories,
+  } = useQuery({
     queryKey: ['all-iptv-categories'],
     queryFn: async () => {
-      // Use the database function to get distinct categories
-      const { data, error } = await supabase.rpc('get_m3u_distinct_categories');
-      
+      const { data, error } = await supabase
+        .from('iptv_channels')
+        .select('category, channelCount:count(*)', { head: false })
+        .not('category', 'is', null)
+        .order('category', { ascending: true });
+
       if (error) throw error;
-      
-      // Get counts per category
-      const categories: CategoryInfo[] = [];
-      for (const item of data || []) {
-        if (item.group_title) {
-          const { count } = await supabase
-            .from('iptv_channels')
-            .select('*', { count: 'exact', head: true })
-            .eq('category', item.group_title);
-          
-          categories.push({
-            name: item.group_title,
-            channelCount: count || 0
-          });
-        }
-      }
-      
-      return categories.sort((a, b) => a.name.localeCompare(b.name));
+
+      const mapped: CategoryInfo[] = (data || []).map((row: any) => ({
+        name: row.category as string,
+        channelCount: Number(row.channelCount) || 0,
+      }));
+
+      return mapped;
     },
     staleTime: 60000,
   });
 
-  // Fetch categories in THIS playlist
-  const { data: thisPlaylistCategories, isLoading: loadingThisPlaylist, refetch: refetchThisPlaylist } = useQuery({
+  // 2) Categorias já nesta playlist
+  const {
+    data: thisPlaylistCategories,
+    isLoading: loadingThisPlaylist,
+    refetch: refetchThisPlaylist,
+  } = useQuery({
     queryKey: ['playlist-categories-list', playlist.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -84,8 +84,12 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // Fetch categories linked to OTHER playlists
-  const { data: otherPlaylistCategories, isLoading: loadingOther, refetch: refetchOther } = useQuery({
+  // 3) Categorias ligadas a OUTRAS playlists (exceto a atual)
+  const {
+    data: otherPlaylistCategories,
+    isLoading: loadingOther,
+    refetch: refetchOther,
+  } = useQuery({
     queryKey: ['other-playlist-categories', playlist.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -104,23 +108,24 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // Available = all - (in this playlist) - (in other playlists)
+  // Disponíveis = todas - (presentes em qualquer playlist)
   const availableCategories = (allCategories || []).filter(
-    cat => !thisPlaylistCategories?.includes(cat.name) && !otherPlaylistCategories?.includes(cat.name)
+    (cat) =>
+      !thisPlaylistCategories?.includes(cat.name) &&
+      !otherPlaylistCategories?.includes(cat.name)
   );
 
-  // Categories in this playlist
-  const categoriesInPlaylist = (allCategories || []).filter(
-    cat => thisPlaylistCategories?.includes(cat.name)
+  // Categorias desta playlist
+  const categoriesInPlaylist = (allCategories || []).filter((cat) =>
+    thisPlaylistCategories?.includes(cat.name)
   );
 
-  // Add categories mutation
+  // Adicionar categorias (todos os canais da categoria)
   const addCategoriesMutation = useMutation({
     mutationFn: async (categories: string[]) => {
       let totalAdded = 0;
 
       for (const category of categories) {
-        // Get all channels in this category
         const { data: channels, error: fetchError } = await supabase
           .from('iptv_channels')
           .select('id')
@@ -129,7 +134,6 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         if (fetchError) throw fetchError;
         if (!channels || channels.length === 0) continue;
 
-        // Get current max position
         const { data: existing } = await supabase
           .from('iptv_playlist_channels')
           .select('position')
@@ -139,7 +143,6 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
         const maxPosition = existing?.[0]?.position || 0;
 
-        // Insert in batches
         for (let i = 0; i < channels.length; i += 500) {
           const batch = channels.slice(i, i + 500).map((ch, idx) => ({
             playlist_id: playlist.id,
@@ -149,7 +152,10 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
           const { error } = await supabase
             .from('iptv_playlist_channels')
-            .upsert(batch, { onConflict: 'playlist_id,channel_id', ignoreDuplicates: true });
+            .upsert(batch, {
+              onConflict: 'playlist_id,channel_id',
+              ignoreDuplicates: true,
+            });
 
           if (error) throw error;
         }
@@ -157,7 +163,6 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         totalAdded += channels.length;
       }
 
-      // Update channel count
       const { count } = await supabase
         .from('iptv_playlist_channels')
         .select('*', { count: 'exact', head: true })
@@ -184,10 +189,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // Remove category mutation
+  // Remover categoria (todos os canais dessa categoria desta playlist)
   const removeCategoryMutation = useMutation({
     mutationFn: async (category: string) => {
-      // Get all channel IDs in this category
       const { data: channels, error: fetchError } = await supabase
         .from('iptv_channels')
         .select('id')
@@ -196,9 +200,8 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       if (fetchError) throw fetchError;
       if (!channels || channels.length === 0) return 0;
 
-      const channelIds = channels.map(ch => ch.id);
+      const channelIds = channels.map((ch) => ch.id);
 
-      // Delete in batches
       for (let i = 0; i < channelIds.length; i += 500) {
         const batch = channelIds.slice(i, i + 500);
         const { error } = await supabase
@@ -210,7 +213,6 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         if (error) throw error;
       }
 
-      // Update channel count
       const { count } = await supabase
         .from('iptv_playlist_channels')
         .select('*', { count: 'exact', head: true })
@@ -237,8 +239,8 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   });
 
   const toggleCategory = (name: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name]
+    setSelectedCategories((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
     );
   };
 
@@ -258,8 +260,15 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
           Adicionar por Categoria
         </h3>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+            />
             Atualizar
           </Button>
           {selectedCategories.length > 0 && (
@@ -280,7 +289,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Available Categories */}
+        {/* Categorias Disponíveis */}
         <div className="border rounded-lg">
           <div className="p-3 border-b bg-muted/50">
             <h4 className="text-sm font-medium">
@@ -323,7 +332,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
           </ScrollArea>
         </div>
 
-        {/* Categories in Playlist */}
+        {/* Categorias na Playlist */}
         <div className="border rounded-lg">
           <div className="p-3 border-b bg-muted/50">
             <h4 className="text-sm font-medium">
