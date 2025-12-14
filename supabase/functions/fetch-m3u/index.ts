@@ -656,8 +656,14 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
     return { inserted: 0, skipped: 0, duplicates: duplicateCount };
   }
 
-  // Remove fields that don't exist as columns in iptv_channels (like normalized_category)
-  const sanitizedRecords = newRecords.map(({ normalized_category, ...rest }) => rest);
+  // Remove fields that don't exist as columns in iptv_channels
+  const sanitizedRecords = newRecords.map(({ 
+    normalized_category,
+    normalized_name,
+    source_hash,
+    series_key,
+    ...rest 
+  }) => rest);
 
   // Use upsert with original_url conflict handling to avoid unique constraint errors
   const { data: upsertData, error } = await supabase
