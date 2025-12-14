@@ -44,7 +44,7 @@ interface IPTVPlaylistChannelsProps {
 }
 
 const PAGE_SIZE = 1000;
-const DISPLAY_LIMIT = 200;
+// No display limit - show all with scroll
 
 export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannelsProps) {
   const queryClient = useQueryClient();
@@ -88,7 +88,7 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
     queryFn: fetchPlaylistChannels,
   });
 
-  // Fetch available channels (not in playlist) with pagination
+  // Fetch available channels (not in THIS playlist) with pagination - load ALL
   const fetchAvailableChannels = useCallback(async () => {
     // Get current channel IDs
     const currentIds = new Set(playlistChannels?.map(pc => pc.channel_id) || []);
@@ -97,11 +97,12 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
     let page = 0;
     let hasMore = true;
 
-    while (hasMore && availableChannels.length < 500) {
+    while (hasMore) {
       let query = supabase
         .from('iptv_channels')
         .select('id, name, slug, logo_url, category, is_healthy')
-        .order('name')
+        .order('category', { ascending: true })
+        .order('name', { ascending: true })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (search) {
@@ -112,7 +113,7 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // Filter out channels already in playlist
+        // Filter out channels already in THIS playlist only
         const filtered = data.filter(ch => !currentIds.has(ch.id));
         availableChannels.push(...filtered);
         hasMore = data.length === PAGE_SIZE;
@@ -255,10 +256,6 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
     refetchAvailable();
   };
 
-  // Display first N channels for performance
-  const displayedPlaylistChannels = playlistChannels?.slice(0, DISPLAY_LIMIT) || [];
-  const hasMorePlaylist = (playlistChannels?.length || 0) > DISPLAY_LIMIT;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -276,11 +273,6 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
             <h3 className="font-medium">
               Canais na Playlist ({playlistChannels?.length || 0})
             </h3>
-            {hasMorePlaylist && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Exibindo primeiros {DISPLAY_LIMIT} canais
-              </p>
-            )}
           </div>
           <ScrollArea className="flex-1 p-2">
             {loadingPlaylist ? (
@@ -293,7 +285,7 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
               </p>
             ) : (
               <div className="space-y-1">
-                {displayedPlaylistChannels.map((pc, idx) => (
+                {(playlistChannels || []).map((pc, idx) => (
                   <div 
                     key={pc.channel_id}
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 group"
@@ -313,7 +305,7 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
                         size="icon"
                         className="h-5 w-5"
                         onClick={() => moveMutation.mutate({ channelId: pc.channel_id, direction: 'down' })}
-                        disabled={idx === displayedPlaylistChannels.length - 1}
+                        disabled={idx === (playlistChannels?.length || 0) - 1}
                       >
                         <ChevronDown className="h-3 w-3" />
                       </Button>
@@ -382,7 +374,7 @@ export function IPTVPlaylistChannels({ playlist, onUpdate }: IPTVPlaylistChannel
               </p>
             ) : (
               <div className="space-y-1">
-                {availableChannels?.slice(0, DISPLAY_LIMIT).map((channel) => (
+                {(availableChannels || []).map((channel) => (
                   <div 
                     key={channel.id}
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"

@@ -131,11 +131,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // Disponíveis = todas - (presentes em qualquer playlist)
+  // Disponíveis = todas - (presentes NESTA playlist apenas)
   const availableCategories = (allCategories || []).filter(
-    (cat) =>
-      !thisPlaylistCategories?.includes(cat.name) &&
-      !otherPlaylistCategories?.includes(cat.name)
+    (cat) => !thisPlaylistCategories?.includes(cat.name)
   );
 
   // Categorias desta playlist
