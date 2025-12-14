@@ -1,9 +1,10 @@
 /**
  * Admin IPTV Management - Unified Page
  * All IPTV configuration in one place with tabs
+ * Lazy loads tab content only when tab is selected
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { ResponsivePageHeader } from '@/components/admin/ResponsivePageHeader';
@@ -29,13 +30,25 @@ const TABS = [
   { id: 'loadtest', label: 'Load Test', icon: FlaskConical },
 ] as const;
 
+type TabId = typeof TABS[number]['id'];
+
 export default function AdminIPTVPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'channels';
+  const currentTab = (searchParams.get('tab') || 'channels') as TabId;
+  
+  // Track which tabs have been visited (for lazy loading)
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(() => new Set([currentTab]));
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = useCallback((tab: string) => {
     setSearchParams({ tab });
-  };
+    setVisitedTabs(prev => {
+      if (prev.has(tab as TabId)) return prev;
+      return new Set([...prev, tab as TabId]);
+    });
+  }, [setSearchParams]);
+
+  // Only render tab content if it has been visited
+  const shouldRenderTab = (tabId: TabId) => visitedTabs.has(tabId);
 
   return (
     <AdminShell backTo="/admin/dashboard">
@@ -61,31 +74,31 @@ export default function AdminIPTVPage() {
 
           <div className="mt-4">
             <TabsContent value="channels" className="m-0">
-              <IPTVChannelsTab />
+              {shouldRenderTab('channels') && <IPTVChannelsTab />}
             </TabsContent>
 
             <TabsContent value="series" className="m-0">
-              <IPTVSeriesTab />
+              {shouldRenderTab('series') && <IPTVSeriesTab />}
             </TabsContent>
 
             <TabsContent value="playlists" className="m-0">
-              <IPTVPlaylistsTab />
+              {shouldRenderTab('playlists') && <IPTVPlaylistsTab />}
             </TabsContent>
 
             <TabsContent value="epg" className="m-0">
-              <IPTVEPGTab />
+              {shouldRenderTab('epg') && <IPTVEPGTab />}
             </TabsContent>
 
             <TabsContent value="transcode" className="m-0">
-              <IPTVTranscodeTab />
+              {shouldRenderTab('transcode') && <IPTVTranscodeTab />}
             </TabsContent>
 
             <TabsContent value="cache" className="m-0">
-              <IPTVCacheTab />
+              {shouldRenderTab('cache') && <IPTVCacheTab />}
             </TabsContent>
 
             <TabsContent value="loadtest" className="m-0">
-              <IPTVLoadTestTab />
+              {shouldRenderTab('loadtest') && <IPTVLoadTestTab />}
             </TabsContent>
           </div>
         </Tabs>
