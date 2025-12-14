@@ -8,6 +8,8 @@
  * - Normalizar streams inconsistentes
  */
 
+// Cloudflare Worker proxy (distributed edge locations)
+const CLOUDFLARE_PROXY_URL = import.meta.env.VITE_CLOUDFLARE_STREAM_PROXY_URL || ''
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 
 export interface StreamInfo {
@@ -20,7 +22,8 @@ export interface StreamInfo {
 
 export class StreamResolver {
   private static instance: StreamResolver
-  private readonly proxyEndpoint = `${SUPABASE_URL}/functions/v1/stream-proxy`
+  // Prefer Cloudflare Worker, fallback to Supabase Edge Function
+  private readonly proxyEndpoint = CLOUDFLARE_PROXY_URL || `${SUPABASE_URL}/functions/v1/stream-proxy`
 
   private constructor() {}
 
@@ -37,12 +40,12 @@ export class StreamResolver {
   resolve(url: string): string {
     if (!url) return ''
     
-    // Already proxied
-    if (url.includes('/functions/v1/stream-proxy')) {
+    // Already proxied (Supabase or Cloudflare)
+    if (url.includes('/functions/v1/stream-proxy') || url.includes('iptv-stream-proxy')) {
       return url
     }
 
-    // Wrap through proxy
+    // Wrap through proxy (Cloudflare Worker or Supabase fallback)
     return `${this.proxyEndpoint}?url=${encodeURIComponent(url)}`
   }
 
