@@ -4,7 +4,7 @@
  * Optimized queries using database-level filtering with indexes
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -33,19 +33,21 @@ interface IPTVPlaylistCategoriesProps {
 export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCategoriesProps) {
   const queryClient = useQueryClient();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [autoLinkDone, setAutoLinkDone] = useState(false);
 
-  // 1) Categorias DISPONÍVEIS: canais que NÃO estão em NENHUMA playlist
+  // 1) Categorias DISPONÍVEIS: canais que NÃO estão nesta playlist específica
   const {
     data: availableCategories = [],
     isLoading: loadingAvailable,
     refetch: refetchAvailable,
   } = useQuery({
-    queryKey: ['available-categories-for-playlist'],
+    queryKey: ['available-categories-for-playlist', playlist.id],
     queryFn: async () => {
-      // Buscar todos os channel_ids que já estão em alguma playlist
+      // Buscar channel_ids que já estão NESTA playlist
       const { data: linkedChannels, error: linkedError } = await supabase
         .from('iptv_playlist_channels')
-        .select('channel_id');
+        .select('channel_id')
+        .eq('playlist_id', playlist.id);
 
       if (linkedError) throw linkedError;
 
@@ -60,7 +62,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       if (allError) throw allError;
 
-      // Filtrar canais não linkados e contar por categoria
+      // Filtrar canais não linkados a ESTA playlist e contar por categoria
       const counts = new Map<string, number>();
       for (const ch of allChannels || []) {
         if (!linkedIds.has(ch.id) && ch.category) {
@@ -105,6 +107,92 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     staleTime: 0,
     gcTime: 0,
   });
+
+  // 3) Auto-vincular categorias que têm o mesmo nome da playlist ao abrir
+  const autoLinkMutation = useMutation({
+    mutationFn: async () => {
+      const playlistNameLower = playlist.name.toLowerCase();
+      
+      // Buscar canais que têm categoria com o mesmo nome da playlist e não estão nela
+      const { data: linkedChannels } = await supabase
+        .from('iptv_playlist_channels')
+        .select('channel_id')
+        .eq('playlist_id', playlist.id);
+
+      const linkedIds = new Set((linkedChannels || []).map(c => c.channel_id));
+
+      const { data: matchingChannels, error } = await supabase
+        .from('iptv_channels')
+        .select('id')
+        .ilike('category', playlistNameLower);
+
+      if (error) throw error;
+      if (!matchingChannels || matchingChannels.length === 0) return 0;
+
+      // Filtrar canais que ainda não estão na playlist
+      const newChannels = matchingChannels.filter(ch => !linkedIds.has(ch.id));
+      if (newChannels.length === 0) return 0;
+
+      // Obter posição máxima atual
+      const { data: existing } = await supabase
+        .from('iptv_playlist_channels')
+        .select('position')
+        .eq('playlist_id', playlist.id)
+        .order('position', { ascending: false })
+        .limit(1);
+
+      const maxPosition = existing?.[0]?.position || 0;
+
+      // Inserir em batches
+      for (let i = 0; i < newChannels.length; i += 500) {
+        const batch = newChannels.slice(i, i + 500).map((ch, idx) => ({
+          playlist_id: playlist.id,
+          channel_id: ch.id,
+          position: maxPosition + i + idx + 1,
+        }));
+
+        await supabase
+          .from('iptv_playlist_channels')
+          .upsert(batch, {
+            onConflict: 'playlist_id,channel_id',
+            ignoreDuplicates: true,
+          });
+      }
+
+      // Atualizar contagem
+      const { count } = await supabase
+        .from('iptv_playlist_channels')
+        .select('*', { count: 'exact', head: true })
+        .eq('playlist_id', playlist.id);
+
+      await supabase
+        .from('iptv_playlists')
+        .update({ channel_count: count || 0 })
+        .eq('id', playlist.id);
+
+      return newChannels.length;
+    },
+    onSuccess: (count) => {
+      if (count > 0) {
+        toast.success(`Auto-vinculados ${count} canais da categoria "${playlist.name}"`);
+        refetchAvailable();
+        refetchPlaylist();
+        queryClient.invalidateQueries({ queryKey: ['iptv-playlists'] });
+        onUpdate();
+      }
+      setAutoLinkDone(true);
+    },
+    onError: () => {
+      setAutoLinkDone(true);
+    },
+  });
+
+  // Executar auto-link ao montar o componente
+  useEffect(() => {
+    if (!autoLinkDone && !autoLinkMutation.isPending) {
+      autoLinkMutation.mutate();
+    }
+  }, [playlist.id]);
 
   // Adicionar categorias (todos os canais da categoria)
   const addCategoriesMutation = useMutation({
