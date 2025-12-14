@@ -240,7 +240,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const reqType = isM3u8 ? 'M3U8' : isTs ? 'TS' : isMp4File ? 'MP4' : isKey ? 'KEY' : 'OTHER';
-    console.log(`[Proxy] ${reqType}: ${decodedUrl.substring(0, 60)}...`);
+    console.log(`[Proxy] ${reqType}: ${decodedUrl.substring(0, 80)}`);
 
     // Build upstream headers - preserve session context
     const upstreamHeaders = new Headers();
@@ -273,20 +273,36 @@ serve(async (req: Request): Promise<Response> => {
       upstreamHeaders.set('Referer', customReferer);
     }
 
+    // Log request headers being sent
+    console.log(`[Proxy] Request headers: Host=${upstreamHeaders.get('Host')}, Referer=${upstreamHeaders.get('Referer')?.substring(0, 50)}`);
+
     const timeout = isM3u8 ? CONFIG.MANIFEST_TIMEOUT_MS : CONFIG.FETCH_TIMEOUT_MS;
     const retries = isM3u8 ? 1 : CONFIG.MAX_RETRIES;
 
     const upstreamResponse = await fetchWithRetry(decodedUrl, upstreamHeaders, timeout, retries);
 
+    // Log upstream response details
+    console.log(`[Proxy] Upstream response: status=${upstreamResponse.status}, content-type=${upstreamResponse.headers.get('content-type')}`);
+
     // Handle non-OK responses
     if (!upstreamResponse.ok && upstreamResponse.status !== 206) {
-      console.log(`[Proxy] Upstream error: ${upstreamResponse.status}`);
+      // Try to get error body for debugging
+      let errorBody = '';
+      try {
+        const bodyText = await upstreamResponse.text();
+        errorBody = bodyText.substring(0, 200);
+      } catch {
+        errorBody = 'Unable to read error body';
+      }
+      
+      console.error(`[Proxy] Upstream error: status=${upstreamResponse.status}, body=${errorBody}`);
       
       return new Response(
         JSON.stringify({ 
           error: 'UPSTREAM_ERROR', 
           status: upstreamResponse.status,
-          message: upstreamResponse.status === 403 ? 'Session expired or access denied' : 'Upstream error'
+          message: upstreamResponse.status === 403 ? 'Session expired or access denied' : 'Upstream error',
+          debug: errorBody.substring(0, 100)
         }),
         { 
           status: upstreamResponse.status, 
