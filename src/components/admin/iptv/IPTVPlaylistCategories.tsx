@@ -123,9 +123,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // 3) (Mantido para futura expansão: categorias ligadas a OUTRAS playlists)
-  //    Atualmente não usamos esse dado, mas deixamos a query preparada caso
-  //    queiramos bloquear categorias já usadas em playlists específicas.
+  // 3) Categorias ligadas a OUTRAS playlists (paginado)
   const {
     data: otherPlaylistCategories,
     isLoading: loadingOther,
@@ -133,26 +131,42 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['other-playlist-categories', playlist.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('iptv_playlist_channels')
-        .select('channel:iptv_channels(category)')
-        .neq('playlist_id', playlist.id);
-
-      if (error) throw error;
-
       const categories = new Set<string>();
-      for (const item of data || []) {
-        const cat = (item.channel as any)?.category;
-        if (cat) categories.add(cat);
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('iptv_playlist_channels')
+          .select('channel:iptv_channels(category)')
+          .neq('playlist_id', playlist.id)
+          .range(page * CATEGORY_PAGE_SIZE, (page + 1) * CATEGORY_PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const item of data) {
+          const cat = (item.channel as any)?.category;
+          if (cat) categories.add(cat);
+        }
+
+        hasMore = data.length === CATEGORY_PAGE_SIZE;
+        page++;
       }
+
       return Array.from(categories);
     },
-    enabled: false, // não usado atualmente
   });
 
-  // Disponíveis = todas - (presentes NESTA playlist apenas)
+  // Disponíveis = todas - (presentes NESTA playlist) - (presentes em OUTRAS playlists)
   const availableCategories = (allCategories || []).filter(
-    (cat) => !thisPlaylistCategories?.includes(cat.name)
+    (cat) => 
+      !thisPlaylistCategories?.includes(cat.name) &&
+      !otherPlaylistCategories?.includes(cat.name)
   );
 
   // Categorias desta playlist
@@ -290,7 +304,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     refetchOther();
   };
 
-  const isLoading = loadingCategories || loadingThisPlaylist;
+  const isLoading = loadingCategories || loadingThisPlaylist || loadingOther;
 
   return (
     <div className="space-y-4">
