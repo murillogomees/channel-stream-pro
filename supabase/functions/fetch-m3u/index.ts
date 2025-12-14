@@ -111,47 +111,36 @@ serve(async (req) => {
           for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
             const batch = channels.slice(i, i + DB_BATCH_SIZE);
             
-            // Check existing URLs to skip duplicates
-            const urls = batch.map(ch => ch.url);
-            const { data: existing } = await supabase
+            const records = batch.map(ch => ({
+              name: ch.name,
+              slug: generateSlug(ch.name),
+              original_url: ch.url,
+              logo_url: ch.logo || null,
+              category: ch.group || null,
+              content_type: detectContentType(ch.url, ch.group),
+              is_healthy: true,
+              health_score: 100,
+              transcode_status: 'none',
+              shard_id: 0,
+              metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
+            }));
+
+            // Use upsert with original_url as conflict key
+            const { data: upsertData, error } = await supabase
               .from('iptv_channels')
-              .select('original_url')
-              .in('original_url', urls);
-            
-            const existingUrls = new Set((existing || []).map(e => e.original_url));
-            const newChannels = batch.filter(ch => !existingUrls.has(ch.url));
-            const batchSkipped = batch.length - newChannels.length;
-            skipped += batchSkipped;
-            
-            if (newChannels.length > 0) {
-              const records = newChannels.map(ch => ({
-                name: ch.name,
-                slug: generateSlug(ch.name),
-                original_url: ch.url,
-                logo_url: ch.logo || null,
-                category: ch.group || null,
-                content_type: detectContentType(ch.url, ch.group),
-                is_healthy: true,
-                health_score: 100,
-                transcode_status: 'none',
-                shard_id: 0,
-                metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-              }));
+              .upsert(records, { 
+                onConflict: 'original_url',
+                ignoreDuplicates: true
+              })
+              .select('id');
 
-              const { error } = await supabase
-                .from('iptv_channels')
-                .insert(records);
-
-              if (error) {
-                // Fallback: insert one by one for any errors
-                for (const record of records) {
-                  const { error: singleError } = await supabase.from('iptv_channels').insert(record);
-                  if (!singleError) inserted++;
-                  else skipped++;
-                }
-              } else {
-                inserted += newChannels.length;
-              }
+            if (error) {
+              console.error('[fetch-m3u] Batch error:', error.message);
+              skipped += batch.length;
+            } else {
+              const insertedCount = upsertData?.length || 0;
+              inserted += insertedCount;
+              skipped += batch.length - insertedCount;
             }
 
             const processed = Math.min(i + DB_BATCH_SIZE, total);
@@ -181,45 +170,36 @@ serve(async (req) => {
     for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
       const batch = channels.slice(i, i + DB_BATCH_SIZE);
       
-      // Check existing URLs to skip duplicates
-      const urls = batch.map(ch => ch.url);
-      const { data: existing } = await supabase
+      const records = batch.map(ch => ({
+        name: ch.name,
+        slug: generateSlug(ch.name),
+        original_url: ch.url,
+        logo_url: ch.logo || null,
+        category: ch.group || null,
+        content_type: detectContentType(ch.url, ch.group),
+        is_healthy: true,
+        health_score: 100,
+        transcode_status: 'none',
+        shard_id: 0,
+        metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
+      }));
+
+      // Use upsert with original_url as conflict key
+      const { data: upsertData, error } = await supabase
         .from('iptv_channels')
-        .select('original_url')
-        .in('original_url', urls);
-      
-      const existingUrls = new Set((existing || []).map(e => e.original_url));
-      const newChannels = batch.filter(ch => !existingUrls.has(ch.url));
-      skipped += batch.length - newChannels.length;
-      
-      if (newChannels.length > 0) {
-        const records = newChannels.map(ch => ({
-          name: ch.name,
-          slug: generateSlug(ch.name),
-          original_url: ch.url,
-          logo_url: ch.logo || null,
-          category: ch.group || null,
-          content_type: detectContentType(ch.url, ch.group),
-          is_healthy: true,
-          health_score: 100,
-          transcode_status: 'none',
-          shard_id: 0,
-          metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-        }));
+        .upsert(records, { 
+          onConflict: 'original_url',
+          ignoreDuplicates: true
+        })
+        .select('id');
 
-        const { error } = await supabase
-          .from('iptv_channels')
-          .insert(records);
-
-        if (error) {
-          for (const record of records) {
-            const { error: singleError } = await supabase.from('iptv_channels').insert(record);
-            if (!singleError) inserted++;
-            else skipped++;
-          }
-        } else {
-          inserted += newChannels.length;
-        }
+      if (error) {
+        console.error('[fetch-m3u] Batch error:', error.message);
+        skipped += batch.length;
+      } else {
+        const insertedCount = upsertData?.length || 0;
+        inserted += insertedCount;
+        skipped += batch.length - insertedCount;
       }
     }
 
