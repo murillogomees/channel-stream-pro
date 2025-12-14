@@ -478,3 +478,19 @@ verify_jwt = false
 # Data migration - transfer data between Supabase instances
 [functions.data-migration]
 verify_jwt = false
+
+# ==========================================
+# IPTV PHASE 2: Multi-origin + LL-HLS + Geo
+# ==========================================
+
+# Origin Failover - multi-origin with automatic failover
+[functions.iptv-origin-failover]
+verify_jwt = false
+
+# LL-HLS Optimizer - low-latency HLS optimization
+[functions.iptv-llhls-optimizer]
+verify_jwt = false
+
+# Geo Router - intelligent geo-based CDN routing
+[functions.iptv-geo-router]
+verify_jwt = false
