@@ -3,13 +3,23 @@
  * 
  * Determines the optimal way to play video content:
  * - VOD (movies, series): Direct URL (no proxy)
- * - HLS manifests: Through proxy for URL rewriting
- * - Live streams: Through stream-proxy for HTTP URLs
+ * - HLS manifests: Through Cloudflare Worker for URL rewriting
+ * - Live streams: Through Cloudflare Worker for HTTP URLs
  * 
- * Uses Supabase Cloud for edge functions.
+ * Uses Cloudflare Worker as PRIMARY proxy (faster, distributed edge).
+ * Falls back to Supabase Edge Function if needed.
  */
 
 import { SUPABASE_URL } from '@/config/supabase';
+
+// Cloudflare Worker - PRIMARY (faster, distributed edge locations)
+const CLOUDFLARE_WORKER_URL = 'https://iptv-stream-proxy.murillogg.workers.dev';
+
+// Supabase Edge Function - FALLBACK
+const SUPABASE_PROXY_URL = `${SUPABASE_URL}/functions/v1/stream-proxy`;
+
+// Use Cloudflare Worker as primary proxy
+const PROXY_URL = CLOUDFLARE_WORKER_URL;
 
 export interface StreamResolution {
   url: string;
@@ -98,7 +108,7 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
   if (isHttpUrl(url)) {
     const contentType = isVodContent(url) ? 'vod' : isDirectLiveStream(url) ? 'live' : 'unknown';
     return {
-      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
+      url: `${PROXY_URL}?url=${encodeURIComponent(url)}`,
       type: 'proxy',
       contentType,
       fallbackUrl: url, // Keep original as fallback (for native apps)
@@ -108,7 +118,7 @@ export function resolveStreamUrl(originalUrl: string): StreamResolution {
   // HLS manifest with HTTPS - use proxy for URL rewriting (manifests are tiny)
   if (isHlsManifest(url) && !isVodContent(url)) {
     return {
-      url: `${SUPABASE_URL}/functions/v1/stream-proxy?url=${encodeURIComponent(url)}`,
+      url: `${PROXY_URL}?url=${encodeURIComponent(url)}`,
       type: 'proxy',
       contentType: 'hls',
       fallbackUrl: url,
