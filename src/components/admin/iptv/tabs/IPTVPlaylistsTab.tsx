@@ -17,6 +17,8 @@ import { Plus, Search, RefreshCw, Trash2, Edit, Copy, List, Users, Loader2, Eye,
 import { IPTVPlaylistForm } from '@/components/admin/iptv/IPTVPlaylistForm';
 import { IPTVPlaylistChannels } from '@/components/admin/iptv/IPTVPlaylistChannels';
 import { IPTVPlaylistCategories } from '@/components/admin/iptv/IPTVPlaylistCategories';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { usePlaylistStats } from '@/hooks/useIPTVRealtimeStats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Playlist {
@@ -34,6 +36,7 @@ interface Playlist {
 
 export function IPTVPlaylistsTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = usePlaylistStats();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isChannelsOpen, setIsChannelsOpen] = useState(false);
@@ -48,21 +51,6 @@ export function IPTVPlaylistsTab() {
       const { data, error } = await query;
       if (error) throw error;
       return data as Playlist[];
-    },
-  });
-
-  const { data: stats } = useQuery({
-    queryKey: ['iptv-playlist-stats'],
-    queryFn: async () => {
-      const [total, publicCount] = await Promise.all([
-        supabase.from('iptv_playlists').select('id', { count: 'exact', head: true }),
-        supabase.from('iptv_playlists').select('id', { count: 'exact', head: true }).eq('is_public', true),
-      ]);
-      return {
-        total: total.count || 0,
-        public: publicCount.count || 0,
-        private: (total.count || 0) - (publicCount.count || 0),
-      };
     },
   });
 
@@ -103,42 +91,12 @@ export function IPTVPlaylistsTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-xl font-bold">{stats?.total || 0}</p>
-              </div>
-              <List className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Públicas</p>
-                <p className="text-xl font-bold text-green-500">{stats?.public || 0}</p>
-              </div>
-              <Eye className="h-6 w-6 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Privadas</p>
-                <p className="text-xl font-bold text-orange-500">{stats?.private || 0}</p>
-              </div>
-              <Users className="h-6 w-6 text-orange-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={3}>
+        <IPTVStatCard label="Total" value={realtimeStats?.total || 0} icon={List} loading={statsLoading} />
+        <IPTVStatCard label="Públicas" value={realtimeStats?.public || 0} icon={Eye} color="green" loading={statsLoading} />
+        <IPTVStatCard label="Privadas" value={realtimeStats?.private || 0} icon={Users} color="orange" loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Actions */}
       <Card>

@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { IPTVChannelForm } from '@/components/admin/iptv/IPTVChannelForm';
 import { IPTVChannelImport } from '@/components/admin/iptv/IPTVChannelImport';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { useChannelStats } from '@/hooks/useIPTVRealtimeStats';
 import { cn } from '@/lib/utils';
 
 interface Channel {
@@ -65,6 +67,7 @@ type ViewMode = 'categories' | 'list';
 
 export function IPTVChannelsTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = useChannelStats();
   
   const [viewMode, setViewMode] = useState<ViewMode>('categories');
   const [search, setSearch] = useState('');
@@ -368,64 +371,14 @@ export function IPTVChannelsTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-xl font-bold">{stats.total.toLocaleString()}</p>
-              </div>
-              <Tv className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Categorias</p>
-                <p className="text-xl font-bold text-purple-500">{stats.categories}</p>
-              </div>
-              <FolderTree className="h-6 w-6 text-purple-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Séries</p>
-                <p className="text-xl font-bold text-blue-500">{stats.series}</p>
-              </div>
-              <Clapperboard className="h-6 w-6 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Saudáveis</p>
-                <p className="text-xl font-bold text-green-500">{stats.healthy.toLocaleString()}</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Com Falha</p>
-                <p className="text-xl font-bold text-red-500">{stats.unhealthy.toLocaleString()}</p>
-              </div>
-              <XCircle className="h-6 w-6 text-red-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={5}>
+        <IPTVStatCard label="Total" value={realtimeStats?.total || 0} icon={Tv} loading={statsLoading} />
+        <IPTVStatCard label="Categorias" value={realtimeStats?.categories || 0} icon={FolderTree} color="purple" loading={statsLoading} />
+        <IPTVStatCard label="Séries" value={realtimeStats?.series || 0} icon={Clapperboard} color="blue" loading={statsLoading} />
+        <IPTVStatCard label="Saudáveis" value={realtimeStats?.healthy || 0} icon={CheckCircle} color="green" loading={statsLoading} />
+        <IPTVStatCard label="Com Falha" value={realtimeStats?.unhealthy || 0} icon={XCircle} color="red" loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Actions Toolbar */}
       <Card>

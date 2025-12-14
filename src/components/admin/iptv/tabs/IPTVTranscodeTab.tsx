@@ -24,6 +24,8 @@ import {
   Clock, Search, Plus, Trash2, Settings, Play, StopCircle,
   Square, RotateCcw, Eraser
 } from 'lucide-react';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { useTranscodeStats } from '@/hooks/useIPTVRealtimeStats';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +42,7 @@ const RESOLUTION_OPTIONS = ['1080p', '720p', '480p', '360p', '240p'];
 
 export function IPTVTranscodeTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = useTranscodeStats();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -70,7 +73,6 @@ export function IPTVTranscodeTab() {
   });
 
   const jobs = jobsData?.jobs || [];
-  const stats = jobsData?.stats || { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 };
 
   // Fetch channels for dropdown
   const { data: channels = [] } = useQuery({
@@ -195,64 +197,14 @@ export function IPTVTranscodeTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Jobs</p>
-                <p className="text-xl font-bold">{stats.total}</p>
-              </div>
-              <Zap className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Pendentes</p>
-                <p className="text-xl font-bold text-yellow-500">{stats.pending}</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Processando</p>
-                <p className="text-xl font-bold text-blue-500">{stats.processing}</p>
-              </div>
-              <Loader2 className="h-6 w-6 text-blue-500 opacity-50 animate-spin" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Concluídos</p>
-                <p className="text-xl font-bold text-green-500">{stats.completed}</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Falharam</p>
-                <p className="text-xl font-bold text-red-500">{stats.failed}</p>
-              </div>
-              <XCircle className="h-6 w-6 text-red-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={5}>
+        <IPTVStatCard label="Total Jobs" value={realtimeStats?.total || 0} icon={Zap} loading={statsLoading} />
+        <IPTVStatCard label="Pendentes" value={realtimeStats?.pending || 0} icon={Clock} color="yellow" loading={statsLoading} />
+        <IPTVStatCard label="Processando" value={realtimeStats?.processing || 0} icon={Loader2} color="blue" loading={statsLoading} />
+        <IPTVStatCard label="Concluídos" value={realtimeStats?.completed || 0} icon={CheckCircle} color="green" loading={statsLoading} />
+        <IPTVStatCard label="Falharam" value={realtimeStats?.failed || 0} icon={XCircle} color="red" loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Info Card */}
       <Card className="border-blue-500/50 bg-blue-500/5">
