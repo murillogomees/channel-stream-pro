@@ -295,14 +295,28 @@ serve(async (req: Request): Promise<Response> => {
         errorBody = 'Unable to read error body';
       }
       
-      console.error(`[Proxy] Upstream error: status=${upstreamResponse.status}, body=${errorBody}`);
+      // Enhanced 403 logging for debugging provider issues
+      if (upstreamResponse.status === 403) {
+        console.error(`[Proxy] ❌ 403 BLOCKED by provider`);
+        console.error(`[Proxy] URL: ${decodedUrl}`);
+        console.error(`[Proxy] This is likely IP-based session binding from Xtream provider`);
+        console.error(`[Proxy] The provider's HLS session token is tied to the client's IP address`);
+        console.error(`[Proxy] Solutions: 1) Ask provider to whitelist proxy IP, 2) Use residential proxy, 3) Change provider`);
+      } else {
+        console.error(`[Proxy] Upstream error: status=${upstreamResponse.status}, body=${errorBody}`);
+      }
       
       return new Response(
         JSON.stringify({ 
           error: 'UPSTREAM_ERROR', 
           status: upstreamResponse.status,
-          message: upstreamResponse.status === 403 ? 'Session expired or access denied' : 'Upstream error',
-          debug: errorBody.substring(0, 100)
+          message: upstreamResponse.status === 403 
+            ? 'O servidor do provedor bloqueou o acesso (403). Isso é uma restrição de IP do provedor IPTV.' 
+            : 'Upstream error',
+          debug: errorBody.substring(0, 100),
+          hint: upstreamResponse.status === 403 
+            ? 'Provider uses IP-based session binding. Proxy IP differs from client IP.' 
+            : undefined
         }),
         { 
           status: upstreamResponse.status, 

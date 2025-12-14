@@ -218,26 +218,60 @@ export function ShakaPlayerUI({
       {showError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
           <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
-            <WifiOff className="w-16 h-16 text-destructive" />
-            <h3 className="text-white text-xl font-semibold">
-              Erro de Reprodução
-            </h3>
-            <p className="text-white/70 text-sm">
-              {error?.message || 'Não foi possível reproduzir o conteúdo'}
-            </p>
-            <button
-              onClick={reload}
-              className="px-6 py-2 rounded-lg bg-primary text-primary-foreground font-medium transition-colors hover:bg-primary/90"
-            >
-              Tentar Novamente
-            </button>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="px-4 py-2 text-white/60 hover:text-white text-sm"
-              >
-                Voltar
-              </button>
+            {/* Check if it's a 403/provider block error */}
+            {error?.message?.includes('403') || error?.message?.includes('UPSTREAM_ERROR') || error?.message?.includes('access denied') ? (
+              <>
+                <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center">
+                  <WifiOff className="w-10 h-10 text-orange-400" />
+                </div>
+                <h3 className="text-white text-xl font-semibold">
+                  Canal Indisponível
+                </h3>
+                <p className="text-white/70 text-sm">
+                  O servidor do provedor bloqueou o acesso a este canal.
+                  Isso pode ser temporário ou uma restrição do serviço.
+                </p>
+                <div className="flex flex-col gap-2 w-full">
+                  <button
+                    onClick={reload}
+                    className="w-full px-6 py-2 rounded-lg bg-orange-500 text-white font-medium transition-colors hover:bg-orange-600"
+                  >
+                    Tentar Novamente
+                  </button>
+                  {onBack && (
+                    <button
+                      onClick={onBack}
+                      className="w-full px-4 py-2 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 text-sm"
+                    >
+                      Voltar e Escolher Outro Canal
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-16 h-16 text-destructive" />
+                <h3 className="text-white text-xl font-semibold">
+                  Erro de Reprodução
+                </h3>
+                <p className="text-white/70 text-sm">
+                  {error?.message || 'Não foi possível reproduzir o conteúdo'}
+                </p>
+                <button
+                  onClick={reload}
+                  className="px-6 py-2 rounded-lg bg-primary text-primary-foreground font-medium transition-colors hover:bg-primary/90"
+                >
+                  Tentar Novamente
+                </button>
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="px-4 py-2 text-white/60 hover:text-white text-sm"
+                  >
+                    Voltar
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
