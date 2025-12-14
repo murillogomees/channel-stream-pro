@@ -215,7 +215,7 @@ export default function AdminClientes() {
     }
   };
 
-  // M3U lists management removed - now using unified m3u_sync_entries
+  // M3U lists management removed - now using unified iptv_channels
 
   if (loadingClientes) {
     return (

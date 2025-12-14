@@ -79,7 +79,7 @@ export default function AdminHub() {
       type ProfileRow = { situacao: string | null; data_vencimento: string | null };
       
       const profilesResult = await db.from('profiles').select('situacao, data_vencimento');
-      const m3uResult = await db.from('m3u_sync_sources').select('id', { count: 'exact', head: true }).eq('is_active', true);
+      const channelsResult = await db.from('iptv_channels').select('id', { count: 'exact', head: true });
       const securityResult = await db.from('security_events').select('id', { count: 'exact', head: true }).eq('resolved', false);
 
       const profiles = (profilesResult.data || []) as ProfileRow[];
@@ -89,7 +89,7 @@ export default function AdminHub() {
         clientesAtivos: profiles.filter(c => c.situacao === 'Ativo').length,
         clientesTestando: profiles.filter(c => c.situacao === 'Testando').length,
         vencendoHoje: profiles.filter(c => c.data_vencimento?.startsWith(today)).length,
-        m3uLists: m3uResult.count || 0,
+        m3uLists: channelsResult.count || 0,
         securityEvents: securityResult.count || 0,
       });
     } catch (error) {

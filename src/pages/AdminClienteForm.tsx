@@ -182,7 +182,7 @@ export default function AdminClienteForm() {
             setValue('origemCadastro', cliente.origem_cadastro as any || '');
             setValue('dispositivoContratado', cliente.dispositivo_contratado as any || '');
 
-            // M3U lists management removed - now using unified m3u_sync_entries
+            // M3U lists management removed - now using unified iptv_channels
 
             // Verificar se cliente já tem usuário de autenticação
             if (data.user_id) {
@@ -348,7 +348,7 @@ export default function AdminClienteForm() {
         description: 'As informações foram salvas com sucesso.',
       });
 
-      // M3U list assignment removed - using unified m3u_sync_entries
+      // M3U list assignment removed - using unified iptv_channels
 
       // Detectar se cliente foi desativado (era ativo e agora está inativo)
       // Tratar null/undefined como ativo por padrão
@@ -562,7 +562,7 @@ export default function AdminClienteForm() {
               : 'O novo cliente foi adicionado com sucesso.',
           });
 
-        // M3U list assignment removed - using unified m3u_sync_entries
+        // M3U list assignment removed - using unified iptv_channels
 
         // Enviar mensagem de boas-vindas via WhatsApp ANTES de mostrar o modal
         if (enviarWhatsApp) {
