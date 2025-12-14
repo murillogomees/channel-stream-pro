@@ -652,10 +652,13 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
     return { inserted: 0, skipped: 0, duplicates: duplicateCount };
   }
 
+  // Remove fields that don't exist as columns in iptv_channels (like normalized_category)
+  const sanitizedRecords = newRecords.map(({ normalized_category, ...rest }) => rest);
+
   // Use upsert with original_url conflict handling to avoid unique constraint errors
   const { data: upsertData, error } = await supabase
     .from('iptv_channels')
-    .upsert(newRecords, {
+    .upsert(sanitizedRecords, {
       onConflict: 'original_url',
       ignoreDuplicates: true
     })
@@ -667,7 +670,7 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
     let insertedCount = 0;
     const insertedChannels: Array<{ id: number; category: string | null }> = [];
     
-    for (const record of newRecords) {
+    for (const record of sanitizedRecords) {
       const { data: singleData, error: singleError } = await supabase
         .from('iptv_channels')
         .upsert(record, {
@@ -687,7 +690,7 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
       await autoAssociateToPlaylists(supabase, insertedChannels);
     }
 
-    return { inserted: insertedCount, skipped: newRecords.length - insertedCount, duplicates: duplicateCount };
+    return { inserted: insertedCount, skipped: sanitizedRecords.length - insertedCount, duplicates: duplicateCount };
   }
 
   const insertedCount = upsertData?.length || 0;
@@ -731,13 +734,13 @@ async function updateCategoriesTable(supabase: any) {
     }
 
     // Update channel_count for all categories
-    const { data: catData } = await supabase.from('iptv_categories').select('id, normalized_name');
+    const { data: catData } = await supabase.from('iptv_categories').select('id, normalized_name, display_name');
     
     for (const category of (catData || [])) {
       const { count } = await supabase
         .from('iptv_channels')
         .select('*', { count: 'exact', head: true })
-        .eq('normalized_category', category.normalized_name);
+        .eq('category', category.display_name);
 
       await supabase
         .from('iptv_categories')
