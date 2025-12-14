@@ -45,6 +45,8 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
   });
 
   const importWithProgress = useCallback(async (payload: { url?: string; content?: string }) => {
+    console.log('[IPTVChannelImport] Starting import with payload:', { url: payload.url?.substring(0, 50), hasContent: !!payload.content });
+    
     setProgressState({
       status: 'fetching',
       total: 0,
@@ -52,12 +54,16 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       inserted: 0,
       skipped: 0,
       progress: 0,
-      message: 'Buscando e analisando M3U...',
+      message: 'Conectando ao servidor e buscando M3U (pode demorar alguns minutos para arquivos grandes)...',
     });
 
     try {
       // Get the Supabase session
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[IPTVChannelImport] Session obtained, calling fetch-m3u...');
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
 
       const response = await fetch(getFunctionUrl('fetch-m3u'), {
         method: 'POST',
@@ -67,7 +73,11 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
           'apikey': supabaseConfig.anonKey,
         },
         body: JSON.stringify({ ...payload, stream: true }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      console.log('[IPTVChannelImport] Response received:', response.status, response.headers.get('content-type'));
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
