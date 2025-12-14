@@ -30,6 +30,8 @@ interface IPTVPlaylistCategoriesProps {
   onUpdate: () => void;
 }
 
+const CATEGORY_PAGE_SIZE = 5000;
+
 export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCategoriesProps) {
   const queryClient = useQueryClient();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -42,17 +44,38 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['all-iptv-categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('iptv_channels')
-        .select('category, channelCount:count(*)', { head: false })
-        .not('category', 'is', null)
-        .order('category', { ascending: true });
+      const counts = new Map<string, number>();
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('iptv_channels')
+          .select('category')
+          .not('category', 'is', null)
+          .order('category', { ascending: true })
+          .range(page * CATEGORY_PAGE_SIZE, (page + 1) * CATEGORY_PAGE_SIZE - 1);
 
-      const mapped: CategoryInfo[] = (data || []).map((row: any) => ({
-        name: row.category as string,
-        channelCount: Number(row.channelCount) || 0,
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const row of data as any[]) {
+          const cat = row.category as string | null;
+          if (!cat) continue;
+          counts.set(cat, (counts.get(cat) || 0) + 1);
+        }
+
+        hasMore = data.length === CATEGORY_PAGE_SIZE;
+        page++;
+      }
+
+      const mapped: CategoryInfo[] = Array.from(counts.entries()).map(([name, count]) => ({
+        name,
+        channelCount: count,
       }));
 
       return mapped;
