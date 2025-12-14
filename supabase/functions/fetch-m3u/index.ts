@@ -70,7 +70,7 @@ serve(async (req) => {
     }
 
     if (content) {
-      return await processM3UContent(content, stream, supabase);
+      return await processM3UContent(content, stream, supabase, req.signal);
     }
 
     console.log("[fetch-m3u] Fetching from URL:", url.substring(0, 80));
@@ -100,13 +100,13 @@ serve(async (req) => {
           headers: { "User-Agent": "VLC/3.0.18 LibVLC/3.0.18", "Accept": "*/*" },
         });
         if (!httpResponse.ok) throw new Error(`Failed to fetch M3U: HTTP ${httpResponse.status}`);
-        return await processStreamingResponse(httpResponse, stream, supabase);
+        return await processStreamingResponse(httpResponse, stream, supabase, req.signal);
       } else {
         throw new Error(`Failed to fetch M3U: HTTP ${response.status}`);
       }
     }
 
-    return await processStreamingResponse(response, stream, supabase);
+    return await processStreamingResponse(response, stream, supabase, req.signal);
 
   } catch (error: any) {
     console.error("[fetch-m3u] Error:", error.message);
@@ -264,7 +264,7 @@ function processChannel(ch: ParsedChannel): ProcessedChannel {
 
 // ==================== STREAMING PROCESSOR ====================
 
-async function processStreamingResponse(response: Response, stream: boolean, supabase: any): Promise<Response> {
+async function processStreamingResponse(response: Response, stream: boolean, supabase: any, abortSignal: AbortSignal): Promise<Response> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("No response body");
 
@@ -291,6 +291,14 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
 
         try {
           while (true) {
+            // Stop if client aborted
+            if (abortSignal.aborted) {
+              console.log('[fetch-m3u] Abort detected during streaming parse');
+              await reader.cancel();
+              controller.close();
+              return;
+            }
+
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -397,6 +405,12 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
 
   // Non-streaming mode
   while (true) {
+    if (abortSignal.aborted) {
+      console.log('[fetch-m3u] Abort detected during non-streaming parse');
+      await reader.cancel();
+      break;
+    }
+
     const { done, value } = await reader.read();
     if (done) break;
 
@@ -404,8 +418,13 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
     const lines = buffer.split('\n');
     buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
+  for (const line of lines) {
+    if (abortSignal.aborted) {
+      console.log('[fetch-m3u] Abort detected during parseAndImportM3U');
+      break;
+    }
+
+    const trimmed = line.trim();
       
       if (trimmed.startsWith('#EXTINF:')) {
         const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
