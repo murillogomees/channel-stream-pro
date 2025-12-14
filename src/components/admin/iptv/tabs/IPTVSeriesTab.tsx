@@ -1000,14 +1000,17 @@ function SeriesSection({
             </div>
             
             {/* Series Logo */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 w-10 h-14 rounded bg-muted flex items-center justify-center overflow-hidden">
               {series.logo_url ? (
-                <img src={series.logo_url} alt="" className="w-10 h-14 rounded object-cover bg-muted" loading="lazy" />
-              ) : (
-                <div className="w-10 h-14 rounded bg-muted flex items-center justify-center">
-                  <Clapperboard className="h-5 w-5 text-muted-foreground" />
-                </div>
-              )}
+                <img 
+                  src={series.logo_url} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                  loading="lazy"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : null}
+              <Clapperboard className="h-5 w-5 text-muted-foreground" />
             </div>
             
             <div className="flex-1 min-w-0">
