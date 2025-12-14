@@ -16,24 +16,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * Converte Supabase User para UnifiedUser
  */
 async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
-  // Buscar profile e TODAS as roles do banco
-  const [profileResult, rolesResult] = await Promise.all([
+  // Buscar profile e role única do banco (agora só pode ter uma role por usuário)
+  const [profileResult, roleResult] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('user_roles').select('role').eq('user_id', user.id)
+    supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle()
   ]);
 
   const profile = profileResult.data;
-  const allRoles = (rolesResult.data || []).map(r => r.role as AppRole);
   
-  // Prioridade: master > admin > client
-  let role: AppRole = 'client';
-  if (allRoles.includes('master')) {
-    role = 'master';
-  } else if (allRoles.includes('admin')) {
-    role = 'admin';
-  } else if (allRoles.includes('client')) {
-    role = 'client';
-  }
+  // Role única do usuário (hierarquia: master > admin > client)
+  const role: AppRole = (roleResult.data?.role as AppRole) || 'client';
+  
+  console.log('[AuthContext] User role:', { userId: user.id, email: user.email, role });
   
   // Calcular status de acesso
   let daysRemaining = 0;
@@ -61,10 +55,10 @@ async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
     updated_at: profile?.updated_at || new Date().toISOString(),
     roles: [role],
     isMaster: role === 'master',
-    isAdmin: role === 'admin' || role === 'master',
+    isAdmin: role === 'admin' || role === 'master', // Master tem todos os privilégios de admin
     isClient: role === 'client',
-    hasValidAccess,
-    isExpired,
+    hasValidAccess: role === 'master' || role === 'admin' || (profile?.cliente_ativo === true && !isExpired),
+    isExpired: role === 'master' || role === 'admin' ? false : isExpired, // Admin/Master nunca expiram
     daysRemaining: Math.max(0, daysRemaining),
     isTrial,
     clienteData: profile ? {

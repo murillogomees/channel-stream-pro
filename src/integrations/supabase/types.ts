@@ -3921,6 +3921,7 @@ export type Database = {
           group_title: string
         }[]
       }
+      get_role_priority: { Args: { role_name: string }; Returns: number }
       get_sync_statistics: { Args: never; Returns: Json }
       has_role: {
         Args: {
