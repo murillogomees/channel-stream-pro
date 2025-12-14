@@ -65,6 +65,10 @@ interface CategoryGroup {
 
 type ViewMode = 'categories' | 'list';
 
+interface DbCategoryRow {
+  group_title: string | null;
+}
+
 export function IPTVChannelsTab() {
   const queryClient = useQueryClient();
   const { data: realtimeStats, isLoading: statsLoading } = useChannelStats();
@@ -134,6 +138,16 @@ export function IPTVChannelsTab() {
     },
   });
 
+  // Fetch ALL distinct categories from DB (independente dos filtros)
+  const { data: allDbCategories } = useQuery<DbCategoryRow[]>({
+    queryKey: ['iptv-all-db-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_m3u_distinct_categories');
+      if (error) throw error;
+      return (data || []) as DbCategoryRow[];
+    },
+  });
+
   // Group channels by category, then by series
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
     if (!allChannels) return [];
@@ -187,8 +201,10 @@ export function IPTVChannelsTab() {
   }, [allChannels]);
 
   const allCategories = useMemo(() => {
-    return categoryGroups.map(g => g.name).filter(n => n !== 'Sem Categoria');
-  }, [categoryGroups]);
+    return (allDbCategories || [])
+      .map((c) => c.group_title)
+      .filter((n): n is string => !!n && n !== 'Sem Categoria');
+  }, [allDbCategories]);
 
   const stats = useMemo(() => {
     if (!allChannels) return { total: 0, healthy: 0, unhealthy: 0, categories: 0, series: 0 };
@@ -197,10 +213,10 @@ export function IPTVChannelsTab() {
       total: allChannels.length,
       healthy: allChannels.filter(c => c.is_healthy).length,
       unhealthy: allChannels.filter(c => !c.is_healthy).length,
-      categories: categoryGroups.length,
+      categories: (allDbCategories || []).filter(c => !!c.group_title).length,
       series: seriesCount,
     };
-  }, [allChannels, categoryGroups]);
+  }, [allChannels, allDbCategories]);
 
   const toggleCategory = useCallback((category: string) => {
     setExpandedCategories(prev => {
