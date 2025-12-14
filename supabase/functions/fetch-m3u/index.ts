@@ -1,9 +1,8 @@
 /**
- * Fetch M3U - Unified Import to iptv_channels with Progress Streaming
+ * Fetch M3U - Unified Import to iptv_channels with Streaming Parse
  * 
- * SEMPRE grava direto em iptv_channels.
- * Retorna progresso via SSE para o frontend.
- * Otimizado para mínimo egress e máxima performance.
+ * Usa streaming para processar arquivos grandes sem estourar memória.
+ * Parseia linha por linha e insere em batches conforme processa.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -14,8 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DB_BATCH_SIZE = 500; // larger batch to reduce DB roundtrips and avoid CPU timeouts
-const MAX_CHANNELS = 50000; // safety limit to avoid memory exhaustion on huge playlists
+const DB_BATCH_SIZE = 500;
 
 interface ParsedChannel {
   name: string;
@@ -42,175 +40,46 @@ serve(async (req) => {
       throw new Error("URL ou conteúdo M3U é obrigatório");
     }
 
-    let m3uContent = content || '';
+    // If content is provided directly, use line-by-line processing
+    if (content) {
+      return await processM3UContent(content, stream, supabase);
+    }
 
-    // Fetch from URL if provided
-    if (url && !m3uContent) {
-      console.log("[fetch-m3u] Fetching from URL:", url.substring(0, 80));
-      
-      let fetchUrl = url;
-      try {
-        const urlObj = new URL(url);
-        const httpPorts = ['8880', '8000', '25461', '25462', '8080'];
-        if (urlObj.protocol === 'https:' && httpPorts.includes(urlObj.port)) {
-          fetchUrl = url.replace('https://', 'http://');
-        }
-      } catch {}
+    // Fetch from URL with streaming
+    console.log("[fetch-m3u] Fetching from URL:", url.substring(0, 80));
+    
+    let fetchUrl = url;
+    try {
+      const urlObj = new URL(url);
+      const httpPorts = ['8880', '8000', '25461', '25462', '8080'];
+      if (urlObj.protocol === 'https:' && httpPorts.includes(urlObj.port)) {
+        fetchUrl = url.replace('https://', 'http://');
+      }
+    } catch {}
 
-      const response = await fetch(fetchUrl, {
-        method: 'GET',
-        headers: {
-          "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
-          "Accept": "*/*",
-        },
-      });
+    const response = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: {
+        "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
+        "Accept": "*/*",
+      },
+    });
 
-      if (!response.ok) {
-        if (fetchUrl.startsWith('https://')) {
-          const httpUrl = fetchUrl.replace('https://', 'http://');
-          const httpResponse = await fetch(httpUrl, {
-            method: 'GET',
-            headers: { "User-Agent": "VLC/3.0.18 LibVLC/3.0.18", "Accept": "*/*" },
-          });
-          if (!httpResponse.ok) throw new Error(`Failed to fetch M3U: HTTP ${httpResponse.status}`);
-          m3uContent = await httpResponse.text();
-        } else {
-          throw new Error(`Failed to fetch M3U: HTTP ${response.status}`);
-        }
+    if (!response.ok) {
+      if (fetchUrl.startsWith('https://')) {
+        const httpUrl = fetchUrl.replace('https://', 'http://');
+        const httpResponse = await fetch(httpUrl, {
+          method: 'GET',
+          headers: { "User-Agent": "VLC/3.0.18 LibVLC/3.0.18", "Accept": "*/*" },
+        });
+        if (!httpResponse.ok) throw new Error(`Failed to fetch M3U: HTTP ${httpResponse.status}`);
+        return await processStreamingResponse(httpResponse, stream, supabase);
       } else {
-        m3uContent = await response.text();
+        throw new Error(`Failed to fetch M3U: HTTP ${response.status}`);
       }
     }
 
-    if (!m3uContent) throw new Error('Nenhum conteúdo M3U fornecido');
-    if (!m3uContent.includes('#EXTM3U') && !m3uContent.includes('#EXTINF')) {
-      throw new Error('Conteúdo não parece ser M3U válido');
-    }
-
-    // Parse M3U content
-    const channels = parseM3U(m3uContent);
-    console.log(`[fetch-m3u] Parsed ${channels.length} channels`);
-
-    if (channels.length === 0) throw new Error('Nenhum canal encontrado no conteúdo M3U');
-
-    const total = channels.length;
-
-    // If streaming mode requested, use SSE
-    if (stream) {
-      const encoder = new TextEncoder();
-      const body = new ReadableStream({
-        async start(controller) {
-          const send = (data: object) => {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-          };
-
-          send({ type: 'start', total });
-
-          let inserted = 0;
-          let skipped = 0;
-
-          for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
-            const batch = channels.slice(i, i + DB_BATCH_SIZE);
-            
-            const records = batch.map(ch => ({
-              name: ch.name,
-              slug: generateSlug(ch.name),
-              original_url: ch.url,
-              logo_url: ch.logo || null,
-              category: ch.group || null,
-              content_type: detectContentType(ch.url, ch.group),
-              is_healthy: true,
-              health_score: 100,
-              transcode_status: 'none',
-              shard_id: 0,
-              metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-            }));
-
-            // Use upsert with original_url as conflict key
-            const { data: upsertData, error } = await supabase
-              .from('iptv_channels')
-              .upsert(records, { 
-                onConflict: 'original_url',
-                ignoreDuplicates: true
-              })
-              .select('id');
-
-            if (error) {
-              console.error('[fetch-m3u] Batch error:', error.message);
-              skipped += batch.length;
-            } else {
-              const insertedCount = upsertData?.length || 0;
-              inserted += insertedCount;
-              skipped += batch.length - insertedCount;
-            }
-
-            const processed = Math.min(i + DB_BATCH_SIZE, total);
-            const progress = Math.round((processed / total) * 100);
-            send({ type: 'progress', processed, total, progress, inserted, skipped });
-          }
-
-          send({ type: 'complete', inserted, skipped, total, message: `Importados ${inserted} canais` });
-          controller.close();
-        }
-      });
-
-      return new Response(body, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-        },
-      });
-    }
-
-    // Non-streaming mode (legacy)
-    let inserted = 0;
-    let skipped = 0;
-
-    for (let i = 0; i < channels.length; i += DB_BATCH_SIZE) {
-      const batch = channels.slice(i, i + DB_BATCH_SIZE);
-      
-      const records = batch.map(ch => ({
-        name: ch.name,
-        slug: generateSlug(ch.name),
-        original_url: ch.url,
-        logo_url: ch.logo || null,
-        category: ch.group || null,
-        content_type: detectContentType(ch.url, ch.group),
-        is_healthy: true,
-        health_score: 100,
-        transcode_status: 'none',
-        shard_id: 0,
-        metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
-      }));
-
-      // Use upsert with original_url as conflict key
-      const { data: upsertData, error } = await supabase
-        .from('iptv_channels')
-        .upsert(records, { 
-          onConflict: 'original_url',
-          ignoreDuplicates: true
-        })
-        .select('id');
-
-      if (error) {
-        console.error('[fetch-m3u] Batch error:', error.message);
-        skipped += batch.length;
-      } else {
-        const insertedCount = upsertData?.length || 0;
-        inserted += insertedCount;
-        skipped += batch.length - insertedCount;
-      }
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, inserted, skipped, total: channels.length,
-        message: `Importados ${inserted} canais${skipped > 0 ? ` (${skipped} duplicados)` : ''}`
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return await processStreamingResponse(response, stream, supabase);
 
   } catch (error: any) {
     console.error("[fetch-m3u] Error:", error.message);
@@ -221,17 +90,277 @@ serve(async (req) => {
   }
 });
 
-function parseM3U(content: string): ParsedChannel[] {
-  const lines = content.split('\n');
-  const channels: ParsedChannel[] = [];
+async function processStreamingResponse(response: Response, stream: boolean, supabase: any): Promise<Response> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = '';
   let currentChannel: Partial<ParsedChannel> = {};
+  let batch: ParsedChannel[] = [];
+  let totalParsed = 0;
+  let inserted = 0;
+  let skipped = 0;
 
-  for (const line of lines) {
-    if (channels.length >= MAX_CHANNELS) {
-      break;
+  // For SSE streaming
+  if (stream) {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      async start(controller) {
+        const send = (data: object) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch (e) {
+            // Controller may be closed
+          }
+        };
+
+        send({ type: 'start', total: 0, message: 'Iniciando processamento...' });
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              
+              if (trimmed.startsWith('#EXTINF:')) {
+                const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
+                const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
+                const tvgIdMatch = trimmed.match(/tvg-id="([^"]+)"/i);
+                const tvgNameMatch = trimmed.match(/tvg-name="([^"]+)"/i);
+                const nameMatch = trimmed.match(/,(.+)$/);
+                currentChannel = {
+                  logo: logoMatch?.[1],
+                  group: groupMatch?.[1],
+                  tvgId: tvgIdMatch?.[1],
+                  tvgName: tvgNameMatch?.[1],
+                  name: nameMatch?.[1]?.trim() || 'Unknown',
+                };
+              } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
+                if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                  currentChannel.url = trimmed;
+                  batch.push(currentChannel as ParsedChannel);
+                  totalParsed++;
+
+                  // Process batch when full
+                  if (batch.length >= DB_BATCH_SIZE) {
+                    const result = await insertBatch(supabase, batch);
+                    inserted += result.inserted;
+                    skipped += result.skipped;
+                    batch = [];
+
+                    send({ 
+                      type: 'progress', 
+                      processed: totalParsed, 
+                      total: totalParsed, 
+                      progress: 0, // Unknown total
+                      inserted, 
+                      skipped,
+                      message: `Processando... ${totalParsed} canais encontrados`
+                    });
+                  }
+                }
+                currentChannel = {};
+              }
+            }
+          }
+
+          // Process remaining buffer
+          if (buffer.trim()) {
+            const trimmed = buffer.trim();
+            if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
+              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                currentChannel.url = trimmed;
+                batch.push(currentChannel as ParsedChannel);
+                totalParsed++;
+              }
+            }
+          }
+
+          // Final batch
+          if (batch.length > 0) {
+            const result = await insertBatch(supabase, batch);
+            inserted += result.inserted;
+            skipped += result.skipped;
+          }
+
+          console.log(`[fetch-m3u] Complete: ${totalParsed} parsed, ${inserted} inserted, ${skipped} skipped`);
+          send({ type: 'complete', inserted, skipped, total: totalParsed, message: `Importados ${inserted} canais` });
+          controller.close();
+
+        } catch (err: any) {
+          console.error('[fetch-m3u] Stream error:', err.message);
+          send({ type: 'error', error: err.message });
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(body, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
+  }
+
+  // Non-streaming mode
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      if (trimmed.startsWith('#EXTINF:')) {
+        const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
+        const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
+        const tvgIdMatch = trimmed.match(/tvg-id="([^"]+)"/i);
+        const tvgNameMatch = trimmed.match(/tvg-name="([^"]+)"/i);
+        const nameMatch = trimmed.match(/,(.+)$/);
+        currentChannel = {
+          logo: logoMatch?.[1],
+          group: groupMatch?.[1],
+          tvgId: tvgIdMatch?.[1],
+          tvgName: tvgNameMatch?.[1],
+          name: nameMatch?.[1]?.trim() || 'Unknown',
+        };
+      } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          currentChannel.url = trimmed;
+          batch.push(currentChannel as ParsedChannel);
+          totalParsed++;
+
+          if (batch.length >= DB_BATCH_SIZE) {
+            const result = await insertBatch(supabase, batch);
+            inserted += result.inserted;
+            skipped += result.skipped;
+            batch = [];
+          }
+        }
+        currentChannel = {};
+      }
     }
+  }
 
+  // Final batch
+  if (batch.length > 0) {
+    const result = await insertBatch(supabase, batch);
+    inserted += result.inserted;
+    skipped += result.skipped;
+  }
+
+  console.log(`[fetch-m3u] Complete: ${totalParsed} parsed, ${inserted} inserted, ${skipped} skipped`);
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, inserted, skipped, total: totalParsed,
+      message: `Importados ${inserted} canais${skipped > 0 ? ` (${skipped} duplicados)` : ''}`
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function processM3UContent(content: string, stream: boolean, supabase: any): Promise<Response> {
+  const lines = content.split('\n');
+  let currentChannel: Partial<ParsedChannel> = {};
+  let batch: ParsedChannel[] = [];
+  let totalParsed = 0;
+  let inserted = 0;
+  let skipped = 0;
+
+  if (stream) {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      async start(controller) {
+        const send = (data: object) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch (e) {}
+        };
+
+        send({ type: 'start', total: lines.length });
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          
+          if (trimmed.startsWith('#EXTINF:')) {
+            const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
+            const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
+            const tvgIdMatch = trimmed.match(/tvg-id="([^"]+)"/i);
+            const tvgNameMatch = trimmed.match(/tvg-name="([^"]+)"/i);
+            const nameMatch = trimmed.match(/,(.+)$/);
+            currentChannel = {
+              logo: logoMatch?.[1],
+              group: groupMatch?.[1],
+              tvgId: tvgIdMatch?.[1],
+              tvgName: tvgNameMatch?.[1],
+              name: nameMatch?.[1]?.trim() || 'Unknown',
+            };
+          } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
+            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+              currentChannel.url = trimmed;
+              batch.push(currentChannel as ParsedChannel);
+              totalParsed++;
+
+              if (batch.length >= DB_BATCH_SIZE) {
+                const result = await insertBatch(supabase, batch);
+                inserted += result.inserted;
+                skipped += result.skipped;
+                batch = [];
+
+                send({ 
+                  type: 'progress', 
+                  processed: totalParsed, 
+                  total: totalParsed,
+                  progress: 0,
+                  inserted, 
+                  skipped 
+                });
+              }
+            }
+            currentChannel = {};
+          }
+        }
+
+        if (batch.length > 0) {
+          const result = await insertBatch(supabase, batch);
+          inserted += result.inserted;
+          skipped += result.skipped;
+        }
+
+        send({ type: 'complete', inserted, skipped, total: totalParsed, message: `Importados ${inserted} canais` });
+        controller.close();
+      }
+    });
+
+    return new Response(body, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
+  }
+
+  // Non-streaming
+  for (const line of lines) {
     const trimmed = line.trim();
+    
     if (trimmed.startsWith('#EXTINF:')) {
       const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
       const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
@@ -239,24 +368,74 @@ function parseM3U(content: string): ParsedChannel[] {
       const tvgNameMatch = trimmed.match(/tvg-name="([^"]+)"/i);
       const nameMatch = trimmed.match(/,(.+)$/);
       currentChannel = {
-        logo: logoMatch?.[1], group: groupMatch?.[1],
-        tvgId: tvgIdMatch?.[1], tvgName: tvgNameMatch?.[1],
+        logo: logoMatch?.[1],
+        group: groupMatch?.[1],
+        tvgId: tvgIdMatch?.[1],
+        tvgName: tvgNameMatch?.[1],
         name: nameMatch?.[1]?.trim() || 'Unknown',
       };
     } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         currentChannel.url = trimmed;
-        channels.push(currentChannel as ParsedChannel);
+        batch.push(currentChannel as ParsedChannel);
+        totalParsed++;
+
+        if (batch.length >= DB_BATCH_SIZE) {
+          const result = await insertBatch(supabase, batch);
+          inserted += result.inserted;
+          skipped += result.skipped;
+          batch = [];
+        }
       }
       currentChannel = {};
     }
   }
 
-  if (channels.length === MAX_CHANNELS) {
-    console.log(`[fetch-m3u] Reached MAX_CHANNELS limit (${MAX_CHANNELS}), remaining entries will be ignored to avoid OOM.`);
+  if (batch.length > 0) {
+    const result = await insertBatch(supabase, batch);
+    inserted += result.inserted;
+    skipped += result.skipped;
   }
 
-  return channels;
+  return new Response(
+    JSON.stringify({ 
+      success: true, inserted, skipped, total: totalParsed,
+      message: `Importados ${inserted} canais${skipped > 0 ? ` (${skipped} duplicados)` : ''}`
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function insertBatch(supabase: any, channels: ParsedChannel[]): Promise<{ inserted: number; skipped: number }> {
+  const records = channels.map(ch => ({
+    name: ch.name,
+    slug: generateSlug(ch.name),
+    original_url: ch.url,
+    logo_url: ch.logo || null,
+    category: ch.group || null,
+    content_type: detectContentType(ch.url, ch.group),
+    is_healthy: true,
+    health_score: 100,
+    transcode_status: 'none',
+    shard_id: 0,
+    metadata: { tvg_id: ch.tvgId || null, tvg_name: ch.tvgName || null }
+  }));
+
+  const { data: upsertData, error } = await supabase
+    .from('iptv_channels')
+    .upsert(records, { 
+      onConflict: 'original_url',
+      ignoreDuplicates: true
+    })
+    .select('id');
+
+  if (error) {
+    console.error('[fetch-m3u] Batch error:', error.message);
+    return { inserted: 0, skipped: channels.length };
+  }
+
+  const insertedCount = upsertData?.length || 0;
+  return { inserted: insertedCount, skipped: channels.length - insertedCount };
 }
 
 function generateSlug(name: string): string {
