@@ -30,7 +30,8 @@ interface IPTVPlaylistCategoriesProps {
   onUpdate: () => void;
 }
 
-const CATEGORY_PAGE_SIZE = 5000;
+// Usar página de 1000 por limitação padrão do Supabase
+const CATEGORY_PAGE_SIZE = 1000;
 
 export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCategoriesProps) {
   const queryClient = useQueryClient();
