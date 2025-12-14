@@ -64,13 +64,25 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     });
 
     try {
-      // Get the Supabase session
+      // Get the Supabase session with timeout
       console.log('[IPTVChannelImport] Getting session...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      let accessToken: string | null = null;
       
-      if (sessionError) {
-        console.error('[IPTVChannelImport] Session error:', sessionError);
-        throw new Error('Erro de autenticação: ' + sessionError.message);
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
+        );
+        
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
+        
+        if (result.error) {
+          console.warn('[IPTVChannelImport] Session error (continuing with anon):', result.error);
+        } else {
+          accessToken = result.data.session?.access_token || null;
+        }
+      } catch (sessionErr) {
+        console.warn('[IPTVChannelImport] Session fetch failed, using anon key:', sessionErr);
       }
       
       const functionUrl = getFunctionUrl('fetch-m3u');
@@ -89,7 +101,7 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || supabaseConfig.anonKey}`,
+          'Authorization': `Bearer ${accessToken || supabaseConfig.anonKey}`,
           'apikey': supabaseConfig.anonKey,
         },
         body: requestBody,
