@@ -108,7 +108,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // 3) Categorias ligadas a OUTRAS playlists (exceto a atual)
+  // 3) (Mantido para futura expansão: categorias ligadas a OUTRAS playlists)
+  //    Atualmente não usamos esse dado, mas deixamos a query preparada caso
+  //    queiramos bloquear categorias já usadas em playlists específicas.
   const {
     data: otherPlaylistCategories,
     isLoading: loadingOther,
@@ -130,6 +132,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       }
       return Array.from(categories);
     },
+    enabled: false, // não usado atualmente
   });
 
   // Disponíveis = todas - (presentes NESTA playlist apenas)
@@ -315,10 +318,10 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         <div className="border rounded-lg">
           <div className="p-3 border-b bg-muted/50">
             <h4 className="text-sm font-medium">
-              Categorias Disponíveis ({availableCategories.length})
+              Todas as Categorias ({availableCategories.length})
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Categorias sem vínculo com nenhuma playlist
+              Lista completa de categorias com canais importados
             </p>
           </div>
           <ScrollArea className="h-[400px] p-2">
