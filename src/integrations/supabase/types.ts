@@ -2134,51 +2134,6 @@ export type Database = {
         }
         Relationships: []
       }
-      m3u_sync_entries: {
-        Row: {
-          created_at: string | null
-          group_title: string | null
-          id: string
-          is_active: boolean | null
-          source_id: string | null
-          stream_type: string | null
-          stream_url: string
-          title: string
-          tvg_id: string | null
-          tvg_logo: string | null
-          tvg_name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          group_title?: string | null
-          id?: string
-          is_active?: boolean | null
-          source_id?: string | null
-          stream_type?: string | null
-          stream_url: string
-          title: string
-          tvg_id?: string | null
-          tvg_logo?: string | null
-          tvg_name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          group_title?: string | null
-          id?: string
-          is_active?: boolean | null
-          source_id?: string | null
-          stream_type?: string | null
-          stream_url?: string
-          title?: string
-          tvg_id?: string | null
-          tvg_logo?: string | null
-          tvg_name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       mercado_pago_config: {
         Row: {
           created_at: string | null
@@ -3890,6 +3845,13 @@ export type Database = {
       }
       get_auth_statistics: { Args: { days?: number }; Returns: Json }
       get_channel_shard: { Args: { channel_id: number }; Returns: number }
+      get_m3u_distinct_categories: {
+        Args: never
+        Returns: {
+          group_title: string
+        }[]
+      }
+      get_sync_statistics: { Args: never; Returns: Json }
       has_role: {
         Args: {
           check_role: Database["public"]["Enums"]["app_role"]
