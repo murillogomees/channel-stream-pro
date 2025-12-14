@@ -1951,6 +1951,70 @@ export type Database = {
           },
         ]
       }
+      iptv_stream_fingerprints: {
+        Row: {
+          channel_id: number | null
+          created_at: string | null
+          hash_algorithm: string | null
+          id: string
+          perceptual_hash: string
+        }
+        Insert: {
+          channel_id?: number | null
+          created_at?: string | null
+          hash_algorithm?: string | null
+          id?: string
+          perceptual_hash: string
+        }
+        Update: {
+          channel_id?: number | null
+          created_at?: string | null
+          hash_algorithm?: string | null
+          id?: string
+          perceptual_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_stream_fingerprints_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_stream_groups: {
+        Row: {
+          canonical_channel_id: number | null
+          created_at: string | null
+          display_name: string | null
+          id: string
+          source_count: number | null
+        }
+        Insert: {
+          canonical_channel_id?: number | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          source_count?: number | null
+        }
+        Update: {
+          canonical_channel_id?: number | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          source_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_stream_groups_canonical_channel_id_fkey"
+            columns: ["canonical_channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       iptv_stream_tokens: {
         Row: {
           channel_id: number | null
@@ -3828,6 +3892,10 @@ export type Database = {
           organized_count: number
         }[]
       }
+      generate_source_hash: {
+        Args: { category: string; name: string; url: string }
+        Returns: string
+      }
       generate_stream_token: {
         Args: {
           p_channel_id: number
@@ -3862,6 +3930,7 @@ export type Database = {
       }
       is_admin_or_master: { Args: { check_user_id?: string }; Returns: boolean }
       is_blocked: { Args: { p_identifier: string }; Returns: boolean }
+      normalize_text: { Args: { input_text: string }; Returns: string }
       parse_series_info_from_name: {
         Args: { channel_name: string }
         Returns: {
