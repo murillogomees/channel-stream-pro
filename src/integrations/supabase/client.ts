@@ -1,14 +1,14 @@
 /**
- * Supabase Client - Lovable Cloud
+ * Supabase Client - Supabase Cloud
  * 
- * Conectado ao projeto Lovable Cloud (waxgowafohlrfoefwhsf)
+ * Projeto: sdvyxdghxqmntyoweqbd
  */
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-// Lovable Cloud configuration
-const SUPABASE_URL = "https://waxgowafohlrfoefwhsf.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";
+// Supabase Cloud configuration
+const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const supabase: SupabaseClient<Database> = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: typeof window !== 'undefined' ? localStorage : undefined,
-    storageKey: 'sb-waxgowafohlrfoefwhsf-auth-token',
+    storageKey: 'sb-sdvyxdghxqmntyoweqbd-auth-token',
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
