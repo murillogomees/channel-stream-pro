@@ -47,6 +47,12 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
   const importWithProgress = useCallback(async (payload: { url?: string; content?: string }) => {
     console.log('[IPTVChannelImport] Starting import with payload:', { url: payload.url, hasContent: !!payload.content });
     
+    if (!payload.url && !payload.content) {
+      console.error('[IPTVChannelImport] No URL or content provided');
+      toast.error('Forneça uma URL ou conteúdo M3U');
+      return;
+    }
+    
     setProgressState({
       status: 'fetching',
       total: 0,
@@ -59,20 +65,34 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
 
     try {
       // Get the Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('[IPTVChannelImport] Session obtained, calling fetch-m3u...');
+      console.log('[IPTVChannelImport] Getting session...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('[IPTVChannelImport] Session error:', sessionError);
+        throw new Error('Erro de autenticação: ' + sessionError.message);
+      }
+      
+      const functionUrl = getFunctionUrl('fetch-m3u');
+      console.log('[IPTVChannelImport] Calling edge function:', functionUrl);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+      const timeoutId = setTimeout(() => {
+        console.log('[IPTVChannelImport] Request timeout after 5min');
+        controller.abort();
+      }, 300000); // 5 min timeout
 
-      const response = await fetch(getFunctionUrl('fetch-m3u'), {
+      const requestBody = JSON.stringify({ ...payload, stream: true });
+      console.log('[IPTVChannelImport] Request body length:', requestBody.length);
+
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || supabaseConfig.anonKey}`,
           'apikey': supabaseConfig.anonKey,
         },
-        body: JSON.stringify({ ...payload, stream: true }),
+        body: requestBody,
         signal: controller.signal,
       });
 
