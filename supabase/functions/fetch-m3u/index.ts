@@ -15,6 +15,7 @@ const corsHeaders = {
 };
 
 const DB_BATCH_SIZE = 500; // larger batch to reduce DB roundtrips and avoid CPU timeouts
+const MAX_CHANNELS = 50000; // safety limit to avoid memory exhaustion on huge playlists
 
 interface ParsedChannel {
   name: string;
@@ -226,6 +227,10 @@ function parseM3U(content: string): ParsedChannel[] {
   let currentChannel: Partial<ParsedChannel> = {};
 
   for (const line of lines) {
+    if (channels.length >= MAX_CHANNELS) {
+      break;
+    }
+
     const trimmed = line.trim();
     if (trimmed.startsWith('#EXTINF:')) {
       const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
@@ -246,6 +251,11 @@ function parseM3U(content: string): ParsedChannel[] {
       currentChannel = {};
     }
   }
+
+  if (channels.length === MAX_CHANNELS) {
+    console.log(`[fetch-m3u] Reached MAX_CHANNELS limit (${MAX_CHANNELS}), remaining entries will be ignored to avoid OOM.`);
+  }
+
   return channels;
 }
 
