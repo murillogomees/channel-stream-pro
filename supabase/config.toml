@@ -1,4 +1,4 @@
-project_id = "waxgowafohlrfoefwhsf"
+project_id = "sdvyxdghxqmntyoweqbd"
 
 [functions.get-r2-config]
 verify_jwt = false
@@ -465,4 +465,12 @@ verify_jwt = false
 
 # Refresh stream token - public for player access
 [functions.refresh-stream-token]
+verify_jwt = false
+
+# ==========================================
+# MIGRATION HELPER
+# ==========================================
+
+# Migration helper - diagnostic and verification
+[functions.migration-helper]
 verify_jwt = false
