@@ -1826,6 +1826,98 @@ export type Database = {
           },
         ]
       }
+      iptv_llhls_config: {
+        Row: {
+          can_skip_until: number | null
+          channel_id: number | null
+          created_at: string | null
+          hold_back_multiplier: number | null
+          id: string
+          part_duration: number | null
+          playlist_window: number | null
+          prefetch_segments: number | null
+          target_latency: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          can_skip_until?: number | null
+          channel_id?: number | null
+          created_at?: string | null
+          hold_back_multiplier?: number | null
+          id?: string
+          part_duration?: number | null
+          playlist_window?: number | null
+          prefetch_segments?: number | null
+          target_latency?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          can_skip_until?: number | null
+          channel_id?: number | null
+          created_at?: string | null
+          hold_back_multiplier?: number | null
+          id?: string
+          part_duration?: number | null
+          playlist_window?: number | null
+          prefetch_segments?: number | null
+          target_latency?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iptv_llhls_config_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iptv_origin_servers: {
+        Row: {
+          created_at: string | null
+          fail_count: number | null
+          health_score: number | null
+          id: string
+          is_active: boolean | null
+          is_healthy: boolean | null
+          last_check_at: string | null
+          latency_ms: number | null
+          origin_id: string
+          region: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          fail_count?: number | null
+          health_score?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_healthy?: boolean | null
+          last_check_at?: string | null
+          latency_ms?: number | null
+          origin_id: string
+          region?: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          fail_count?: number | null
+          health_score?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_healthy?: boolean | null
+          last_check_at?: string | null
+          latency_ms?: number | null
+          origin_id?: string
+          region?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       iptv_playlist_channels: {
         Row: {
           added_at: string | null
@@ -1950,6 +2042,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      iptv_routing_logs: {
+        Row: {
+          client_region: string
+          created_at: string | null
+          id: string
+          latency_ms: number | null
+          selected_cdn: string
+          stream_path: string | null
+        }
+        Insert: {
+          client_region: string
+          created_at?: string | null
+          id?: string
+          latency_ms?: number | null
+          selected_cdn: string
+          stream_path?: string | null
+        }
+        Update: {
+          client_region?: string
+          created_at?: string | null
+          id?: string
+          latency_ms?: number | null
+          selected_cdn?: string
+          stream_path?: string | null
+        }
+        Relationships: []
       }
       iptv_stream_fingerprints: {
         Row: {
@@ -3929,6 +4048,10 @@ export type Database = {
           check_user_id: string
         }
         Returns: boolean
+      }
+      increment_origin_fail_count: {
+        Args: { p_origin_id: string }
+        Returns: undefined
       }
       is_admin_or_master: { Args: { check_user_id?: string }; Returns: boolean }
       is_blocked: { Args: { p_identifier: string }; Returns: boolean }
