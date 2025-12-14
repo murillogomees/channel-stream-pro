@@ -623,32 +623,59 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
   // Process all channels with normalization and series detection
   const records = channels.map(ch => processChannel(ch));
 
-  // Check for existing source_hashes to detect duplicates
-  const sourceHashes = records.map(r => r.source_hash);
+  // Check for existing original_urls to detect duplicates (primary unique constraint)
+  const originalUrls = records.map(r => r.original_url);
   const { data: existingRecords } = await supabase
     .from('iptv_channels')
-    .select('source_hash')
-    .in('source_hash', sourceHashes);
+    .select('original_url')
+    .in('original_url', originalUrls);
 
-  const existingHashes = new Set((existingRecords || []).map((r: any) => r.source_hash));
+  const existingUrls = new Set((existingRecords || []).map((r: any) => r.original_url));
   
   // Filter out duplicates
-  const newRecords = records.filter(r => !existingHashes.has(r.source_hash));
+  const newRecords = records.filter(r => !existingUrls.has(r.original_url));
   const duplicateCount = records.length - newRecords.length;
 
   if (newRecords.length === 0) {
     return { inserted: 0, skipped: 0, duplicates: duplicateCount };
   }
 
-  // Insert new records
+  // Use upsert with original_url conflict handling to avoid unique constraint errors
   const { data: upsertData, error } = await supabase
     .from('iptv_channels')
-    .insert(newRecords)
+    .upsert(newRecords, {
+      onConflict: 'original_url',
+      ignoreDuplicates: true
+    })
     .select('id, category');
 
   if (error) {
     console.error('[fetch-m3u] Batch error:', error.message);
-    return { inserted: 0, skipped: channels.length, duplicates: 0 };
+    // Try inserting one by one to get as many as possible
+    let insertedCount = 0;
+    const insertedChannels: Array<{ id: number; category: string | null }> = [];
+    
+    for (const record of newRecords) {
+      const { data: singleData, error: singleError } = await supabase
+        .from('iptv_channels')
+        .upsert(record, {
+          onConflict: 'original_url',
+          ignoreDuplicates: true
+        })
+        .select('id, category')
+        .single();
+      
+      if (!singleError && singleData) {
+        insertedCount++;
+        insertedChannels.push(singleData);
+      }
+    }
+
+    if (insertedChannels.length > 0) {
+      await autoAssociateToPlaylists(supabase, insertedChannels);
+    }
+
+    return { inserted: insertedCount, skipped: newRecords.length - insertedCount, duplicates: duplicateCount };
   }
 
   const insertedCount = upsertData?.length || 0;
