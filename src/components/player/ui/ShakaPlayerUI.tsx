@@ -246,8 +246,8 @@ export function ShakaPlayerUI({
       {/* Top Bar */}
       <div 
         className={cn(
-          "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity duration-300 z-5",
-          showControls ? "opacity-100" : "opacity-0"
+          "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity duration-300 z-30",
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       >
         <div className="flex items-center gap-4">
@@ -283,7 +283,7 @@ export function ShakaPlayerUI({
       {/* Bottom Controls */}
       <div 
         className={cn(
-          "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 z-5",
+          "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 z-30",
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       >
