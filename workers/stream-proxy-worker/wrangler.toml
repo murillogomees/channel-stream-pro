@@ -1,0 +1,9 @@
+name = "iptv-stream-proxy"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (set via wrangler secret put):
+# - STREAM_PROXY_SECRET: Optional secret for additional auth
