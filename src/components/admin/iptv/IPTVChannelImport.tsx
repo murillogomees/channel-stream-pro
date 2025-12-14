@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseConfig, getFunctionUrl } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,17 +56,15 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     });
 
     try {
-      // Get the Supabase URL for the edge function
+      // Get the Supabase session
       const { data: { session } } = await supabase.auth.getSession();
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/fetch-m3u`, {
+      const response = await fetch(getFunctionUrl('fetch-m3u'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || anonKey}`,
-          'apikey': anonKey,
+          'Authorization': `Bearer ${session?.access_token || supabaseConfig.anonKey}`,
+          'apikey': supabaseConfig.anonKey,
         },
         body: JSON.stringify({ ...payload, stream: true }),
       });
