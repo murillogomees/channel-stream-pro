@@ -36,4 +36,6 @@ export interface PrefetchStats {
   cacheHits: number;
   cacheMisses: number;
   avgResolutionTimeMs: number;
+  mlPatternsLearned?: number;
+  mlSequencesTracked?: number;
 }
