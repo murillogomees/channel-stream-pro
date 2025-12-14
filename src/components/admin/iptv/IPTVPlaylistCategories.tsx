@@ -108,32 +108,49 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     gcTime: 0,
   });
 
-  // 3) Auto-vincular categorias que têm o mesmo nome da playlist ao abrir
+  // 3) Auto-unificar: categorias disponíveis com mesmo nome de categorias já na playlist
   const autoLinkMutation = useMutation({
     mutationFn: async () => {
-      const playlistNameLower = playlist.name.toLowerCase();
-      
-      // Buscar canais que têm categoria com o mesmo nome da playlist e não estão nela
-      const { data: linkedChannels } = await supabase
+      // 1. Buscar categorias que JÁ existem nesta playlist
+      const { data: playlistChannelsData } = await supabase
         .from('iptv_playlist_channels')
-        .select('channel_id')
+        .select('channel_id, channel:iptv_channels!inner(category)')
         .eq('playlist_id', playlist.id);
 
-      const linkedIds = new Set((linkedChannels || []).map(c => c.channel_id));
+      if (!playlistChannelsData || playlistChannelsData.length === 0) return 0;
 
-      const { data: matchingChannels, error } = await supabase
+      // Extrair categorias únicas já na playlist
+      const existingCategories = new Set<string>();
+      const linkedIds = new Set<number>();
+      
+      for (const item of playlistChannelsData) {
+        linkedIds.add(item.channel_id);
+        const cat = (item.channel as any)?.category as string;
+        if (cat) existingCategories.add(cat.toLowerCase().trim());
+      }
+
+      if (existingCategories.size === 0) return 0;
+
+      // 2. Buscar TODOS os canais que têm essas mesmas categorias mas não estão na playlist
+      const { data: allChannelsWithCategories } = await supabase
         .from('iptv_channels')
-        .select('id')
-        .ilike('category', playlistNameLower);
+        .select('id, category')
+        .not('category', 'is', null);
 
-      if (error) throw error;
-      if (!matchingChannels || matchingChannels.length === 0) return 0;
+      if (!allChannelsWithCategories) return 0;
 
-      // Filtrar canais que ainda não estão na playlist
-      const newChannels = matchingChannels.filter(ch => !linkedIds.has(ch.id));
+      // Filtrar canais que:
+      // - Têm categoria que já existe na playlist
+      // - Ainda não estão vinculados a esta playlist
+      const newChannels = allChannelsWithCategories.filter(ch => {
+        if (!ch.category) return false;
+        if (linkedIds.has(ch.id)) return false;
+        return existingCategories.has(ch.category.toLowerCase().trim());
+      });
+
       if (newChannels.length === 0) return 0;
 
-      // Obter posição máxima atual
+      // 3. Obter posição máxima atual
       const { data: existing } = await supabase
         .from('iptv_playlist_channels')
         .select('position')
@@ -143,7 +160,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       const maxPosition = existing?.[0]?.position || 0;
 
-      // Inserir em batches
+      // 4. Inserir em batches
       for (let i = 0; i < newChannels.length; i += 500) {
         const batch = newChannels.slice(i, i + 500).map((ch, idx) => ({
           playlist_id: playlist.id,
@@ -159,7 +176,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
           });
       }
 
-      // Atualizar contagem
+      // 5. Atualizar contagem
       const { count } = await supabase
         .from('iptv_playlist_channels')
         .select('*', { count: 'exact', head: true })
@@ -174,7 +191,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
     onSuccess: (count) => {
       if (count > 0) {
-        toast.success(`Auto-vinculados ${count} canais da categoria "${playlist.name}"`);
+        toast.success(`Unificados ${count} canais de categorias existentes`);
         refetchAvailable();
         refetchPlaylist();
         queryClient.invalidateQueries({ queryKey: ['iptv-playlists'] });
@@ -182,12 +199,13 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       }
       setAutoLinkDone(true);
     },
-    onError: () => {
+    onError: (err) => {
+      console.error('[IPTVPlaylistCategories] Auto-link error:', err);
       setAutoLinkDone(true);
     },
   });
 
-  // Executar auto-link ao montar o componente
+  // Executar auto-unificação ao montar o componente
   useEffect(() => {
     if (!autoLinkDone && !autoLinkMutation.isPending) {
       autoLinkMutation.mutate();
