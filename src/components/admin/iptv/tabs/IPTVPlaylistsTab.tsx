@@ -13,9 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Plus, Search, RefreshCw, Trash2, Edit, Copy, List, Users, Loader2, Eye, Download, Settings } from 'lucide-react';
+import { Plus, Search, RefreshCw, Trash2, Edit, Copy, List, Users, Loader2, Eye, Download, Settings, FolderPlus } from 'lucide-react';
 import { IPTVPlaylistForm } from '@/components/admin/iptv/IPTVPlaylistForm';
 import { IPTVPlaylistChannels } from '@/components/admin/iptv/IPTVPlaylistChannels';
+import { IPTVPlaylistCategories } from '@/components/admin/iptv/IPTVPlaylistCategories';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Playlist {
   id: number;
@@ -239,11 +241,28 @@ export function IPTVPlaylistsTab() {
                           <Settings className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[90vh]">
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
-                          <DialogTitle>Canais: {playlist.name}</DialogTitle>
+                          <DialogTitle>Gerenciar: {playlist.name}</DialogTitle>
                         </DialogHeader>
-                        <IPTVPlaylistChannels playlist={playlist} onUpdate={() => refetch()} />
+                        <Tabs defaultValue="categories" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="categories" className="gap-2">
+                              <FolderPlus className="h-4 w-4" />
+                              Por Categoria
+                            </TabsTrigger>
+                            <TabsTrigger value="channels" className="gap-2">
+                              <List className="h-4 w-4" />
+                              Por Canal
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="categories" className="mt-4">
+                            <IPTVPlaylistCategories playlist={playlist} onUpdate={() => refetch()} />
+                          </TabsContent>
+                          <TabsContent value="channels" className="mt-4">
+                            <IPTVPlaylistChannels playlist={playlist} onUpdate={() => refetch()} />
+                          </TabsContent>
+                        </Tabs>
                       </DialogContent>
                     </Dialog>
                     <Button variant="ghost" size="icon" onClick={() => { setEditingPlaylist(playlist); setIsFormOpen(true); }}>

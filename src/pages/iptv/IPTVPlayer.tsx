@@ -1,6 +1,6 @@
 /**
- * IPTV Player Page - Shaka Player Enterprise
- * Uses Shaka Player engine with stream-proxy
+ * IPTV Player Page - Fully Responsive
+ * Adapts to mobile, tablet, desktop, and TV screens
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -29,10 +29,10 @@ export default function IPTVPlayer() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="text-white">Conectando ao canal...</p>
+          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-primary mx-auto" />
+          <p className="text-white text-sm sm:text-base">Conectando ao canal...</p>
         </div>
       </div>
     );
@@ -40,28 +40,37 @@ export default function IPTVPlayer() {
 
   if (!channel?.original_url) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <p className="text-white">Canal não disponível</p>
+          <p className="text-white text-sm sm:text-base">Canal não disponível</p>
+          <button
+            onClick={handleBack}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm sm:text-base hover:bg-primary/90 transition-colors"
+          >
+            Voltar
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-black">
-      <ShakaPlayerUI
-        streamUrl={channel.original_url}
-        title={channel.name}
-        subtitle={channel.category || undefined}
-        brand={{
-          name: 'IPTV Link',
-          logo: channel.logo_url || undefined,
-          primaryColor: 'hsl(var(--primary))'
-        }}
-        onBack={handleBack}
-        onError={handleError}
-      />
+    <div className="fixed inset-0 bg-black">
+      {/* Player container - responsive aspect ratio */}
+      <div className="w-full h-full">
+        <ShakaPlayerUI
+          streamUrl={channel.original_url}
+          title={channel.name}
+          subtitle={channel.category || undefined}
+          brand={{
+            name: 'IPTV Link',
+            logo: channel.logo_url || undefined,
+            primaryColor: 'hsl(var(--primary))'
+          }}
+          onBack={handleBack}
+          onError={handleError}
+        />
+      </div>
     </div>
   );
 }

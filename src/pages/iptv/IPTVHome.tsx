@@ -1,9 +1,15 @@
 /**
  * IPTV Home - Netflix-style IPTV browsing experience
+ * - Aba "Todos": 4 fileiras aleatórias
+ * - Aba "Ao Vivo": playlist slug "live"
+ * - Aba "Filmes": playlist slug "movies"
+ * - Aba "Séries": playlist slug "series"
+ * - Aba "Favoritos": localStorage favorites
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { iptvService, IPTVChannel, ChannelGroup } from '@/services/iptvService';
 import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,35 +22,124 @@ import { NetflixContentGrid } from '@/components/iptv/NetflixContentGrid';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type TabType = 'all' | 'live' | 'vod' | 'series' | 'favorites';
+
+// Playlist slug mapping
+const PLAYLIST_SLUGS: Record<string, string> = {
+  live: 'live',
+  vod: 'movies',
+  series: 'series',
+};
 
 export default function IPTVHome() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'vod' | 'series' | 'favorites'>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'rows' | 'grid'>('rows');
   const [favorites, setFavorites] = useLocalStorage<string[]>('iptv-favorites', []);
 
-  // Fetch grouped channels
-  const { data: channelGroups, isLoading } = useQuery({
-    queryKey: ['iptv-channels-grouped', activeTab],
+  // Fetch random channels for "Todos" tab (4 groups with random selection)
+  const { data: randomGroups, isLoading: loadingRandom } = useQuery({
+    queryKey: ['iptv-random-groups'],
     queryFn: async () => {
-      const contentType = activeTab === 'all' || activeTab === 'favorites' ? undefined : activeTab;
-      return iptvService.getChannelsGrouped({ 
-        healthyOnly: true,
-        contentType 
-      });
+      // Get all categories
+      const { data: categories } = await supabase
+        .from('iptv_channels')
+        .select('category')
+        .not('category', 'is', null)
+        .eq('is_healthy', true);
+
+      const uniqueCategories = [...new Set(categories?.map(c => c.category) || [])];
+      
+      // Shuffle and take 4 random categories
+      const shuffled = uniqueCategories.sort(() => Math.random() - 0.5);
+      const selectedCats = shuffled.slice(0, 4);
+
+      // Fetch channels for each category (limit 20 each, randomized)
+      const groups: ChannelGroup[] = [];
+      for (const cat of selectedCats) {
+        const { data: channels } = await supabase
+          .from('iptv_channels')
+          .select('*')
+          .eq('category', cat)
+          .eq('is_healthy', true)
+          .limit(50);
+
+        if (channels && channels.length > 0) {
+          // Shuffle and take max 20
+          const shuffledChannels = channels.sort(() => Math.random() - 0.5).slice(0, 20);
+          groups.push({
+            name: cat || 'Sem Categoria',
+            channels: shuffledChannels as IPTVChannel[],
+          });
+        }
+      }
+
+      return groups;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds (so it refreshes more often for variety)
+    enabled: activeTab === 'all',
   });
 
-  // Fetch categories
-  const { data: categories = [] } = useQuery({
-    queryKey: ['iptv-categories'],
-    queryFn: () => iptvService.getCategories(),
-    staleTime: 10 * 60 * 1000,
+  // Fetch playlist channels by slug for other tabs
+  const { data: playlistChannels, isLoading: loadingPlaylist } = useQuery({
+    queryKey: ['iptv-playlist-by-slug', activeTab],
+    queryFn: async () => {
+      const slug = PLAYLIST_SLUGS[activeTab];
+      if (!slug) return null;
+
+      // Find playlist by slug
+      const { data: playlist } = await supabase
+        .from('iptv_playlists')
+        .select('id, name')
+        .eq('slug', slug)
+        .single();
+
+      if (!playlist) return null;
+
+      // Get channels from playlist
+      const { data: channels } = await supabase
+        .from('iptv_playlist_channels')
+        .select(`
+          position,
+          channel:iptv_channels(*)
+        `)
+        .eq('playlist_id', playlist.id)
+        .order('position');
+
+      if (!channels) return null;
+
+      // Group by category
+      const groups: Record<string, IPTVChannel[]> = {};
+      for (const item of channels) {
+        const ch = item.channel as any as IPTVChannel;
+        if (!ch) continue;
+        const cat = ch.category || 'Sem Categoria';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(ch);
+      }
+
+      return Object.entries(groups).map(([name, chs]) => ({ name, channels: chs }));
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: activeTab !== 'all' && activeTab !== 'favorites',
+  });
+
+  // Fetch all channels for favorites
+  const { data: allChannelsForFavorites } = useQuery({
+    queryKey: ['iptv-all-for-favorites', favorites],
+    queryFn: async () => {
+      if (favorites.length === 0) return [];
+      
+      const { data } = await supabase
+        .from('iptv_channels')
+        .select('*')
+        .in('id', favorites.map(Number));
+
+      return data as IPTVChannel[] || [];
+    },
+    enabled: activeTab === 'favorites' && favorites.length > 0,
   });
 
   // Search results
@@ -62,35 +157,19 @@ export default function IPTVHome() {
     enabled: searchQuery.length >= 2,
   });
 
-  // Filter by favorites
+  // Display groups based on active tab
   const displayGroups = useMemo(() => {
-    if (!channelGroups) return [];
+    if (activeTab === 'all') {
+      return randomGroups || [];
+    }
     
     if (activeTab === 'favorites') {
-      const favChannels = channelGroups
-        .flatMap(g => g.channels)
-        .filter(c => favorites.includes(String(c.id)));
-      
-      if (favChannels.length === 0) return [];
-      return [{ name: 'Meus Favoritos', channels: favChannels }];
+      if (!allChannelsForFavorites || allChannelsForFavorites.length === 0) return [];
+      return [{ name: 'Meus Favoritos', channels: allChannelsForFavorites }];
     }
 
-    if (selectedCategory) {
-      return channelGroups.filter(g => g.name === selectedCategory);
-    }
-
-    return channelGroups;
-  }, [channelGroups, activeTab, selectedCategory, favorites]);
-
-  // All channels flat for grid view
-  const allChannels = useMemo(() => {
-    return displayGroups.flatMap(g => g.channels).map(ch => ({
-      id: String(ch.id),
-      name: ch.name,
-      tvg_logo: ch.logo_url || undefined,
-      category_name: ch.category || undefined,
-    }));
-  }, [displayGroups]);
+    return playlistChannels || [];
+  }, [activeTab, randomGroups, playlistChannels, allChannelsForFavorites]);
 
   // Hero featured items
   const heroItems = useMemo(() => {
@@ -126,6 +205,9 @@ export default function IPTVHome() {
     return favorites.includes(id);
   }, [favorites]);
 
+  const isLoading = (activeTab === 'all' && loadingRandom) || 
+                    (activeTab !== 'all' && activeTab !== 'favorites' && loadingPlaylist);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -140,7 +222,7 @@ export default function IPTVHome() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      {heroItems.length > 0 && viewMode === 'rows' && !selectedCategory && (
+      {heroItems.length > 0 && (
         <TVHeroSection
           items={heroItems}
           onPlay={(item) => handlePlay({ id: item.id })}
@@ -149,131 +231,63 @@ export default function IPTVHome() {
         />
       )}
 
-      {/* Navigation Bar - Full Width Netflix Style */}
+      {/* Navigation Bar - Full Width Responsive */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
-        <div className="w-full">
-          <div className="flex items-center justify-between w-full">
-            {/* Tabs - Full Width */}
-            <Tabs 
-              value={activeTab} 
-              onValueChange={(v) => { setActiveTab(v as any); setSelectedCategory(null); }}
-              className="flex-1"
-            >
-              <TabsList className="w-full h-12 sm:h-14 lg:h-16 2xl:h-20 bg-muted/30 rounded-none justify-start sm:justify-center gap-0 p-0">
-                <TabsTrigger 
-                  value="all" 
-                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
-                >
-                  <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span className="hidden xs:inline sm:inline">Todos</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="live" 
-                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
-                >
-                  <Tv className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span className="hidden xs:inline sm:inline">Ao Vivo</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="vod" 
-                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
-                >
-                  <Film className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span className="hidden xs:inline sm:inline">Filmes</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="series" 
-                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
-                >
-                  <Radio className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span className="hidden xs:inline sm:inline">Séries</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="favorites" 
-                  className="flex-1 h-full gap-1.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm lg:text-base 2xl:text-lg px-2 sm:px-4"
-                >
-                  <Heart className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span className="hidden xs:inline sm:inline">Favoritos</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+        <div className="flex items-center w-full">
+          {/* Tabs - Responsive without horizontal scroll */}
+          <Tabs 
+            value={activeTab} 
+            onValueChange={(v) => setActiveTab(v as TabType)}
+            className="flex-1"
+          >
+            <TabsList className="w-full h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 bg-muted/30 rounded-none grid grid-cols-5 p-0">
+              <TabsTrigger 
+                value="all" 
+                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
+              >
+                <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Todos</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="live" 
+                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
+              >
+                <Tv className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Ao Vivo</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="vod" 
+                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
+              >
+                <Film className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Filmes</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="series" 
+                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
+              >
+                <Radio className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Séries</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="favorites" 
+                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
+              >
+                <Heart className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Favoritos</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-            {/* Search Icon - End of tabs bar */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsSearchOpen(true)}
-              className="h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 2xl:h-20 2xl:w-20 rounded-none hover:bg-primary/10 shrink-0"
-            >
-              <Search className="h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 2xl:h-8 2xl:w-8" />
-            </Button>
-          </div>
-
-          {/* Secondary Controls - Categories & View Mode */}
-          {(categories.length > 0 || true) && (
-            <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 border-t border-border/50 bg-muted/20">
-              {/* Category Filter */}
-              <div className="flex items-center gap-2">
-                {categories.length > 0 && (
-                  <>
-                    <Select
-                      value={selectedCategory || 'all'}
-                      onValueChange={(value) => setSelectedCategory(value === 'all' ? null : value)}
-                    >
-                      <SelectTrigger className="w-[140px] sm:w-[180px] h-8 sm:h-9 text-xs sm:text-sm">
-                        <div className="flex items-center gap-2">
-                          <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <SelectValue placeholder="Categoria" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {selectedCategory && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedCategory(null)}
-                        className="gap-1 h-8 text-xs"
-                      >
-                        <X className="h-3 w-3" />
-                        <span className="hidden sm:inline">Limpar</span>
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* View Mode Toggle */}
-              <div className="flex items-center border rounded-lg overflow-hidden">
-                <Button
-                  variant={viewMode === 'rows' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('rows')}
-                  className="rounded-none h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
-                >
-                  <span className="hidden sm:inline">Linhas</span>
-                  <span className="sm:hidden">≡</span>
-                </Button>
-                <Button
-                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="rounded-none h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
-                >
-                  <span className="hidden sm:inline">Grade</span>
-                  <span className="sm:hidden">⊞</span>
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Search Icon */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsSearchOpen(true)}
+            className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 lg:h-18 lg:w-18 xl:h-20 xl:w-20 rounded-none hover:bg-primary/10 shrink-0"
+          >
+            <Search className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+          </Button>
         </div>
       </div>
 
@@ -288,17 +302,11 @@ export default function IPTVHome() {
             <p className="text-muted-foreground">
               {activeTab === 'favorites' 
                 ? 'Adicione canais aos favoritos para vê-los aqui'
-                : 'Tente mudar o filtro ou categoria'}
+                : activeTab === 'all' 
+                  ? 'Importe canais M3U para começar'
+                  : `Crie uma playlist com slug "${PLAYLIST_SLUGS[activeTab] || activeTab}" para exibir conteúdo aqui`}
             </p>
           </div>
-        ) : viewMode === 'grid' ? (
-          <NetflixContentGrid
-            channels={allChannels}
-            isFavorite={isFavorite}
-            onPlay={(ch) => navigate(`/app/player/${ch.id}`)}
-            onToggleFavorite={(id) => handleToggleFavorite(id)}
-            initialLimit={48}
-          />
         ) : (
           <div className="space-y-2 lg:space-y-4 pt-4">
             {displayGroups.map((group) => (
@@ -334,7 +342,7 @@ export default function IPTVHome() {
         resultCount={searchResults?.length}
       />
 
-      {/* Search Results (when search is open and has query) */}
+      {/* Search Results */}
       {isSearchOpen && searchQuery.length >= 2 && searchResults && searchResults.length > 0 && (
         <div className="fixed inset-0 z-50 pt-48 px-4 bg-background/95 overflow-y-auto">
           <div className="max-w-6xl mx-auto">
