@@ -447,53 +447,81 @@ async function insertBatch(supabase: any, channels: ParsedChannel[]): Promise<{ 
 // Auto-associate imported channels to existing playlists by matching category name
 async function autoAssociateToPlaylists(supabase: any, channels: Array<{ id: number; category: string | null }>) {
   // Get unique categories from this batch
-  const categories = [...new Set(channels.filter(c => c.category).map(c => c.category!.toLowerCase()))];
+  const categories = [...new Set(channels.filter(c => c.category).map(c => c.category!))];
   
   if (categories.length === 0) return;
 
-  // Find playlists that match any of these categories (case-insensitive)
+  console.log(`[fetch-m3u] Checking auto-association for ${categories.length} categories`);
+
+  // Fetch all playlists to match categories
   const { data: playlists, error: playlistError } = await supabase
     .from('iptv_playlists')
-    .select('id, name')
-    .or(categories.map(c => `name.ilike.${c}`).join(','));
+    .select('id, name');
 
-  if (playlistError || !playlists || playlists.length === 0) return;
+  if (playlistError || !playlists || playlists.length === 0) {
+    console.log('[fetch-m3u] No playlists found for auto-association');
+    return;
+  }
 
   // Create a map of lowercase playlist names to playlist IDs
   const playlistMap = new Map<string, number>();
   for (const p of playlists) {
-    playlistMap.set(p.name.toLowerCase(), p.id);
+    playlistMap.set(p.name.toLowerCase().trim(), p.id);
   }
+
+  console.log(`[fetch-m3u] Found ${playlists.length} playlists to match against`);
 
   // Group channels by their matching playlist
   const associations: Array<{ playlist_id: number; channel_id: number; position: number }> = [];
   
   for (const channel of channels) {
     if (!channel.category) continue;
-    const playlistId = playlistMap.get(channel.category.toLowerCase());
+    const categoryLower = channel.category.toLowerCase().trim();
+    const playlistId = playlistMap.get(categoryLower);
     if (playlistId) {
       associations.push({
         playlist_id: playlistId,
         channel_id: channel.id,
-        position: 0, // Will be updated by trigger or frontend
+        position: 0,
       });
     }
   }
 
   if (associations.length > 0) {
-    // Insert associations, ignoring duplicates
-    const { error: assocError } = await supabase
-      .from('iptv_playlist_channels')
-      .upsert(associations, {
-        onConflict: 'playlist_id,channel_id',
-        ignoreDuplicates: true
-      });
+    console.log(`[fetch-m3u] Auto-associating ${associations.length} channels to playlists`);
+    
+    // Insert in batches to avoid payload limits
+    for (let i = 0; i < associations.length; i += 500) {
+      const batch = associations.slice(i, i + 500);
+      const { error: assocError } = await supabase
+        .from('iptv_playlist_channels')
+        .upsert(batch, {
+          onConflict: 'playlist_id,channel_id',
+          ignoreDuplicates: true
+        });
 
-    if (assocError) {
-      console.warn('[fetch-m3u] Auto-associate error:', assocError.message);
-    } else {
-      console.log(`[fetch-m3u] Auto-associated ${associations.length} channels to playlists`);
+      if (assocError) {
+        console.warn('[fetch-m3u] Auto-associate batch error:', assocError.message);
+      }
     }
+
+    // Update playlist channel counts
+    const playlistIds = [...new Set(associations.map(a => a.playlist_id))];
+    for (const plId of playlistIds) {
+      const { count } = await supabase
+        .from('iptv_playlist_channels')
+        .select('*', { count: 'exact', head: true })
+        .eq('playlist_id', plId);
+
+      await supabase
+        .from('iptv_playlists')
+        .update({ channel_count: count || 0 })
+        .eq('id', plId);
+    }
+
+    console.log(`[fetch-m3u] Auto-associated ${associations.length} channels to ${playlistIds.length} playlists`);
+  } else {
+    console.log('[fetch-m3u] No matching playlists found for imported categories');
   }
 }
 
