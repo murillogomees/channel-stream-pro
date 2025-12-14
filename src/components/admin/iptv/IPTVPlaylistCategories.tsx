@@ -275,7 +275,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     refetchOther();
   };
 
-  const isLoading = loadingCategories || loadingThisPlaylist || loadingOther;
+  const isLoading = loadingCategories || loadingThisPlaylist;
 
   return (
     <div className="space-y-4">
