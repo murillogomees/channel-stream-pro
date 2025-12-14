@@ -250,35 +250,23 @@ serve(async (req: Request): Promise<Response> => {
     upstreamHeaders.set('Accept', '*/*');
     upstreamHeaders.set('Connection', 'keep-alive');
     
-    // Inject stream token if provided (dynamic token system for auto-refresh)
-    const streamToken = req.headers.get('x-stream-token');
-    if (streamToken) {
-      console.log('[Proxy] Injecting stream token from x-stream-token header');
-      upstreamHeaders.set('Authorization', `Bearer ${streamToken}`);
+    // Set referer from original URL origin FIRST (important for some providers)
+    try {
+      const urlObj = new URL(decodedUrl);
+      upstreamHeaders.set('Referer', `${urlObj.protocol}//${urlObj.host}/`);
+      upstreamHeaders.set('Origin', `${urlObj.protocol}//${urlObj.host}`);
+      upstreamHeaders.set('Host', urlObj.host);
+    } catch {
+      // Ignore
     }
-    
-    // Forward important headers from client (except authorization if we set it via token)
-    const headersToForward = ['range', 'cookie'];
+
+    // Forward ALL relevant headers from client for session continuity
+    const headersToForward = ['range', 'cookie', 'if-none-match', 'if-modified-since'];
     headersToForward.forEach(header => {
       const value = req.headers.get(header);
       if (value) upstreamHeaders.set(header, value);
     });
     
-    // Only forward authorization if no stream token was provided
-    if (!streamToken) {
-      const authHeader = req.headers.get('authorization');
-      if (authHeader) upstreamHeaders.set('Authorization', authHeader);
-    }
-    
-    // Set referer from original URL origin
-    try {
-      const urlObj = new URL(decodedUrl);
-      upstreamHeaders.set('Referer', urlObj.origin + '/');
-      upstreamHeaders.set('Origin', urlObj.origin);
-    } catch {
-      // Ignore
-    }
-
     // Custom referer override
     const customReferer = req.headers.get('x-original-referer');
     if (customReferer) {
