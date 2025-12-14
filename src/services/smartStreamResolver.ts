@@ -13,7 +13,7 @@
 import { SUPABASE_URL } from '@/config/supabase';
 
 // Cloudflare Worker - PRIMARY (faster, distributed edge locations)
-const CLOUDFLARE_WORKER_URL = 'https://iptv-stream-proxy.murillogg.workers.dev';
+const CLOUDFLARE_WORKER_URL = 'https://iptv-stream-proxy.storgetec.workers.dev';
 
 // Supabase Edge Function - FALLBACK
 const SUPABASE_PROXY_URL = `${SUPABASE_URL}/functions/v1/stream-proxy`;
