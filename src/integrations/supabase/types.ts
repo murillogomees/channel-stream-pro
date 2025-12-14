@@ -3886,6 +3886,7 @@ export type Database = {
         | { Args: { p_dry_run?: boolean }; Returns: Json }
       cleanup_iptv_duplicates: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: number }
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       force_detect_series_by_pattern: {
         Args: never
         Returns: {
