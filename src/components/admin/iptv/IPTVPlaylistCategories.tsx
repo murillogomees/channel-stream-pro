@@ -81,7 +81,8 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       return mapped;
     },
-    staleTime: 60000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // 2) Categorias já nesta playlist (paginado para playlists grandes)
@@ -121,6 +122,8 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       return Array.from(categories);
     },
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // 3) Categorias ligadas a OUTRAS playlists (paginado)
@@ -160,6 +163,8 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       return Array.from(categories);
     },
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Disponíveis = todas - (presentes NESTA playlist) - (presentes em OUTRAS playlists)
