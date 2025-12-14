@@ -1,20 +1,27 @@
 /**
  * TIPOS UNIFICADOS DE AUTENTICAÇÃO
- * @version 3.0.0
+ * @version 4.0.0
  * 
- * Sistema baseado em:
- * - auth.users (Supabase Auth) - identidade
- * - public.profiles - dados de perfil
- * - public.user_roles - permissões (client, admin, master)
- * - public.clientes - dados de cliente e vencimento
- * - public.user_subscriptions - status de assinatura
- */
-
-/**
- * Roles do sistema (3 níveis):
- * - client: Acesso apenas a /app/* (streaming)
- * - admin: Acesso total ao dashboard + /app/* 
- * - master: Único usuário (murillo@gmail.com) com acesso total incluindo manipulação de admins
+ * HIERARQUIA DE ROLES (cada usuário só pode ter UMA role):
+ * 
+ * 1. MASTER (mais alto) - murillo@gmail.com
+ *    - Acesso TOTAL e irrestrito a todo o sistema
+ *    - CRUD completo em todas as tabelas
+ *    - Executar migrations e configurar serviços
+ *    - Gerenciar rotas, tokens e integrações
+ *    - Criar/remover admins
+ *    - Funções exclusivas que admin não pode acessar
+ * 
+ * 2. ADMIN (intermediário)
+ *    - Gerencia o sistema e usuários
+ *    - Acesso ao dashboard administrativo
+ *    - CRUD em clientes e conteúdo
+ *    - Algumas funções podem ser restritas apenas ao master
+ * 
+ * 3. CLIENT (base)
+ *    - Acesso apenas a /app/* (streaming/player)
+ *    - Depende de assinatura ativa para acesso
+ *    - Sem acesso ao painel administrativo
  */
 export type AppRole = 'client' | 'admin' | 'master';
 
