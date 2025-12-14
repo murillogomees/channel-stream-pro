@@ -221,11 +221,16 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
   });
 
-  // Executar auto-unificação ao montar o componente
+  // Executar auto-unificação ao montar o componente e ao trocar de playlist
   useEffect(() => {
     if (!autoLinkDone && !autoLinkMutation.isPending) {
       autoLinkMutation.mutate();
     }
+  }, [playlist.id, autoLinkDone, autoLinkMutation.isPending]);
+
+  // Sempre que trocar de playlist, resetar flag para reexecutar auto-unificação
+  useEffect(() => {
+    setAutoLinkDone(false);
   }, [playlist.id]);
 
   // Adicionar categorias (todos os canais da categoria)
