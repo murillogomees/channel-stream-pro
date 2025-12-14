@@ -85,32 +85,49 @@ export function IPTVChannelsTab() {
   const [targetCategory, setTargetCategory] = useState<string>('');
   const [isAutoOrganizeOpen, setIsAutoOrganizeOpen] = useState(false);
 
-  // Fetch all channels
+  // Fetch all channels with pagination to bypass 1000 row limit
   const { data: allChannels, isLoading, refetch } = useQuery({
     queryKey: ['iptv-channels-all', search, healthFilter, typeFilter],
     queryFn: async () => {
-      let query = supabase
-        .from('iptv_channels')
-        .select('*')
-        .order('category', { ascending: true, nullsFirst: false })
-        .order('series_name', { ascending: true, nullsFirst: false })
-        .order('season_number', { ascending: true })
-        .order('episode_number', { ascending: true })
-        .order('name', { ascending: true });
+      const PAGE_SIZE = 1000;
+      let allData: Channel[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,category.ilike.%${search}%,series_name.ilike.%${search}%`);
-      }
-      if (healthFilter !== 'all') {
-        query = query.eq('is_healthy', healthFilter === 'healthy');
-      }
-      if (typeFilter !== 'all') {
-        query = query.eq('content_type', typeFilter);
+      while (hasMore) {
+        let query = supabase
+          .from('iptv_channels')
+          .select('*')
+          .order('category', { ascending: true, nullsFirst: false })
+          .order('series_name', { ascending: true, nullsFirst: false })
+          .order('season_number', { ascending: true })
+          .order('episode_number', { ascending: true })
+          .order('name', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,category.ilike.%${search}%,series_name.ilike.%${search}%`);
+        }
+        if (healthFilter !== 'all') {
+          query = query.eq('is_healthy', healthFilter === 'healthy');
+        }
+        if (typeFilter !== 'all') {
+          query = query.eq('content_type', typeFilter);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Channel[];
+      return allData as Channel[];
     },
   });
 
