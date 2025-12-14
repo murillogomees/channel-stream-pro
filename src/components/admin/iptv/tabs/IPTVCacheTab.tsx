@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { iptvTranscodeService, CacheStats } from '@/services/iptvTranscodeService';
+import { iptvTranscodeService } from '@/services/iptvTranscodeService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,8 @@ import {
   Database, RefreshCw, Loader2, Trash2, Search, 
   HardDrive, Zap, Clock, AlertTriangle, Flame, Server, MemoryStick
 } from 'lucide-react';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { useCacheStats } from '@/hooks/useIPTVRealtimeStats';
 
 interface CacheEntry {
   id: number;
@@ -36,6 +38,7 @@ interface CacheEntry {
 
 export function IPTVCacheTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = useCacheStats();
   const [search, setSearch] = useState('');
   const [isWarmupOpen, setIsWarmupOpen] = useState(false);
   const [warmupTTL, setWarmupTTL] = useState(3600);
@@ -61,16 +64,6 @@ export function IPTVCacheTab() {
     },
   });
 
-  // Fetch cache stats via Edge Function
-  const { data: statsData } = useQuery({
-    queryKey: ['iptv-cache-stats'],
-    queryFn: async () => {
-      const { stats } = await iptvTranscodeService.getCacheStats();
-      return stats;
-    },
-    refetchInterval: 10000,
-  });
-
   // Fetch channels for warmup
   const { data: channels = [] } = useQuery({
     queryKey: ['iptv-channels-warmup'],
@@ -85,16 +78,6 @@ export function IPTVCacheTab() {
       return data;
     },
   });
-
-  const stats: CacheStats = statsData || {
-    totalKeys: cacheEntries.length,
-    warmKeys: cacheEntries.filter(c => c.is_warm).length,
-    coldKeys: cacheEntries.filter(c => !c.is_warm).length,
-    expiredKeys: cacheEntries.filter(c => c.expires_at && new Date(c.expires_at) < new Date()).length,
-    memoryKeys: 0,
-    providers: [...new Set(cacheEntries.map(c => c.cdn_provider))],
-    redisConfigured: false,
-  };
 
   // Clear cache mutation
   const clearCacheMutation = useMutation({
@@ -155,78 +138,13 @@ export function IPTVCacheTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Entradas</p>
-                <p className="text-xl font-bold">{stats.totalKeys}</p>
-              </div>
-              <Database className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Cache Quente</p>
-                <p className="text-xl font-bold text-green-500">{stats.warmKeys}</p>
-              </div>
-              <Zap className="h-6 w-6 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Cache Frio</p>
-                <p className="text-xl font-bold text-blue-500">{stats.coldKeys}</p>
-              </div>
-              <HardDrive className="h-6 w-6 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Expirados</p>
-                <p className="text-xl font-bold text-red-500">{stats.expiredKeys}</p>
-              </div>
-              <Clock className="h-6 w-6 text-red-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Em Memória</p>
-                <p className="text-xl font-bold text-purple-500">{stats.memoryKeys}</p>
-              </div>
-              <MemoryStick className="h-6 w-6 text-purple-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Redis</p>
-                <p className="text-xl font-bold">{stats.redisConfigured ? 
-                  <Badge className="bg-green-500">Ativo</Badge> : 
-                  <Badge variant="secondary">Fallback</Badge>
-                }</p>
-              </div>
-              <Server className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={4}>
+        <IPTVStatCard label="Total Entradas" value={realtimeStats?.total || 0} icon={Database} loading={statsLoading} />
+        <IPTVStatCard label="Cache Quente" value={realtimeStats?.warm || 0} icon={Zap} color="green" loading={statsLoading} />
+        <IPTVStatCard label="Cache Frio" value={realtimeStats?.cold || 0} icon={HardDrive} color="blue" loading={statsLoading} />
+        <IPTVStatCard label="Expirados" value={realtimeStats?.expired || 0} icon={Clock} color="red" loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Info Card */}
       <Card className="border-blue-500/50 bg-blue-500/5">

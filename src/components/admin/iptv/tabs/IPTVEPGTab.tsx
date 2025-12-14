@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Trash2, Search, RefreshCw, Calendar, Tv, Clock, Loader2 } from 'lucide-react';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { useEPGStats } from '@/hooks/useIPTVRealtimeStats';
 
 interface EPGProgram {
   id: string;
@@ -29,6 +31,7 @@ interface EPGProgram {
 
 export function IPTVEPGTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = useEPGStats();
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -100,59 +103,16 @@ export function IPTVEPGTab() {
   };
 
   const now = new Date();
-  const activePrograms = programs.filter(p => new Date(p.start_time) <= now && new Date(p.end_time) > now).length;
-  const upcomingPrograms = programs.filter(p => new Date(p.start_time) > now).length;
-  const uniqueChannels = new Set(programs.map(p => p.channel_id)).size;
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-xl font-bold">{programs.length}</p>
-              </div>
-              <Calendar className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Ao Vivo</p>
-                <p className="text-xl font-bold text-green-500">{activePrograms}</p>
-              </div>
-              <Tv className="h-6 w-6 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">A Seguir</p>
-                <p className="text-xl font-bold text-blue-500">{upcomingPrograms}</p>
-              </div>
-              <Clock className="h-6 w-6 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Canais</p>
-                <p className="text-xl font-bold">{uniqueChannels}</p>
-              </div>
-              <Tv className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={4}>
+        <IPTVStatCard label="Total" value={realtimeStats?.total || 0} icon={Calendar} loading={statsLoading} />
+        <IPTVStatCard label="Ao Vivo" value={realtimeStats?.active || 0} icon={Tv} color="green" loading={statsLoading} />
+        <IPTVStatCard label="A Seguir" value={realtimeStats?.upcoming || 0} icon={Clock} color="blue" loading={statsLoading} />
+        <IPTVStatCard label="Canais" value={realtimeStats?.channels || 0} icon={Tv} loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Actions */}
       <Card>

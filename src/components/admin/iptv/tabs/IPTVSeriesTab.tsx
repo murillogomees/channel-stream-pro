@@ -22,8 +22,10 @@ import {
   ChevronDown, ChevronRight, FolderOpen, Folder, 
   MoreVertical, Pencil, Film, Tv2, Play, 
   Clapperboard, Hash, Calendar, ArrowRightLeft,
-  Wand2, Check, X, ListTree, LayoutList
+  Wand2, Check, X, ListTree, LayoutList, AlertCircle
 } from 'lucide-react';
+import { IPTVStatCard, IPTVStatsGrid } from '@/components/admin/iptv/IPTVStatsCards';
+import { useSeriesStats } from '@/hooks/useIPTVRealtimeStats';
 import { cn } from '@/lib/utils';
 
 interface SeriesChannel {
@@ -74,6 +76,7 @@ type ViewMode = 'hierarchy' | 'flat';
 
 export function IPTVSeriesTab() {
   const queryClient = useQueryClient();
+  const { data: realtimeStats, isLoading: statsLoading } = useSeriesStats();
   
   const [viewMode, setViewMode] = useState<ViewMode>('hierarchy');
   const [search, setSearch] = useState('');
@@ -106,26 +109,43 @@ export function IPTVSeriesTab() {
     seriesFound: 0,
   });
 
-  // Fetch all series channels
+  // Fetch all series channels with pagination
   const { data: seriesChannels, isLoading, refetch } = useQuery({
     queryKey: ['iptv-series-channels', search],
     queryFn: async () => {
-      let query = supabase
-        .from('iptv_channels')
-        .select('id, name, original_url, logo_url, category, series_name, season_number, episode_number, episode_title, is_series, is_healthy, created_at')
-        .eq('is_series', true)
-        .order('category', { ascending: true, nullsFirst: false })
-        .order('series_name', { ascending: true })
-        .order('season_number', { ascending: true })
-        .order('episode_number', { ascending: true });
+      const PAGE_SIZE = 1000;
+      let allData: SeriesChannel[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,series_name.ilike.%${search}%,category.ilike.%${search}%`);
+      while (hasMore) {
+        let query = supabase
+          .from('iptv_channels')
+          .select('id, name, original_url, logo_url, category, series_name, season_number, episode_number, episode_title, is_series, is_healthy, created_at')
+          .eq('is_series', true)
+          .order('category', { ascending: true, nullsFirst: false })
+          .order('series_name', { ascending: true })
+          .order('season_number', { ascending: true })
+          .order('episode_number', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,series_name.ilike.%${search}%,category.ilike.%${search}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as SeriesChannel[];
+      return allData as SeriesChannel[];
     },
   });
 
@@ -478,53 +498,13 @@ export function IPTVSeriesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Episódios</p>
-                <p className="text-xl font-bold">{stats.totalEpisodes.toLocaleString()}</p>
-              </div>
-              <Film className="h-6 w-6 text-primary opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Séries</p>
-                <p className="text-xl font-bold text-purple-500">{stats.totalSeries}</p>
-              </div>
-              <Clapperboard className="h-6 w-6 text-purple-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Categorias</p>
-                <p className="text-xl font-bold text-blue-500">{stats.totalCategories}</p>
-              </div>
-              <Folder className="h-6 w-6 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={cn(stats.unorganized > 0 && "border-orange-500/50")}>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Não Organizados</p>
-                <p className="text-xl font-bold text-orange-500">{stats.unorganized.toLocaleString()}</p>
-              </div>
-              <Wand2 className="h-6 w-6 text-orange-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats - Realtime */}
+      <IPTVStatsGrid columns={4}>
+        <IPTVStatCard label="Episódios" value={realtimeStats?.totalEpisodes || 0} icon={Film} loading={statsLoading} />
+        <IPTVStatCard label="Séries" value={realtimeStats?.totalSeries || 0} icon={Clapperboard} color="blue" loading={statsLoading} />
+        <IPTVStatCard label="Categorias" value={realtimeStats?.totalCategories || 0} icon={Folder} color="purple" loading={statsLoading} />
+        <IPTVStatCard label="Não Organizados" value={realtimeStats?.unorganized || 0} icon={AlertCircle} color="yellow" loading={statsLoading} />
+      </IPTVStatsGrid>
 
       {/* Actions Toolbar */}
       <Card>
