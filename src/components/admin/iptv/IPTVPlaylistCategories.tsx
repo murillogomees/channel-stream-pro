@@ -336,10 +336,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
             ) : (
               <div className="space-y-1">
                 {availableCategories.map((cat) => (
-                  <div
+                  <label
                     key={cat.name}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                    onClick={() => toggleCategory(cat.name)}
                   >
                     <Checkbox
                       checked={selectedCategories.includes(cat.name)}
@@ -350,7 +349,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
                     <Badge variant="secondary" className="text-xs">
                       {cat.channelCount}
                     </Badge>
-                  </div>
+                  </label>
                 ))}
               </div>
             )}
