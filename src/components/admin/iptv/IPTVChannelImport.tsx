@@ -4,7 +4,7 @@
  * With real-time progress via SSE
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, supabaseConfig, getFunctionUrl } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,20 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     skipped: 0,
     progress: 0,
   });
+  
+  // Ref to track the current abort controller for cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Cleanup on unmount - abort any running import
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        console.log('[IPTVChannelImport] Cleanup: aborting active import');
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const importWithProgress = useCallback(async (payload: { url?: string; content?: string }) => {
     console.log('[IPTVChannelImport] Starting import with payload:', { url: payload.url, hasContent: !!payload.content });
@@ -88,7 +102,15 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       const functionUrl = getFunctionUrl('fetch-m3u');
       console.log('[IPTVChannelImport] Calling edge function:', functionUrl);
 
+      // Cancel any existing import before starting new one
+      if (abortControllerRef.current) {
+        console.log('[IPTVChannelImport] Aborting previous import');
+        abortControllerRef.current.abort();
+      }
+      
       const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
       const timeoutId = setTimeout(() => {
         console.log('[IPTVChannelImport] Request timeout after 5min');
         controller.abort();
@@ -109,6 +131,13 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       });
 
       clearTimeout(timeoutId);
+      
+      // Check if aborted before processing
+      if (controller.signal.aborted) {
+        console.log('[IPTVChannelImport] Import was aborted, skipping processing');
+        return;
+      }
+      
       console.log('[IPTVChannelImport] Response received:', response.status, response.headers.get('content-type'));
 
       if (!response.ok) {
@@ -123,6 +152,13 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       let buffer = '';
 
       while (true) {
+        // Check abort signal in loop
+        if (controller.signal.aborted) {
+          console.log('[IPTVChannelImport] Import aborted during read loop');
+          reader.cancel();
+          return;
+        }
+        
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -184,6 +220,12 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         }
       }
     } catch (error) {
+      // Don't show error if it was an intentional abort
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[IPTVChannelImport] Import cancelled by user/cleanup');
+        return;
+      }
+      
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       setProgressState(prev => ({
         ...prev,
@@ -192,12 +234,24 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         message: `Erro: ${message}`,
       }));
       toast.error(`Erro: ${message}`);
+    } finally {
+      // Clear ref when done
+      if (abortControllerRef.current?.signal.aborted === false) {
+        abortControllerRef.current = null;
+      }
     }
   }, [queryClient, onSuccess]);
 
   const isLoading = progressState.status === 'fetching' || progressState.status === 'importing';
 
   const handleReset = () => {
+    // Abort any running import
+    if (abortControllerRef.current) {
+      console.log('[IPTVChannelImport] Reset: aborting active import');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
     setProgressState({
       status: 'idle',
       total: 0,
