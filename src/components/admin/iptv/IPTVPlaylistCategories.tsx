@@ -46,12 +46,19 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       // Buscar channel_ids que já estão NESTA playlist
       const { data: linkedChannels, error: linkedError } = await supabase
         .from('iptv_playlist_channels')
-        .select('channel_id')
+        .select('channel_id, channel:iptv_channels!inner(category)')
         .eq('playlist_id', playlist.id);
 
       if (linkedError) throw linkedError;
 
       const linkedIds = new Set((linkedChannels || []).map(c => c.channel_id));
+
+      // Extrair categorias que já existem na playlist (para não aparecerem como "disponíveis")
+      const existingCategoryNames = new Set<string>();
+      for (const item of linkedChannels || []) {
+        const cat = (item as any).channel?.category as string | null;
+        if (cat) existingCategoryNames.add(cat.toLowerCase().trim());
+      }
 
       // Buscar todos os canais com categoria
       const { data: allChannels, error: allError } = await supabase
@@ -62,12 +69,16 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       if (allError) throw allError;
 
-      // Filtrar canais não linkados a ESTA playlist e contar por categoria
+      // Filtrar canais não linkados a ESTA playlist e contar por categoria,
+      // ignorando categorias que já existem na playlist
       const counts = new Map<string, number>();
       for (const ch of allChannels || []) {
-        if (!linkedIds.has(ch.id) && ch.category) {
-          counts.set(ch.category, (counts.get(ch.category) || 0) + 1);
-        }
+        if (!ch.category) continue;
+        if (linkedIds.has(ch.id)) continue;
+        const catKey = ch.category.toLowerCase().trim();
+        if (existingCategoryNames.has(catKey)) continue;
+
+        counts.set(ch.category, (counts.get(ch.category) || 0) + 1);
       }
 
       return Array.from(counts.entries())
