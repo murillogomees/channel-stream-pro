@@ -632,9 +632,21 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
 
   const existingUrls = new Set((existingRecords || []).map((r: any) => r.original_url));
   
-  // Filter out duplicates
-  const newRecords = records.filter(r => !existingUrls.has(r.original_url));
-  const duplicateCount = records.length - newRecords.length;
+  // Filter out duplicates that already exist in DB
+  const nonExistingRecords = records.filter(r => !existingUrls.has(r.original_url));
+  const alreadyExistingCount = records.length - nonExistingRecords.length;
+
+  // Also de-duplicate inside this batch by original_url to avoid unique violations
+  const uniqueByUrlMap = new Map<string, typeof nonExistingRecords[0]>();
+  for (const rec of nonExistingRecords) {
+    if (!uniqueByUrlMap.has(rec.original_url)) {
+      uniqueByUrlMap.set(rec.original_url, rec);
+    }
+  }
+  const newRecords = Array.from(uniqueByUrlMap.values());
+  const inBatchDuplicates = nonExistingRecords.length - newRecords.length;
+
+  const duplicateCount = alreadyExistingCount + inBatchDuplicates;
 
   if (newRecords.length === 0) {
     return { inserted: 0, skipped: 0, duplicates: duplicateCount };
