@@ -427,7 +427,7 @@ async function insertBatch(supabase: any, channels: ParsedChannel[]): Promise<{ 
       onConflict: 'original_url',
       ignoreDuplicates: true
     })
-    .select('id');
+    .select('id, category');
 
   if (error) {
     console.error('[fetch-m3u] Batch error:', error.message);
@@ -435,7 +435,66 @@ async function insertBatch(supabase: any, channels: ParsedChannel[]): Promise<{ 
   }
 
   const insertedCount = upsertData?.length || 0;
+
+  // Auto-associate channels to playlists based on category name match
+  if (upsertData && upsertData.length > 0) {
+    await autoAssociateToPlaylists(supabase, upsertData);
+  }
+
   return { inserted: insertedCount, skipped: channels.length - insertedCount };
+}
+
+// Auto-associate imported channels to existing playlists by matching category name
+async function autoAssociateToPlaylists(supabase: any, channels: Array<{ id: number; category: string | null }>) {
+  // Get unique categories from this batch
+  const categories = [...new Set(channels.filter(c => c.category).map(c => c.category!.toLowerCase()))];
+  
+  if (categories.length === 0) return;
+
+  // Find playlists that match any of these categories (case-insensitive)
+  const { data: playlists, error: playlistError } = await supabase
+    .from('iptv_playlists')
+    .select('id, name')
+    .or(categories.map(c => `name.ilike.${c}`).join(','));
+
+  if (playlistError || !playlists || playlists.length === 0) return;
+
+  // Create a map of lowercase playlist names to playlist IDs
+  const playlistMap = new Map<string, number>();
+  for (const p of playlists) {
+    playlistMap.set(p.name.toLowerCase(), p.id);
+  }
+
+  // Group channels by their matching playlist
+  const associations: Array<{ playlist_id: number; channel_id: number; position: number }> = [];
+  
+  for (const channel of channels) {
+    if (!channel.category) continue;
+    const playlistId = playlistMap.get(channel.category.toLowerCase());
+    if (playlistId) {
+      associations.push({
+        playlist_id: playlistId,
+        channel_id: channel.id,
+        position: 0, // Will be updated by trigger or frontend
+      });
+    }
+  }
+
+  if (associations.length > 0) {
+    // Insert associations, ignoring duplicates
+    const { error: assocError } = await supabase
+      .from('iptv_playlist_channels')
+      .upsert(associations, {
+        onConflict: 'playlist_id,channel_id',
+        ignoreDuplicates: true
+      });
+
+    if (assocError) {
+      console.warn('[fetch-m3u] Auto-associate error:', assocError.message);
+    } else {
+      console.log(`[fetch-m3u] Auto-associated ${associations.length} channels to playlists`);
+    }
+  }
 }
 
 function generateSlug(name: string): string {
