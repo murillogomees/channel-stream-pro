@@ -84,7 +84,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     staleTime: 60000,
   });
 
-  // 2) Categorias já nesta playlist
+  // 2) Categorias já nesta playlist (paginado para playlists grandes)
   const {
     data: thisPlaylistCategories,
     isLoading: loadingThisPlaylist,
@@ -92,18 +92,33 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['playlist-categories-list', playlist.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('iptv_playlist_channels')
-        .select('channel:iptv_channels(category)')
-        .eq('playlist_id', playlist.id);
-
-      if (error) throw error;
-
       const categories = new Set<string>();
-      for (const item of data || []) {
-        const cat = (item.channel as any)?.category;
-        if (cat) categories.add(cat);
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('iptv_playlist_channels')
+          .select('channel:iptv_channels(category)')
+          .eq('playlist_id', playlist.id)
+          .range(page * CATEGORY_PAGE_SIZE, (page + 1) * CATEGORY_PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const item of data) {
+          const cat = (item.channel as any)?.category;
+          if (cat) categories.add(cat);
+        }
+
+        hasMore = data.length === CATEGORY_PAGE_SIZE;
+        page++;
       }
+
       return Array.from(categories);
     },
   });
