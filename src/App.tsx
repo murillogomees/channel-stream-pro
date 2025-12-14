@@ -35,10 +35,18 @@ const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage")
 const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage"));
-// AdminRLSCoverage removed - table not available
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
 const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupabaseIntegrationPage"));
-// AdminSelfHostedPage removed - using Supabase Cloud only
+
+// System Control Modules
+const SystemOverview = lazy(() => import("./pages/admin/system/index"));
+const AuthRecovery = lazy(() => import("./pages/admin/system/AuthRecovery"));
+const DatabaseRebuild = lazy(() => import("./pages/admin/system/DatabaseRebuild"));
+const SchemaPreview = lazy(() => import("./pages/admin/system/SchemaPreview"));
+const FunctionsRPCs = lazy(() => import("./pages/admin/system/FunctionsRPCs"));
+const RLSControl = lazy(() => import("./pages/admin/system/RLSControl"));
+const UsageValidation = lazy(() => import("./pages/admin/system/UsageValidation"));
+const ExecutePlan = lazy(() => import("./pages/admin/system/ExecutePlan"));
 
 // IPTV Management Pages
 const AdminIPTVPage = lazy(() => import("./pages/admin/AdminIPTVPage"));
@@ -129,7 +137,16 @@ function AppContent() {
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
 <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
             <Route path="/admin/supabase-integration" element={<ProtectedRoute requireAdmin><AdminSupabaseIntegrationPage /></ProtectedRoute>} />
-            {/* Self-hosted route removed - using Supabase Cloud only */}
+            
+            {/* System Control Panel - Database & Auth */}
+            <Route path="/admin/system" element={<ProtectedRoute requireAdmin><SystemOverview /></ProtectedRoute>} />
+            <Route path="/admin/system/auth" element={<ProtectedRoute requireAdmin><AuthRecovery /></ProtectedRoute>} />
+            <Route path="/admin/system/database" element={<ProtectedRoute requireAdmin><DatabaseRebuild /></ProtectedRoute>} />
+            <Route path="/admin/system/schema-preview" element={<ProtectedRoute requireAdmin><SchemaPreview /></ProtectedRoute>} />
+            <Route path="/admin/system/functions" element={<ProtectedRoute requireAdmin><FunctionsRPCs /></ProtectedRoute>} />
+            <Route path="/admin/system/rls" element={<ProtectedRoute requireAdmin><RLSControl /></ProtectedRoute>} />
+            <Route path="/admin/system/usage-validation" element={<ProtectedRoute requireAdmin><UsageValidation /></ProtectedRoute>} />
+            <Route path="/admin/system/execute" element={<ProtectedRoute requireAdmin><ExecutePlan /></ProtectedRoute>} />
             
             {/* IPTV Management - Unified */}
             <Route path="/admin/iptv" element={<ProtectedRoute requireAdmin><AdminIPTVPage /></ProtectedRoute>} />
