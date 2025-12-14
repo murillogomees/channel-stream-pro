@@ -18,7 +18,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DB_BATCH_SIZE = 500;
+const DB_BATCH_SIZE = 100;
 
 interface ParsedChannel {
   name: string;
