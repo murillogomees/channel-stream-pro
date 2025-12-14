@@ -45,7 +45,7 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
   });
 
   const importWithProgress = useCallback(async (payload: { url?: string; content?: string }) => {
-    console.log('[IPTVChannelImport] Starting import with payload:', { url: payload.url?.substring(0, 50), hasContent: !!payload.content });
+    console.log('[IPTVChannelImport] Starting import with payload:', { url: payload.url, hasContent: !!payload.content });
     
     setProgressState({
       status: 'fetching',
