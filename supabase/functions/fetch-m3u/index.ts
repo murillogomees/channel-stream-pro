@@ -623,30 +623,15 @@ async function insertBatchEnterprise(supabase: any, channels: ParsedChannel[]): 
   // Process all channels with normalization and series detection
   const records = channels.map(ch => processChannel(ch));
 
-  // Check for existing original_urls to detect duplicates (primary unique constraint)
-  const originalUrls = records.map(r => r.original_url);
-  const { data: existingRecords } = await supabase
-    .from('iptv_channels')
-    .select('original_url')
-    .in('original_url', originalUrls);
-
-  const existingUrls = new Set((existingRecords || []).map((r: any) => r.original_url));
-  
-  // Filter out duplicates that already exist in DB
-  const nonExistingRecords = records.filter(r => !existingUrls.has(r.original_url));
-  const alreadyExistingCount = records.length - nonExistingRecords.length;
-
-  // Also de-duplicate inside this batch by original_url to avoid unique violations
-  const uniqueByUrlMap = new Map<string, typeof nonExistingRecords[0]>();
-  for (const rec of nonExistingRecords) {
+  // De-duplicate inside this batch by original_url only (DB has unique constraint on original_url)
+  const uniqueByUrlMap = new Map<string, typeof records[0]>();
+  for (const rec of records) {
     if (!uniqueByUrlMap.has(rec.original_url)) {
       uniqueByUrlMap.set(rec.original_url, rec);
     }
   }
   const newRecords = Array.from(uniqueByUrlMap.values());
-  const inBatchDuplicates = nonExistingRecords.length - newRecords.length;
-
-  const duplicateCount = alreadyExistingCount + inBatchDuplicates;
+  const duplicateCount = records.length - newRecords.length;
 
   if (newRecords.length === 0) {
     return { inserted: 0, skipped: 0, duplicates: duplicateCount };
