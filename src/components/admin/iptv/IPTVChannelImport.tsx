@@ -122,22 +122,29 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              console.log('[IPTVChannelImport] SSE event:', data.type, data);
               
               if (data.type === 'start') {
                 setProgressState(prev => ({
                   ...prev,
                   status: 'importing',
-                  total: data.total,
-                  message: `Importando ${data.total.toLocaleString()} canais...`,
+                  total: data.total || 0,
+                  message: data.total > 0 
+                    ? `Importando ${data.total.toLocaleString()} canais...`
+                    : 'Processando arquivo M3U...',
                 }));
               } else if (data.type === 'progress') {
+                // Em streaming, o total é atualizado conforme processa
+                const displayTotal = data.total || data.processed;
                 setProgressState(prev => ({
                   ...prev,
+                  status: 'importing',
                   processed: data.processed,
+                  total: displayTotal,
                   inserted: data.inserted,
                   skipped: data.skipped,
-                  progress: data.progress,
-                  message: `${data.processed.toLocaleString()} de ${data.total.toLocaleString()} (${data.progress}%)`,
+                  progress: displayTotal > 0 ? Math.round((data.processed / displayTotal) * 100) : 0,
+                  message: data.message || `${data.processed.toLocaleString()} canais processados (${data.inserted.toLocaleString()} inseridos)`,
                 }));
               } else if (data.type === 'complete') {
                 setProgressState({
@@ -147,16 +154,20 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
                   inserted: data.inserted,
                   skipped: data.skipped,
                   progress: 100,
-                  message: data.message,
+                  message: `Concluído! ${data.inserted.toLocaleString()} canais importados`,
                 });
-                toast.success(data.message);
+                toast.success(`Importados ${data.inserted.toLocaleString()} canais`);
                 queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
                 queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
                 if (payload.url) setM3uUrl('');
                 if (payload.content) setM3uContent('');
                 onSuccess();
+              } else if (data.type === 'error') {
+                throw new Error(data.error || 'Erro no processamento');
               }
-            } catch {}
+            } catch (parseError) {
+              console.warn('[IPTVChannelImport] SSE parse error:', parseError);
+            }
           }
         }
       }
