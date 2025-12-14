@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker to deploy (all, rate-limiter, origin-failover)'
+        description: 'Worker to deploy (all, rate-limiter, origin-failover, stream-proxy)'
         required: false
         default: 'all'
 
@@ -120,6 +120,29 @@ jobs:
               
               cd ..
               echo "✅ origin-failover-worker deployed"
+            fi
+          fi
+          
+          # Deploy stream-proxy-worker
+          if [ "$WORKER_INPUT" == "all" ] || [ "$WORKER_INPUT" == "stream-proxy" ]; then
+            if [ -d "stream-proxy-worker" ]; then
+              echo "🚀 Deploying stream-proxy-worker..."
+              cd stream-proxy-worker
+              
+              # Create wrangler.toml
+              cat > wrangler.toml << 'EOF'
+          name = "iptv-stream-proxy"
+          main = "index.ts"
+          compatibility_date = "2024-01-01"
+          
+          [vars]
+          ENVIRONMENT = "production"
+          EOF
+              
+              wrangler deploy
+              
+              cd ..
+              echo "✅ stream-proxy-worker deployed"
             fi
           fi
           
