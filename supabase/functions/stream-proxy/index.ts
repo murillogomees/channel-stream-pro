@@ -78,7 +78,18 @@ function isSegment(url: string): boolean {
 
 function isMp4(url: string): boolean {
   const urlLower = url.toLowerCase();
-  return urlLower.endsWith('.mp4');
+  return urlLower.endsWith('.mp4') || 
+         urlLower.endsWith('.mkv') ||
+         urlLower.endsWith('.avi') ||
+         urlLower.endsWith('.webm') ||
+         urlLower.endsWith('.mov') ||
+         urlLower.includes('/movie/') ||
+         urlLower.includes('/series/');
+}
+
+function isKeyFile(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  return urlLower.endsWith('.key') || urlLower.includes('/key/');
 }
 
 
