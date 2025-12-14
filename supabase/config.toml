@@ -474,3 +474,7 @@ verify_jwt = false
 # Migration helper - diagnostic and verification
 [functions.migration-helper]
 verify_jwt = false
+
+# Data migration - transfer data between Supabase instances
+[functions.data-migration]
+verify_jwt = false
