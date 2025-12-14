@@ -3820,6 +3820,7 @@ export type Database = {
       cleanup_fase8_old_data:
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
+      cleanup_iptv_duplicates: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: number }
       force_detect_series_by_pattern: {
         Args: never
