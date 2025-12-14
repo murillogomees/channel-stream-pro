@@ -73,7 +73,8 @@ function isSegment(url: string): boolean {
   return urlLower.endsWith('.ts') || 
          urlLower.endsWith('.aac') || 
          urlLower.endsWith('.m4s') ||
-         urlLower.endsWith('.fmp4');
+         urlLower.endsWith('.fmp4') ||
+         urlLower.includes('/hls/');  // Allow HLS segment paths
 }
 
 function isMp4(url: string): boolean {
@@ -233,9 +234,8 @@ serve(async (req: Request): Promise<Response> => {
     const isMp4File = isMp4(decodedUrl);
     const isKey = isKeyFile(decodedUrl);
 
-    // Validate stream type
-    if (!isM3u8 && !isTs && !isKey) {
-      // Allow other media types but log
+    // Validate stream type - allow all media through, just log non-standard ones
+    if (!isM3u8 && !isTs && !isKey && !isMp4File) {
       console.log(`[Proxy] Non-standard media type: ${decodedUrl.substring(0, 50)}...`);
     }
 
