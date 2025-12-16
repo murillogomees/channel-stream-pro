@@ -36,7 +36,6 @@ const AdminUsuariosPage = lazy(() => import("./pages/admin/AdminUsuariosPage"));
 const AdminIntegracaoPage = lazy(() => import("./pages/admin/AdminIntegracaoPage"));
 const AdminMigracoesPage = lazy(() => import("./pages/admin/AdminMigracoesPage"));
 const AdminBuildsDeploysPage = lazy(() => import("./pages/admin/AdminBuildsDeploysPage"));
-const AdminSupabaseIntegrationPage = lazy(() => import("./pages/admin/AdminSupabaseIntegrationPage"));
 const AdminObservabilityPage = lazy(() => import("./pages/admin/AdminObservabilityPage"));
 
 // System Control Modules
@@ -137,7 +136,6 @@ function AppContent() {
             <Route path="/admin/perfil" element={<ProtectedRoute requireAdmin><UnifiedProfile /></ProtectedRoute>} />
             <Route path="/admin/afiliados" element={<ProtectedRoute requireAdmin><AdminAffiliates /></ProtectedRoute>} />
 <Route path="/admin/builds" element={<ProtectedRoute requireAdmin><AdminBuildsDeploysPage /></ProtectedRoute>} />
-            <Route path="/admin/supabase-integration" element={<ProtectedRoute requireAdmin><AdminSupabaseIntegrationPage /></ProtectedRoute>} />
             <Route path="/admin/observability" element={<ProtectedRoute requireAdmin><AdminObservabilityPage /></ProtectedRoute>} />
             
             {/* System Control Panel - Database & Auth */}

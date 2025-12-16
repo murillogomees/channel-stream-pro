@@ -13,7 +13,6 @@ import { TokenManager, tokenManager } from './TokenManager'
 import { StreamResolver, streamResolver } from './StreamResolver'
 import { BufferManager } from './BufferManager'
 import { ErrorManager, PlayerError } from './ErrorManager'
-import { MetricsCollector, SessionMetrics } from './MetricsCollector'
 
 export type PlayerState = 
   | 'idle'
@@ -26,6 +25,14 @@ export type PlayerState =
   | 'recovering'
   | 'error'
   | 'destroyed'
+
+export interface SessionMetrics {
+  sessionId: string
+  startTime: number
+  bufferingEvents: number
+  errorCount: number
+  totalPlayTime: number
+}
 
 export interface PlayerControllerConfig {
   onStateChange?: (state: PlayerState) => void
@@ -46,14 +53,18 @@ export class PlayerController {
   private streamResolver: StreamResolver
   private bufferManager: BufferManager
   private errorManager: ErrorManager
-  private metricsCollector: MetricsCollector
+  
+  // Simple metrics
+  private sessionId: string = crypto.randomUUID()
+  private sessionStartTime: number = Date.now()
+  private bufferingEvents: number = 0
+  private errorCount: number = 0
 
   constructor(config: PlayerControllerConfig = {}) {
     this.config = config
     this.tokenManager = tokenManager
     this.streamResolver = streamResolver
     this.bufferManager = new BufferManager()
-    this.metricsCollector = new MetricsCollector()
     
     this.errorManager = new ErrorManager({
       onRecoverable: (error) => this.handleRecoverableError(error),
@@ -71,9 +82,11 @@ export class PlayerController {
     this.currentUrl = streamUrl
     this.setState('initializing')
     
-    // Initialize metrics
-    this.metricsCollector.init(userId, contentId, this.detectContentType(streamUrl))
-    this.metricsCollector.report('stream_load_start')
+    // Reset session
+    this.sessionId = crypto.randomUUID()
+    this.sessionStartTime = Date.now()
+    this.bufferingEvents = 0
+    this.errorCount = 0
 
     // Ensure we have a valid token before starting
     try {
@@ -130,7 +143,6 @@ export class PlayerController {
   seek(time: number): void {
     if (this.video) {
       this.video.currentTime = time
-      this.metricsCollector.report('seek', { time })
     }
   }
 
@@ -148,8 +160,6 @@ export class PlayerController {
    */
   async reloadStream(): Promise<void> {
     if (!this.currentUrl || !this.video) return
-    
-    this.metricsCollector.report('stream_load_start')
     
     // Force token refresh
     this.tokenManager.invalidate()
@@ -175,7 +185,6 @@ export class PlayerController {
     }
     
     this.bufferManager.detach()
-    this.metricsCollector.destroy()
     this.errorManager.clearHistory()
     
     this.video = null
@@ -200,7 +209,17 @@ export class PlayerController {
    * Get metrics summary
    */
   getMetrics(): SessionMetrics {
-    return this.metricsCollector.getSummary()
+    return {
+      sessionId: this.sessionId,
+      startTime: this.sessionStartTime,
+      bufferingEvents: this.bufferingEvents,
+      errorCount: this.errorCount,
+      totalPlayTime: Date.now() - this.sessionStartTime
+    }
+  }
+
+  getSessionId(): string {
+    return this.sessionId
   }
 
   private setState(state: PlayerState): void {
@@ -216,7 +235,6 @@ export class PlayerController {
     }
 
     const bufferConfig = this.bufferManager.getHlsConfig()
-    const sessionId = this.metricsCollector.getSessionId()
 
     this.hls = new Hls({
       enableWorker: true,
@@ -233,7 +251,7 @@ export class PlayerController {
         if (token) {
           xhr.setRequestHeader('x-stream-token', token)
         }
-        xhr.setRequestHeader('x-session-id', sessionId)
+        xhr.setRequestHeader('x-session-id', this.sessionId)
         xhr.withCredentials = false
       }
     })
@@ -244,7 +262,6 @@ export class PlayerController {
     // Event handlers
     this.hls.on(Events.MANIFEST_PARSED, (_event: string, data: ManifestParsedData) => {
       console.log('[PlayerController] Manifest parsed, levels:', data.levels.length)
-      this.metricsCollector.report('stream_load_complete', { levels: data.levels.length })
       this.setState('ready')
       this.play()
     })
@@ -261,25 +278,20 @@ export class PlayerController {
     // Video element events
     video.onplaying = () => {
       this.setState('playing')
-      this.metricsCollector.report('first_frame')
     }
     
     video.onpause = () => {
       if (this.state !== 'buffering' && this.state !== 'recovering') {
         this.setState('paused')
-        this.metricsCollector.report('pause')
       }
     }
     
     video.onwaiting = () => {
       this.setState('buffering')
-      this.metricsCollector.report('buffering_start')
+      this.bufferingEvents++
     }
     
     video.onplaying = () => {
-      if (this.state === 'buffering') {
-        this.metricsCollector.report('buffering_end')
-      }
       this.setState('playing')
     }
 
@@ -297,7 +309,6 @@ export class PlayerController {
     
     video.addEventListener('loadedmetadata', () => {
       this.setState('ready')
-      this.metricsCollector.report('stream_load_complete')
       this.play()
     })
     
@@ -312,7 +323,7 @@ export class PlayerController {
     const httpStatus = response?.code
 
     console.error('[PlayerController] HLS Error:', type, details, 'Status:', httpStatus)
-    this.metricsCollector.report('error', { type, details, httpStatus })
+    this.errorCount++
 
     // Handle 403 specifically
     if (httpStatus === 403 || details.includes('403')) {
@@ -399,10 +410,5 @@ export class PlayerController {
     console.error('[PlayerController] Fatal error:', error.message)
     this.setState('error')
     this.config.onError?.(error)
-  }
-
-  private detectContentType(url: string): string {
-    const info = this.streamResolver.analyze(url)
-    return info.contentType
   }
 }
