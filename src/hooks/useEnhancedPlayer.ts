@@ -5,7 +5,6 @@
  * - Enhanced ABR (aggressive up-switch, conservative down-switch)
  * - Segment prefetch on hover/start
  * - Resume support (server + local fallback)
- * - Player analytics (events to /api/player/events)
  */
 
 import { useRef, useCallback, useEffect } from 'react';
@@ -13,12 +12,10 @@ import Hls from 'hls.js';
 import { enhancedABRService, ABRMetrics } from '@/services/enhancedABRService';
 import { useSegmentPrefetch } from '@/hooks/useSegmentPrefetch';
 import { useResume } from '@/hooks/useResume';
-import { usePlayerAnalytics } from '@/hooks/usePlayerAnalytics';
 import { 
   useEnhancedABR as useEnhancedABRFlag, 
   useSegmentPrefetch as useSegmentPrefetchFlag,
   useResumeSupport as useResumeSupportFlag,
-  usePlayerAnalytics as usePlayerAnalyticsFlag,
 } from '@/hooks/useFeatureFlags';
 
 interface UseEnhancedPlayerOptions {
@@ -47,7 +44,6 @@ export function useEnhancedPlayer({
   const enableEnhancedABR = useEnhancedABRFlag();
   const enableSegmentPrefetch = useSegmentPrefetchFlag();
   const enableResume = useResumeSupportFlag();
-  const enableAnalytics = usePlayerAnalyticsFlag();
 
   // Segment prefetch
   const segmentPrefetch = useSegmentPrefetch({
@@ -69,23 +65,11 @@ export function useEnhancedPlayer({
     minProgressToSave: 10,
   });
 
-  // Player analytics
-  const analytics = usePlayerAnalytics({
-    contentId,
-    contentType,
-    autoStart: enableAnalytics,
-  });
-
   /**
    * Attach video element
    */
   const attachVideo = useCallback((video: HTMLVideoElement) => {
     videoRef.current = video;
-
-    // Attach analytics listeners
-    if (enableAnalytics) {
-      analytics.attachVideo(video);
-    }
 
     // Track time updates for resume
     if (enableResume) {
@@ -118,7 +102,7 @@ export function useEnhancedPlayer({
         video.removeEventListener('ended', handleEnded);
       };
     }
-  }, [enableAnalytics, enableResume, analytics, resume]);
+  }, [enableResume, resume]);
 
   /**
    * Attach HLS instance
@@ -130,22 +114,7 @@ export function useEnhancedPlayer({
     if (enableEnhancedABR) {
       enhancedABRService.attach(hls, (level, label, direction) => {
         console.log(`[EnhancedPlayer] Quality ${direction}: ${label}`);
-        
-        // Track in analytics
-        if (enableAnalytics) {
-          const metrics = enhancedABRService.getMetrics();
-          analytics.trackEvent('bitrateChange', {
-            bitrate: metrics.currentBitrate,
-            qualityLabel: label,
-            direction,
-          });
-        }
       });
-    }
-
-    // Attach HLS analytics
-    if (enableAnalytics) {
-      analytics.attachHls(hls);
     }
 
     return () => {
@@ -153,7 +122,7 @@ export function useEnhancedPlayer({
         enhancedABRService.detach();
       }
     };
-  }, [enableEnhancedABR, enableAnalytics, analytics]);
+  }, [enableEnhancedABR]);
 
   /**
    * Prefetch on hover (call when channel card is hovered)
@@ -168,20 +137,8 @@ export function useEnhancedPlayer({
    * Handle playback error with fallback to alternative sources
    */
   const handlePlaybackError = useCallback(async (error: Error, source?: 'cdn_worker' | 'stream_proxy' | 'r2_direct' | 'cloudflare_stream' | 'origin') => {
-    console.error('[EnhancedPlayer] Playback error:', error);
-    
-    // Report error to analytics if enabled
-    if (enableAnalytics) {
-      analytics.trackEvent('error', {
-        error: error.message,
-        contentId,
-        streamUrl,
-      });
-    }
-
-    // Log error for debugging
     console.error('[EnhancedPlayer] Playback error:', error.message);
-  }, [enableAnalytics, analytics, contentId, streamUrl]);
+  }, []);
 
   /**
    * Prefetch on start (call when playback begins)
@@ -261,8 +218,8 @@ export function useEnhancedPlayer({
     seekToResume,
     declineResume,
 
-    // Analytics
-    sessionId: analytics.sessionId,
+    // Analytics (simplified)
+    sessionId: crypto.randomUUID(),
 
     // ABR
     getABRMetrics,
@@ -275,7 +232,6 @@ export function useEnhancedPlayer({
       enhancedABR: enableEnhancedABR,
       segmentPrefetch: enableSegmentPrefetch,
       resume: enableResume,
-      analytics: enableAnalytics,
     },
   };
 }

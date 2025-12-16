@@ -5,9 +5,8 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { PlayerController, PlayerState } from '../modules/PlayerController'
+import { PlayerController, PlayerState, SessionMetrics } from '../modules/PlayerController'
 import { PlayerError } from '../modules/ErrorManager'
-import { SessionMetrics } from '../modules/MetricsCollector'
 
 export interface UseIPTVPlayerOptions {
   userId?: string

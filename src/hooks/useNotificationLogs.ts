@@ -1,123 +1,120 @@
-import { useState, useEffect } from 'react';
+/**
+ * useNotificationLogs - Hook simplificado para logs de notificação
+ * Usa a tabela notification_logs existente
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface NotificationLog {
+  id: string;
+  clienteId?: string;
+  clienteNome: string;
+  telefone: string;
+  template: string;
+  tipo?: string;
+  status: 'success' | 'error' | 'pending';
+  dataEnvio: string;
+  erro?: string;
+  resposta?: any;
+  arquivoEnviado?: {
+    nome: string;
+    tipo: string;
+    tamanho: number;
+  };
+}
+
+export interface NotificationStats {
+  total24h: number;
+  success24h: number;
+  errors24h: number;
+  lastSentAt?: Date;
+}
+
 export function useNotificationLogs() {
-  const [stats, setStats] = useState({
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [stats, setStats] = useState<NotificationStats>({
     total24h: 0,
     success24h: 0,
     errors24h: 0,
-    lastSentAt: null as Date | null,
   });
-  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadStats = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('sent_notifications')
+        .from('notification_logs')
         .select('*')
-        .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('sent_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
-      if (data) {
-        const success = data.filter(l => l.status === 'sent').length;
-        const errors = data.filter(l => l.status === 'failed').length;
-        const lastLog = data[0];
+      const mappedLogs: NotificationLog[] = (data || []).map(log => ({
+        id: log.id,
+        clienteId: log.recipient_id || undefined,
+        clienteNome: log.recipient_phone || 'N/A',
+        telefone: log.recipient_phone || '',
+        template: log.template_key || 'Manual',
+        status: (log.status as 'success' | 'error' | 'pending') || 'pending',
+        dataEnvio: log.sent_at || log.created_at,
+        erro: log.error_message || undefined,
+      }));
 
-        setStats({
-          total24h: data.length,
-          success24h: success,
-          errors24h: errors,
-          lastSentAt: lastLog?.sent_at ? new Date(lastLog.sent_at) : null,
-        });
-      }
+      setLogs(mappedLogs);
+
+      // Calculate stats
+      const now = new Date();
+      const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const recent = mappedLogs.filter(l => new Date(l.dataEnvio) > last24h);
+
+      setStats({
+        total24h: recent.length,
+        success24h: recent.filter(l => l.status === 'success').length,
+        errors24h: recent.filter(l => l.status === 'error').length,
+        lastSentAt: mappedLogs[0] ? new Date(mappedLogs[0].dataEnvio) : undefined,
+      });
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error('Error fetching notification logs:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadLogs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('sent_notifications')
-        .select(`
-          *,
-          profiles:recipient_id (
-            nome,
-            contact_phone,
-            data_vencimento,
-            situacao
-          )
-        `)
-        .order('sent_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      if (data) setLogs(data);
-    } catch (error) {
-      console.error('Erro ao carregar logs:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadStats();
-    loadLogs();
-
-    const channel = supabase
-      .channel('sent_notifications_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'sent_notifications'
-        },
-        () => {
-          loadStats();
-          loadLogs();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
-  const addLog = async (log: {
-    clienteId: string;
-    clienteNome?: string;
-    telefone: string;
-    template: string;
-    tipo: string;
-    status: string;
-    erro?: string;
-    resposta?: any;
-    arquivoEnviado?: {
-      nome: string;
-      tipo: string;
-      tamanho: number;
-    };
-  }) => {
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  const addLog = useCallback(async (log: Omit<NotificationLog, 'id' | 'dataEnvio'>) => {
     try {
-      await supabase.from('sent_notifications').insert({
+      await supabase.from('notification_logs').insert({
         recipient_id: log.clienteId,
         recipient_phone: log.telefone,
         template_key: log.template,
-        message_content: log.tipo,
-        status: log.status === 'success' ? 'sent' : 'failed',
+        status: log.status,
         error_message: log.erro,
+        sent_at: new Date().toISOString(),
       });
-      await loadStats();
-      await loadLogs();
+      
+      // Add to local state immediately
+      const newLog: NotificationLog = {
+        ...log,
+        id: crypto.randomUUID(),
+        dataEnvio: new Date().toISOString(),
+      };
+      setLogs(prev => [newLog, ...prev]);
     } catch (error) {
-      console.error('Erro ao salvar log:', error);
+      console.error('Error adding notification log:', error);
     }
-  };
+  }, []);
 
-  return { addLog, stats, logs, loading, refresh: loadStats };
+  return {
+    logs,
+    stats,
+    loading,
+    refresh: fetchLogs,
+    addLog,
+  };
 }
+
+export default useNotificationLogs;

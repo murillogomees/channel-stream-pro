@@ -8,8 +8,8 @@ import { WhatsappTemplate } from '@/types/whatsapp';
 import { WhatsAppClient } from '../core/WhatsAppClient';
 import { TemplateEngine } from '../core/TemplateEngine';
 import { ConfigManager } from '../core/ConfigManager';
-import { NotificationLogger } from '../core/NotificationLogger';
 import { AdminNotifier } from '../core/AdminNotifier';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface NotificationResult {
   success: boolean;
@@ -21,13 +21,11 @@ export class UnifiedNotificationHandler {
   private whatsappClient: WhatsAppClient | null = null;
   private templateEngine: TemplateEngine;
   private configManager: ConfigManager;
-  private logger: NotificationLogger;
   private adminNotifier: AdminNotifier;
 
   constructor() {
     this.templateEngine = new TemplateEngine();
     this.configManager = new ConfigManager();
-    this.logger = new NotificationLogger();
     this.adminNotifier = new AdminNotifier();
   }
 
@@ -44,6 +42,32 @@ export class UnifiedNotificationHandler {
 
     this.whatsappClient = new WhatsAppClient(credentials);
     return this.whatsappClient;
+  }
+
+  /**
+   * Log notification to database
+   */
+  private async logNotification(
+    phone: string,
+    templateKey: string,
+    message: string,
+    status: 'sent' | 'failed',
+    recipientId?: string,
+    errorMessage?: string
+  ): Promise<void> {
+    try {
+      await supabase.from('notification_logs').insert({
+        recipient_phone: phone,
+        template_key: templateKey,
+        message_content: message,
+        status,
+        recipient_id: recipientId,
+        error_message: errorMessage,
+        sent_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[NotificationHandler] Failed to log notification:', err);
+    }
   }
 
   /**
@@ -65,7 +89,7 @@ export class UnifiedNotificationHandler {
       const response = await this.dispatchMessage(whatsapp, cliente, template, message, extraVars);
 
       // Log sucesso
-      await this.logger.logSuccess(cliente.telefone, template.name, message, cliente.id);
+      await this.logNotification(cliente.telefone, template.name, message, 'sent', cliente.id);
       
       // Notifica admins
       await this.adminNotifier.notifyAboutClientMessage(whatsapp, cliente, template, true);
@@ -75,12 +99,13 @@ export class UnifiedNotificationHandler {
     } catch (error: any) {
       console.error('[UnifiedNotificationHandler] Erro:', error);
       
-      await this.logger.logError(
+      await this.logNotification(
         cliente.telefone,
         template.name,
         template.message,
-        error.message,
-        cliente.id
+        'failed',
+        cliente.id,
+        error.message
       );
 
       const whatsapp = await this.ensureWhatsAppClient().catch(() => null);
@@ -130,12 +155,12 @@ export class UnifiedNotificationHandler {
       const message = this.templateEngine.generateWelcomeMessage(cliente);
       const response = await whatsapp.sendTextMessage(cliente.telefone, message);
 
-      await this.logger.logSuccess(cliente.telefone, 'boas_vindas', message, cliente.id);
+      await this.logNotification(cliente.telefone, 'boas_vindas', message, 'sent', cliente.id);
 
       return { success: true, messageId: response.data?.to };
 
     } catch (error: any) {
-      await this.logger.logError(cliente.telefone, 'boas_vindas', '', error.message, cliente.id);
+      await this.logNotification(cliente.telefone, 'boas_vindas', '', 'failed', cliente.id, error.message);
       return { success: false, error: error.message };
     }
   }

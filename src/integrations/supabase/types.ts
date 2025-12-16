@@ -2645,42 +2645,6 @@ export type Database = {
         }
         Relationships: []
       }
-      passkey_credentials: {
-        Row: {
-          counter: number | null
-          created_at: string | null
-          credential_id: string
-          device_name: string | null
-          id: string
-          is_active: boolean | null
-          last_used_at: string | null
-          public_key: string
-          user_id: string
-        }
-        Insert: {
-          counter?: number | null
-          created_at?: string | null
-          credential_id: string
-          device_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_used_at?: string | null
-          public_key: string
-          user_id: string
-        }
-        Update: {
-          counter?: number | null
-          created_at?: string | null
-          credential_id?: string
-          device_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_used_at?: string | null
-          public_key?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       payment_history: {
         Row: {
           created_at: string | null
@@ -2958,39 +2922,6 @@ export type Database = {
         }
         Relationships: []
       }
-      player_events: {
-        Row: {
-          content_id: string | null
-          content_type: string | null
-          created_at: string
-          event_data: Json | null
-          event_type: string
-          id: string
-          session_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          content_id?: string | null
-          content_type?: string | null
-          created_at?: string
-          event_data?: Json | null
-          event_type: string
-          id?: string
-          session_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          content_id?: string | null
-          content_type?: string | null
-          created_at?: string
-          event_data?: Json | null
-          event_type?: string
-          id?: string
-          session_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           cliente_ativo: boolean | null
@@ -3249,48 +3180,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rls_audit_resolutions: {
-        Row: {
-          created_at: string | null
-          id: string
-          issue_hash: string
-          issue_type: string
-          policy_name: string | null
-          resolution_notes: string | null
-          resolved_at: string | null
-          resolved_by: string | null
-          status: string | null
-          suggested_fix: string | null
-          table_name: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          issue_hash: string
-          issue_type: string
-          policy_name?: string | null
-          resolution_notes?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string | null
-          suggested_fix?: string | null
-          table_name: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          issue_hash?: string
-          issue_type?: string
-          policy_name?: string | null
-          resolution_notes?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string | null
-          suggested_fix?: string | null
-          table_name?: string
-        }
-        Relationships: []
-      }
       rls_fix_backups: {
         Row: {
           applied_at: string | null
@@ -3468,50 +3357,6 @@ export type Database = {
         }
         Relationships: []
       }
-      sent_notifications: {
-        Row: {
-          error_message: string | null
-          external_id: string | null
-          id: string
-          message_content: string | null
-          recipient_id: string | null
-          recipient_phone: string | null
-          sent_at: string | null
-          status: string | null
-          template_key: string | null
-        }
-        Insert: {
-          error_message?: string | null
-          external_id?: string | null
-          id?: string
-          message_content?: string | null
-          recipient_id?: string | null
-          recipient_phone?: string | null
-          sent_at?: string | null
-          status?: string | null
-          template_key?: string | null
-        }
-        Update: {
-          error_message?: string | null
-          external_id?: string | null
-          id?: string
-          message_content?: string | null
-          recipient_id?: string | null
-          recipient_phone?: string | null
-          sent_at?: string | null
-          status?: string | null
-          template_key?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sent_notifications_recipient_id_fkey"
-            columns: ["recipient_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       status_change_history: {
         Row: {
           changed_at: string | null
@@ -3669,15 +3514,7 @@ export type Database = {
           ip_address?: string | null
           performed_by?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "supabase_instance_audit_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "supabase_instances"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       supabase_instance_backups: {
         Row: {
@@ -3711,98 +3548,6 @@ export type Database = {
           id?: string
           instance_id?: string | null
           started_at?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supabase_instance_backups_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "supabase_instances"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      supabase_instances: {
-        Row: {
-          anon_key_enc: string | null
-          created_at: string
-          created_by: string | null
-          db_size_bytes: number | null
-          id: string
-          last_backup: string | null
-          last_health_check: string | null
-          name: string
-          pg_host: string | null
-          pg_port: number | null
-          postgres_version: string | null
-          service_role_key_enc: string
-          status: string | null
-          supabase_url: string
-          updated_at: string
-        }
-        Insert: {
-          anon_key_enc?: string | null
-          created_at?: string
-          created_by?: string | null
-          db_size_bytes?: number | null
-          id?: string
-          last_backup?: string | null
-          last_health_check?: string | null
-          name: string
-          pg_host?: string | null
-          pg_port?: number | null
-          postgres_version?: string | null
-          service_role_key_enc: string
-          status?: string | null
-          supabase_url: string
-          updated_at?: string
-        }
-        Update: {
-          anon_key_enc?: string | null
-          created_at?: string
-          created_by?: string | null
-          db_size_bytes?: number | null
-          id?: string
-          last_backup?: string | null
-          last_health_check?: string | null
-          name?: string
-          pg_host?: string | null
-          pg_port?: number | null
-          postgres_version?: string | null
-          service_role_key_enc?: string
-          status?: string | null
-          supabase_url?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      system_backups: {
-        Row: {
-          backup_type: string
-          completed_at: string | null
-          created_at: string | null
-          file_path: string | null
-          file_size: number | null
-          id: string
-          status: string | null
-        }
-        Insert: {
-          backup_type: string
-          completed_at?: string | null
-          created_at?: string | null
-          file_path?: string | null
-          file_size?: number | null
-          id?: string
-          status?: string | null
-        }
-        Update: {
-          backup_type?: string
-          completed_at?: string | null
-          created_at?: string | null
-          file_path?: string | null
-          file_size?: number | null
-          id?: string
           status?: string | null
         }
         Relationships: []
@@ -3887,36 +3632,6 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      trending_rankings: {
-        Row: {
-          content_id: string
-          content_type: string | null
-          created_at: string
-          id: string
-          rank_position: number | null
-          score: number | null
-          updated_at: string
-        }
-        Insert: {
-          content_id: string
-          content_type?: string | null
-          created_at?: string
-          id?: string
-          rank_position?: number | null
-          score?: number | null
-          updated_at?: string
-        }
-        Update: {
-          content_id?: string
-          content_type?: string | null
-          created_at?: string
-          id?: string
-          rank_position?: number | null
-          score?: number | null
           updated_at?: string
         }
         Relationships: []
