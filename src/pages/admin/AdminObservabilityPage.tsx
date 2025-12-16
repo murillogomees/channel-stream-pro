@@ -6,11 +6,13 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Activity, Heart, Database, TrendingUp } from "lucide-react";
+import { Activity, Heart, Database, TrendingUp, Zap, Bell } from "lucide-react";
 import ObservabilityMetrics from "@/components/admin/observability/ObservabilityMetrics";
 import ObservabilityHealth from "@/components/admin/observability/ObservabilityHealth";
 import ObservabilityCharts from "@/components/admin/observability/ObservabilityCharts";
 import ObservabilityHotChannels from "@/components/admin/observability/ObservabilityHotChannels";
+import ObservabilityLoadTest from "@/components/admin/observability/ObservabilityLoadTest";
+import ObservabilityAlerts from "@/components/admin/observability/ObservabilityAlerts";
 
 export default function AdminObservabilityPage() {
   const [activeTab, setActiveTab] = useState("metrics");
@@ -39,6 +41,18 @@ export default function AdminObservabilityPage() {
       label: "Hot Channels",
       icon: <Database className="h-4 w-4" />,
       content: <ObservabilityHotChannels />
+    },
+    {
+      value: "load-test",
+      label: "Load Test",
+      icon: <Zap className="h-4 w-4" />,
+      content: <ObservabilityLoadTest />
+    },
+    {
+      value: "alerts",
+      label: "Alertas",
+      icon: <Bell className="h-4 w-4" />,
+      content: <ObservabilityAlerts />
     }
   ];
 

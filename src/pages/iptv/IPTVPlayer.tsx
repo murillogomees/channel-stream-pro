@@ -1,5 +1,5 @@
 /**
- * IPTV Player Page - Fully Responsive
+ * IPTV Player Page - Fully Responsive with Streaming Optimization
  * Adapts to mobile, tablet, desktop, and TV screens
  */
 
@@ -7,11 +7,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { iptvService } from '@/services/iptvService';
 import { ShakaPlayerUI } from '@/components/player';
+import { useStreamingOptimization } from '@/hooks/useStreamingOptimization';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export default function IPTVPlayer() {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: channel, isLoading } = useQuery({
     queryKey: ['iptv-channel', channelId],
@@ -19,12 +22,45 @@ export default function IPTVPlayer() {
     enabled: !!channelId,
   });
 
+  // Initialize streaming optimization
+  const {
+    bufferConfig,
+    predictions,
+    updateBufferLevel,
+    recordViewing,
+    getPlayerConfig,
+    isChannelPreloaded,
+    getPreloadedUrl
+  } = useStreamingOptimization({
+    channelId: channelId ? Number(channelId) : undefined,
+    contentType: channel?.content_type === 'vod' ? 'vod' : 'live',
+    enablePredictivePreload: true,
+    enableSmartBuffer: true
+  });
+
   const handleBack = () => {
+    // Record viewing duration when leaving
+    recordViewing();
     navigate('/app/home');
   };
 
   const handleError = (message: string) => {
     console.error('[IPTVPlayer] Error:', message);
+  };
+
+  // Get optimized stream URL (preloaded if available)
+  const getOptimizedUrl = () => {
+    if (!channel?.original_url) return null;
+    
+    const channelIdNum = Number(channelId);
+    if (isChannelPreloaded(channelIdNum)) {
+      const preloadedUrl = getPreloadedUrl(channelIdNum);
+      if (preloadedUrl) {
+        console.log('[IPTVPlayer] Using preloaded URL for channel:', channelIdNum);
+        return preloadedUrl;
+      }
+    }
+    return channel.original_url;
   };
 
   if (isLoading) {
@@ -38,7 +74,9 @@ export default function IPTVPlayer() {
     );
   }
 
-  if (!channel?.original_url) {
+  const streamUrl = getOptimizedUrl();
+
+  if (!streamUrl) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center p-4">
         <div className="text-center space-y-4">
@@ -54,23 +92,34 @@ export default function IPTVPlayer() {
     );
   }
 
+  // Get player config from smart buffer service
+  const playerConfig = getPlayerConfig('shaka');
+
   return (
     <div className="fixed inset-0 bg-black">
       {/* Player container - responsive aspect ratio */}
       <div className="w-full h-full">
         <ShakaPlayerUI
-          streamUrl={channel.original_url}
-          title={channel.name}
-          subtitle={channel.category || undefined}
+          streamUrl={streamUrl}
+          title={channel?.name || 'Canal'}
+          subtitle={channel?.category || undefined}
           brand={{
             name: 'IPTV Link',
-            logo: channel.logo_url || undefined,
+            logo: channel?.logo_url || undefined,
             primaryColor: 'hsl(var(--primary))'
           }}
           onBack={handleBack}
           onError={handleError}
         />
       </div>
+
+      {/* Debug overlay (only in development) */}
+      {import.meta.env.DEV && bufferConfig && (
+        <div className="fixed bottom-4 left-4 bg-black/80 text-white text-xs p-2 rounded max-w-xs">
+          <div>Buffer: {bufferConfig.minBuffer}s - {bufferConfig.maxBuffer}s</div>
+          <div>Predictions: {predictions.length}</div>
+        </div>
+      )}
     </div>
   );
 }
