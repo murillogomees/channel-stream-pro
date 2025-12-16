@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { observabilityService, DashboardMetrics, SystemHealthStatus } from '@/services/observabilityService';
+import { 
+  observabilityService, 
+  DashboardMetrics, 
+  SystemHealthStatus,
+  DashboardSummary,
+  ChannelHealthStats 
+} from '@/services/observabilityService';
 
 interface UseObservabilityOptions {
   autoRefresh?: boolean;
@@ -16,19 +22,25 @@ export function useObservability(options: UseObservabilityOptions = {}) {
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [health, setHealth] = useState<SystemHealthStatus | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [channelStats, setChannelStats] = useState<ChannelHealthStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const [metricsData, healthData] = await Promise.all([
+      const [metricsData, healthData, summaryData, statsData] = await Promise.all([
         observabilityService.getMetrics(timeRange),
-        observabilityService.getSystemHealth()
+        observabilityService.getSystemHealth(),
+        observabilityService.getDashboardSummary(),
+        observabilityService.getChannelStatsByCategory()
       ]);
       
       setMetrics(metricsData);
       setHealth(healthData);
+      setSummary(summaryData);
+      setChannelStats(statsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -49,6 +61,16 @@ export function useObservability(options: UseObservabilityOptions = {}) {
     observabilityService.clearCache();
     setIsLoading(true);
     fetchData();
+  }, [fetchData]);
+
+  const refreshViews = useCallback(async () => {
+    setIsLoading(true);
+    const success = await observabilityService.refreshMaterializedViews();
+    if (success) {
+      await fetchData();
+    }
+    setIsLoading(false);
+    return success;
   }, [fetchData]);
 
   const getStatusColor = useCallback((status: 'healthy' | 'degraded' | 'unhealthy'): string => {
@@ -72,9 +94,12 @@ export function useObservability(options: UseObservabilityOptions = {}) {
   return {
     metrics,
     health,
+    summary,
+    channelStats,
     isLoading,
     error,
     refresh,
+    refreshViews,
     getStatusColor,
     getStatusBg
   };
