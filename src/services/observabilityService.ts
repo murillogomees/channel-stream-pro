@@ -148,15 +148,47 @@ class ObservabilityService {
 
   async recordMetric(type: string, name: string, value: number, tags?: Record<string, any>): Promise<void> {
     try {
-      await supabase.rpc('record_metric', {
-        p_type: type,
-        p_name: name,
-        p_value: value,
-        p_tags: tags || {}
-      });
+      // Persist to history table for realtime dashboard
+      await supabase
+        .from('observability_metrics_history')
+        .insert({
+          metric_type: type,
+          metric_name: name,
+          metric_value: value,
+          tags: tags || {}
+        });
     } catch (error) {
       console.warn('[Observability] Failed to record metric:', error);
     }
+  }
+
+  async getMetricsHistory(
+    timeRange: '1h' | '24h' | '7d' = '24h',
+    metricType?: string
+  ): Promise<any[]> {
+    const hoursMap = { '1h': 1, '24h': 24, '7d': 168 };
+    const hours = hoursMap[timeRange];
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+    let query = supabase
+      .from('observability_metrics_history')
+      .select('*')
+      .gte('recorded_at', since)
+      .order('recorded_at', { ascending: false })
+      .limit(1000);
+
+    if (metricType) {
+      query = query.eq('metric_type', metricType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[Observability] Failed to fetch history:', error);
+      return [];
+    }
+
+    return data || [];
   }
 
   async getHotChannels(limit: number = 10): Promise<HotChannel[]> {
