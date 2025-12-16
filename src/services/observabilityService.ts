@@ -40,6 +40,31 @@ export interface DashboardMetrics {
   hotChannels: HotChannel[];
 }
 
+// Materialized view summary types
+export interface DashboardSummary {
+  total_users: number;
+  active_users: number;
+  trial_users: number;
+  expired_users: number;
+  expiring_soon: number;
+  total_channels: number;
+  healthy_channels: number;
+  total_categories: number;
+  total_series: number;
+  approved_payments: number;
+  monthly_revenue: number;
+  last_refresh: string | null;
+}
+
+export interface ChannelHealthStats {
+  category: string;
+  channel_count: number;
+  healthy_count: number;
+  unhealthy_count: number;
+  avg_health_score: number;
+  series_count: number;
+}
+
 export interface SystemHealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   duration_ms: number;
@@ -62,9 +87,80 @@ export interface SystemHealthStatus {
 class ObservabilityService {
   private metricsCache: DashboardMetrics | null = null;
   private healthCache: SystemHealthStatus | null = null;
+  private summaryCache: DashboardSummary | null = null;
   private lastMetricsFetch = 0;
   private lastHealthFetch = 0;
+  private lastSummaryFetch = 0;
   private readonly CACHE_TTL = 30000; // 30 seconds
+
+  /**
+   * Get dashboard summary from materialized view (optimized)
+   */
+  async getDashboardSummary(): Promise<DashboardSummary> {
+    const now = Date.now();
+    
+    if (this.summaryCache && now - this.lastSummaryFetch < this.CACHE_TTL) {
+      return this.summaryCache;
+    }
+
+    try {
+      // Use the optimized database function
+      const { data, error } = await supabase.rpc('get_dashboard_summary');
+
+      if (error) throw error;
+
+      const summary = data?.[0] || {
+        total_users: 0,
+        active_users: 0,
+        trial_users: 0,
+        expired_users: 0,
+        expiring_soon: 0,
+        total_channels: 0,
+        healthy_channels: 0,
+        total_categories: 0,
+        total_series: 0,
+        approved_payments: 0,
+        monthly_revenue: 0,
+        last_refresh: null
+      };
+
+      this.summaryCache = summary;
+      this.lastSummaryFetch = now;
+      
+      return summary;
+    } catch (error) {
+      console.error('[Observability] Failed to fetch dashboard summary:', error);
+      return this.summaryCache || {
+        total_users: 0,
+        active_users: 0,
+        trial_users: 0,
+        expired_users: 0,
+        expiring_soon: 0,
+        total_channels: 0,
+        healthy_channels: 0,
+        total_categories: 0,
+        total_series: 0,
+        approved_payments: 0,
+        monthly_revenue: 0,
+        last_refresh: null
+      };
+    }
+  }
+
+  /**
+   * Get channel stats by category from materialized view
+   */
+  async getChannelStatsByCategory(): Promise<ChannelHealthStats[]> {
+    try {
+      const { data, error } = await supabase.rpc('get_channel_stats_by_category');
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('[Observability] Failed to fetch channel stats:', error);
+      return [];
+    }
+  }
 
   async getMetrics(timeRange: '1h' | '24h' | '7d' = '24h'): Promise<DashboardMetrics> {
     const now = Date.now();
@@ -191,22 +287,22 @@ class ObservabilityService {
     return data || [];
   }
 
+  /**
+   * Get hot channels from materialized view (optimized)
+   */
   async getHotChannels(limit: number = 10): Promise<HotChannel[]> {
     try {
-      const { data, error } = await supabase
-        .from('mv_hot_channels')
-        .select('id, name, category, view_count, total_duration')
-        .order('view_count', { ascending: false })
-        .limit(limit);
+      // Use the optimized database function
+      const { data, error } = await supabase.rpc('get_hot_channels', { p_limit: limit });
 
       if (error) throw error;
 
-      return (data || []).map((c: { id: number; name: string; category: string | null; view_count: number; total_duration: number }) => ({
-        id: c.id,
+      return (data || []).map((c: any) => ({
+        id: Number(c.id),
         name: c.name,
         category: c.category || 'Unknown',
-        views: c.view_count || 0,
-        uniqueViewers: Math.floor((c.total_duration || 0) / 60) // Approximate from watch duration
+        views: Number(c.view_count) || 0,
+        uniqueViewers: Math.floor((Number(c.total_duration) || 0) / 60)
       }));
     } catch (error) {
       console.error('[Observability] Failed to fetch hot channels:', error);
@@ -214,11 +310,49 @@ class ObservabilityService {
     }
   }
 
+  /**
+   * Get recent activities using optimized function
+   */
+  async getRecentActivities(userId?: string, limit: number = 50, days: number = 7): Promise<any[]> {
+    try {
+      const { data, error } = await supabase.rpc('get_recent_activities', {
+        p_user_id: userId || null,
+        p_limit: limit,
+        p_days: days
+      });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('[Observability] Failed to fetch activities:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Manually trigger materialized views refresh
+   */
+  async refreshMaterializedViews(): Promise<boolean> {
+    try {
+      const { error } = await supabase.rpc('refresh_all_materialized_views');
+      if (error) throw error;
+      
+      // Clear local cache
+      this.clearCache();
+      return true;
+    } catch (error) {
+      console.error('[Observability] Failed to refresh materialized views:', error);
+      return false;
+    }
+  }
+
   clearCache(): void {
     this.metricsCache = null;
     this.healthCache = null;
+    this.summaryCache = null;
     this.lastMetricsFetch = 0;
     this.lastHealthFetch = 0;
+    this.lastSummaryFetch = 0;
   }
 }
 
