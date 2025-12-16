@@ -1875,6 +1875,8 @@ export type Database = {
       }
       iptv_origin_servers: {
         Row: {
+          bandwidth_mbps: number | null
+          concurrent_streams: number | null
           created_at: string | null
           fail_count: number | null
           health_score: number | null
@@ -1883,12 +1885,15 @@ export type Database = {
           is_healthy: boolean | null
           last_check_at: string | null
           latency_ms: number | null
+          max_concurrent_streams: number | null
           origin_id: string
           region: string
           updated_at: string | null
           url: string
         }
         Insert: {
+          bandwidth_mbps?: number | null
+          concurrent_streams?: number | null
           created_at?: string | null
           fail_count?: number | null
           health_score?: number | null
@@ -1897,12 +1902,15 @@ export type Database = {
           is_healthy?: boolean | null
           last_check_at?: string | null
           latency_ms?: number | null
+          max_concurrent_streams?: number | null
           origin_id: string
           region?: string
           updated_at?: string | null
           url: string
         }
         Update: {
+          bandwidth_mbps?: number | null
+          concurrent_streams?: number | null
           created_at?: string | null
           fail_count?: number | null
           health_score?: number | null
@@ -1911,6 +1919,7 @@ export type Database = {
           is_healthy?: boolean | null
           last_check_at?: string | null
           latency_ms?: number | null
+          max_concurrent_streams?: number | null
           origin_id?: string
           region?: string
           updated_at?: string | null
@@ -3965,7 +3974,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_origin_statistics: {
+        Row: {
+          bandwidth_mbps: number | null
+          concurrent_streams: number | null
+          fail_count: number | null
+          health_score: number | null
+          health_status: string | null
+          is_active: boolean | null
+          is_healthy: boolean | null
+          last_check_at: string | null
+          latency_ms: number | null
+          max_concurrent_streams: number | null
+          origin_id: string | null
+          region: string | null
+          url: string | null
+        }
+        Insert: {
+          bandwidth_mbps?: number | null
+          concurrent_streams?: number | null
+          fail_count?: number | null
+          health_score?: number | null
+          health_status?: never
+          is_active?: boolean | null
+          is_healthy?: boolean | null
+          last_check_at?: string | null
+          latency_ms?: number | null
+          max_concurrent_streams?: number | null
+          origin_id?: string | null
+          region?: string | null
+          url?: string | null
+        }
+        Update: {
+          bandwidth_mbps?: number | null
+          concurrent_streams?: number | null
+          fail_count?: number | null
+          health_score?: number | null
+          health_status?: never
+          is_active?: boolean | null
+          is_healthy?: boolean | null
+          last_check_at?: string | null
+          latency_ms?: number | null
+          max_concurrent_streams?: number | null
+          origin_id?: string | null
+          region?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       auto_block_identifier: {
@@ -4033,6 +4089,16 @@ export type Database = {
         }[]
       }
       get_auth_statistics: { Args: { days?: number }; Returns: Json }
+      get_best_origin_for_region: {
+        Args: { p_region?: string }
+        Returns: {
+          health_score: number
+          latency_ms: number
+          origin_id: string
+          region: string
+          url: string
+        }[]
+      }
       get_channel_shard: { Args: { channel_id: number }; Returns: number }
       get_m3u_distinct_categories: {
         Args: never
