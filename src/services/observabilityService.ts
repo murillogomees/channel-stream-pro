@@ -195,18 +195,18 @@ class ObservabilityService {
     try {
       const { data, error } = await supabase
         .from('mv_hot_channels')
-        .select('id, name, category, view_count_24h, unique_viewers_24h')
-        .order('view_count_24h', { ascending: false })
+        .select('id, name, category, view_count, total_duration')
+        .order('view_count', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
 
-      return (data || []).map(c => ({
+      return (data || []).map((c: { id: number; name: string; category: string | null; view_count: number; total_duration: number }) => ({
         id: c.id,
         name: c.name,
         category: c.category || 'Unknown',
-        views: c.view_count_24h || 0,
-        uniqueViewers: c.unique_viewers_24h || 0
+        views: c.view_count || 0,
+        uniqueViewers: Math.floor((c.total_duration || 0) / 60) // Approximate from watch duration
       }));
     } catch (error) {
       console.error('[Observability] Failed to fetch hot channels:', error);
