@@ -334,6 +334,13 @@ export type Database = {
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_analytics_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
+          },
         ]
       }
       affiliate_config: {
@@ -393,6 +400,13 @@ export type Database = {
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_dashboard_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
+          },
         ]
       }
       affiliate_fraud_logs: {
@@ -448,6 +462,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_fraud_logs_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
           },
         ]
       }
@@ -514,6 +535,13 @@ export type Database = {
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_link_clicks_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
+          },
         ]
       }
       affiliate_links: {
@@ -563,6 +591,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_links_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
           },
         ]
       }
@@ -653,6 +688,13 @@ export type Database = {
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_onboarding_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
+          },
         ]
       }
       affiliate_payouts: {
@@ -705,6 +747,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_payouts_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
           },
         ]
       }
@@ -801,6 +850,13 @@ export type Database = {
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_referrals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
+          },
         ]
       }
       affiliate_reports: {
@@ -838,6 +894,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_reports_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
           },
         ]
       }
@@ -930,6 +993,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "affiliates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_withdrawals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "mv_affiliate_performance"
+            referencedColumns: ["affiliate_id"]
           },
         ]
       }
@@ -1207,6 +1277,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_status_history_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_profile_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -3921,22 +3998,50 @@ export type Database = {
       }
     }
     Views: {
+      mv_affiliate_performance: {
+        Row: {
+          affiliate_id: string | null
+          code: string | null
+          commission_rate: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          name: string | null
+          total_clicks: number | null
+          total_commission: number | null
+          total_referrals: number | null
+        }
+        Relationships: []
+      }
       mv_channel_health_summary: {
         Row: {
           avg_health_score: number | null
           category: string | null
-          excellent_count: number | null
-          good_count: number | null
+          channel_count: number | null
+          healthy_count: number | null
+          series_count: number | null
+          unhealthy_count: number | null
+        }
+        Relationships: []
+      }
+      mv_dashboard_summary: {
+        Row: {
+          active_users: number | null
+          approved_payments: number | null
+          expired_users: number | null
+          expiring_soon: number | null
           healthy_channels: number | null
-          poor_count: number | null
+          last_refresh: string | null
+          monthly_revenue: number | null
+          total_categories: number | null
           total_channels: number | null
-          unhealthy_channels: number | null
+          total_series: number | null
+          total_users: number | null
+          trial_users: number | null
         }
         Relationships: []
       }
       mv_hot_channels: {
         Row: {
-          avg_duration: number | null
           category: string | null
           health_score: number | null
           id: number | null
@@ -3944,19 +4049,40 @@ export type Database = {
           logo_url: string | null
           name: string | null
           original_url: string | null
-          unique_viewers_24h: number | null
-          view_count_24h: number | null
+          slug: string | null
+          total_duration: number | null
+          view_count: number | null
+        }
+        Relationships: []
+      }
+      mv_payment_analytics: {
+        Row: {
+          approved: number | null
+          avg_ticket: number | null
+          date: string | null
+          pending: number | null
+          rejected: number | null
+          revenue: number | null
+          total_payments: number | null
         }
         Relationships: []
       }
       mv_user_activity_summary: {
         Row: {
-          avg_duration: number | null
-          hour_bucket: string | null
-          total_buffer_events: number | null
-          total_views: number | null
-          unique_channels: number | null
-          unique_users: number | null
+          action_types: string[] | null
+          active_days: number | null
+          last_activity: string | null
+          total_actions: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      v_channel_categories: {
+        Row: {
+          category: string | null
+          healthy: number | null
+          series: number | null
+          total: number | null
         }
         Relationships: []
       }
@@ -4005,6 +4131,52 @@ export type Database = {
           origin_id?: string | null
           region?: string | null
           url?: string | null
+        }
+        Relationships: []
+      }
+      v_pending_notifications: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          message_content: string | null
+          recipient_name: string | null
+          recipient_phone: string | null
+          scheduled_at: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          message_content?: string | null
+          recipient_name?: string | null
+          recipient_phone?: string | null
+          scheduled_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          message_content?: string | null
+          recipient_name?: string | null
+          recipient_phone?: string | null
+          scheduled_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      v_user_profile_summary: {
+        Row: {
+          cliente_ativo: boolean | null
+          contact_phone: string | null
+          data_contratacao: string | null
+          data_vencimento: string | null
+          email: string | null
+          id: string | null
+          nome: string | null
+          plano: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
+          situacao: string | null
+          subscription_status: string | null
         }
         Relationships: []
       }
@@ -4089,6 +4261,46 @@ export type Database = {
         }[]
       }
       get_channel_shard: { Args: { channel_id: number }; Returns: number }
+      get_channel_stats_by_category: {
+        Args: never
+        Returns: {
+          avg_health_score: number
+          category: string
+          channel_count: number
+          healthy_count: number
+          series_count: number
+          unhealthy_count: number
+        }[]
+      }
+      get_dashboard_summary: {
+        Args: never
+        Returns: {
+          active_users: number
+          approved_payments: number
+          expired_users: number
+          expiring_soon: number
+          healthy_channels: number
+          last_refresh: string
+          monthly_revenue: number
+          total_categories: number
+          total_channels: number
+          total_series: number
+          total_users: number
+          trial_users: number
+        }[]
+      }
+      get_hot_channels: {
+        Args: { p_limit?: number }
+        Returns: {
+          category: string
+          id: number
+          is_healthy: boolean
+          logo_url: string
+          name: string
+          total_duration: number
+          view_count: number
+        }[]
+      }
       get_m3u_distinct_categories: {
         Args: never
         Returns: {
@@ -4158,6 +4370,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_all_materialized_views: { Args: never; Returns: undefined }
       refresh_hot_data_views: { Args: never; Returns: undefined }
       revoke_token_family: {
         Args: { p_family_id: string; p_reason?: string }
