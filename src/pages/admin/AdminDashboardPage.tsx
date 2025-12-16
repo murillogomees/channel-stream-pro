@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Users, Bell, Shield, BarChart3, Clock, AlertTriangle,
   UserCog, Tv, Play, Download, Settings2, ListVideo,
-  LayoutDashboard, GitBranch, Zap, TrendingUp, Rocket
+  LayoutDashboard, GitBranch, Zap, TrendingUp, Rocket, Activity
 } from "lucide-react";
 import { useProfiles } from "@/hooks/useProfiles";
 
@@ -192,6 +192,15 @@ export default function AdminDashboardPage() {
             badge="Novo"
             isNew
             variant="accent"
+          />
+          <NavCard
+            title="Observabilidade"
+            description="Métricas em tempo real e health"
+            icon={<Activity className="h-5 w-5" />}
+            path="/admin/observability"
+            badge="Novo"
+            isNew
+            variant="success"
           />
         </div>
       </section>
