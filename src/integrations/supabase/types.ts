@@ -2618,6 +2618,33 @@ export type Database = {
         }
         Relationships: []
       }
+      observability_metrics_history: {
+        Row: {
+          id: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: string
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Relationships: []
+      }
       passkey_credentials: {
         Row: {
           counter: number | null
@@ -4304,6 +4331,7 @@ export type Database = {
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
       cleanup_iptv_duplicates: { Args: never; Returns: number }
+      cleanup_old_observability_metrics: { Args: never; Returns: number }
       cleanup_old_viewing_history: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: number }
       create_next_partition: { Args: never; Returns: undefined }
