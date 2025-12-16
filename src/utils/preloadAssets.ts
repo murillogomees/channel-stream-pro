@@ -11,7 +11,7 @@ export function preloadCriticalAssets() {
   
   // Preconnect to external resources that will be needed
   const connections = [
-    import.meta.env.VITE_SUPABASE_URL || 'https://waxgowafohlrfoefwhsf.supabase.co'
+    import.meta.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co'
   ];
   
   connections.forEach((url) => {
