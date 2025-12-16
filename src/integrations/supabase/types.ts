@@ -1694,6 +1694,13 @@ export type Database = {
             referencedRelation: "iptv_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_cdn_cache_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_channel_metrics: {
@@ -1724,6 +1731,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_channel_metrics_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -1824,6 +1838,13 @@ export type Database = {
             referencedRelation: "iptv_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_channels_fallback_channel_id_fkey"
+            columns: ["fallback_channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_llhls_config: {
@@ -1869,6 +1890,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: true
             referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_llhls_config_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -1964,6 +1992,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "iptv_playlist_channels_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "iptv_playlist_channels_playlist_id_fkey"
             columns: ["playlist_id"]
             isOneToOne: false
@@ -2050,6 +2085,13 @@ export type Database = {
             referencedRelation: "iptv_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_probe_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_routing_logs: {
@@ -2109,6 +2151,13 @@ export type Database = {
             referencedRelation: "iptv_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_stream_fingerprints_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_stream_groups: {
@@ -2139,6 +2188,13 @@ export type Database = {
             columns: ["canonical_channel_id"]
             isOneToOne: false
             referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_stream_groups_canonical_channel_id_fkey"
+            columns: ["canonical_channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -2183,6 +2239,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_stream_tokens_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -2236,6 +2299,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_transcode_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -2711,6 +2781,87 @@ export type Database = {
           user_id?: string
           verification_token?: string
           verified_at?: string | null
+        }
+        Relationships: []
+      }
+      performance_metrics: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Relationships: []
+      }
+      performance_metrics_current: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Relationships: []
+      }
+      performance_metrics_next: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
         }
         Relationships: []
       }
@@ -3948,6 +4099,13 @@ export type Database = {
             referencedRelation: "iptv_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_viewing_history_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       watch_progress: {
@@ -4021,6 +4179,45 @@ export type Database = {
       }
     }
     Views: {
+      mv_channel_health_summary: {
+        Row: {
+          avg_health_score: number | null
+          category: string | null
+          excellent_count: number | null
+          good_count: number | null
+          healthy_channels: number | null
+          poor_count: number | null
+          total_channels: number | null
+          unhealthy_channels: number | null
+        }
+        Relationships: []
+      }
+      mv_hot_channels: {
+        Row: {
+          avg_duration: number | null
+          category: string | null
+          health_score: number | null
+          id: number | null
+          is_healthy: boolean | null
+          logo_url: string | null
+          name: string | null
+          original_url: string | null
+          unique_viewers_24h: number | null
+          view_count_24h: number | null
+        }
+        Relationships: []
+      }
+      mv_user_activity_summary: {
+        Row: {
+          avg_duration: number | null
+          hour_bucket: string | null
+          total_buffer_events: number | null
+          total_views: number | null
+          unique_channels: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
       v_origin_statistics: {
         Row: {
           bandwidth_mbps: number | null
@@ -4109,6 +4306,7 @@ export type Database = {
       cleanup_iptv_duplicates: { Args: never; Returns: number }
       cleanup_old_viewing_history: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: number }
+      create_next_partition: { Args: never; Returns: undefined }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       force_detect_series_by_pattern: {
         Args: never
@@ -4154,6 +4352,17 @@ export type Database = {
           group_title: string
         }[]
       }
+      get_metrics_summary: {
+        Args: { p_hours?: number; p_type?: string }
+        Returns: {
+          avg_value: number
+          count: number
+          max_value: number
+          metric_name: string
+          metric_type: string
+          min_value: number
+        }[]
+      }
       get_role_priority: { Args: { role_name: string }; Returns: number }
       get_sync_statistics: { Args: never; Returns: Json }
       get_user_top_channels: {
@@ -4191,6 +4400,10 @@ export type Database = {
           series_name: string
         }[]
       }
+      record_metric: {
+        Args: { p_name: string; p_tags?: Json; p_type: string; p_value: number }
+        Returns: undefined
+      }
       record_viewing: {
         Args: {
           p_buffer_events?: number
@@ -4202,6 +4415,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_hot_data_views: { Args: never; Returns: undefined }
       revoke_token_family: {
         Args: { p_family_id: string; p_reason?: string }
         Returns: number
