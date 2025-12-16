@@ -3903,6 +3903,53 @@ export type Database = {
           },
         ]
       }
+      user_viewing_history: {
+        Row: {
+          buffer_events: number | null
+          category: string | null
+          channel_id: number
+          created_at: string
+          device_type: string | null
+          id: string
+          quality_played: string | null
+          user_id: string
+          watch_duration: number | null
+          watched_at: string
+        }
+        Insert: {
+          buffer_events?: number | null
+          category?: string | null
+          channel_id: number
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          quality_played?: string | null
+          user_id: string
+          watch_duration?: number | null
+          watched_at?: string
+        }
+        Update: {
+          buffer_events?: number | null
+          category?: string | null
+          channel_id?: number
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          quality_played?: string | null
+          user_id?: string
+          watch_duration?: number | null
+          watched_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_viewing_history_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watch_progress: {
         Row: {
           completed: boolean | null
@@ -4060,6 +4107,7 @@ export type Database = {
         | { Args: never; Returns: Json }
         | { Args: { p_dry_run?: boolean }; Returns: Json }
       cleanup_iptv_duplicates: { Args: never; Returns: number }
+      cleanup_old_viewing_history: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: number }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       force_detect_series_by_pattern: {
@@ -4108,6 +4156,17 @@ export type Database = {
       }
       get_role_priority: { Args: { role_name: string }; Returns: number }
       get_sync_statistics: { Args: never; Returns: Json }
+      get_user_top_channels: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          category: string
+          channel_id: number
+          channel_name: string
+          last_watched: string
+          total_duration: number
+          view_count: number
+        }[]
+      }
       has_role: {
         Args: {
           check_role: Database["public"]["Enums"]["app_role"]
@@ -4131,6 +4190,17 @@ export type Database = {
           season_number: number
           series_name: string
         }[]
+      }
+      record_viewing: {
+        Args: {
+          p_buffer_events?: number
+          p_channel_id: number
+          p_device_type?: string
+          p_duration?: number
+          p_quality?: string
+          p_user_id: string
+        }
+        Returns: string
       }
       revoke_token_family: {
         Args: { p_family_id: string; p_reason?: string }
