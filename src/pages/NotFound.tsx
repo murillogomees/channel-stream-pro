@@ -5,15 +5,21 @@ import { useAuth } from "@/contexts/AuthContext";
 const NotFound = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isClient, loading } = useAuth();
+  const { user, isClient, isAdmin, isMaster, loading } = useAuth();
   const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     // Wait for auth to finish loading
     if (loading) return;
 
-    // If user is logged in as client, redirect to /app/home
-    if (user && isClient) {
+    // Admin/Master can access any route - don't redirect them
+    if (user && (isAdmin || isMaster)) {
+      console.log("[NotFound] Admin/Master user - not redirecting");
+      return;
+    }
+
+    // If user is logged in as client only, redirect to /app/home
+    if (user && isClient && !isAdmin && !isMaster) {
       console.log("[NotFound] Client logged in, redirecting to /app/home");
       setRedirecting(true);
       navigate('/app/home', { replace: true });
