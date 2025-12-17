@@ -18,12 +18,16 @@ export default function Forbidden() {
 
   const handleGoHome = () => {
     if (isAdmin) {
-      navigate('/dashboard');
-    } else if (isClient) {
-      navigate('/conta');
-    } else {
-      navigate('/');
+      navigate('/admin/dashboard');
+      return;
     }
+
+    if (isClient) {
+      navigate('/app/home');
+      return;
+    }
+
+    navigate('/');
   };
 
   return (
