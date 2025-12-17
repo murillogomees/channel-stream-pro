@@ -100,9 +100,9 @@ export const ProtectedRoute = ({
         authLoggingService.logAccessDenied(user.id, user.email || '', 'admin required', location.pathname);
       }, 0);
     }
-    // Se é cliente, redireciona para /app/player
+    // Se é cliente, redireciona para Home do app (rota válida)
     if (isClient) {
-      return <Navigate to="/app/player" replace />;
+      return <Navigate to="/app/home" replace />;
     }
     return <Navigate to="/403" state={{ required: 'admin' }} replace />;
   }
