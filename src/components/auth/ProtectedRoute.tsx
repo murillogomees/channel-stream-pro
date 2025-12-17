@@ -94,7 +94,7 @@ export const ProtectedRoute = ({
     return <Navigate to="/403" state={{ required: 'master' }} replace />;
   }
 
-  if (requireAdmin && !isAdmin && !rolesNotLoadedYet) {
+  if (requireAdmin && !isAdmin && !isMaster && !rolesNotLoadedYet) {
     if (user) {
       setTimeout(() => {
         authLoggingService.logAccessDenied(user.id, user.email || '', 'admin required', location.pathname);
