@@ -1,47 +1,71 @@
 /**
- * Supabase Client - Supabase Cloud
- * 
- * Projeto: sdvyxdghxqmntyoweqbd
+ * Supabase Client
+ *
+ * IMPORTANT: this must be configured via Vite env vars provided by the backend integration.
+ * Never hardcode project URLs/keys here, otherwise Edge Functions will break when the backend changes.
  */
+
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-// Supabase Cloud configuration
-const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
+function getProjectRefFromUrl(url: string): string | null {
+  try {
+    const { hostname } = new URL(url);
+    // <ref>.supabase.co
+    const parts = hostname.split(".");
+    return parts.length > 0 ? parts[0] : null;
+  } catch {
+    return null;
+  }
+}
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
-export const supabase: SupabaseClient<Database> = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
-    storageKey: 'sb-sdvyxdghxqmntyoweqbd-auth-token',
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: "pkce",
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 2,
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  // Fail fast with a clear error so we don't get silent "Failed to fetch" later.
+  // eslint-disable-next-line no-console
+  console.error(
+    "[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Check backend connection/env vars."
+  );
+}
+
+const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined) ??
+  (SUPABASE_URL ? getProjectRefFromUrl(SUPABASE_URL) : null) ??
+  "unknown";
+
+export const supabase: SupabaseClient<Database> = createClient<Database>(
+  SUPABASE_URL ?? "",
+  SUPABASE_PUBLISHABLE_KEY ?? "",
+  {
+    auth: {
+      storage: typeof window !== "undefined" ? localStorage : undefined,
+      storageKey: `sb-${projectRef}-auth-token`,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: "pkce",
     },
-    log_level: "error",
-  },
-  global: {
-    headers: {
-      "X-Client-Info": "iptv-link-cloud",
+    realtime: {
+      params: {
+        eventsPerSecond: 2,
+      },
+      log_level: "error",
     },
-  },
-});
+    global: {
+      headers: {
+        "X-Client-Info": "iptv-link-cloud",
+      },
+    },
+  }
+);
 
-// Export configuration for services
 export const supabaseConfig = {
-  url: SUPABASE_URL,
-  anonKey: SUPABASE_PUBLISHABLE_KEY,
+  url: SUPABASE_URL ?? "",
+  anonKey: SUPABASE_PUBLISHABLE_KEY ?? "",
+  projectRef,
 };
 
-// Helper to get edge function URL
 export const getFunctionUrl = (functionName: string): string => {
-  return `${SUPABASE_URL}/functions/v1/${functionName}`;
+  return `${supabaseConfig.url}/functions/v1/${functionName}`;
 };
