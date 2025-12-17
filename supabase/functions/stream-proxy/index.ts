@@ -407,38 +407,72 @@ async function fetchWithRetry(
   proxyConfig: ProxyConfig | null
 ): Promise<Response> {
   let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
   
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  // For 503 errors, we retry more aggressively
+  const totalAttempts = maxRetries + 2; // Extra attempts for 503
+  
+  for (let attempt = 0; attempt < totalAttempts; attempt++) {
     try {
+      let response: Response;
+      
       // Try via residential proxy first if configured
       if (proxyConfig) {
         console.log(`[Proxy] Attempt ${attempt + 1} via residential proxy`);
-        return await fetchViaProxy(url, headers, proxyConfig, timeoutMs);
+        response = await fetchViaProxy(url, headers, proxyConfig, timeoutMs);
+      } else {
+        // Direct fetch fallback
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        
+        response = await fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+          redirect: 'follow',
+        });
+        
+        clearTimeout(timeoutId);
       }
       
-      // Direct fetch fallback
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      // Check for 503 - provider overloaded, retry after delay
+      if (response.status === 503) {
+        console.log(`[Proxy] Upstream returned 503, attempt ${attempt + 1}/${totalAttempts}`);
+        lastResponse = response;
+        
+        if (attempt < totalAttempts - 1) {
+          // Exponential backoff for 503: 1s, 2s, 4s
+          const delay = 1000 * Math.pow(2, attempt);
+          console.log(`[Proxy] Waiting ${delay}ms before retry...`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-        redirect: 'follow',
-      });
+      // Check for 403 - might be temporary, retry once
+      if (response.status === 403 && attempt < 1) {
+        console.log(`[Proxy] Upstream returned 403, retrying once...`);
+        await new Promise(r => setTimeout(r, 500));
+        continue;
+      }
       
-      clearTimeout(timeoutId);
+      console.log(`[Proxy] Upstream response: status=${response.status}`);
       return response;
       
     } catch (err) {
       lastError = err as Error;
       console.log(`[Proxy] Attempt ${attempt + 1} failed: ${lastError.message}`);
       
-      if (attempt < maxRetries - 1) {
+      if (attempt < totalAttempts - 1) {
         const delay = CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt);
         await new Promise(r => setTimeout(r, delay));
       }
     }
+  }
+  
+  // If we have a last response (503), return it instead of throwing
+  if (lastResponse) {
+    return lastResponse;
   }
   
   throw lastError || new Error('Max retries exceeded');
