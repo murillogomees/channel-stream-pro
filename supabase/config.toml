@@ -494,3 +494,11 @@ verify_jwt = false
 # Geo Router - intelligent geo-based CDN routing
 [functions.iptv-geo-router]
 verify_jwt = false
+
+# ==========================================
+# M3U FETCH & IMPORT
+# ==========================================
+
+# Fetch M3U from URL - enterprise import pipeline
+[functions.fetch-m3u]
+verify_jwt = false
