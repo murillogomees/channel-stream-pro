@@ -453,15 +453,15 @@ async function fetchWithRetry(
           continue;
         }
 
-        // If 503, try again or fallback to direct
-        if (response.status === 503) {
-          console.log(`[Proxy] Upstream returned 503 via proxy, attempt ${attempt + 1}`);
+        // If 503 or 405, try again or fallback to direct
+        if (response.status === 503 || response.status === 405) {
+          console.log(`[Proxy] Upstream returned ${response.status} via proxy, attempt ${attempt + 1}`);
           lastResponse = response;
           if (attempt < 1) {
             await new Promise(r => setTimeout(r, 1000));
             continue;
           }
-          // After 2 proxy attempts with 503, try direct
+          // After 2 proxy attempts, try direct
           break;
         }
 
@@ -552,18 +552,16 @@ serve(async (req: Request): Promise<Response> => {
     // Extract session ID for sticky proxy IP
     const rawSessionId = req.headers.get('x-session-id') || undefined;
 
-    // Sticky key must be short + alphanumeric to avoid breaking proxy auth formats
-    const stickyKey = rawSessionId
-      ? rawSessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-16)
-      : undefined;
+    // TEMPORARILY DISABLED: Sticky session causing 405/407 errors
+    // TODO: Re-enable once we confirm correct proxy-seller format
+    const stickyKey = undefined; // rawSessionId ? rawSessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-16) : undefined;
 
-    // Parse residential proxy config (with sticky session when possible)
+    // Parse residential proxy config (without sticky session for now)
     const proxyUrlEnv = Deno.env.get('RESIDENTIAL_PROXY_URL');
     const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv, stickyKey) : null;
 
     if (proxyConfig) {
-      const stickyInfo = stickyKey ? ` (sticky: ${stickyKey})` : '';
-      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port}${stickyInfo}`);
+      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port} (sticky DISABLED for debug)`);
     }
 
     const isM3u8 = isManifest(decodedUrl);
