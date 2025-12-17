@@ -248,15 +248,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [updateAuthState]);
 
+  const roles = user?.roles || [];
+  const isMaster = roles.includes('master') || user?.isMaster === true;
+  const isAdmin = isMaster || roles.includes('admin') || user?.isAdmin === true;
+  const isClient = !isAdmin && roles.includes('client');
+
   const value: AuthContextType = {
     user,
     session,
     loading,
     isAuthenticated: !!session,
-    isAdmin: user?.isAdmin || false,
-    isMaster: user?.isMaster || false,
-    isClient: user?.isClient || false,
-    hasValidAccess: user?.hasValidAccess || false,
+    isAdmin,
+    isMaster,
+    isClient,
+    hasValidAccess: user?.hasValidAccess || isAdmin, // master/admin sempre válido
     isExpired: user?.isExpired || false,
     isTrial: user?.isTrial || false,
     daysRemaining: user?.daysRemaining || 0,
