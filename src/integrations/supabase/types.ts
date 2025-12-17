@@ -2368,6 +2368,8 @@ export type Database = {
           original_url: string
           priority: number | null
           probe_error: string | null
+          r2_uploaded: boolean | null
+          r2_url: string | null
           resolution: string | null
           season_number: number | null
           series_name: string | null
@@ -2397,6 +2399,8 @@ export type Database = {
           original_url: string
           priority?: number | null
           probe_error?: string | null
+          r2_uploaded?: boolean | null
+          r2_url?: string | null
           resolution?: string | null
           season_number?: number | null
           series_name?: string | null
@@ -2426,6 +2430,8 @@ export type Database = {
           original_url?: string
           priority?: number | null
           probe_error?: string | null
+          r2_uploaded?: boolean | null
+          r2_url?: string | null
           resolution?: string | null
           season_number?: number | null
           series_name?: string | null
@@ -3659,6 +3665,116 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_bulk_cache_jobs: {
+        Row: {
+          batch_size: number | null
+          completed_at: string | null
+          content_filter: string | null
+          created_at: string | null
+          created_by: string | null
+          current_batch: number | null
+          error_message: string | null
+          failed_items: number | null
+          id: string
+          processed_items: number | null
+          skipped_items: number | null
+          started_at: string | null
+          status: string
+          success_items: number | null
+          total_items: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_size?: number | null
+          completed_at?: string | null
+          content_filter?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_batch?: number | null
+          error_message?: string | null
+          failed_items?: number | null
+          id?: string
+          processed_items?: number | null
+          skipped_items?: number | null
+          started_at?: string | null
+          status?: string
+          success_items?: number | null
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_size?: number | null
+          completed_at?: string | null
+          content_filter?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_batch?: number | null
+          error_message?: string | null
+          failed_items?: number | null
+          id?: string
+          processed_items?: number | null
+          skipped_items?: number | null
+          started_at?: string | null
+          status?: string
+          success_items?: number | null
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      r2_cached_content: {
+        Row: {
+          access_count: number | null
+          cached_at: string | null
+          channel_id: number
+          content_type: string | null
+          file_size: number | null
+          id: string
+          job_id: string | null
+          last_accessed_at: string | null
+          mime_type: string | null
+          original_url: string
+          r2_key: string
+          r2_url: string
+        }
+        Insert: {
+          access_count?: number | null
+          cached_at?: string | null
+          channel_id: number
+          content_type?: string | null
+          file_size?: number | null
+          id?: string
+          job_id?: string | null
+          last_accessed_at?: string | null
+          mime_type?: string | null
+          original_url: string
+          r2_key: string
+          r2_url: string
+        }
+        Update: {
+          access_count?: number | null
+          cached_at?: string | null
+          channel_id?: number
+          content_type?: string | null
+          file_size?: number | null
+          id?: string
+          job_id?: string | null
+          last_accessed_at?: string | null
+          mime_type?: string | null
+          original_url?: string
+          r2_key?: string
+          r2_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "r2_cached_content_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "r2_bulk_cache_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_tracking: {
         Row: {
           created_at: string | null
@@ -4876,6 +4992,16 @@ export type Database = {
       }
       get_role_priority: { Args: { role_name: string }; Returns: number }
       get_sync_statistics: { Args: never; Returns: Json }
+      get_uncached_vod_channels: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          category: string
+          channel_id: number
+          channel_name: string
+          content_type: string
+          original_url: string
+        }[]
+      }
       get_user_top_channels: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
