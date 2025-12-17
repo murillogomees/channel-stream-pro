@@ -65,9 +65,6 @@ interface CategoryGroup {
 
 type ViewMode = 'categories' | 'list';
 
-interface DbCategoryRow {
-  group_title: string | null;
-}
 
 export function IPTVChannelsTab() {
   const queryClient = useQueryClient();
@@ -91,6 +88,7 @@ export function IPTVChannelsTab() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [targetCategory, setTargetCategory] = useState<string>('');
   const [isAutoOrganizeOpen, setIsAutoOrganizeOpen] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
 
   // Fetch all channels with pagination to bypass 1000 row limit
   const { data: allChannels, isLoading, refetch } = useQuery({
@@ -138,15 +136,6 @@ export function IPTVChannelsTab() {
     },
   });
 
-  // Fetch ALL distinct categories from DB (independente dos filtros)
-  const { data: allDbCategories } = useQuery<DbCategoryRow[]>({
-    queryKey: ['iptv-all-db-categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_m3u_distinct_categories');
-      if (error) throw error;
-      return (data || []) as DbCategoryRow[];
-    },
-  });
 
   // Group channels by category, then by series
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
@@ -201,22 +190,25 @@ export function IPTVChannelsTab() {
   }, [allChannels]);
 
   const allCategories = useMemo(() => {
-    return (allDbCategories || [])
-      .map((c) => c.group_title)
-      .filter((n): n is string => !!n && n !== 'Sem Categoria');
-  }, [allDbCategories]);
+    const categories = new Set<string>();
+    (allChannels || []).forEach((c) => {
+      if (c.category) categories.add(c.category);
+    });
+    return Array.from(categories).sort((a, b) => a.localeCompare(b));
+  }, [allChannels]);
 
   const stats = useMemo(() => {
     if (!allChannels) return { total: 0, healthy: 0, unhealthy: 0, categories: 0, series: 0 };
     const seriesCount = new Set(allChannels.filter(c => c.series_name).map(c => c.series_name)).size;
+    const categoriesCount = new Set(allChannels.map(c => c.category).filter((c): c is string => !!c)).size;
     return {
       total: allChannels.length,
       healthy: allChannels.filter(c => c.is_healthy).length,
       unhealthy: allChannels.filter(c => !c.is_healthy).length,
-      categories: (allDbCategories || []).filter(c => !!c.group_title).length,
+      categories: categoriesCount,
       series: seriesCount,
     };
-  }, [allChannels, allDbCategories]);
+  }, [allChannels]);
 
   const toggleCategory = useCallback((category: string) => {
     setExpandedCategories(prev => {
@@ -370,6 +362,39 @@ export function IPTVChannelsTab() {
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
+  const resetAllMutation = useMutation({
+    mutationFn: async () => {
+      // Ordem importa por causa de chaves estrangeiras
+      const steps = [
+        () => supabase.from('iptv_channel_metrics').delete().gt('id', 0),
+        () => supabase.from('iptv_cdn_cache').delete().gt('id', 0),
+        () => supabase.from('iptv_transcode_jobs').delete().gt('id', 0),
+        () => supabase.from('iptv_probe_jobs').delete().gt('id', 0),
+        () => supabase.from('epg_programs').delete().not('id', 'is', null),
+        () => supabase.from('iptv_playlist_channels').delete().gt('playlist_id', 0),
+        () => supabase.from('iptv_playlists').delete().gt('id', 0),
+        () => supabase.from('r2_cached_content').delete().not('id', 'is', null),
+        () => supabase.from('r2_bulk_cache_jobs').delete().not('id', 'is', null),
+        () => supabase.from('iptv_channels').delete().gt('id', 0),
+      ];
+
+      for (const step of steps) {
+        const { error } = await step();
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success('IPTV limpo: todos os dados foram removidos');
+      setSelectedChannels([]);
+      setExpandedCategories(new Set());
+      setExpandedSeries(new Set());
+      setIsResetOpen(false);
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && typeof q.queryKey[0] === 'string' && (q.queryKey[0].startsWith('iptv') || q.queryKey[0].startsWith('r2')) });
+      refetch();
+    },
+    onError: (error) => toast.error(`Erro ao limpar: ${error.message}`),
+  });
+
   const getContentTypeIcon = (type: string) => {
     switch (type) {
       case 'live': return <Tv className="h-4 w-4" />;
@@ -473,6 +498,32 @@ export function IPTVChannelsTab() {
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Atualizar
               </Button>
+
+              <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={resetAllMutation.isPending}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Limpar IPTV
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Apagar tudo do IPTV</DialogTitle>
+                    <DialogDescription>
+                      Isso vai remover canais, playlists, EPG, jobs e cache relacionados ao IPTV. Essa ação não pode ser desfeita.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsResetOpen(false)} disabled={resetAllMutation.isPending}>
+                      Cancelar
+                    </Button>
+                    <Button variant="destructive" onClick={() => resetAllMutation.mutate()} disabled={resetAllMutation.isPending}>
+                      {resetAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                      Apagar tudo
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <Button variant="default" size="sm" onClick={() => setIsAutoOrganizeOpen(true)} className="bg-orange-500 hover:bg-orange-600">
                 <Wand2 className="h-4 w-4 mr-1" />
