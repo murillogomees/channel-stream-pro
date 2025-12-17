@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase, supabaseConfig, getFunctionUrl } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,24 +78,6 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     });
 
     try {
-      // Get the Supabase session (required for protected function)
-      console.log('[IPTVChannelImport] Getting session...');
-
-      const sessionWithTimeout = await Promise.race([
-        supabase.auth.getSession(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 5000)),
-      ]);
-
-      const { data: sessionData, error: sessionError } = sessionWithTimeout as Awaited<ReturnType<typeof supabase.auth.getSession>>;
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error('Sessão expirada. Faça login novamente e tente importar.');
-      }
-
-      const accessToken = sessionData.session.access_token;
-
-      const functionUrl = getFunctionUrl('fetch-m3u');
-      console.log('[IPTVChannelImport] Calling edge function:', functionUrl);
-
       // Cancel any existing import before starting new one
       if (abortControllerRef.current) {
         console.log('[IPTVChannelImport] Aborting previous import');
@@ -110,19 +92,11 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         controller.abort();
       }, 300000); // 5 min timeout
 
-      const requestBody = JSON.stringify({ ...payload, stream: true });
-      console.log('[IPTVChannelImport] Request body length:', requestBody.length);
+      console.log('[IPTVChannelImport] Invoking edge function via SDK...');
 
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Authorization': `Bearer ${accessToken}`,
-          'apikey': supabaseConfig.anonKey,
-        },
-        body: requestBody,
-        signal: controller.signal,
+      // Use supabase.functions.invoke for better CORS handling
+      const { data, error } = await supabase.functions.invoke('fetch-m3u', {
+        body: { ...payload, stream: false }, // Non-streaming mode via SDK
       });
 
       clearTimeout(timeoutId);
@@ -132,87 +106,33 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         console.log('[IPTVChannelImport] Import was aborted, skipping processing');
         return;
       }
-      
-      console.log('[IPTVChannelImport] Response received:', response.status, response.headers.get('content-type'));
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+      if (error) {
+        throw new Error(error.message || 'Erro ao chamar função de importação');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Não foi possível ler a resposta');
+      console.log('[IPTVChannelImport] Response received:', data);
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        // Check abort signal in loop
-        if (controller.signal.aborted) {
-          console.log('[IPTVChannelImport] Import aborted during read loop');
-          reader.cancel();
-          return;
-        }
-        
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log('[IPTVChannelImport] SSE event:', data.type, data);
-              
-              if (data.type === 'start') {
-                setProgressState(prev => ({
-                  ...prev,
-                  status: 'importing',
-                  total: data.total || 0,
-                  message: data.total > 0 
-                    ? `Importando ${data.total.toLocaleString()} canais...`
-                    : 'Processando arquivo M3U...',
-                }));
-              } else if (data.type === 'progress') {
-                // Em streaming, o total é atualizado conforme processa
-                const displayTotal = data.total || data.processed;
-                setProgressState(prev => ({
-                  ...prev,
-                  status: 'importing',
-                  processed: data.processed,
-                  total: displayTotal,
-                  inserted: data.inserted,
-                  skipped: data.skipped,
-                  progress: displayTotal > 0 ? Math.round((data.processed / displayTotal) * 100) : 0,
-                  message: data.message || `${data.processed.toLocaleString()} canais processados (${data.inserted.toLocaleString()} inseridos)`,
-                }));
-              } else if (data.type === 'complete') {
-                setProgressState({
-                  status: 'complete',
-                  total: data.total,
-                  processed: data.total,
-                  inserted: data.inserted,
-                  skipped: data.skipped,
-                  progress: 100,
-                  message: `Concluído! ${data.inserted.toLocaleString()} canais importados`,
-                });
-                toast.success(`Importados ${data.inserted.toLocaleString()} canais`);
-                queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
-                queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
-                if (payload.url) setM3uUrl('');
-                if (payload.content) setM3uContent('');
-                onSuccess();
-              } else if (data.type === 'error') {
-                throw new Error(data.error || 'Erro no processamento');
-              }
-            } catch (parseError) {
-              console.warn('[IPTVChannelImport] SSE parse error:', parseError);
-            }
-          }
-        }
+      // Handle non-streaming response
+      if (data?.success) {
+        setProgressState({
+          status: 'complete',
+          total: data.total || 0,
+          processed: data.total || 0,
+          inserted: data.inserted || 0,
+          skipped: data.skipped || 0,
+          progress: 100,
+          message: `Concluído! ${(data.inserted || 0).toLocaleString()} canais importados`,
+        });
+        toast.success(`Importados ${(data.inserted || 0).toLocaleString()} canais`);
+        queryClient.invalidateQueries({ queryKey: ['iptv-channels'] });
+        queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
+        if (payload.url) setM3uUrl('');
+        if (payload.content) setM3uContent('');
+        onSuccess();
+        return;
+      } else {
+        throw new Error(data?.error || 'Erro desconhecido na importação');
       }
     } catch (error) {
       // Don't show error if it was an intentional abort
