@@ -227,13 +227,17 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       }
       
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      const friendlyMessage = message === 'Failed to fetch'
+        ? 'Falha de conexão com o backend (rede/CORS). Se estiver usando VPN/AdBlock, desative e tente novamente.'
+        : message;
+
       setProgressState(prev => ({
         ...prev,
         status: 'error',
-        error: message,
-        message: `Erro: ${message}`,
+        error: friendlyMessage,
+        message: `Erro: ${friendlyMessage}`,
       }));
-      toast.error(`Erro: ${message}`);
+      toast.error(`Erro: ${friendlyMessage}`);
     } finally {
       // Clear ref when done
       if (abortControllerRef.current?.signal.aborted === false) {
