@@ -123,6 +123,10 @@ function AppContent() {
                 ADMIN ROUTES - Consolidated Hubs
             ======================================== */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/" element={<Navigate to="/admin/dashboard" replace />} />
+            {/* Normalize trailing segments (/admin/dashboard/, /admin/dashboard/anything) */}
+            <Route path="/admin/dashboard/*" element={<Navigate to="/admin/dashboard" replace />} />
+
             <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
             <Route path="/admin/notificacoes" element={<ProtectedRoute requireAdmin><AdminNotificacoesPage /></ProtectedRoute>} />
             <Route path="/admin/seguranca" element={<ProtectedRoute requireAdmin><AdminSegurancaPage /></ProtectedRoute>} />
