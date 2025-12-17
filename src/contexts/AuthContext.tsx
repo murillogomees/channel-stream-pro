@@ -15,29 +15,82 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 /**
  * Converte Supabase User para UnifiedUser
  */
-async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
-  // Buscar profile e role em paralelo com timeout
-  const timeoutPromise = new Promise((_, reject) => 
+async function convertToUnifiedUser(user: User, accessToken?: string): Promise<UnifiedUser> {
+  // Buscar profile e roles em paralelo com timeout
+  const timeoutPromise = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Timeout')), 5000)
   );
 
-  try {
-    const [profileResult, roleResult] = await Promise.race([
-      Promise.all([
-        supabase.from('profiles').select('id,nome,email,contact_phone,origem_cadastro,created_at,updated_at,situacao,plano,data_vencimento,valor_pago,cliente_ativo').eq('id', user.id).maybeSingle(),
-        supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle()
-      ]),
-      timeoutPromise
-    ]) as [typeof profileResult, typeof roleResult];
+  // Fallback seguro: tenta extrair role do JWT (claim assinado) e, se não existir, de metadados.
+  const getRoleFallback = (): AppRole | null => {
+    // 1) JWT claims
+    try {
+      if (accessToken) {
+        const parts = accessToken.split('.');
+        if (parts.length === 3) {
+          const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const pad = payload.length % 4;
+          const padded = pad ? payload + '='.repeat(4 - pad) : payload;
+          const json = JSON.parse(atob(padded));
+          const claim = (json?.user_role || json?.role) as string | undefined;
+          if (claim === 'master' || claim === 'admin' || claim === 'client') return claim;
+        }
+      }
+    } catch {
+      // ignore
+    }
 
-    const profile = profileResult?.data;
-    const role: AppRole = (roleResult?.data?.role as AppRole) || 'client';
-    
+    // 2) Metadados (se houver)
+    const metaRole = (user.app_metadata as any)?.user_role || (user.app_metadata as any)?.role;
+    const metaRole2 = (user.user_metadata as any)?.user_role || (user.user_metadata as any)?.role;
+    const r = (metaRole || metaRole2) as string | undefined;
+    if (r === 'master' || r === 'admin' || r === 'client') return r;
+
+    return null;
+  };
+
+  const pickRole = (roles: Array<{ role: AppRole | string }> | null | undefined): AppRole => {
+    const list = (roles || [])
+      .map((x) => (x?.role as string | undefined)?.toLowerCase())
+      .filter(Boolean) as string[];
+
+    if (list.includes('master')) return 'master';
+    if (list.includes('admin')) return 'admin';
+    if (list.includes('client')) return 'client';
+
+    return getRoleFallback() || 'client';
+  };
+
+  try {
+    const [{ data: profile, error: profileError }, { data: rolesData, error: rolesError }] =
+      (await Promise.race([
+        Promise.all([
+          supabase
+            .from('profiles')
+            .select(
+              'id,nome,email,contact_phone,origem_cadastro,created_at,updated_at,situacao,plano,data_vencimento,valor_pago,cliente_ativo'
+            )
+            .eq('id', user.id)
+            .maybeSingle(),
+          // Pode existir mais de 1 row em bases antigas; por isso NÃO usamos maybeSingle
+          supabase.from('user_roles').select('role').eq('user_id', user.id),
+        ]),
+        timeoutPromise,
+      ])) as [
+        { data: any; error: any },
+        { data: Array<{ role: AppRole }> | null; error: any },
+      ];
+
+    if (profileError) console.warn('[AuthContext] profiles fetch error:', profileError);
+    if (rolesError) console.warn('[AuthContext] user_roles fetch error:', rolesError);
+
+    const role: AppRole = pickRole(rolesData);
+
     // Calcular status de acesso
     let daysRemaining = 0;
     let isExpired = false;
     const isTrial = profile?.situacao === 'Testando';
-    
+
     if (profile?.data_vencimento) {
       const vencimento = new Date(profile.data_vencimento);
       const diffTime = vencimento.getTime() - Date.now();
@@ -58,21 +111,26 @@ async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
       isMaster: role === 'master',
       isAdmin: role === 'admin' || role === 'master',
       isClient: role === 'client',
-      hasValidAccess: role === 'master' || role === 'admin' || (profile?.cliente_ativo === true && !isExpired),
+      hasValidAccess:
+        role === 'master' || role === 'admin' || (profile?.cliente_ativo === true && !isExpired),
       isExpired: role === 'master' || role === 'admin' ? false : isExpired,
       daysRemaining: Math.max(0, daysRemaining),
       isTrial,
-      clienteData: profile ? {
-        id: profile.id,
-        situacao: profile.situacao,
-        plano: profile.plano,
-        data_vencimento: profile.data_vencimento,
-        valor_pago: profile.valor_pago,
-        cliente_ativo: profile.cliente_ativo,
-      } : undefined,
+      clienteData: profile
+        ? {
+            id: profile.id,
+            situacao: profile.situacao,
+            plano: profile.plano,
+            data_vencimento: profile.data_vencimento,
+            valor_pago: profile.valor_pago,
+            cliente_ativo: profile.cliente_ativo,
+          }
+        : undefined,
     };
   } catch (e) {
     // Fallback rápido se timeout ou erro
+    const fallbackRole = getRoleFallback() || 'client';
+
     return {
       id: user.id,
       nome: user.email?.split('@')[0] || 'Usuário',
@@ -82,11 +140,11 @@ async function convertToUnifiedUser(user: User): Promise<UnifiedUser> {
       origem_cadastro: undefined,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      roles: ['client'],
-      isMaster: false,
-      isAdmin: false,
-      isClient: true,
-      hasValidAccess: false,
+      roles: [fallbackRole],
+      isMaster: fallbackRole === 'master',
+      isAdmin: fallbackRole === 'admin' || fallbackRole === 'master',
+      isClient: fallbackRole === 'client',
+      hasValidAccess: fallbackRole === 'admin' || fallbackRole === 'master',
       isExpired: false,
       daysRemaining: 0,
       isTrial: false,
@@ -106,7 +164,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateAuthState = useCallback(async (currentSession: Session | null) => {
     if (currentSession?.user) {
       try {
-        const unifiedUser = await convertToUnifiedUser(currentSession.user);
+        const unifiedUser = await convertToUnifiedUser(
+          currentSession.user,
+          currentSession.access_token
+        );
         setUser(unifiedUser);
         setSession(currentSession);
       } catch (e) {
@@ -128,7 +189,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       if (currentSession?.user) {
-        const unifiedUser = await convertToUnifiedUser(currentSession.user);
+        const unifiedUser = await convertToUnifiedUser(
+          currentSession.user,
+          currentSession.access_token
+        );
         setUser(unifiedUser);
       }
     } catch (e) {
