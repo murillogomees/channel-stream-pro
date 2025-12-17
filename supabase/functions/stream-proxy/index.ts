@@ -76,17 +76,11 @@ function parseProxyUrl(proxyUrl: string, sessionId?: string): ProxyConfig | null
     // Format: user:pass@host:port
     const match = proxyUrl.match(/^([^:]+):([^@]+)@([^:]+):(\d+)$/);
     if (match) {
-      let username = match[1];
-      
-      // Add session ID for sticky IP (proxy-seller format: user-session-XXXX)
-      if (sessionId) {
-        // Remove any existing session suffix and add new one
-        username = username.replace(/-session-[^-]+$/, '');
-        username = `${username}-session-${sessionId}`;
-      }
-      
+      // NOTE: Session stickiness disabled - proxy-seller.com format not working
+      // The 407 error suggests the session suffix breaks authentication
+      // Using basic proxy without session modification for now
       return {
-        username,
+        username: match[1],
         password: match[2],
         host: match[3],
         port: parseInt(match[4], 10),
@@ -96,15 +90,9 @@ function parseProxyUrl(proxyUrl: string, sessionId?: string): ProxyConfig | null
     
     // Try URL format: http://user:pass@host:port
     const url = new URL(proxyUrl.startsWith('http') ? proxyUrl : `http://${proxyUrl}`);
-    let username = url.username;
-    
-    if (sessionId) {
-      username = username.replace(/-session-[^-]+$/, '');
-      username = `${username}-session-${sessionId}`;
-    }
     
     return {
-      username,
+      username: url.username,
       password: url.password,
       host: url.hostname,
       port: parseInt(url.port, 10) || 80,
