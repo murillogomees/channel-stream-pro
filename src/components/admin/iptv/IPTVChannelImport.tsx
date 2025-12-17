@@ -78,27 +78,21 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     });
 
     try {
-      // Get the Supabase session with timeout
+      // Get the Supabase session (required for protected function)
       console.log('[IPTVChannelImport] Getting session...');
-      let accessToken: string | null = null;
-      
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 5000)
-        );
-        
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
-        
-        if (result.error) {
-          console.warn('[IPTVChannelImport] Session error (continuing with anon):', result.error);
-        } else {
-          accessToken = result.data.session?.access_token || null;
-        }
-      } catch (sessionErr) {
-        console.warn('[IPTVChannelImport] Session fetch failed, using anon key:', sessionErr);
+
+      const sessionWithTimeout = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 5000)),
+      ]);
+
+      const { data: sessionData, error: sessionError } = sessionWithTimeout as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error('Sessão expirada. Faça login novamente e tente importar.');
       }
-      
+
+      const accessToken = sessionData.session.access_token;
+
       const functionUrl = getFunctionUrl('fetch-m3u');
       console.log('[IPTVChannelImport] Calling edge function:', functionUrl);
 
@@ -123,7 +117,8 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || supabaseConfig.anonKey}`,
+          'Accept': 'text/event-stream',
+          'Authorization': `Bearer ${accessToken}`,
           'apikey': supabaseConfig.anonKey,
         },
         body: requestBody,
