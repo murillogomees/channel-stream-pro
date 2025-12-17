@@ -196,8 +196,14 @@ async function fetchViaProxy(
   targetUrl: string,
   headers: Headers,
   proxyConfig: ProxyConfig,
-  timeoutMs: number
+  timeoutMs: number,
+  redirectCount: number = 0
 ): Promise<Response> {
+  // Prevent infinite redirect loops
+  if (redirectCount > 5) {
+    throw new Error('Too many redirects');
+  }
+
   const targetParsed = new URL(targetUrl);
   const isHttps = targetParsed.protocol === 'https:';
   const targetPort = targetParsed.port || (isHttps ? 443 : 80);
@@ -247,7 +253,7 @@ async function fetchViaProxy(
       let totalSize = 0;
       const buffer = new Uint8Array(65536);
       
-      const readResponse = async () => {
+      const readResponse = async (): Promise<Response> => {
         while (true) {
           const n = await conn.read(buffer);
           if (n === null) break;
@@ -281,6 +287,23 @@ async function fetchViaProxy(
                   line.substring(0, colonIndex).trim(),
                   line.substring(colonIndex + 1).trim()
                 );
+              }
+            }
+            
+            // Handle redirects (301, 302, 303, 307, 308)
+            if (status >= 300 && status < 400) {
+              const location = responseHeaders.get('Location');
+              if (location) {
+                console.log(`[Proxy] Following ${status} redirect to: ${location.substring(0, 80)}`);
+                conn.close();
+                
+                // Resolve relative URLs
+                const redirectUrl = location.startsWith('http') 
+                  ? location 
+                  : `${targetParsed.protocol}//${targetParsed.host}${location.startsWith('/') ? location : '/' + location}`;
+                
+                // Follow the redirect
+                return await fetchViaProxy(redirectUrl, headers, proxyConfig, timeoutMs, redirectCount + 1);
               }
             }
             
@@ -355,7 +378,7 @@ async function fetchViaProxy(
       
       // Fallback to direct fetch for HTTPS
       console.log(`[Proxy] HTTPS target - falling back to direct fetch`);
-      return await fetch(targetUrl, { headers });
+      return await fetch(targetUrl, { headers, redirect: 'follow' });
     }
   } finally {
     try {
