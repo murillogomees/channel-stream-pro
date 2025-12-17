@@ -365,22 +365,22 @@ export function IPTVChannelsTab() {
   const resetAllMutation = useMutation({
     mutationFn: async () => {
       // Ordem importa por causa de chaves estrangeiras
+      // Tabelas que existem no schema atual
       const steps = [
-        () => supabase.from('iptv_channel_metrics').delete().gt('id', 0),
-        () => supabase.from('iptv_cdn_cache').delete().gt('id', 0),
-        () => supabase.from('iptv_transcode_jobs').delete().gt('id', 0),
-        () => supabase.from('iptv_probe_jobs').delete().gt('id', 0),
-        () => supabase.from('epg_programs').delete().not('id', 'is', null),
-        () => supabase.from('iptv_playlist_channels').delete().gt('playlist_id', 0),
-        () => supabase.from('iptv_playlists').delete().gt('id', 0),
-        () => supabase.from('r2_cached_content').delete().not('id', 'is', null),
-        () => supabase.from('r2_bulk_cache_jobs').delete().not('id', 'is', null),
-        () => supabase.from('iptv_channels').delete().gt('id', 0),
+        { table: 'iptv_channel_metrics', query: () => supabase.from('iptv_channel_metrics').delete().gt('id', 0) },
+        { table: 'iptv_cdn_cache', query: () => supabase.from('iptv_cdn_cache').delete().gt('id', 0) },
+        { table: 'iptv_transcode_jobs', query: () => supabase.from('iptv_transcode_jobs').delete().gt('id', 0) },
+        { table: 'iptv_probe_jobs', query: () => supabase.from('iptv_probe_jobs').delete().gt('id', 0) },
+        { table: 'epg_programs', query: () => supabase.from('epg_programs').delete().not('id', 'is', null) },
+        { table: 'iptv_playlist_channels', query: () => supabase.from('iptv_playlist_channels').delete().gt('playlist_id', 0) },
+        { table: 'iptv_playlists', query: () => supabase.from('iptv_playlists').delete().gt('id', 0) },
+        { table: 'iptv_channels', query: () => supabase.from('iptv_channels').delete().gt('id', 0) },
       ];
 
       for (const step of steps) {
-        const { error } = await step();
-        if (error) throw error;
+        const { error } = await step.query();
+        // Ignora erros de tabela não encontrada
+        if (error && !error.message.includes('schema cache')) throw error;
       }
     },
     onSuccess: () => {
@@ -389,7 +389,7 @@ export function IPTVChannelsTab() {
       setExpandedCategories(new Set());
       setExpandedSeries(new Set());
       setIsResetOpen(false);
-      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && typeof q.queryKey[0] === 'string' && (q.queryKey[0].startsWith('iptv') || q.queryKey[0].startsWith('r2')) });
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && typeof q.queryKey[0] === 'string' && q.queryKey[0].startsWith('iptv') });
       refetch();
     },
     onError: (error) => toast.error(`Erro ao limpar: ${error.message}`),
