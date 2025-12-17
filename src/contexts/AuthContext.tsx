@@ -16,10 +16,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * Converte Supabase User para UnifiedUser
  */
 async function convertToUnifiedUser(user: User, accessToken?: string): Promise<UnifiedUser> {
-  // Buscar profile e roles em paralelo com timeout
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Timeout')), 5000)
-  );
+  const withTimeout = <T,>(promise: PromiseLike<T>, ms: number): Promise<T> => {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), ms)
+    );
+
+    // Postgrest builders are PromiseLike (thenable) but not full Promises.
+    return Promise.race([Promise.resolve(promise as unknown as T), timeoutPromise]);
+  };
 
   // Fallback seguro: tenta extrair role do JWT (claim assinado) e, se não existir, de metadados.
   const getRoleFallback = (): AppRole | null => {
@@ -62,30 +66,37 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
   };
 
   try {
-    const [{ data: profile, error: profileError }, { data: rolesData, error: rolesError }] =
-      (await Promise.race([
-        Promise.all([
-          supabase
-            .from('profiles')
-            .select(
-              'id,nome,email,contact_phone,origem_cadastro,created_at,updated_at,situacao,plano,data_vencimento,valor_pago,cliente_ativo'
-            )
-            .eq('id', user.id)
-            .maybeSingle(),
-          // Pode existir mais de 1 row em bases antigas; por isso NÃO usamos maybeSingle
-          supabase.from('user_roles').select('role').eq('user_id', user.id),
-        ]),
-        timeoutPromise,
-      ])) as [
-        { data: any; error: any },
-        { data: Array<{ role: AppRole }> | null; error: any },
-      ];
+    // 1) Role PRIMEIRO (não pode depender do fetch de profile)
+    let role: AppRole = getRoleFallback() || 'client';
+    try {
+      const { data: rolesData, error: rolesError } = await withTimeout(
+        supabase.from('user_roles').select('role').eq('user_id', user.id),
+        2500
+      );
+      if (rolesError) console.warn('[AuthContext] user_roles fetch error:', rolesError);
+      role = pickRole((rolesData as Array<{ role: AppRole }> | null) ?? null);
+    } catch (e) {
+      console.warn('[AuthContext] user_roles fetch timeout/error:', e);
+    }
 
-    if (profileError) console.warn('[AuthContext] profiles fetch error:', profileError);
-    if (rolesError) console.warn('[AuthContext] user_roles fetch error:', rolesError);
-
-    const role: AppRole = pickRole(rolesData);
-
+    // 2) Profile (melhor esforço)
+    let profile: any = null;
+    try {
+      const { data, error: profileError } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select(
+            'id,nome,email,contact_phone,origem_cadastro,created_at,updated_at,situacao,plano,data_vencimento,valor_pago,cliente_ativo'
+          )
+          .eq('id', user.id)
+          .maybeSingle(),
+        5000
+      );
+      if (profileError) console.warn('[AuthContext] profiles fetch error:', profileError);
+      profile = data;
+    } catch (e) {
+      console.warn('[AuthContext] profiles fetch timeout/error:', e);
+    }
     // Calcular status de acesso
     let daysRemaining = 0;
     let isExpired = false;
