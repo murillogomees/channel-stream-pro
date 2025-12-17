@@ -1,7 +1,7 @@
 /**
  * PROTEÇÃO DE ROTAS UNIFICADA
- * @version 2.0.0
- * 
+ * @version 2.0.1
+ *
  * Controle de acesso:
  * - /app/* → Apenas clientes autenticados com acesso válido
  * - /admin/* → Apenas administradores
@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { authLoggingService } from '@/services/authLoggingService';
 import { useEffect, useState } from 'react';
+import { supabaseConfig } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -87,20 +88,40 @@ export const ProtectedRoute = ({
   
   if (requireMaster && !isMaster && !rolesNotLoadedYet) {
     if (user) {
+      console.warn('[ProtectedRoute] Access denied (master required)', {
+        path: location.pathname,
+        userId: user.id,
+        email: user.email,
+        roles: user.roles,
+        isAdmin,
+        isMaster,
+        backend: supabaseConfig.url,
+      });
+
       setTimeout(() => {
         authLoggingService.logAccessDenied(user.id, user.email || '', 'master required', location.pathname);
       }, 0);
     }
-    return <Navigate to="/403" state={{ required: 'master' }} replace />;
+    return <Navigate to="/403" state={{ required: 'master', has: user?.roles?.[0] ?? 'none' }} replace />;
   }
 
   if (requireAdmin && !isAdmin && !isMaster && !rolesNotLoadedYet) {
     if (user) {
+      console.warn('[ProtectedRoute] Access denied (admin required)', {
+        path: location.pathname,
+        userId: user.id,
+        email: user.email,
+        roles: user.roles,
+        isAdmin,
+        isMaster,
+        backend: supabaseConfig.url,
+      });
+
       setTimeout(() => {
         authLoggingService.logAccessDenied(user.id, user.email || '', 'admin required', location.pathname);
       }, 0);
     }
-    return <Navigate to="/403" state={{ required: 'admin' }} replace />;
+    return <Navigate to="/403" state={{ required: 'admin', has: user?.roles?.[0] ?? 'none' }} replace />;
   }
 
   // ========================================
@@ -109,11 +130,21 @@ export const ProtectedRoute = ({
   
   if (requireClient && !isClient && !isAdmin && !rolesNotLoadedYet) {
     if (user) {
+      console.warn('[ProtectedRoute] Access denied (client required)', {
+        path: location.pathname,
+        userId: user.id,
+        email: user.email,
+        roles: user.roles,
+        isAdmin,
+        isMaster,
+        backend: supabaseConfig.url,
+      });
+
       setTimeout(() => {
         authLoggingService.logAccessDenied(user.id, user.email || '', 'client required', location.pathname);
       }, 0);
     }
-    return <Navigate to="/403" state={{ required: 'client' }} replace />;
+    return <Navigate to="/403" state={{ required: 'client', has: user?.roles?.[0] ?? 'none' }} replace />;
   }
 
   // Verificar acesso válido (não vencido) para rotas /app/*
