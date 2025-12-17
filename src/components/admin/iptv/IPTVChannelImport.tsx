@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseConfig } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -143,7 +143,7 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       const friendlyMessage = message === 'Failed to fetch'
-        ? 'Falha de conexão com o backend (rede/CORS). Se estiver usando VPN/AdBlock, desative e tente novamente.'
+        ? `Falha de conexão com o backend (${supabaseConfig.url || 'URL não configurada'}). Verifique se o backend está conectado e tente novamente.`
         : message;
 
       setProgressState(prev => ({

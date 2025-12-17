@@ -1,13 +1,11 @@
 /**
- * Supabase Configuration
- * Central configuration for Supabase Cloud
+ * Backend configuration (URL + public key)
+ *
+ * Keep this file free of hardcoded credentials so it always matches the currently connected backend.
  */
 
-// Supabase Cloud URL - SINGLE SOURCE OF TRUTH
-export const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
-
-// Edge Functions base URL
+export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "";
 export const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
-// Public anon key
-export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
+// Public publishable key (safe for frontend). Provided automatically by the backend integration.
+export const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ?? "";
