@@ -409,68 +409,73 @@ async function fetchWithRetry(
   let lastError: Error | null = null;
   let lastResponse: Response | null = null;
   
-  // For 503 errors, we retry more aggressively
-  const totalAttempts = maxRetries + 2; // Extra attempts for 503
-  
-  for (let attempt = 0; attempt < totalAttempts; attempt++) {
-    try {
-      let response: Response;
-      
-      // Try via residential proxy first if configured
-      if (proxyConfig) {
+  // First try with proxy if configured
+  if (proxyConfig) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
         console.log(`[Proxy] Attempt ${attempt + 1} via residential proxy`);
-        response = await fetchViaProxy(url, headers, proxyConfig, timeoutMs);
-      } else {
-        // Direct fetch fallback
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const response = await fetchViaProxy(url, headers, proxyConfig, timeoutMs);
         
-        response = await fetch(url, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-          redirect: 'follow',
-        });
-        
-        clearTimeout(timeoutId);
-      }
-      
-      // Check for 503 - provider overloaded, retry after delay
-      if (response.status === 503) {
-        console.log(`[Proxy] Upstream returned 503, attempt ${attempt + 1}/${totalAttempts}`);
-        lastResponse = response;
-        
-        if (attempt < totalAttempts - 1) {
-          // Exponential backoff for 503: 1s, 2s, 4s
-          const delay = 1000 * Math.pow(2, attempt);
-          console.log(`[Proxy] Waiting ${delay}ms before retry...`);
-          await new Promise(r => setTimeout(r, delay));
-          continue;
+        // If 503, try again or fallback to direct
+        if (response.status === 503) {
+          console.log(`[Proxy] Upstream returned 503 via proxy, attempt ${attempt + 1}`);
+          lastResponse = response;
+          if (attempt < 1) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          // After 2 proxy attempts with 503, try direct
+          break;
         }
+        
+        console.log(`[Proxy] Upstream response: status=${response.status}`);
+        return response;
+      } catch (err) {
+        lastError = err as Error;
+        console.log(`[Proxy] Proxy attempt ${attempt + 1} failed: ${lastError.message}`);
       }
+    }
+    
+    // Fallback to direct if proxy returned 503 or failed
+    console.log(`[Proxy] Proxy failed, trying direct connection...`);
+  }
+  
+  // Direct fetch (fallback or primary if no proxy)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`[Proxy] Direct attempt ${attempt + 1}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
-      // Check for 403 - might be temporary, retry once
-      if (response.status === 403 && attempt < 1) {
-        console.log(`[Proxy] Upstream returned 403, retrying once...`);
-        await new Promise(r => setTimeout(r, 500));
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+        redirect: 'follow',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.status === 503 && attempt < maxRetries - 1) {
+        console.log(`[Proxy] Direct got 503, retrying...`);
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         continue;
       }
       
-      console.log(`[Proxy] Upstream response: status=${response.status}`);
+      console.log(`[Proxy] Direct response: status=${response.status}`);
       return response;
       
     } catch (err) {
       lastError = err as Error;
-      console.log(`[Proxy] Attempt ${attempt + 1} failed: ${lastError.message}`);
+      console.log(`[Proxy] Direct attempt ${attempt + 1} failed: ${lastError.message}`);
       
-      if (attempt < totalAttempts - 1) {
-        const delay = CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt);
-        await new Promise(r => setTimeout(r, delay));
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt)));
       }
     }
   }
   
-  // If we have a last response (503), return it instead of throwing
+  // Return last response if we have one (even if 503)
   if (lastResponse) {
     return lastResponse;
   }
