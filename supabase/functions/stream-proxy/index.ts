@@ -552,16 +552,19 @@ serve(async (req: Request): Promise<Response> => {
     // Extract session ID for sticky proxy IP
     const rawSessionId = req.headers.get('x-session-id') || undefined;
 
-    // TEMPORARILY DISABLED: Sticky session causing 405/407 errors
-    // TODO: Re-enable once we confirm correct proxy-seller format
-    const stickyKey = undefined; // rawSessionId ? rawSessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-16) : undefined;
+    // Sticky key must be short + alphanumeric to avoid breaking proxy auth formats
+    // (prevents 403 from upstream providers that bind tokens to a single IP)
+    const stickyKey = rawSessionId
+      ? rawSessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-16)
+      : undefined;
 
-    // Parse residential proxy config (without sticky session for now)
+    // Parse residential proxy config (with sticky session when possible)
     const proxyUrlEnv = Deno.env.get('RESIDENTIAL_PROXY_URL');
     const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv, stickyKey) : null;
 
     if (proxyConfig) {
-      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port} (sticky DISABLED for debug)`);
+      const stickyInfo = stickyKey ? ` (sticky: ${stickyKey})` : '';
+      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port}${stickyInfo}`);
     }
 
     const isM3u8 = isManifest(decodedUrl);
