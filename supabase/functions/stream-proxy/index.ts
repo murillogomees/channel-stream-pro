@@ -66,37 +66,58 @@ function isUrlBlocked(url: string): boolean {
 interface ProxyConfig {
   host: string;
   port: number;
+  /** The actual username used for Proxy-Authorization */
   username: string;
+  /** Original username from RESIDENTIAL_PROXY_URL (without sticky modifiers) */
+  baseUsername: string;
   password: string;
+  /** Optional sticky session key (sanitized) */
   sessionId?: string;
 }
 
-function parseProxyUrl(proxyUrl: string, sessionId?: string): ProxyConfig | null {
+function buildStickyUsername(baseUsername: string, stickyKey: string): string {
+  // Proxy-Seller session control format: append "_s_<id>" to the login.
+  // Docs: login like "xxx_s_100" keeps the same exit IP while the node stays online.
+  return `${baseUsername}_s_${stickyKey}`;
+}
+
+function parseProxyUrl(proxyUrl: string, stickyKey?: string): ProxyConfig | null {
   try {
     // Format: user:pass@host:port
     const match = proxyUrl.match(/^([^:]+):([^@]+)@([^:]+):(\d+)$/);
     if (match) {
-      // NOTE: Session stickiness disabled - proxy-seller.com format not working
-      // The 407 error suggests the session suffix breaks authentication
-      // Using basic proxy without session modification for now
+      const baseUsername = match[1];
+      const password = match[2];
+      const host = match[3];
+      const port = parseInt(match[4], 10);
+
+      const username = stickyKey ? buildStickyUsername(baseUsername, stickyKey) : baseUsername;
+
       return {
-        username: match[1],
-        password: match[2],
-        host: match[3],
-        port: parseInt(match[4], 10),
-        sessionId,
+        baseUsername,
+        username,
+        password,
+        host,
+        port,
+        sessionId: stickyKey,
       };
     }
-    
+
     // Try URL format: http://user:pass@host:port
     const url = new URL(proxyUrl.startsWith('http') ? proxyUrl : `http://${proxyUrl}`);
-    
+    const baseUsername = url.username;
+    const password = url.password;
+    const host = url.hostname;
+    const port = parseInt(url.port, 10) || 80;
+    const username = stickyKey ? buildStickyUsername(baseUsername, stickyKey) : baseUsername;
+
     return {
-      username: url.username,
-      password: url.password,
-      host: url.hostname,
-      port: parseInt(url.port, 10) || 80,
-      sessionId,
+      baseUsername,
+      username,
+      password,
+      host,
+      port,
+      sessionId: stickyKey,
     };
   } catch (e) {
     console.error('[Proxy] Failed to parse proxy URL:', e);
@@ -411,11 +432,27 @@ async function fetchWithRetry(
   
   // First try with proxy if configured
   if (proxyConfig) {
+    let proxy = proxyConfig;
+
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         console.log(`[Proxy] Attempt ${attempt + 1} via residential proxy`);
-        const response = await fetchViaProxy(url, headers, proxyConfig, timeoutMs);
-        
+        const response = await fetchViaProxy(url, headers, proxy, timeoutMs);
+
+        // Proxy auth error (407)
+        // Most common cause: sticky username format not accepted.
+        // Fallback to base username once.
+        if (response.status === 407 && proxy.sessionId) {
+          console.warn('[Proxy] 407 from proxy with sticky session; retrying with base username');
+          proxy = {
+            ...proxy,
+            username: proxy.baseUsername,
+            sessionId: undefined,
+          };
+          lastResponse = response;
+          continue;
+        }
+
         // If 503, try again or fallback to direct
         if (response.status === 503) {
           console.log(`[Proxy] Upstream returned 503 via proxy, attempt ${attempt + 1}`);
@@ -427,7 +464,7 @@ async function fetchWithRetry(
           // After 2 proxy attempts with 503, try direct
           break;
         }
-        
+
         console.log(`[Proxy] Upstream response: status=${response.status}`);
         return response;
       } catch (err) {
@@ -435,7 +472,7 @@ async function fetchWithRetry(
         console.log(`[Proxy] Proxy attempt ${attempt + 1} failed: ${lastError.message}`);
       }
     }
-    
+
     // Fallback to direct if proxy returned 503 or failed
     console.log(`[Proxy] Proxy failed, trying direct connection...`);
   }
@@ -513,14 +550,19 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Extract session ID for sticky proxy IP
-    const sessionId = req.headers.get('x-session-id') || undefined;
-    
-    // Parse residential proxy config with session stickiness
+    const rawSessionId = req.headers.get('x-session-id') || undefined;
+
+    // Sticky key must be short + alphanumeric to avoid breaking proxy auth formats
+    const stickyKey = rawSessionId
+      ? rawSessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-16)
+      : undefined;
+
+    // Parse residential proxy config (with sticky session when possible)
     const proxyUrlEnv = Deno.env.get('RESIDENTIAL_PROXY_URL');
-    const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv, sessionId) : null;
-    
+    const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv, stickyKey) : null;
+
     if (proxyConfig) {
-      const stickyInfo = sessionId ? ` (sticky session: ${sessionId.substring(0, 20)})` : '';
+      const stickyInfo = stickyKey ? ` (sticky: ${stickyKey})` : '';
       console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port}${stickyInfo}`);
     }
 
