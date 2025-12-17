@@ -68,28 +68,47 @@ interface ProxyConfig {
   port: number;
   username: string;
   password: string;
+  sessionId?: string;
 }
 
-function parseProxyUrl(proxyUrl: string): ProxyConfig | null {
+function parseProxyUrl(proxyUrl: string, sessionId?: string): ProxyConfig | null {
   try {
     // Format: user:pass@host:port
     const match = proxyUrl.match(/^([^:]+):([^@]+)@([^:]+):(\d+)$/);
     if (match) {
+      let username = match[1];
+      
+      // Add session ID for sticky IP (proxy-seller format: user-session-XXXX)
+      if (sessionId) {
+        // Remove any existing session suffix and add new one
+        username = username.replace(/-session-[^-]+$/, '');
+        username = `${username}-session-${sessionId}`;
+      }
+      
       return {
-        username: match[1],
+        username,
         password: match[2],
         host: match[3],
         port: parseInt(match[4], 10),
+        sessionId,
       };
     }
     
     // Try URL format: http://user:pass@host:port
     const url = new URL(proxyUrl.startsWith('http') ? proxyUrl : `http://${proxyUrl}`);
+    let username = url.username;
+    
+    if (sessionId) {
+      username = username.replace(/-session-[^-]+$/, '');
+      username = `${username}-session-${sessionId}`;
+    }
+    
     return {
-      username: url.username,
+      username,
       password: url.password,
       host: url.hostname,
       port: parseInt(url.port, 10) || 80,
+      sessionId,
     };
   } catch (e) {
     console.error('[Proxy] Failed to parse proxy URL:', e);
@@ -466,12 +485,16 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Parse residential proxy config
+    // Extract session ID for sticky proxy IP
+    const sessionId = req.headers.get('x-session-id') || undefined;
+    
+    // Parse residential proxy config with session stickiness
     const proxyUrlEnv = Deno.env.get('RESIDENTIAL_PROXY_URL');
-    const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv) : null;
+    const proxyConfig = proxyUrlEnv ? parseProxyUrl(proxyUrlEnv, sessionId) : null;
     
     if (proxyConfig) {
-      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port}`);
+      const stickyInfo = sessionId ? ` (sticky session: ${sessionId.substring(0, 20)})` : '';
+      console.log(`[Proxy] 🏠 Residential proxy enabled: ${proxyConfig.host}:${proxyConfig.port}${stickyInfo}`);
     }
 
     const isM3u8 = isManifest(decodedUrl);
