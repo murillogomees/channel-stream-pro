@@ -12,4 +12,4 @@ export const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
 export const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
 // Public publishable key for sdvyxdghxqmntyoweqbd
-export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQzODc1NDcsImV4cCI6MjA0OTk2MzU0N30.SZJPngG9T-AG8smX2_Tt-T7oZm0b2qMkE-hxPEWNabw";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
