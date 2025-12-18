@@ -2479,6 +2479,51 @@ export type Database = {
           },
         ]
       }
+      iptv_import_jobs: {
+        Row: {
+          created_at: string
+          created_by: string
+          error: string | null
+          id: string
+          inserted_count: number
+          message: string | null
+          parsed_count: number
+          skipped_count: number
+          source_name: string | null
+          source_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          error?: string | null
+          id?: string
+          inserted_count?: number
+          message?: string | null
+          parsed_count?: number
+          skipped_count?: number
+          source_name?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          id?: string
+          inserted_count?: number
+          message?: string | null
+          parsed_count?: number
+          skipped_count?: number
+          source_name?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       iptv_llhls_config: {
         Row: {
           can_skip_until: number | null
@@ -5146,6 +5191,7 @@ export type Database = {
           organized_count: number
         }[]
       }
+      gen_random_uuid: { Args: never; Returns: string }
       generate_source_hash: {
         Args: { category: string; name: string; url: string }
         Returns: string
