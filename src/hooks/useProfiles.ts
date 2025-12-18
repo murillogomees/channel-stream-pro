@@ -1,52 +1,51 @@
 /**
- * useProfiles - Hook unificado para gerenciar profiles/clientes
- * Usa queries diretas ao Supabase (sem Edge Functions)
+ * useProfiles - Hook unificado e otimizado para gerenciar profiles
+ * Usa projeções de colunas específicas para reduzir egress
+ * Stats vêm da materialized view (pré-computados no banco)
  */
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { profileService, ProfileListItem, ProfileStats } from '@/services/profileService';
 
-export interface UnifiedProfile {
-  id: string;
-  nome: string;
-  email: string;
-  contact_phone?: string;
+export interface UnifiedProfile extends ProfileListItem {
+  updated_at?: string;
   origem_cadastro?: string;
-  created_at: string;
-  updated_at: string;
-  situacao?: string;
-  plano?: string;
-  data_vencimento?: string;
-  data_contratacao?: string;
   valor_pago?: number;
-  cliente_ativo?: boolean;
+  data_contratacao?: string;
+  is_recorrente?: boolean;
   data_ultimo_pagamento?: string;
   forma_ultimo_pagamento?: string;
-  is_recorrente?: boolean;
   dispositivo_contratado?: string;
   roles?: string[];
+}
+
+interface ProfileStatsExtended extends ProfileStats {
+  total: number;
+  ativos: number;
+  inativos: number;
+  vencendoProximos5Dias: number;
+  vencidos: number;
+  emTeste: number;
+  porSituacao: Record<string, number>;
 }
 
 export function useProfiles() {
   const [profiles, setProfiles] = useState<UnifiedProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<ProfileStatsExtended | null>(null);
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
     setError(null);
+    
     try {
-      // Query profiles directly
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) throw profilesError;
-
-      // Get roles for all profiles
-      const profileIds = profilesData?.map(p => p.id) || [];
+      // Busca lista otimizada (apenas colunas necessárias)
+      const profilesList = await profileService.getList();
+      const profileIds = profilesList.map(p => p.id);
       
+      // Busca roles separadamente
       let rolesMap = new Map<string, string[]>();
       
       if (profileIds.length > 0) {
@@ -62,31 +61,52 @@ export function useProfiles() {
         });
       }
 
-      // Map profiles with roles
-      const profilesWithRoles: UnifiedProfile[] = (profilesData || []).map(profile => ({
-        id: profile.id,
-        nome: profile.nome || '',
-        email: profile.email || '',
-        contact_phone: profile.contact_phone,
-        origem_cadastro: profile.origem_cadastro,
-        created_at: profile.created_at,
-        updated_at: profile.updated_at,
-        situacao: profile.situacao,
-        plano: profile.plano,
-        data_vencimento: profile.data_vencimento,
-        data_contratacao: profile.data_contratacao,
-        valor_pago: profile.valor_pago,
-        cliente_ativo: profile.cliente_ativo,
-        data_ultimo_pagamento: profile.data_ultimo_pagamento,
-        forma_ultimo_pagamento: profile.forma_ultimo_pagamento,
-        is_recorrente: profile.is_recorrente,
-        dispositivo_contratado: profile.dispositivo_contratado,
+      // Mapeia profiles com roles
+      const profilesWithRoles: UnifiedProfile[] = profilesList.map(profile => ({
+        ...profile,
         roles: rolesMap.get(profile.id) || ['client'],
       }));
 
       setProfiles(profilesWithRoles);
+      
+      // Busca stats da materialized view
+      const mvStats = await profileService.getStats();
+      
+      // Calcula stats adicionais a partir dos profiles carregados
+      const now = new Date();
+      const cincoProximos = new Date();
+      cincoProximos.setDate(now.getDate() + 5);
+
+      const porSituacao = profilesWithRoles.reduce((acc, p) => {
+        const situacao = p.situacao || 'Indefinido';
+        acc[situacao] = (acc[situacao] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const vencidos = profilesWithRoles.filter(p => {
+        if (!p.data_vencimento) return false;
+        return new Date(p.data_vencimento) < now;
+      }).length;
+
+      const vencendoProximos5Dias = profilesWithRoles.filter(p => {
+        if (!p.data_vencimento) return false;
+        const vencimento = new Date(p.data_vencimento);
+        return vencimento >= now && vencimento <= cincoProximos;
+      }).length;
+
+      setStats({
+        ...mvStats,
+        total: mvStats.total_users,
+        ativos: mvStats.active_users,
+        inativos: mvStats.expired_users,
+        vencendoProximos5Dias,
+        vencidos,
+        emTeste: mvStats.trial_users,
+        porSituacao,
+      });
+      
     } catch (e: any) {
-      console.error('Erro ao carregar profiles:', e);
+      console.error('[useProfiles] Error:', e);
       setError(e?.message || 'Erro ao carregar profiles');
       setProfiles([]);
     } finally {
@@ -99,39 +119,24 @@ export function useProfiles() {
   }, [fetchProfiles]);
 
   const updateProfile = useCallback(async (id: string, updates: Partial<UnifiedProfile>) => {
-    // Remove readonly fields
     const { roles, ...updateData } = updates;
+    const updated = await profileService.update(id, updateData);
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    if (data) {
-      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-      return data;
+    if (updated) {
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
     }
+    
+    return updated;
   }, []);
 
   const deleteProfile = useCallback(async (id: string) => {
-    // Delete roles first
-    await supabase.from('user_roles').delete().eq('user_id', id);
-    
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
-    if (error) throw error;
-    
+    await profileService.delete(id);
     setProfiles(prev => prev.filter(p => p.id !== id));
   }, []);
 
   const updateRole = useCallback(async (id: string, role: string) => {
-    // Delete existing roles
     await supabase.from('user_roles').delete().eq('user_id', id);
     
-    // Insert new role
     const { error } = await supabase
       .from('user_roles')
       .insert({ user_id: id, role: role as 'admin' | 'client' | 'master' });
@@ -142,54 +147,19 @@ export function useProfiles() {
   }, []);
 
   const getStats = useCallback(() => {
-    const total = profiles.length;
-    const now = new Date();
-    const cincoProximos = new Date();
-    cincoProximos.setDate(now.getDate() + 5);
-
-    const ativos = profiles.filter(p => {
-      if (!p.cliente_ativo || p.situacao !== 'Ativo') return false;
-      if (!p.data_vencimento) return true;
-      const vencimento = new Date(p.data_vencimento);
-      return vencimento >= now;
-    }).length;
-
-    const inativos = profiles.filter(p => 
-      p.cliente_ativo === false || p.situacao === 'Inativo'
-    ).length;
-
-    const vencendoProximos5Dias = profiles.filter(p => {
-      if (!p.data_vencimento) return false;
-      const vencimento = new Date(p.data_vencimento);
-      return vencimento >= now && vencimento <= cincoProximos;
-    }).length;
-
-    const vencidos = profiles.filter(p => {
-      if (!p.data_vencimento) return false;
-      const vencimento = new Date(p.data_vencimento);
-      return vencimento < now;
-    }).length;
-
-    const emTeste = profiles.filter(p => p.situacao === 'Testando').length;
-
-    const porSituacao = profiles.reduce((acc, p) => {
-      const situacao = p.situacao || 'Indefinido';
-      acc[situacao] = (acc[situacao] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return { 
-      total, 
-      ativos,
-      inativos,
-      vencendoProximos5Dias, 
-      vencidos,
-      emTeste,
-      porSituacao 
-    };
-  }, [profiles]);
-
-  const stats = useMemo(() => getStats(), [getStats]);
+    if (!stats) {
+      return {
+        total: profiles.length,
+        ativos: 0,
+        inativos: 0,
+        vencendoProximos5Dias: 0,
+        vencidos: 0,
+        emTeste: 0,
+        porSituacao: {},
+      };
+    }
+    return stats;
+  }, [stats, profiles.length]);
 
   return {
     profiles,
@@ -199,6 +169,6 @@ export function useProfiles() {
     updateProfile,
     deleteProfile,
     updateRole,
-    getStats: () => stats,
+    getStats,
   };
 }
