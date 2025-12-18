@@ -130,13 +130,13 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      addLog('info', `⏱️ Timeout configurado: 10 minutos`);
+      addLog('info', `⏱️ Timeout configurado: 30 minutos`);
       addLog('info', `🔄 Modo: Streaming (SSE)`);
 
       const timeoutId = setTimeout(() => {
-        addLog('error', '⏱️ Timeout atingido (10 min)');
+        addLog('error', '⏱️ Timeout atingido (30 min)');
         controller.abort();
-      }, 600000); // 10 min
+      }, 1800000); // 30 min
 
       // Use direct fetch with SSE for better progress tracking
       const fetchUrl = `${supabaseConfig.url}/functions/v1/fetch-m3u`;
@@ -263,10 +263,18 @@ export function IPTVChannelImport({ onSuccess }: IPTVChannelImportProps) {
     } catch (error) {
       stopTimer();
       
-      if (error instanceof Error && error.name === 'AbortError') {
-        addLog('warn', '⚠️ Importação cancelada pelo usuário/timeout');
-        return;
-      }
+       if (error instanceof Error && error.name === 'AbortError') {
+         const reason = 'Timeout/cancelamento da importação';
+         addLog('warn', `⚠️ ${reason}`);
+         setProgressState(prev => ({
+           ...prev,
+           status: 'error',
+           error: reason,
+           message: `Erro: ${reason}`,
+         }));
+         toast.error(reason);
+         return;
+       }
       
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       
