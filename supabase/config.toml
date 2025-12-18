@@ -502,3 +502,11 @@ verify_jwt = false
 # Fetch M3U from URL - enterprise import pipeline
 [functions.fetch-m3u]
 verify_jwt = false
+
+# ==========================================
+# CLOUD DIAGNOSTICS
+# ==========================================
+
+# Cloud diagnostics - queries external Supabase Cloud project
+[functions.cloud-diagnostics]
+verify_jwt = false
