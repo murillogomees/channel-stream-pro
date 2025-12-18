@@ -272,22 +272,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Safety timeout reduzido para 5s
+    let isMounted = true;
+    let authResolved = false;
+    
+    // Safety timeout aumentado para 12s (RPC pode demorar)
     const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn('[AuthContext] Safety timeout triggered after 5s');
+      if (loading && isMounted && !authResolved) {
+        console.warn('[AuthContext] Safety timeout triggered after 12s - forcing login redirect');
+        setUser(null);
+        setSession(null);
         setLoading(false);
       }
-    }, 5000);
+    }, 12000);
 
     // Listener de mudanças de autenticação - DEVE ser primeiro
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        if (!isMounted) return;
         
+        console.log('[AuthContext] Auth event:', event);
         
         // Usar setTimeout para evitar deadlock
         setTimeout(() => {
-          updateAuthState(currentSession);
+          if (isMounted) {
+            authResolved = true;
+            updateAuthState(currentSession);
+          }
         }, 0);
       }
     );
@@ -295,16 +305,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Verificar sessão inicial
     supabase.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
-        updateAuthState(currentSession);
+        if (isMounted) {
+          authResolved = true;
+          updateAuthState(currentSession);
+        }
       })
       .catch((error) => {
         console.error('[AuthContext] Error getting session:', error);
-        setUser(null);
-        setSession(null);
-        setLoading(false);
+        if (isMounted) {
+          setUser(null);
+          setSession(null);
+          setLoading(false);
+        }
       });
 
     return () => {
+      isMounted = false;
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
