@@ -579,22 +579,49 @@ serve(async (req: Request): Promise<Response> => {
     const reqType = isM3u8 ? 'M3U8' : isTs ? 'TS' : isMp4File ? 'MP4' : isKey ? 'KEY' : 'OTHER';
     console.log(`[Proxy] ${reqType}: ${decodedUrl.substring(0, 80)}`);
 
-    // Build upstream headers
+    // Build upstream headers - usando headers mais realistas
     const upstreamHeaders = new Headers();
-    upstreamHeaders.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
+    
+    // User-Agents rotativos para evitar detecção
+    const userAgents = [
+      'Lavf/60.3.100', // FFmpeg - muito usado por players IPTV
+      'IPTV Smarters Pro',
+      'TiviMate/4.7.0',
+      'VLC/3.0.18 LibVLC/3.0.18',
+      'Kodi/20.0 (Linux; Android 12; SHIELD Android TV Build/SQ3A.220705.003.A1)',
+      'ExoPlayerLib/2.18.1',
+      'GST-IPTV/1.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ];
+    
+    // Selecionar User-Agent baseado no hash da URL para consistência de sessão
+    const urlHash = decodedUrl.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
+    const selectedUA = userAgents[Math.abs(urlHash) % userAgents.length];
+    
+    upstreamHeaders.set('User-Agent', selectedUA);
     upstreamHeaders.set('Accept', '*/*');
+    upstreamHeaders.set('Accept-Language', 'pt-BR,pt;q=0.9,en;q=0.8');
+    upstreamHeaders.set('Accept-Encoding', 'identity'); // Evita compressão que pode causar problemas
     upstreamHeaders.set('Connection', 'keep-alive');
+    upstreamHeaders.set('Pragma', 'no-cache');
+    upstreamHeaders.set('Cache-Control', 'no-cache');
     
     try {
       const urlObj = new URL(decodedUrl);
       upstreamHeaders.set('Referer', `${urlObj.protocol}//${urlObj.host}/`);
       upstreamHeaders.set('Origin', `${urlObj.protocol}//${urlObj.host}`);
       upstreamHeaders.set('Host', urlObj.host);
+      
+      // Headers específicos para Xtream Codes
+      if (urlObj.pathname.includes('/hls/') || urlObj.pathname.includes('/live/')) {
+        upstreamHeaders.set('X-Forwarded-For', '127.0.0.1'); // Tenta bypass
+        upstreamHeaders.set('X-Real-IP', '127.0.0.1');
+      }
     } catch {
       // Ignore
     }
 
-    const headersToForward = ['range', 'cookie', 'if-none-match', 'if-modified-since'];
+    const headersToForward = ['range', 'cookie', 'if-none-match', 'if-modified-since', 'authorization'];
     headersToForward.forEach(header => {
       const value = req.headers.get(header);
       if (value) upstreamHeaders.set(header, value);
@@ -603,6 +630,12 @@ serve(async (req: Request): Promise<Response> => {
     const customReferer = req.headers.get('x-original-referer');
     if (customReferer) {
       upstreamHeaders.set('Referer', customReferer);
+    }
+    
+    // Passar cookie do cliente se existir
+    const clientCookie = req.headers.get('cookie');
+    if (clientCookie) {
+      upstreamHeaders.set('Cookie', clientCookie);
     }
 
     console.log(`[Proxy] Request: Host=${upstreamHeaders.get('Host')}, via_proxy=${!!proxyConfig}`);
@@ -626,8 +659,51 @@ serve(async (req: Request): Promise<Response> => {
       if (upstreamResponse.status === 403) {
         console.error(`[Proxy] ❌ 403 BLOCKED - URL: ${decodedUrl.substring(0, 60)}`);
         console.error(`[Proxy] Proxy used: ${proxyConfig ? 'YES' : 'NO'}`);
+        console.error(`[Proxy] User-Agent: ${upstreamHeaders.get('User-Agent')}`);
+        
+        // Se usou proxy e falhou, tenta conexão direta
         if (proxyConfig) {
-          console.error(`[Proxy] Even with residential proxy, provider blocked. May need different proxy region.`);
+          console.log(`[Proxy] Tentando fallback direto após 403 via proxy...`);
+          try {
+            const directResponse = await fetch(decodedUrl, {
+              headers: upstreamHeaders,
+              redirect: 'follow',
+            });
+            if (directResponse.ok || directResponse.status === 206) {
+              console.log(`[Proxy] ✅ Fallback direto funcionou!`);
+              // Continue with directResponse instead
+              const responseHeaders = new Headers(CORS_HEADERS);
+              let contentType = directResponse.headers.get('Content-Type') || 'application/octet-stream';
+              if (isM3u8) contentType = 'application/vnd.apple.mpegurl';
+              else if (isTs) contentType = 'video/mp2t';
+              else if (isMp4File) contentType = 'video/mp4';
+              responseHeaders.set('Content-Type', contentType);
+              responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+              
+              if (isM3u8) {
+                const manifestContent = await directResponse.text();
+                if (manifestContent && manifestContent.includes('#EXTM3U')) {
+                  const baseUrl = getBaseUrl(decodedUrl);
+                  const proxyBaseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/stream-proxy`;
+                  const rewrittenManifest = rewriteManifest(manifestContent, baseUrl, proxyBaseUrl);
+                  return new Response(rewrittenManifest, { status: 200, headers: responseHeaders });
+                }
+              }
+              
+              const passHeaders = ['Content-Length', 'Content-Range', 'Accept-Ranges'];
+              passHeaders.forEach(header => {
+                const value = directResponse.headers.get(header);
+                if (value) responseHeaders.set(header, value);
+              });
+              
+              return new Response(directResponse.body, { 
+                status: directResponse.status, 
+                headers: responseHeaders 
+              });
+            }
+          } catch (fallbackErr) {
+            console.error(`[Proxy] Fallback direto também falhou: ${fallbackErr}`);
+          }
         }
       }
       
@@ -636,10 +712,13 @@ serve(async (req: Request): Promise<Response> => {
           error: 'UPSTREAM_ERROR', 
           status: upstreamResponse.status,
           message: upstreamResponse.status === 403 
-            ? 'Servidor do provedor bloqueou acesso (403)' 
+            ? 'Servidor do provedor bloqueou acesso (403). O provedor pode ter restrição de IP ou token expirado.' 
             : 'Upstream error',
           debug: errorBody.substring(0, 100),
-          proxy_used: !!proxyConfig
+          proxy_used: !!proxyConfig,
+          suggestion: upstreamResponse.status === 403 
+            ? 'Tente recarregar a página ou reconectar a playlist IPTV'
+            : undefined
         }),
         { 
           status: upstreamResponse.status, 
