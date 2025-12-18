@@ -26,9 +26,8 @@ function getProjectRefFromUrl(url: string): string | null {
 const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQzODc1NDcsImV4cCI6MjA0OTk2MzU0N30.SZJPngG9T-AG8smX2_Tt-T7oZm0b2qMkE-hxPEWNabw";
 
-const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined) ??
-  (SUPABASE_URL ? getProjectRefFromUrl(SUPABASE_URL) : null) ??
-  "unknown";
+// Forçar projectRef para sdvyxdghxqmntyoweqbd
+const projectRef = 'sdvyxdghxqmntyoweqbd';
 
 export const supabase: SupabaseClient<Database> = createClient<Database>(
   SUPABASE_URL ?? "",
