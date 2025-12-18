@@ -7,11 +7,11 @@ const corsHeaders = {
 };
 
 // Source: Lovable Cloud
-const SOURCE_URL = "https://waxgowafohlrfoefwhsf.supabase.co";
-const SOURCE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";
+const SOURCE_URL = Deno.env.get('SUPABASE_URL') || "https://waxgowafohlrfoefwhsf.supabase.co";
+const SOURCE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";
 
-// Destination: User's Supabase Cloud
-const DEST_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
+// Destination: Same project (self-migration/cleanup)
+const DEST_URL = SOURCE_URL;
 const DEST_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 serve(async (req) => {

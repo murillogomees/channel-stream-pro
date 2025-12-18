@@ -702,7 +702,7 @@ export function PaymentVariablesAdmin() {
                   </p>
                   <Input 
                     type="text" 
-                    value={import.meta.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co'} 
+                    value={import.meta.env.VITE_SUPABASE_URL || '(não configurado)'} 
                     disabled 
                     className="font-mono text-xs"
                   />
