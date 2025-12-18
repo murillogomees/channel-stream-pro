@@ -40,7 +40,25 @@ serve(async (req) => {
       );
     }
 
-    const body: TMDBRequest = await req.json();
+    let body: TMDBRequest;
+    
+    // Support both GET with query params and POST with JSON body
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      body = {
+        action: (url.searchParams.get('action') as TMDBRequest['action']) || 'search',
+        type: (url.searchParams.get('type') as 'movie' | 'tv') || 'movie',
+        query: url.searchParams.get('query') || undefined,
+        id: url.searchParams.get('id') || undefined,
+        page: parseInt(url.searchParams.get('page') || '1'),
+        timeWindow: (url.searchParams.get('timeWindow') as 'day' | 'week') || 'week',
+        seasonNumber: url.searchParams.get('seasonNumber') ? parseInt(url.searchParams.get('seasonNumber')!) : undefined,
+        tmdbId: url.searchParams.get('tmdbId') || undefined,
+      };
+    } else {
+      body = await req.json();
+    }
+    
     let { action, type = 'movie', query, id, page = 1, timeWindow = 'week', seasonNumber, tmdbId, contentId } = body;
 
     // Legacy support: if tmdbId provided without action, assume season fetch
