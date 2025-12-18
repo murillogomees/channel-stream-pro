@@ -104,7 +104,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
 
       return available.sort((a, b) => a.name.localeCompare(b.name));
     },
-    staleTime: 30000, // 30s cache
+    staleTime: 0, // Always refetch when invalidated
     gcTime: 60000,
   });
 
@@ -153,7 +153,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         .map(([name, count]) => ({ name, channelCount: count }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },
-    staleTime: 30000,
+    staleTime: 0, // Always refetch when invalidated
     gcTime: 60000,
   });
 
@@ -271,8 +271,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     onSuccess: (count) => {
       if (count > 0) {
         toast.success(`Unificados ${count} canais de categorias existentes`);
-        refetchAvailable();
-        refetchPlaylist();
+        // Invalidate instead of refetch to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+        queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
         queryClient.invalidateQueries({ queryKey: ['iptv-playlists'] });
         onUpdate();
       }
@@ -354,8 +355,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     onSuccess: (count) => {
       toast.success(`${count} canais adicionados!`);
       setSelectedCategories([]);
-      refetchAvailable();
-      refetchPlaylist();
+      // Invalidate instead of refetch to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+      queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
       queryClient.invalidateQueries({ queryKey: ['playlist-channels'] });
       queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
       onUpdate();
@@ -403,8 +405,9 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     },
     onSuccess: (count) => {
       toast.success(`${count} canais removidos!`);
-      refetchAvailable();
-      refetchPlaylist();
+      // Invalidate instead of refetch to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+      queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
       queryClient.invalidateQueries({ queryKey: ['playlist-channels'] });
       queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
       onUpdate();
