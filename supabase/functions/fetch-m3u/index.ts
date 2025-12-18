@@ -28,6 +28,27 @@ interface ParsedChannel {
   group?: string;
 }
 
+function extractQuotedAttr(line: string, attr: string): string | undefined {
+  const needle = `${attr}="`;
+  const start = line.indexOf(needle);
+  if (start === -1) return undefined;
+  const from = start + needle.length;
+  const end = line.indexOf('"', from);
+  if (end === -1) return undefined;
+  return line.slice(from, end);
+}
+
+function parseExtInf(line: string): Partial<ParsedChannel> {
+  // Example: #EXTINF:-1 tvg-logo="..." group-title="...",Channel Name
+  const comma = line.lastIndexOf(',');
+  const name = (comma !== -1 ? line.slice(comma + 1) : '').trim() || 'Unknown';
+  return {
+    name,
+    logo: extractQuotedAttr(line, 'tvg-logo'),
+    group: extractQuotedAttr(line, 'group-title'),
+  };
+}
+
 // CPU yield function to prevent timeout
 const cpuYield = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -122,6 +143,22 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
 
         send({ type: 'start', total: 0, message: 'Iniciando importação...' });
 
+        let lastProgressAt = Date.now();
+        const sendProgress = (force = false) => {
+          const now = Date.now();
+          if (!force && now - lastProgressAt < 2000) return;
+          lastProgressAt = now;
+          send({
+            type: 'progress',
+            processed: totalParsed,
+            total: totalParsed,
+            progress: 0,
+            inserted,
+            skipped,
+            message: `Processando... ${totalParsed} canais`,
+          });
+        };
+
         try {
           while (true) {
             if (abortSignal.aborted) {
@@ -140,29 +177,25 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
 
             for (const line of lines) {
               lineCount++;
-              
+
               // CPU yield to prevent timeout
               if (lineCount % YIELD_INTERVAL === 0) {
                 await cpuYield();
               }
 
               const trimmed = line.trim();
-              
+
               if (trimmed.startsWith('#EXTINF:')) {
-                // Simple fast parsing
-                const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
-                const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
-                const nameMatch = trimmed.match(/,([^,]+)$/);
-                currentChannel = {
-                  logo: logoMatch?.[1],
-                  group: groupMatch?.[1],
-                  name: nameMatch?.[1]?.trim() || 'Unknown',
-                };
+                // Fast parse (avoid heavy regex)
+                currentChannel = parseExtInf(trimmed);
               } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
                 if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
                   currentChannel.url = trimmed;
                   batch.push(currentChannel as ParsedChannel);
                   totalParsed++;
+
+                  // Heartbeat progress even before DB flush
+                  sendProgress(false);
 
                   if (batch.length >= DB_BATCH_SIZE) {
                     const result = await insertBatchFast(supabase, batch);
@@ -173,15 +206,8 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
                     // Yield after DB operation
                     await cpuYield();
 
-                    send({ 
-                      type: 'progress', 
-                      processed: totalParsed, 
-                      total: totalParsed, 
-                      progress: 0,
-                      inserted, 
-                      skipped,
-                      message: `Processando... ${totalParsed} canais`
-                    });
+                    // Force a progress update after each DB flush
+                    sendProgress(true);
                   }
                 }
                 currentChannel = {};
@@ -261,14 +287,7 @@ async function processStreamingResponse(response: Response, stream: boolean, sup
       const trimmed = line.trim();
       
       if (trimmed.startsWith('#EXTINF:')) {
-        const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
-        const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
-        const nameMatch = trimmed.match(/,([^,]+)$/);
-        currentChannel = {
-          logo: logoMatch?.[1],
-          group: groupMatch?.[1],
-          name: nameMatch?.[1]?.trim() || 'Unknown',
-        };
+        currentChannel = parseExtInf(trimmed);
       } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
         if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
           currentChannel.url = trimmed;
@@ -340,14 +359,7 @@ async function processM3UContent(content: string, stream: boolean, supabase: any
           const trimmed = line.trim();
           
           if (trimmed.startsWith('#EXTINF:')) {
-            const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
-            const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
-            const nameMatch = trimmed.match(/,([^,]+)$/);
-            currentChannel = {
-              logo: logoMatch?.[1],
-              group: groupMatch?.[1],
-              name: nameMatch?.[1]?.trim() || 'Unknown',
-            };
+            currentChannel = parseExtInf(trimmed);
           } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
             if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
               currentChannel.url = trimmed;
@@ -414,14 +426,7 @@ async function processM3UContent(content: string, stream: boolean, supabase: any
     const trimmed = line.trim();
     
     if (trimmed.startsWith('#EXTINF:')) {
-      const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/i);
-      const groupMatch = trimmed.match(/group-title="([^"]+)"/i);
-      const nameMatch = trimmed.match(/,([^,]+)$/);
-      currentChannel = {
-        logo: logoMatch?.[1],
-        group: groupMatch?.[1],
-        name: nameMatch?.[1]?.trim() || 'Unknown',
-      };
+      currentChannel = parseExtInf(trimmed);
     } else if (trimmed && !trimmed.startsWith('#') && currentChannel.name) {
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         currentChannel.url = trimmed;
@@ -511,11 +516,19 @@ async function insertBatchFast(supabase: any, channels: ParsedChannel[]): Promis
 
 // ==================== UTILITIES ====================
 
+const RUN_SUFFIX = Date.now().toString(36);
+let SLUG_SEQ = 0;
+
 function generateSlug(name: string): string {
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).substring(2, 6);
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').substring(0, 50);
-  return `${base}-${ts}-${rand}`;
+  // Very fast slug generation: deterministic per-process suffix + sequence
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .substring(0, 50);
+
+  const seq = (SLUG_SEQ++).toString(36);
+  return `${base || 'ch'}-${RUN_SUFFIX}-${seq}`;
 }
 
 function detectContentType(url: string, group?: string): string {
