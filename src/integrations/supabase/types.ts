@@ -4541,6 +4541,49 @@ export type Database = {
         }
         Relationships: []
       }
+      user_favorites: {
+        Row: {
+          channel_id: number
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: number
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: number
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_favorites_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "iptv_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_favorites_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_favorites_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -4923,6 +4966,15 @@ export type Database = {
           active_days: number | null
           last_activity: string | null
           total_actions: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      mv_user_favorites_stats: {
+        Row: {
+          favorite_categories: string[] | null
+          total_favorites: number | null
+          unique_categories: number | null
           user_id: string | null
         }
         Relationships: []
