@@ -41,10 +41,10 @@ serve(async (req) => {
     const liveChannelIds = new Set((liveChannels || []).map(pc => pc.channel_id));
     console.log(`[AI Recommend] Total canais LIVE a excluir: ${liveChannelIds.size}`);
 
-    // Buscar canais healthy
+    // Buscar canais healthy COM dados de série
     const { data: allChannels, error: detailsError } = await supabase
       .from("iptv_channels")
-      .select("id, name, category, logo_url, content_type, is_series")
+      .select("id, name, category, logo_url, content_type, is_series, series_name, season_number, episode_number")
       .eq("is_healthy", true)
       .limit(3000);
 
@@ -54,8 +54,38 @@ serve(async (req) => {
     }
 
     // Filtrar EXCLUINDO canais da playlist live
-    const channels = (allChannels || []).filter(ch => !liveChannelIds.has(ch.id));
-    console.log(`[AI Recommend] Total canais após excluir live: ${channels.length}`);
+    const filteredChannels = (allChannels || []).filter(ch => !liveChannelIds.has(ch.id));
+    console.log(`[AI Recommend] Total canais após excluir live: ${filteredChannels.length}`);
+
+    // Agrupar séries pelo primeiro episódio
+    const seriesMap = new Map<string, typeof filteredChannels[0]>();
+    const nonSeriesItems: typeof filteredChannels = [];
+
+    for (const ch of filteredChannels) {
+      if (!ch.is_series || !ch.series_name) {
+        nonSeriesItems.push(ch);
+        continue;
+      }
+
+      const existing = seriesMap.get(ch.series_name);
+      
+      if (!existing) {
+        seriesMap.set(ch.series_name, { ...ch, name: ch.series_name });
+      } else {
+        const existingSeason = existing.season_number || 999;
+        const existingEpisode = existing.episode_number || 999;
+        const currentSeason = ch.season_number || 999;
+        const currentEpisode = ch.episode_number || 999;
+
+        if (currentSeason < existingSeason || 
+            (currentSeason === existingSeason && currentEpisode < existingEpisode)) {
+          seriesMap.set(ch.series_name, { ...ch, name: ch.series_name });
+        }
+      }
+    }
+
+    const channels = [...nonSeriesItems, ...seriesMap.values()];
+    console.log(`[AI Recommend] Total após agrupar séries: ${channels.length}`);
 
     // Criar lista de conteúdo disponível
     const availableContent = channels.map(ch => ({
