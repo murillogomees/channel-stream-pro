@@ -5,11 +5,10 @@
  */
 
 /**
- * SUPABASE CLOUD PROJECT: sdvyxdghxqmntyoweqbd
- * Hardcoded para garantir uso exclusivo do projeto correto
+ * LOVABLE CLOUD PROJECT
+ * Usa variáveis de ambiente fornecidas automaticamente pelo Lovable
  */
-export const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://waxgowafohlrfoefwhsf.supabase.co";
 export const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
-// Public publishable key for sdvyxdghxqmntyoweqbd
-export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw";

@@ -20,14 +20,13 @@ function getProjectRefFromUrl(url: string): string | null {
 }
 
 /**
- * SUPABASE CLOUD PROJECT: sdvyxdghxqmntyoweqbd
- * Este é o projeto padrão de produção - NÃO usar Lovable Cloud
+ * LOVABLE CLOUD PROJECT: waxgowafohlrfoefwhsf
+ * Projeto integrado com Lovable - Edge Functions deployam automaticamente
  */
-const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzMxNTAsImV4cCI6MjA3ODYwOTE1MH0.60t5M81zC_UI5qr3Pfjy0Pa2AKqglMQu7RLmE0K2iak";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Forçar projectRef para sdvyxdghxqmntyoweqbd
-const projectRef = 'sdvyxdghxqmntyoweqbd';
+const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'waxgowafohlrfoefwhsf';
 
 export const supabase: SupabaseClient<Database> = createClient<Database>(
   SUPABASE_URL ?? "",
