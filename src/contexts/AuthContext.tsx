@@ -67,16 +67,55 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
 
   try {
     // 1) Role PRIMEIRO (não pode depender do fetch de profile)
+    // Observação: timeout muito agressivo aqui pode "rebaixar" temporariamente (ex.: master → client).
     let role: AppRole = getRoleFallback() || 'client';
+
+    const resolveRoleViaRpc = async (): Promise<AppRole | null> => {
+      try {
+        const { data: isMaster } = await withTimeout(
+          supabase.rpc('has_role', { check_user_id: user.id, check_role: 'master' }),
+          5000
+        );
+        if (isMaster === true) return 'master';
+
+        const { data: isAdmin } = await withTimeout(
+          supabase.rpc('has_role', { check_user_id: user.id, check_role: 'admin' }),
+          5000
+        );
+        if (isAdmin === true) return 'admin';
+
+        const { data: isClient } = await withTimeout(
+          supabase.rpc('has_role', { check_user_id: user.id, check_role: 'client' }),
+          5000
+        );
+        if (isClient === true) return 'client';
+      } catch (e) {
+        console.warn('[AuthContext] has_role RPC fallback failed:', e);
+      }
+      return null;
+    };
+
     try {
       const { data: rolesData, error: rolesError } = await withTimeout(
         supabase.from('user_roles').select('role').eq('user_id', user.id),
-        2500
+        8000
       );
-      if (rolesError) console.warn('[AuthContext] user_roles fetch error:', rolesError);
-      role = pickRole((rolesData as Array<{ role: AppRole }> | null) ?? null);
+
+      if (rolesError) {
+        console.warn('[AuthContext] user_roles fetch error:', rolesError);
+        role = (await resolveRoleViaRpc()) || role;
+      } else {
+        const picked = pickRole((rolesData as Array<{ role: AppRole }> | null) ?? null);
+        // Se veio "client" só por fallback e existe role real no backend, tenta RPC.
+        if (picked === 'client' && (!rolesData || rolesData.length === 0)) {
+          role = (await resolveRoleViaRpc()) || picked;
+        } else {
+          role = picked;
+        }
+      }
     } catch (e) {
       console.warn('[AuthContext] user_roles fetch timeout/error:', e);
+      role = (await resolveRoleViaRpc()) || role;
     }
 
     // 2) Profile (melhor esforço)
