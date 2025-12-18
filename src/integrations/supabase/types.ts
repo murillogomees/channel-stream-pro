@@ -2306,6 +2306,13 @@ export type Database = {
             referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_cdn_cache_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_channel_metrics: {
@@ -2343,6 +2350,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_channel_metrics_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
             referencedColumns: ["id"]
           },
         ]
@@ -2456,6 +2470,13 @@ export type Database = {
             referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_channels_fallback_channel_id_fkey"
+            columns: ["fallback_channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_llhls_config: {
@@ -2508,6 +2529,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: true
             referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_llhls_config_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "mv_recent_content"
             referencedColumns: ["id"]
           },
         ]
@@ -2610,6 +2638,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "iptv_playlist_channels_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "iptv_playlist_channels_playlist_id_fkey"
             columns: ["playlist_id"]
             isOneToOne: false
@@ -2703,6 +2738,13 @@ export type Database = {
             referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_probe_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_routing_logs: {
@@ -2769,6 +2811,13 @@ export type Database = {
             referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "iptv_stream_fingerprints_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
         ]
       }
       iptv_stream_groups: {
@@ -2806,6 +2855,13 @@ export type Database = {
             columns: ["canonical_channel_id"]
             isOneToOne: false
             referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_stream_groups_canonical_channel_id_fkey"
+            columns: ["canonical_channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
             referencedColumns: ["id"]
           },
         ]
@@ -2857,6 +2913,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_stream_tokens_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
             referencedColumns: ["id"]
           },
         ]
@@ -2917,6 +2980,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "mv_hot_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iptv_transcode_jobs_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
             referencedColumns: ["id"]
           },
         ]
@@ -4650,6 +4720,13 @@ export type Database = {
             referencedRelation: "mv_hot_channels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_viewing_history_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "mv_recent_content"
+            referencedColumns: ["id"]
+          },
         ]
       }
       watch_progress: {
@@ -4737,6 +4814,19 @@ export type Database = {
         }
         Relationships: []
       }
+      mv_category_stats: {
+        Row: {
+          category: string | null
+          channel_count: number | null
+          first_added: string | null
+          healthy_count: number | null
+          last_updated: string | null
+          live_count: number | null
+          series_count: number | null
+          vod_count: number | null
+        }
+        Relationships: []
+      }
       mv_channel_health_summary: {
         Row: {
           avg_health_score: number | null
@@ -4745,6 +4835,15 @@ export type Database = {
           healthy_count: number | null
           series_count: number | null
           unhealthy_count: number | null
+        }
+        Relationships: []
+      }
+      mv_content_type_stats: {
+        Row: {
+          categories: string[] | null
+          category_count: number | null
+          content_type: string | null
+          total: number | null
         }
         Relationships: []
       }
@@ -4789,6 +4888,32 @@ export type Database = {
           rejected: number | null
           revenue: number | null
           total_payments: number | null
+        }
+        Relationships: []
+      }
+      mv_recent_content: {
+        Row: {
+          category: string | null
+          content_type: string | null
+          created_at: string | null
+          id: number | null
+          is_series: boolean | null
+          logo_url: string | null
+          name: string | null
+          series_name: string | null
+        }
+        Relationships: []
+      }
+      mv_series_catalog: {
+        Row: {
+          category: string | null
+          episode_count: number | null
+          first_episode_id: number | null
+          logo_url: string | null
+          max_episode: number | null
+          max_season: number | null
+          seasons: number[] | null
+          series_name: string | null
         }
         Relationships: []
       }
@@ -5134,6 +5259,7 @@ export type Database = {
         Returns: string
       }
       refresh_all_materialized_views: { Args: never; Returns: undefined }
+      refresh_browse_views: { Args: never; Returns: undefined }
       refresh_hot_data_views: { Args: never; Returns: undefined }
       revoke_token_family: {
         Args: { p_family_id: string; p_reason?: string }
