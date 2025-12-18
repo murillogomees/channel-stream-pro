@@ -43,55 +43,69 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['available-categories-for-playlist', playlist.id],
     queryFn: async () => {
-      // Buscar todos os vínculos de canais com playlists
-      const { data: playlistChannels, error: linkedError } = await supabase
+      // Get all distinct categories from iptv_channels using RPC or direct aggregation
+      // First, get categories already in this playlist
+      const { data: linkedCategories, error: linkedErr } = await supabase
         .from('iptv_playlist_channels')
-        .select('channel_id, playlist_id, channel:iptv_channels!inner(category)');
+        .select('channel:iptv_channels!inner(category)')
+        .eq('playlist_id', playlist.id)
+        .not('channel.category', 'is', null);
 
-      if (linkedError) throw linkedError;
+      if (linkedErr) throw linkedErr;
 
-      const linkedIdsAnyPlaylist = new Set<number>();
-      const existingCategoryNamesCurrent = new Set<string>();
+      const existingCats = new Set<string>();
+      for (const item of linkedCategories || []) {
+        const cat = (item.channel as any)?.category as string;
+        if (cat) existingCats.add(cat.toLowerCase().trim());
+      }
 
-      for (const item of playlistChannels || []) {
-        linkedIdsAnyPlaylist.add(item.channel_id as number);
-        const cat = (item as any).channel?.category as string | null;
-        if (!cat) continue;
+      // Get ALL distinct categories with counts using a more efficient approach
+      // Fetch in batches to bypass 1000 row limit
+      const allCategoryCounts = new Map<string, number>();
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-        if (item.playlist_id === playlist.id) {
-          // Categorias que já existem nesta playlist NÃO devem aparecer como disponíveis
-          existingCategoryNamesCurrent.add(cat.toLowerCase().trim());
+      while (hasMore) {
+        const { data: batch, error: batchErr } = await supabase
+          .from('iptv_channels')
+          .select('id, category')
+          .not('category', 'is', null)
+          .range(offset, offset + batchSize - 1)
+          .order('id', { ascending: true });
+
+        if (batchErr) throw batchErr;
+
+        if (!batch || batch.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const ch of batch) {
+          if (ch.category) {
+            allCategoryCounts.set(ch.category, (allCategoryCounts.get(ch.category) || 0) + 1);
+          }
+        }
+
+        if (batch.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
         }
       }
 
-      // Buscar todos os canais com categoria
-      const { data: allChannels, error: allError } = await supabase
-        .from('iptv_channels')
-        .select('id, category')
-        .not('category', 'is', null)
-        .order('category', { ascending: true });
-
-      if (allError) throw allError;
-
-      // Categorias disponíveis = canais que NÃO estão em NENHUMA playlist
-      // e cuja categoria ainda não existe nesta playlist
-      const counts = new Map<string, number>();
-      for (const ch of allChannels || []) {
-        if (!ch.category) continue;
-        if (linkedIdsAnyPlaylist.has(ch.id)) continue;
-
-        const catKey = ch.category.toLowerCase().trim();
-        if (existingCategoryNamesCurrent.has(catKey)) continue;
-
-        counts.set(ch.category, (counts.get(ch.category) || 0) + 1);
+      // Filter out categories already in playlist
+      const available: CategoryInfo[] = [];
+      for (const [name, count] of allCategoryCounts) {
+        if (!existingCats.has(name.toLowerCase().trim())) {
+          available.push({ name, channelCount: count });
+        }
       }
 
-      return Array.from(counts.entries())
-        .map(([name, count]) => ({ name, channelCount: count }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      return available.sort((a, b) => a.name.localeCompare(b.name));
     },
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 30000, // 30s cache
+    gcTime: 60000,
   });
 
   // 2) Categorias NESTA PLAYLIST: categorias dos canais vinculados a esta playlist
@@ -102,67 +116,116 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['playlist-categories', playlist.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('iptv_playlist_channels')
-        .select('channel:iptv_channels!inner(category)')
-        .eq('playlist_id', playlist.id)
-        .not('channel.category', 'is', null);
-
-      if (error) throw error;
-
+      // Fetch in batches to handle large playlists
       const counts = new Map<string, number>();
-      for (const item of data || []) {
-        const cat = (item.channel as any)?.category as string;
-        if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('iptv_playlist_channels')
+          .select('channel:iptv_channels!inner(category)')
+          .eq('playlist_id', playlist.id)
+          .not('channel.category', 'is', null)
+          .range(offset, offset + batchSize - 1);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const item of data) {
+          const cat = (item.channel as any)?.category as string;
+          if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
+        }
+
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
       }
 
       return Array.from(counts.entries())
         .map(([name, count]) => ({ name, channelCount: count }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 30000,
+    gcTime: 60000,
   });
 
   // 3) Auto-unificar: categorias disponíveis com mesmo nome de categorias já na playlist
   const autoLinkMutation = useMutation({
     mutationFn: async () => {
-      // 1. Buscar categorias que JÁ existem nesta playlist
-      const { data: playlistChannelsData } = await supabase
-        .from('iptv_playlist_channels')
-        .select('channel_id, channel:iptv_channels!inner(category)')
-        .eq('playlist_id', playlist.id);
-
-      if (!playlistChannelsData || playlistChannelsData.length === 0) return 0;
-
-      // Extrair categorias únicas já na playlist
+      // 1. Buscar categorias que JÁ existem nesta playlist (with pagination)
       const existingCategories = new Set<string>();
       const linkedIds = new Set<number>();
-      
-      for (const item of playlistChannelsData) {
-        linkedIds.add(item.channel_id);
-        const cat = (item.channel as any)?.category as string;
-        if (cat) existingCategories.add(cat.toLowerCase().trim());
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: playlistBatch } = await supabase
+          .from('iptv_playlist_channels')
+          .select('channel_id, channel:iptv_channels!inner(category)')
+          .eq('playlist_id', playlist.id)
+          .range(offset, offset + batchSize - 1);
+
+        if (!playlistBatch || playlistBatch.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const item of playlistBatch) {
+          linkedIds.add(item.channel_id);
+          const cat = (item.channel as any)?.category as string;
+          if (cat) existingCategories.add(cat.toLowerCase().trim());
+        }
+
+        if (playlistBatch.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
       }
 
       if (existingCategories.size === 0) return 0;
 
-      // 2. Buscar TODOS os canais que têm essas mesmas categorias mas não estão na playlist
-      const { data: allChannelsWithCategories } = await supabase
-        .from('iptv_channels')
-        .select('id, category')
-        .not('category', 'is', null);
+      // 2. Buscar TODOS os canais que têm essas mesmas categorias mas não estão na playlist (with pagination)
+      const newChannels: { id: number; category: string }[] = [];
+      offset = 0;
+      hasMore = true;
 
-      if (!allChannelsWithCategories) return 0;
+      while (hasMore) {
+        const { data: channelBatch } = await supabase
+          .from('iptv_channels')
+          .select('id, category')
+          .not('category', 'is', null)
+          .range(offset, offset + batchSize - 1)
+          .order('id', { ascending: true });
 
-      // Filtrar canais que:
-      // - Têm categoria que já existe na playlist
-      // - Ainda não estão vinculados a esta playlist
-      const newChannels = allChannelsWithCategories.filter(ch => {
-        if (!ch.category) return false;
-        if (linkedIds.has(ch.id)) return false;
-        return existingCategories.has(ch.category.toLowerCase().trim());
-      });
+        if (!channelBatch || channelBatch.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const ch of channelBatch) {
+          if (!ch.category) continue;
+          if (linkedIds.has(ch.id)) continue;
+          if (existingCategories.has(ch.category.toLowerCase().trim())) {
+            newChannels.push({ id: ch.id, category: ch.category });
+          }
+        }
+
+        if (channelBatch.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
+      }
 
       if (newChannels.length === 0) return 0;
 
