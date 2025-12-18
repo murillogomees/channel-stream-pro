@@ -43,24 +43,40 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
   } = useQuery({
     queryKey: ['available-categories-for-playlist', playlist.id],
     queryFn: async () => {
-      // Get all distinct categories from iptv_channels using RPC or direct aggregation
-      // First, get categories already in this playlist
-      const { data: linkedCategories, error: linkedErr } = await supabase
-        .from('iptv_playlist_channels')
-        .select('channel:iptv_channels!inner(category)')
-        .eq('playlist_id', playlist.id)
-        .not('channel.category', 'is', null);
+      // 1) Categorias já vinculadas a QUALQUER playlist (global)
+      // Obs: a lista de "disponíveis" deve mostrar apenas categorias que ainda não foram usadas em nenhuma playlist.
+      const linkedCats = new Set<string>();
+      let linkedOffset = 0;
+      const linkedBatchSize = 1000;
+      let linkedHasMore = true;
 
-      if (linkedErr) throw linkedErr;
+      while (linkedHasMore) {
+        const { data: linkedBatch, error: linkedErr } = await supabase
+          .from('iptv_playlist_channels')
+          .select('channel:iptv_channels!inner(category)')
+          .not('channel.category', 'is', null)
+          .range(linkedOffset, linkedOffset + linkedBatchSize - 1);
 
-      const existingCats = new Set<string>();
-      for (const item of linkedCategories || []) {
-        const cat = (item.channel as any)?.category as string;
-        if (cat) existingCats.add(cat.toLowerCase().trim());
+        if (linkedErr) throw linkedErr;
+
+        if (!linkedBatch || linkedBatch.length === 0) {
+          linkedHasMore = false;
+          break;
+        }
+
+        for (const item of linkedBatch) {
+          const cat = (item.channel as any)?.category as string;
+          if (cat) linkedCats.add(cat.toLowerCase().trim());
+        }
+
+        if (linkedBatch.length < linkedBatchSize) {
+          linkedHasMore = false;
+        } else {
+          linkedOffset += linkedBatchSize;
+        }
       }
 
-      // Get ALL distinct categories with counts using a more efficient approach
-      // Fetch in batches to bypass 1000 row limit
+      // 2) Buscar TODAS as categorias com contagem (varrendo iptv_channels em batches)
       const allCategoryCounts = new Map<string, number>();
       let offset = 0;
       const batchSize = 1000;
@@ -94,10 +110,10 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
         }
       }
 
-      // Filter out categories already in playlist
+      // 3) Retornar apenas categorias que ainda não estão em nenhuma playlist
       const available: CategoryInfo[] = [];
       for (const [name, count] of allCategoryCounts) {
-        if (!existingCats.has(name.toLowerCase().trim())) {
+        if (!linkedCats.has(name.toLowerCase().trim())) {
           available.push({ name, channelCount: count });
         }
       }
@@ -272,7 +288,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       if (count > 0) {
         toast.success(`Unificados ${count} canais de categorias existentes`);
         // Invalidate instead of refetch to ensure fresh data
-        queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+        queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist'] });
         queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
         queryClient.invalidateQueries({ queryKey: ['iptv-playlists'] });
         onUpdate();
@@ -356,7 +372,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
       toast.success(`${count} canais adicionados!`);
       setSelectedCategories([]);
       // Invalidate instead of refetch to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist'] });
       queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
       queryClient.invalidateQueries({ queryKey: ['playlist-channels'] });
       queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
@@ -406,7 +422,7 @@ export function IPTVPlaylistCategories({ playlist, onUpdate }: IPTVPlaylistCateg
     onSuccess: (count) => {
       toast.success(`${count} canais removidos!`);
       // Invalidate instead of refetch to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist', playlist.id] });
+      queryClient.invalidateQueries({ queryKey: ['available-categories-for-playlist'] });
       queryClient.invalidateQueries({ queryKey: ['playlist-categories', playlist.id] });
       queryClient.invalidateQueries({ queryKey: ['playlist-channels'] });
       queryClient.invalidateQueries({ queryKey: ['iptv-stats'] });
