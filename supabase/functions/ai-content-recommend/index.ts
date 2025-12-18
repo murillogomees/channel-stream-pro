@@ -23,38 +23,86 @@ serve(async (req) => {
 
     const { favorites = [], recentlyWatched = [] } = await req.json();
 
-    // Buscar filmes e séries disponíveis (apenas vod e séries, sem live)
-    const { data: movies } = await supabase
+    console.log("[AI Recommend] Buscando playlists permitidas (movie, series)...");
+
+    // Buscar IDs das playlists permitidas (movie e series, excluindo live)
+    const { data: allowedPlaylists, error: playlistError } = await supabase
+      .from("iptv_playlists")
+      .select("id, slug")
+      .in("slug", ["movie", "series"]);
+
+    if (playlistError) {
+      console.error("[AI Recommend] Erro ao buscar playlists:", playlistError);
+      throw playlistError;
+    }
+
+    if (!allowedPlaylists || allowedPlaylists.length === 0) {
+      console.log("[AI Recommend] Nenhuma playlist movie/series encontrada");
+      return new Response(JSON.stringify({ groups: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const moviePlaylistId = allowedPlaylists.find(p => p.slug === "movie")?.id;
+    const seriesPlaylistId = allowedPlaylists.find(p => p.slug === "series")?.id;
+
+    console.log(`[AI Recommend] Playlists: movie=${moviePlaylistId}, series=${seriesPlaylistId}`);
+
+    // Buscar IDs dos canais das playlists movie e series
+    const playlistIds = allowedPlaylists.map(p => p.id);
+    
+    const { data: playlistChannels, error: channelsError } = await supabase
+      .from("iptv_playlist_channels")
+      .select("channel_id, playlist_id")
+      .in("playlist_id", playlistIds)
+      .limit(2000);
+
+    if (channelsError) {
+      console.error("[AI Recommend] Erro ao buscar canais das playlists:", channelsError);
+      throw channelsError;
+    }
+
+    if (!playlistChannels || playlistChannels.length === 0) {
+      console.log("[AI Recommend] Nenhum canal encontrado nas playlists");
+      return new Response(JSON.stringify({ groups: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const channelIds = [...new Set(playlistChannels.map(pc => pc.channel_id))];
+    const movieChannelIds = new Set(playlistChannels.filter(pc => pc.playlist_id === moviePlaylistId).map(pc => pc.channel_id));
+    const seriesChannelIds = new Set(playlistChannels.filter(pc => pc.playlist_id === seriesPlaylistId).map(pc => pc.channel_id));
+
+    console.log(`[AI Recommend] Total canais: ${channelIds.length}, Filmes: ${movieChannelIds.size}, Séries: ${seriesChannelIds.size}`);
+
+    // Buscar detalhes dos canais
+    const { data: channels, error: detailsError } = await supabase
       .from("iptv_channels")
-      .select("id, name, category, logo_url, content_type")
-      .eq("is_healthy", true)
-      .eq("content_type", "vod")
-      .limit(100);
+      .select("id, name, category, logo_url")
+      .in("id", channelIds.slice(0, 500))
+      .eq("is_healthy", true);
 
-    const { data: series } = await supabase
-      .from("mv_series_catalog")
-      .select("series_name, category, episode_count, logo_url, first_episode_id")
-      .order("episode_count", { ascending: false })
-      .limit(50);
+    if (detailsError) {
+      console.error("[AI Recommend] Erro ao buscar detalhes dos canais:", detailsError);
+      throw detailsError;
+    }
 
-    // Criar lista de conteúdo disponível
-    const availableContent = [
-      ...(movies || []).map(m => ({
-        id: m.id,
-        name: m.name,
-        category: m.category,
-        type: "movie",
-        logo_url: m.logo_url,
-      })),
-      ...(series || []).map(s => ({
-        id: s.first_episode_id,
-        name: s.series_name,
-        category: s.category,
-        type: "series",
-        episode_count: s.episode_count,
-        logo_url: s.logo_url,
-      })),
-    ];
+    // Criar lista de conteúdo disponível com tipo baseado na playlist
+    const availableContent = (channels || []).map(ch => ({
+      id: ch.id,
+      name: ch.name,
+      category: ch.category,
+      type: seriesChannelIds.has(ch.id) ? "series" : "movie",
+      logo_url: ch.logo_url,
+    }));
+
+    console.log(`[AI Recommend] Conteúdo disponível para IA: ${availableContent.length} itens`);
+
+    if (availableContent.length === 0) {
+      return new Response(JSON.stringify({ groups: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Usar IA para recomendar conteúdo
     const systemPrompt = `Você é um assistente de recomendação de filmes e séries. 
@@ -166,6 +214,8 @@ IMPORTANTE: Retorne APENAS um JSON com os IDs no formato: {"recommended_ids": [1
           is_series: item.type === "series",
         })),
       }));
+
+    console.log(`[AI Recommend] Retornando ${groups.length} grupos com recomendações`);
 
     return new Response(JSON.stringify({ groups }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

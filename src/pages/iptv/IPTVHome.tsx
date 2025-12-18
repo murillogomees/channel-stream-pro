@@ -35,57 +35,47 @@ export default function IPTVHome() {
   // Fallback: categorias aleatórias (apenas filmes/séries)
   const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
 
-  // Fetch channels by content type (vod/series only - live hidden)
+  // Fetch channels by playlist (movie/series only - live hidden)
   const { data: contentTypeChannels, isLoading: loadingContentType } = useQuery({
-    queryKey: ['iptv-content-type', activeTab],
+    queryKey: ['iptv-content-by-playlist', activeTab],
     queryFn: async () => {
       if (activeTab === 'all' || activeTab === 'favorites') return null;
 
-      // Para séries, buscar da view materializada
-      if (activeTab === 'series') {
-        const { data } = await supabase
-          .from('mv_series_catalog')
-          .select('*')
-          .order('episode_count', { ascending: false })
-          .limit(100);
+      // Buscar a playlist correspondente
+      const playlistSlug = activeTab === 'series' ? 'series' : 'movie';
+      
+      const { data: playlist } = await supabase
+        .from('iptv_playlists')
+        .select('id')
+        .eq('slug', playlistSlug)
+        .single();
 
-        if (!data) return [];
+      if (!playlist) return [];
 
-        // Agrupar por categoria
-        const groups: Record<string, any[]> = {};
-        for (const series of data) {
-          const cat = series.category || 'Séries';
-          if (!groups[cat]) groups[cat] = [];
-          groups[cat].push({
-            id: series.first_episode_id,
-            name: series.series_name,
-            logo_url: series.logo_url,
-            category: series.category,
-            is_series: true,
-            episode_count: series.episode_count,
-            max_season: series.max_season,
-          });
-        }
+      // Buscar IDs dos canais da playlist
+      const { data: playlistChannels } = await supabase
+        .from('iptv_playlist_channels')
+        .select('channel_id')
+        .eq('playlist_id', playlist.id)
+        .limit(500);
 
-        return Object.entries(groups)
-          .slice(0, 6)
-          .map(([name, channels]) => ({ name, channels: channels.slice(0, 20) }));
-      }
+      if (!playlistChannels || playlistChannels.length === 0) return [];
 
-      // Para vod (filmes), buscar canais diretamente
-      const { data } = await supabase
+      const channelIds = playlistChannels.map(pc => pc.channel_id);
+
+      // Buscar detalhes dos canais
+      const { data: channels } = await supabase
         .from('iptv_channels')
         .select('id, name, logo_url, category, content_type, is_series')
-        .eq('is_healthy', true)
-        .eq('content_type', 'vod')
-        .limit(200);
+        .in('id', channelIds)
+        .eq('is_healthy', true);
 
-      if (!data) return [];
+      if (!channels) return [];
 
       // Agrupar por categoria
       const groups: Record<string, IPTVChannel[]> = {};
-      for (const ch of data) {
-        const cat = ch.category || 'Sem Categoria';
+      for (const ch of channels) {
+        const cat = ch.category || (activeTab === 'series' ? 'Séries' : 'Filmes');
         if (!groups[cat]) groups[cat] = [];
         if (groups[cat].length < 20) {
           groups[cat].push(ch as unknown as IPTVChannel);
@@ -94,7 +84,7 @@ export default function IPTVHome() {
 
       return Object.entries(groups)
         .slice(0, 6)
-        .map(([name, channels]) => ({ name, channels }));
+        .map(([name, chs]) => ({ name, channels: chs }));
     },
     staleTime: 2 * 60 * 1000,
     enabled: activeTab !== 'all' && activeTab !== 'favorites',
