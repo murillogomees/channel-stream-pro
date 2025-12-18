@@ -1,7 +1,6 @@
 -- =====================================================
 -- COMPLETE MIGRATION ORDER
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- =====================================================
 
 -- STEP 1: CLEANUP (execute in order)

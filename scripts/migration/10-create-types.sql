@@ -1,8 +1,8 @@
 -- =====================================================
 -- SCRIPT 10: CREATE ALL TYPES
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- Execute BEFORE creating tables
+-- =====================================================
 -- =====================================================
 
 -- Create app_role enum type

@@ -1,7 +1,6 @@
 -- =====================================================
 -- SCRIPT 14: CREATE ALL RLS POLICIES
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- =====================================================
 
 -- Enable RLS on all tables

@@ -1,10 +1,10 @@
-# Migração Supabase Cloud - Documentação Final
+# Supabase Cloud - Documentação de Produção
 
 ## Status: ✅ COMPLETO
 
-**Data:** 2025-12-13
-**Projeto:** waxgowafohlrfoefwhsf
-**URL:** https://waxgowafohlrfoefwhsf.supabase.co
+**Data:** 2025-12-18
+**Projeto:** sdvyxdghxqmntyoweqbd
+**URL:** https://sdvyxdghxqmntyoweqbd.supabase.co
 
 ---
 
@@ -31,22 +31,12 @@
 ### Tabelas Principais:
 - `profiles` - Dados do usuário
 - `user_roles` - Permissões (client/admin/master)
-- `iptv_channels` - 22,974 canais
+- `iptv_channels` - Canais IPTV
 - `subscription_plans` - Planos de assinatura
 
 ---
 
 ## 3. EDGE FUNCTIONS
-
-### Funções Removidas (self-hosted):
-- `custom-auth` - Substituída por GoTrue
-- `coolify-api` - Não necessário
-- `coolify-secrets` - Não necessário
-- `remote-command` - Não necessário
-- `ssh-command` - Não necessário
-- `main` (router) - Não necessário para Cloud
-- `deploy-webhook` - Auto-deploy do Lovable
-- Funções diagnóstico GoTrue - Não necessário
 
 ### Funções Ativas (75+):
 - `iptv-play` - Streaming autenticado
@@ -72,12 +62,6 @@
 | CLOUDFLARE_* | ✅ Stream |
 | TMDB_API_KEY | ✅ |
 
-### Secrets Obsoletos (podem ser removidos):
-- `SELFHOSTED_DB_URL`
-- `SELFHOSTED_SERVICE_ROLE_KEY`
-- `VPS_SSH_*`
-- `COOLIFY_API_TOKEN`
-
 ---
 
 ## 5. ARQUITETURA FINAL
@@ -85,7 +69,7 @@
 ```
 Frontend (React/Vite)
     ↓
-Supabase Cloud (waxgowafohlrfoefwhsf)
+Supabase Cloud (sdvyxdghxqmntyoweqbd)
     ├── Auth (GoTrue)
     ├── Database (PostgreSQL)
     ├── Edge Functions
@@ -102,14 +86,14 @@ Supabase Cloud (waxgowafohlrfoefwhsf)
 - [x] Edge Functions deployadas
 - [x] Secrets configurados
 - [x] Frontend apontando para Cloud
-- [x] Referências self-hosted removidas do código principal
+- [x] Todas as referências atualizadas para sdvyxdghxqmntyoweqbd
 
 ---
 
-## 7. PRÓXIMOS PASSOS RECOMENDADOS
+## 7. VARIÁVEIS DE AMBIENTE
 
-1. **Remover secrets obsoletos** via Lovable Settings
-2. **Testar login/signup** em produção
-3. **Verificar pagamentos** MercadoPago
-4. **Testar notificações** WhatsApp
-5. **Monitorar logs** de Edge Functions
+```env
+VITE_SUPABASE_URL=https://sdvyxdghxqmntyoweqbd.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_PROJECT_ID=sdvyxdghxqmntyoweqbd
+```

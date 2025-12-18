@@ -1,7 +1,6 @@
 -- =====================================================
 -- SCRIPT 13: CREATE ALL INDEXES
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- =====================================================
 
 -- Performance indexes
