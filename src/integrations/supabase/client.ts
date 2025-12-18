@@ -19,16 +19,12 @@ function getProjectRefFromUrl(url: string): string | null {
   }
 }
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  // Fail fast with a clear error so we don't get silent "Failed to fetch" later.
-  // eslint-disable-next-line no-console
-  console.error(
-    "[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Check backend connection/env vars."
-  );
-}
+/**
+ * SUPABASE CLOUD PROJECT: sdvyxdghxqmntyoweqbd
+ * Este é o projeto padrão de produção - NÃO usar Lovable Cloud
+ */
+const SUPABASE_URL = "https://sdvyxdghxqmntyoweqbd.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQzODc1NDcsImV4cCI6MjA0OTk2MzU0N30.SZJPngG9T-AG8smX2_Tt-T7oZm0b2qMkE-hxPEWNabw";
 
 const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined) ??
   (SUPABASE_URL ? getProjectRefFromUrl(SUPABASE_URL) : null) ??
