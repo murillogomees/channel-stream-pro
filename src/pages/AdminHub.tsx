@@ -8,6 +8,9 @@ const db = supabase as unknown as {
     select: (columns: string, options?: { count?: string; head?: boolean }) => {
       eq: (column: string, value: unknown) => Promise<{ data: unknown[] | null; count: number | null; error: Error | null }>;
       single: () => Promise<{ data: unknown | null; error: Error | null }>;
+      limit: (n: number) => {
+        single: () => Promise<{ data: unknown | null; error: Error | null }>;
+      };
     } & Promise<{ data: unknown[] | null; count: number | null; error: Error | null }>;
     update: (data: Record<string, unknown>) => {
       eq: (column: string, value: unknown) => Promise<{ error: Error | null }>;
@@ -73,22 +76,25 @@ export default function AdminHub() {
 
   const fetchStats = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-
-      // Usar helper db para evitar erro de tipo infinito
-      type ProfileRow = { situacao: string | null; data_vencimento: string | null };
+      // Usar materialized view para stats de usuários (muito mais eficiente)
+      type MvStats = { total_users: number; active_users: number; trial_users: number; expiring_soon: number };
       
-      const profilesResult = await db.from('profiles').select('situacao, data_vencimento');
+      const { data: mvStatsRaw } = await db
+        .from('mv_dashboard_summary')
+        .select('total_users,active_users,trial_users,expiring_soon')
+        .limit(1)
+        .single();
+      
+      const mvStats = mvStatsRaw as MvStats | null;
+
       const channelsResult = await db.from('iptv_channels').select('id', { count: 'exact', head: true });
       const securityResult = await db.from('security_events').select('id', { count: 'exact', head: true }).eq('resolved', false);
 
-      const profiles = (profilesResult.data || []) as ProfileRow[];
-      
       setStats({
-        totalClientes: profiles.length,
-        clientesAtivos: profiles.filter(c => c.situacao === 'Ativo').length,
-        clientesTestando: profiles.filter(c => c.situacao === 'Testando').length,
-        vencendoHoje: profiles.filter(c => c.data_vencimento?.startsWith(today)).length,
+        totalClientes: mvStats?.total_users || 0,
+        clientesAtivos: mvStats?.active_users || 0,
+        clientesTestando: mvStats?.trial_users || 0,
+        vencendoHoje: mvStats?.expiring_soon || 0,
         m3uLists: channelsResult.count || 0,
         securityEvents: securityResult.count || 0,
       });

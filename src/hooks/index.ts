@@ -2,6 +2,11 @@
  * Hooks Export - Cleaned after M3U/Streaming removal
  */
 
+// Profiles (Fase 2 - Otimizado para produção)
+export { useProfiles } from './useProfiles';
+export type { UnifiedProfile } from './useProfiles';
+export { useProfileStats } from './useProfileStats';
+
 // Feature Flags
 export { 
   useFeatureFlags, 
