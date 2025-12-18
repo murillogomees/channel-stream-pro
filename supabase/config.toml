@@ -510,3 +510,11 @@ verify_jwt = false
 # Cloud diagnostics - queries external Supabase Cloud project
 [functions.cloud-diagnostics]
 verify_jwt = false
+
+# ==========================================
+# MAINTENANCE
+# ==========================================
+
+# Refresh materialized views - cron/admin access
+[functions.refresh-views]
+verify_jwt = false
