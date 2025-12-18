@@ -1,36 +1,25 @@
 /**
  * IPTV Home - Netflix-style IPTV browsing experience
- * - Aba "Todos": 4 fileiras aleatórias
- * - Aba "Ao Vivo": playlist slug "live"
- * - Aba "Filmes": playlist slug "movies"
- * - Aba "Séries": playlist slug "series"
- * - Aba "Favoritos": localStorage favorites
+ * OTIMIZADO: Usa views materializadas para 55k+ canais
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { iptvService, IPTVChannel, ChannelGroup } from '@/services/iptvService';
-import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star, Filter, X } from 'lucide-react';
+import { useRandomCategoryGroups, useCategoryStats, useSeriesCatalog } from '@/hooks/useIPTVOptimized';
+import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TVContentRow } from '@/components/iptv/TVContentRow';
 import { TVHeroSection } from '@/components/iptv/TVHeroSection';
 import { TVSearchOverlay } from '@/components/iptv/TVSearchOverlay';
 import { TVContentCard } from '@/components/iptv/TVContentCard';
-import { NetflixContentGrid } from '@/components/iptv/NetflixContentGrid';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toast } from 'sonner';
 
 type TabType = 'all' | 'live' | 'vod' | 'series' | 'favorites';
-
-// Playlist slug mapping
-const PLAYLIST_SLUGS: Record<string, string> = {
-  live: 'live',
-  vod: 'movies',
-  series: 'series',
-};
 
 export default function IPTVHome() {
   const navigate = useNavigate();
@@ -39,90 +28,73 @@ export default function IPTVHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useLocalStorage<string[]>('iptv-favorites', []);
 
-  // Fetch random channels for "Todos" tab (4 groups with random selection)
-  const { data: randomGroups, isLoading: loadingRandom } = useQuery({
-    queryKey: ['iptv-random-groups'],
+  // OTIMIZADO: Usa view materializada para categorias aleatórias
+  const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
+
+  // Fetch channels by content type (live/vod) - otimizado com índices parciais
+  const { data: contentTypeChannels, isLoading: loadingContentType } = useQuery({
+    queryKey: ['iptv-content-type', activeTab],
     queryFn: async () => {
-      // Get all categories
-      const { data: categories } = await supabase
-        .from('iptv_channels')
-        .select('category')
-        .not('category', 'is', null)
-        .eq('is_healthy', true);
+      if (activeTab === 'all' || activeTab === 'favorites') return null;
 
-      const uniqueCategories = [...new Set(categories?.map(c => c.category) || [])];
+      const contentType = activeTab === 'live' ? 'live' : activeTab === 'vod' ? 'vod' : null;
       
-      // Shuffle and take 4 random categories
-      const shuffled = uniqueCategories.sort(() => Math.random() - 0.5);
-      const selectedCats = shuffled.slice(0, 4);
-
-      // Fetch channels for each category (limit 20 each, randomized)
-      const groups: ChannelGroup[] = [];
-      for (const cat of selectedCats) {
-        const { data: channels } = await supabase
-          .from('iptv_channels')
+      // Para séries, buscar da view materializada
+      if (activeTab === 'series') {
+        const { data } = await supabase
+          .from('mv_series_catalog')
           .select('*')
-          .eq('category', cat)
-          .eq('is_healthy', true)
-          .limit(50);
+          .order('episode_count', { ascending: false })
+          .limit(100);
 
-        if (channels && channels.length > 0) {
-          // Shuffle and take max 20
-          const shuffledChannels = channels.sort(() => Math.random() - 0.5).slice(0, 20);
-          groups.push({
-            name: cat || 'Sem Categoria',
-            channels: shuffledChannels as IPTVChannel[],
+        if (!data) return [];
+
+        // Agrupar por categoria
+        const groups: Record<string, any[]> = {};
+        for (const series of data) {
+          const cat = series.category || 'Séries';
+          if (!groups[cat]) groups[cat] = [];
+          groups[cat].push({
+            id: series.first_episode_id,
+            name: series.series_name,
+            logo_url: series.logo_url,
+            category: series.category,
+            is_series: true,
+            episode_count: series.episode_count,
+            max_season: series.max_season,
           });
+        }
+
+        return Object.entries(groups)
+          .slice(0, 6)
+          .map(([name, channels]) => ({ name, channels: channels.slice(0, 20) }));
+      }
+
+      // Para live/vod, buscar canais diretamente com índice otimizado
+      const { data } = await supabase
+        .from('iptv_channels')
+        .select('id, name, logo_url, category, content_type, is_series')
+        .eq('is_healthy', true)
+        .eq('content_type', contentType)
+        .limit(200);
+
+      if (!data) return [];
+
+      // Agrupar por categoria
+      const groups: Record<string, IPTVChannel[]> = {};
+      for (const ch of data) {
+        const cat = ch.category || 'Sem Categoria';
+        if (!groups[cat]) groups[cat] = [];
+        if (groups[cat].length < 20) {
+          groups[cat].push(ch as unknown as IPTVChannel);
         }
       }
 
-      return groups;
+      return Object.entries(groups)
+        .slice(0, 6)
+        .map(([name, channels]) => ({ name, channels }));
     },
-    staleTime: 30 * 1000, // 30 seconds (so it refreshes more often for variety)
-    enabled: activeTab === 'all',
-  });
-
-  // Fetch playlist channels by slug for other tabs
-  const { data: playlistChannels, isLoading: loadingPlaylist } = useQuery({
-    queryKey: ['iptv-playlist-by-slug', activeTab],
-    queryFn: async () => {
-      const slug = PLAYLIST_SLUGS[activeTab];
-      if (!slug) return null;
-
-      // Find playlist by slug
-      const { data: playlist } = await supabase
-        .from('iptv_playlists')
-        .select('id, name')
-        .eq('slug', slug)
-        .single();
-
-      if (!playlist) return null;
-
-      // Get channels from playlist
-      const { data: channels } = await supabase
-        .from('iptv_playlist_channels')
-        .select(`
-          position,
-          channel:iptv_channels(*)
-        `)
-        .eq('playlist_id', playlist.id)
-        .order('position');
-
-      if (!channels) return null;
-
-      // Group by category
-      const groups: Record<string, IPTVChannel[]> = {};
-      for (const item of channels) {
-        const ch = item.channel as any as IPTVChannel;
-        if (!ch) continue;
-        const cat = ch.category || 'Sem Categoria';
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(ch);
-      }
-
-      return Object.entries(groups).map(([name, chs]) => ({ name, channels: chs }));
-    },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     enabled: activeTab !== 'all' && activeTab !== 'favorites',
   });
 
@@ -168,8 +140,8 @@ export default function IPTVHome() {
       return [{ name: 'Meus Favoritos', channels: allChannelsForFavorites }];
     }
 
-    return playlistChannels || [];
-  }, [activeTab, randomGroups, playlistChannels, allChannelsForFavorites]);
+    return contentTypeChannels || [];
+  }, [activeTab, randomGroups, contentTypeChannels, allChannelsForFavorites]);
 
   // Hero featured items
   const heroItems = useMemo(() => {
@@ -206,7 +178,7 @@ export default function IPTVHome() {
   }, [favorites]);
 
   const isLoading = (activeTab === 'all' && loadingRandom) || 
-                    (activeTab !== 'all' && activeTab !== 'favorites' && loadingPlaylist);
+                    (activeTab !== 'all' && activeTab !== 'favorites' && loadingContentType);
 
   if (isLoading) {
     return (
@@ -304,7 +276,7 @@ export default function IPTVHome() {
                 ? 'Adicione canais aos favoritos para vê-los aqui'
                 : activeTab === 'all' 
                   ? 'Importe canais M3U para começar'
-                  : `Crie uma playlist com slug "${PLAYLIST_SLUGS[activeTab] || activeTab}" para exibir conteúdo aqui`}
+                  : `Selecione uma categoria para ver o conteúdo`}
             </p>
           </div>
         ) : (
