@@ -35,13 +35,28 @@ export default function IPTVHome() {
   // Fallback: categorias aleatórias (apenas filmes/séries)
   const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
 
-  // Fetch channels by playlist (movie/series only - live hidden)
+  // Fetch channels by playlist (movie/series only - live excluded)
   const { data: contentTypeChannels, isLoading: loadingContentType } = useQuery({
-    queryKey: ['iptv-content-by-playlist', activeTab],
+    queryKey: ['iptv-content-exclude-live', activeTab],
     queryFn: async () => {
       if (activeTab === 'all' || activeTab === 'favorites') return null;
 
-      // Buscar a playlist correspondente
+      // Buscar ID da playlist "live" para EXCLUIR
+      const { data: livePlaylist } = await supabase
+        .from('iptv_playlists')
+        .select('id')
+        .eq('slug', 'live')
+        .single();
+
+      // Buscar TODOS os IDs dos canais da playlist "live"
+      const { data: liveChannels } = await supabase
+        .from('iptv_playlist_channels')
+        .select('channel_id')
+        .eq('playlist_id', livePlaylist?.id || 0);
+
+      const liveChannelIds = new Set((liveChannels || []).map(pc => pc.channel_id));
+
+      // Buscar a playlist correspondente (movie ou series)
       const playlistSlug = activeTab === 'series' ? 'series' : 'movie';
       
       const { data: playlist } = await supabase
@@ -52,16 +67,21 @@ export default function IPTVHome() {
 
       if (!playlist) return [];
 
-      // Buscar IDs dos canais da playlist
+      // Buscar IDs dos canais da playlist específica
       const { data: playlistChannels } = await supabase
         .from('iptv_playlist_channels')
         .select('channel_id')
         .eq('playlist_id', playlist.id)
-        .limit(500);
+        .limit(1000);
 
       if (!playlistChannels || playlistChannels.length === 0) return [];
 
-      const channelIds = playlistChannels.map(pc => pc.channel_id);
+      // Filtrar excluindo canais que também estão na playlist live
+      const channelIds = playlistChannels
+        .map(pc => pc.channel_id)
+        .filter(id => !liveChannelIds.has(id));
+
+      if (channelIds.length === 0) return [];
 
       // Buscar detalhes dos canais
       const { data: channels } = await supabase

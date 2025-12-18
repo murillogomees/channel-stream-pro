@@ -23,76 +23,46 @@ serve(async (req) => {
 
     const { favorites = [], recentlyWatched = [] } = await req.json();
 
-    console.log("[AI Recommend] Buscando playlists permitidas (movie, series)...");
+    console.log("[AI Recommend] Buscando playlist 'live' para EXCLUIR...");
 
-    // Buscar IDs das playlists permitidas (movie e series, excluindo live)
-    const { data: allowedPlaylists, error: playlistError } = await supabase
+    // Buscar ID da playlist "live" para EXCLUIR seus canais
+    const { data: livePlaylist } = await supabase
       .from("iptv_playlists")
-      .select("id, slug")
-      .in("slug", ["movie", "series"]);
+      .select("id")
+      .eq("slug", "live")
+      .single();
 
-    if (playlistError) {
-      console.error("[AI Recommend] Erro ao buscar playlists:", playlistError);
-      throw playlistError;
-    }
-
-    if (!allowedPlaylists || allowedPlaylists.length === 0) {
-      console.log("[AI Recommend] Nenhuma playlist movie/series encontrada");
-      return new Response(JSON.stringify({ groups: [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const moviePlaylistId = allowedPlaylists.find(p => p.slug === "movie")?.id;
-    const seriesPlaylistId = allowedPlaylists.find(p => p.slug === "series")?.id;
-
-    console.log(`[AI Recommend] Playlists: movie=${moviePlaylistId}, series=${seriesPlaylistId}`);
-
-    // Buscar IDs dos canais das playlists movie e series
-    const playlistIds = allowedPlaylists.map(p => p.id);
-    
-    const { data: playlistChannels, error: channelsError } = await supabase
+    // Buscar TODOS os IDs dos canais da playlist "live"
+    const { data: liveChannels } = await supabase
       .from("iptv_playlist_channels")
-      .select("channel_id, playlist_id")
-      .in("playlist_id", playlistIds)
-      .limit(2000);
+      .select("channel_id")
+      .eq("playlist_id", livePlaylist?.id || 0);
 
-    if (channelsError) {
-      console.error("[AI Recommend] Erro ao buscar canais das playlists:", channelsError);
-      throw channelsError;
-    }
+    const liveChannelIds = new Set((liveChannels || []).map(pc => pc.channel_id));
+    console.log(`[AI Recommend] Total canais LIVE a excluir: ${liveChannelIds.size}`);
 
-    if (!playlistChannels || playlistChannels.length === 0) {
-      console.log("[AI Recommend] Nenhum canal encontrado nas playlists");
-      return new Response(JSON.stringify({ groups: [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const channelIds = [...new Set(playlistChannels.map(pc => pc.channel_id))];
-    const movieChannelIds = new Set(playlistChannels.filter(pc => pc.playlist_id === moviePlaylistId).map(pc => pc.channel_id));
-    const seriesChannelIds = new Set(playlistChannels.filter(pc => pc.playlist_id === seriesPlaylistId).map(pc => pc.channel_id));
-
-    console.log(`[AI Recommend] Total canais: ${channelIds.length}, Filmes: ${movieChannelIds.size}, Séries: ${seriesChannelIds.size}`);
-
-    // Buscar detalhes dos canais
-    const { data: channels, error: detailsError } = await supabase
+    // Buscar canais healthy
+    const { data: allChannels, error: detailsError } = await supabase
       .from("iptv_channels")
-      .select("id, name, category, logo_url")
-      .in("id", channelIds.slice(0, 500))
-      .eq("is_healthy", true);
+      .select("id, name, category, logo_url, content_type, is_series")
+      .eq("is_healthy", true)
+      .limit(3000);
 
     if (detailsError) {
-      console.error("[AI Recommend] Erro ao buscar detalhes dos canais:", detailsError);
+      console.error("[AI Recommend] Erro ao buscar canais:", detailsError);
       throw detailsError;
     }
 
-    // Criar lista de conteúdo disponível com tipo baseado na playlist
-    const availableContent = (channels || []).map(ch => ({
+    // Filtrar EXCLUINDO canais da playlist live
+    const channels = (allChannels || []).filter(ch => !liveChannelIds.has(ch.id));
+    console.log(`[AI Recommend] Total canais após excluir live: ${channels.length}`);
+
+    // Criar lista de conteúdo disponível
+    const availableContent = channels.map(ch => ({
       id: ch.id,
       name: ch.name,
       category: ch.category,
-      type: seriesChannelIds.has(ch.id) ? "series" : "movie",
+      type: ch.is_series ? "series" : "movie",
       logo_url: ch.logo_url,
     }));
 
