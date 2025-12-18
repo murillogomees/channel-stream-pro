@@ -3621,45 +3621,126 @@ export type Database = {
         Row: {
           app_name: string
           background_color: string | null
+          categories: Json | null
           created_at: string | null
           description: string | null
           display: string | null
+          display_mode: string | null
           icon_192: string | null
           icon_512: string | null
+          icon_maskable: string | null
           id: string
+          install_banner_delay_seconds: number | null
+          install_banner_enabled: boolean | null
+          install_banner_message: string | null
+          install_banner_style: string | null
+          language: string | null
           orientation: string | null
+          prefer_related_applications: boolean | null
+          push_enabled: boolean | null
+          push_server_endpoint: string | null
+          push_vapid_private_key: string | null
+          push_vapid_public_key: string | null
+          scope: string | null
           screenshots: Json | null
           short_name: string | null
+          start_url: string | null
+          sw_api_strategy: string | null
+          sw_app_shell_precache: boolean | null
+          sw_auto_update: boolean | null
+          sw_cache_expiration_days: number | null
+          sw_clients_claim: boolean | null
+          sw_enabled: boolean | null
+          sw_images_strategy: string | null
+          sw_js_css_strategy: string | null
+          sw_max_cache_items: number | null
+          sw_offline_page_url: string | null
+          sw_show_update_popup: boolean | null
+          sw_skip_waiting: boolean | null
           theme_color: string | null
           updated_at: string | null
         }
         Insert: {
           app_name?: string
           background_color?: string | null
+          categories?: Json | null
           created_at?: string | null
           description?: string | null
           display?: string | null
+          display_mode?: string | null
           icon_192?: string | null
           icon_512?: string | null
+          icon_maskable?: string | null
           id?: string
+          install_banner_delay_seconds?: number | null
+          install_banner_enabled?: boolean | null
+          install_banner_message?: string | null
+          install_banner_style?: string | null
+          language?: string | null
           orientation?: string | null
+          prefer_related_applications?: boolean | null
+          push_enabled?: boolean | null
+          push_server_endpoint?: string | null
+          push_vapid_private_key?: string | null
+          push_vapid_public_key?: string | null
+          scope?: string | null
           screenshots?: Json | null
           short_name?: string | null
+          start_url?: string | null
+          sw_api_strategy?: string | null
+          sw_app_shell_precache?: boolean | null
+          sw_auto_update?: boolean | null
+          sw_cache_expiration_days?: number | null
+          sw_clients_claim?: boolean | null
+          sw_enabled?: boolean | null
+          sw_images_strategy?: string | null
+          sw_js_css_strategy?: string | null
+          sw_max_cache_items?: number | null
+          sw_offline_page_url?: string | null
+          sw_show_update_popup?: boolean | null
+          sw_skip_waiting?: boolean | null
           theme_color?: string | null
           updated_at?: string | null
         }
         Update: {
           app_name?: string
           background_color?: string | null
+          categories?: Json | null
           created_at?: string | null
           description?: string | null
           display?: string | null
+          display_mode?: string | null
           icon_192?: string | null
           icon_512?: string | null
+          icon_maskable?: string | null
           id?: string
+          install_banner_delay_seconds?: number | null
+          install_banner_enabled?: boolean | null
+          install_banner_message?: string | null
+          install_banner_style?: string | null
+          language?: string | null
           orientation?: string | null
+          prefer_related_applications?: boolean | null
+          push_enabled?: boolean | null
+          push_server_endpoint?: string | null
+          push_vapid_private_key?: string | null
+          push_vapid_public_key?: string | null
+          scope?: string | null
           screenshots?: Json | null
           short_name?: string | null
+          start_url?: string | null
+          sw_api_strategy?: string | null
+          sw_app_shell_precache?: boolean | null
+          sw_auto_update?: boolean | null
+          sw_cache_expiration_days?: number | null
+          sw_clients_claim?: boolean | null
+          sw_enabled?: boolean | null
+          sw_images_strategy?: string | null
+          sw_js_css_strategy?: string | null
+          sw_max_cache_items?: number | null
+          sw_offline_page_url?: string | null
+          sw_show_update_popup?: boolean | null
+          sw_skip_waiting?: boolean | null
           theme_color?: string | null
           updated_at?: string | null
         }
