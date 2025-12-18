@@ -1,17 +1,16 @@
 import { cn } from '@/lib/utils';
-import { Tv, Film, Clapperboard, Heart, Home, Search, Settings } from 'lucide-react';
+import { Film, Clapperboard, Heart, Home, Search, Settings, Tv } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface TVNavRailProps {
-  activeTab: 'home' | 'live' | 'movies' | 'series' | 'favorites';
-  onTabChange: (tab: 'home' | 'live' | 'movies' | 'series' | 'favorites') => void;
+  activeTab: 'home' | 'movies' | 'series' | 'favorites';
+  onTabChange: (tab: 'home' | 'movies' | 'series' | 'favorites') => void;
   onSearch?: () => void;
   onSettings?: () => void;
 }
 
 const navItems = [
   { id: 'home', label: 'Início', icon: Home },
-  { id: 'live', label: 'TV ao Vivo', icon: Tv },
   { id: 'movies', label: 'Filmes', icon: Film },
   { id: 'series', label: 'Séries', icon: Clapperboard },
   { id: 'favorites', label: 'Favoritos', icon: Heart },

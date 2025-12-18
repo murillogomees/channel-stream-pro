@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { iptvService, IPTVChannel, ChannelGroup } from '@/services/iptvService';
 import { useRandomCategoryGroups, useCategoryStats, useSeriesCatalog } from '@/hooks/useIPTVOptimized';
-import { Loader2, Search, Heart, Tv, Film, Radio, Grid3X3, Star } from 'lucide-react';
+import { Loader2, Search, Heart, Film, Radio, Grid3X3, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TVContentRow } from '@/components/iptv/TVContentRow';
@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { toast } from 'sonner';
 
-type TabType = 'all' | 'live' | 'vod' | 'series' | 'favorites';
+type TabType = 'all' | 'vod' | 'series' | 'favorites';
 
 export default function IPTVHome() {
   const navigate = useNavigate();
@@ -31,14 +31,12 @@ export default function IPTVHome() {
   // OTIMIZADO: Usa view materializada para categorias aleatórias
   const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
 
-  // Fetch channels by content type (live/vod) - otimizado com índices parciais
+  // Fetch channels by content type (vod/series only - live hidden)
   const { data: contentTypeChannels, isLoading: loadingContentType } = useQuery({
     queryKey: ['iptv-content-type', activeTab],
     queryFn: async () => {
       if (activeTab === 'all' || activeTab === 'favorites') return null;
 
-      const contentType = activeTab === 'live' ? 'live' : activeTab === 'vod' ? 'vod' : null;
-      
       // Para séries, buscar da view materializada
       if (activeTab === 'series') {
         const { data } = await supabase
@@ -70,12 +68,12 @@ export default function IPTVHome() {
           .map(([name, channels]) => ({ name, channels: channels.slice(0, 20) }));
       }
 
-      // Para live/vod, buscar canais diretamente com índice otimizado
+      // Para vod (filmes), buscar canais diretamente
       const { data } = await supabase
         .from('iptv_channels')
         .select('id, name, logo_url, category, content_type, is_series')
         .eq('is_healthy', true)
-        .eq('content_type', contentType)
+        .eq('content_type', 'vod')
         .limit(200);
 
       if (!data) return [];
@@ -212,20 +210,13 @@ export default function IPTVHome() {
             onValueChange={(v) => setActiveTab(v as TabType)}
             className="flex-1"
           >
-            <TabsList className="w-full h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 bg-muted/30 rounded-none grid grid-cols-5 p-0">
+            <TabsList className="w-full h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 bg-muted/30 rounded-none grid grid-cols-4 p-0">
               <TabsTrigger 
                 value="all" 
                 className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
               >
                 <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
                 <span className="truncate">Todos</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="live" 
-                className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
-              >
-                <Tv className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
-                <span className="truncate">Ao Vivo</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="vod" 
