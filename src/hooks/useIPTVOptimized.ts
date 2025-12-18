@@ -161,55 +161,63 @@ export function useChannelsByCategory(category: string, limit = 20) {
 
 /**
  * Hook para buscar categorias aleatórias com canais (otimizado)
- * FILTRADO: Apenas filmes (vod) e séries, sem conteúdo live
+ * FILTRADO: Apenas canais das playlists "movie" e "series", excluindo "live"
  */
 export function useRandomCategoryGroups(count = 4) {
-  const { data: categories } = useCategoryStats();
-
   return useQuery({
-    queryKey: ['random-category-groups', count, categories?.length],
+    queryKey: ['random-category-groups-by-playlist', count],
     queryFn: async () => {
-      if (!categories || categories.length === 0) return [];
+      // Buscar IDs das playlists permitidas (movie e series)
+      const { data: allowedPlaylists } = await supabase
+        .from('iptv_playlists')
+        .select('id')
+        .in('slug', ['movie', 'series']);
 
-      // Filtrar categorias que tenham filmes ou séries (não apenas live)
-      const filteredCategories = categories.filter(
-        cat => (cat.vod_count > 0 || cat.series_count > 0)
-      );
+      if (!allowedPlaylists || allowedPlaylists.length === 0) return [];
 
-      if (filteredCategories.length === 0) return [];
+      const allowedPlaylistIds = allowedPlaylists.map(p => p.id);
 
-      // Shuffle and pick random categories
-      const shuffled = [...filteredCategories].sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, count);
+      // Buscar canais das playlists permitidas
+      const { data: playlistChannels } = await supabase
+        .from('iptv_playlist_channels')
+        .select('channel_id')
+        .in('playlist_id', allowedPlaylistIds)
+        .limit(5000);
 
-      // Fetch channels for each category in parallel (apenas vod e séries)
-      const groups = await Promise.all(
-        selected.map(async (cat) => {
-          const { data: channels } = await supabase
-            .from('iptv_channels')
-            .select('id, name, logo_url, category, content_type, is_series')
-            .eq('category', cat.category)
-            .eq('is_healthy', true)
-            .in('content_type', ['vod', 'series'])
-            .limit(50);
+      if (!playlistChannels || playlistChannels.length === 0) return [];
 
-          if (!channels || channels.length === 0) return null;
+      const allowedChannelIds = playlistChannels.map(pc => pc.channel_id);
 
-          // Shuffle and take max 20
-          const shuffledChannels = channels.sort(() => Math.random() - 0.5).slice(0, 20);
+      // Buscar canais com suas categorias
+      const { data: channels } = await supabase
+        .from('iptv_channels')
+        .select('id, name, logo_url, category, content_type, is_series')
+        .in('id', allowedChannelIds.slice(0, 1000)) // Limitar para performance
+        .eq('is_healthy', true);
 
-          return {
-            name: cat.category,
-            channels: shuffledChannels,
-            totalCount: cat.vod_count + cat.series_count,
-          };
-        })
-      );
+      if (!channels || channels.length === 0) return [];
 
-      return groups.filter(Boolean);
+      // Agrupar por categoria
+      const categoryGroups: Record<string, typeof channels> = {};
+      for (const ch of channels) {
+        const cat = ch.category || 'Conteúdo';
+        if (!categoryGroups[cat]) categoryGroups[cat] = [];
+        categoryGroups[cat].push(ch);
+      }
+
+      // Filtrar categorias com pelo menos 5 canais e shuffle
+      const validCategories = Object.entries(categoryGroups)
+        .filter(([_, chs]) => chs.length >= 5)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, count);
+
+      return validCategories.map(([name, chs]) => ({
+        name,
+        channels: chs.sort(() => Math.random() - 0.5).slice(0, 20),
+        totalCount: chs.length,
+      }));
     },
-    staleTime: 30 * 1000, // 30 seconds for variety
-    enabled: !!categories && categories.length > 0,
+    staleTime: 30 * 1000,
   });
 }
 
