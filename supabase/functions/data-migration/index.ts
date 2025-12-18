@@ -5,10 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Source: Supabase Cloud
-const SOURCE_URL = Deno.env.get('SUPABASE_URL') || "https://sdvyxdghxqmntyoweqbd.supabase.co";
-const SOURCE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwMjQ5MDIsImV4cCI6MjA0OTYwMDkwMn0.lPPcpvBUK4pN2JYrNqFmLtgvKuT3bPNCjpfVkR7NS8Y";
+// Lovable Cloud Project - uses environment variables
+const SOURCE_URL = Deno.env.get('SUPABASE_URL')!;
+const SOURCE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 // Destination: Same project (self-migration/cleanup)
 const DEST_URL = SOURCE_URL;

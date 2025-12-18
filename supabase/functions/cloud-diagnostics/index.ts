@@ -7,11 +7,11 @@ const corsHeaders = {
 };
 
 /**
- * PROJETO SUPABASE CLOUD: sdvyxdghxqmntyoweqbd
- * NÃO USAR Lovable Cloud (waxgowafohlrfoefwhsf)
+ * LOVABLE CLOUD PROJECT: waxgowafohlrfoefwhsf
+ * Uses environment variables provided automatically
  */
-const SUPABASE_CLOUD_URL = 'https://sdvyxdghxqmntyoweqbd.supabase.co';
-const SUPABASE_CLOUD_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzAzMzE1MCwiZXhwIjoyMDc4NjA5MTUwfQ.yQsFGWOzmuJ9JWGszylUEtqbTJvkLyICuslz_qBD1Tg';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,15 +19,15 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(SUPABASE_CLOUD_URL, SUPABASE_CLOUD_SERVICE_KEY, {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false }
     });
 
     const diagnostics: Record<string, any> = {
       project: {
-        url: SUPABASE_CLOUD_URL,
-        projectRef: 'sdvyxdghxqmntyoweqbd',
-        source: 'HARDCODED - Supabase Cloud'
+        url: SUPABASE_URL,
+        projectRef: 'waxgowafohlrfoefwhsf',
+        source: 'Environment Variables - Lovable Cloud'
       },
       timestamp: new Date().toISOString()
     };
