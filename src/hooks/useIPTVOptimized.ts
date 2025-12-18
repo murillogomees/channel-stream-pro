@@ -161,45 +161,44 @@ export function useChannelsByCategory(category: string, limit = 20) {
 
 /**
  * Hook para buscar categorias aleatórias com canais (otimizado)
- * FILTRADO: Apenas canais das playlists "movie" e "series", excluindo "live"
+ * FILTRADO: Exclui todos os canais da playlist "live"
  */
 export function useRandomCategoryGroups(count = 4) {
   return useQuery({
-    queryKey: ['random-category-groups-by-playlist', count],
+    queryKey: ['random-category-groups-exclude-live', count],
     queryFn: async () => {
-      // Buscar IDs das playlists permitidas (movie e series)
-      const { data: allowedPlaylists } = await supabase
+      // Buscar ID da playlist "live" para EXCLUIR
+      const { data: livePlaylist } = await supabase
         .from('iptv_playlists')
         .select('id')
-        .in('slug', ['movie', 'series']);
+        .eq('slug', 'live')
+        .single();
 
-      if (!allowedPlaylists || allowedPlaylists.length === 0) return [];
+      if (!livePlaylist) return [];
 
-      const allowedPlaylistIds = allowedPlaylists.map(p => p.id);
-
-      // Buscar canais das playlists permitidas
-      const { data: playlistChannels } = await supabase
+      // Buscar TODOS os IDs dos canais da playlist "live"
+      const { data: liveChannels } = await supabase
         .from('iptv_playlist_channels')
         .select('channel_id')
-        .in('playlist_id', allowedPlaylistIds)
-        .limit(5000);
+        .eq('playlist_id', livePlaylist.id);
 
-      if (!playlistChannels || playlistChannels.length === 0) return [];
+      const liveChannelIds = new Set((liveChannels || []).map(pc => pc.channel_id));
 
-      const allowedChannelIds = playlistChannels.map(pc => pc.channel_id);
-
-      // Buscar canais com suas categorias
+      // Buscar canais healthy, excluindo os da playlist live
       const { data: channels } = await supabase
         .from('iptv_channels')
         .select('id, name, logo_url, category, content_type, is_series')
-        .in('id', allowedChannelIds.slice(0, 1000)) // Limitar para performance
-        .eq('is_healthy', true);
+        .eq('is_healthy', true)
+        .limit(2000);
 
       if (!channels || channels.length === 0) return [];
 
+      // Filtrar excluindo canais da playlist live
+      const filteredChannels = channels.filter(ch => !liveChannelIds.has(ch.id));
+
       // Agrupar por categoria
-      const categoryGroups: Record<string, typeof channels> = {};
-      for (const ch of channels) {
+      const categoryGroups: Record<string, typeof filteredChannels> = {};
+      for (const ch of filteredChannels) {
         const cat = ch.category || 'Conteúdo';
         if (!categoryGroups[cat]) categoryGroups[cat] = [];
         categoryGroups[cat].push(ch);
