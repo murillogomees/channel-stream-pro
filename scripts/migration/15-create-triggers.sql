@@ -1,7 +1,6 @@
 -- =====================================================
 -- SCRIPT 15: CREATE AUTH TRIGGER
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- =====================================================
 
 -- Trigger for new user registration

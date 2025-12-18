@@ -26,8 +26,8 @@ import { SharedArray } from 'k6/data';
 // - ENABLE_SPIKE_TEST: Enable spike test scenario (default: true)
 // - ENVIRONMENT: Test environment name (default: staging)
 
-const BASE_URL = __ENV.SUPABASE_URL || 'https://waxgowafohlrfoefwhsf.supabase.co';
-const ANON_KEY = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw';
+const BASE_URL = __ENV.SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co';
+const ANON_KEY = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwMjQ5MDIsImV4cCI6MjA0OTYwMDkwMn0.lPPcpvBUK4pN2JYrNqFmLtgvKuT3bPNCjpfVkR7NS8Y';
 const EDGE_FUNCTIONS_URL = `${BASE_URL}/functions/v1`;
 
 // Configurable test parameters

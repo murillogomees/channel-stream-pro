@@ -25,7 +25,7 @@
     "policies": 95
   },
   "infrastructure": {
-    "supabase_project": "waxgowafohlrfoefwhsf",
+    "supabase_project": "sdvyxdghxqmntyoweqbd",
     "cdn": "cloudflare",
     "storage": "r2",
     "monitoring": ["sentry", "web_vitals"]

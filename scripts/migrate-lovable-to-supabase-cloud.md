@@ -1,20 +1,20 @@
-# Migração Lovable Cloud → Supabase Cloud
+# Migração para Supabase Cloud (sdvyxdghxqmntyoweqbd)
 
-## Dados do Projeto
+## Dados do Projeto de Produção
 
-| Origem (Lovable Cloud) | Destino (Supabase Cloud) |
-|------------------------|--------------------------|
-| `waxgowafohlrfoefwhsf` | `sdvyxdghxqmntyoweqbd` |
+| Projeto Supabase Cloud |
+|------------------------|
+| `sdvyxdghxqmntyoweqbd` |
 
 ---
 
-## 1. EXPORTAR BANCO DE DADOS (Origem)
+## 1. EXPORTAR BANCO DE DADOS (Backup)
 
 ### Via Terminal (pg_dump)
 
 ```bash
-# Exportar do Lovable Cloud
-pg_dump "postgresql://postgres.waxgowafohlrfoefwhsf:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres" \
+# Exportar do Supabase Cloud
+pg_dump "postgresql://postgres.sdvyxdghxqmntyoweqbd:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres" \
   --no-owner \
   --no-privileges \
   --schema=public \
@@ -30,11 +30,11 @@ pg_dump "postgresql://postgres.waxgowafohlrfoefwhsf:[PASSWORD]@aws-0-us-west-1.p
   --exclude-schema=pgsodium \
   --exclude-schema=net \
   -Fc \
-  -f lovable_cloud_backup.dump
+  -f supabase_cloud_backup.dump
 ```
 
 ### Via Supabase Dashboard (Alternativa)
-1. Acesse: https://supabase.com/dashboard/project/waxgowafohlrfoefwhsf/settings/database
+1. Acesse: https://supabase.com/dashboard/project/sdvyxdghxqmntyoweqbd/settings/database
 2. Em "Database Backups" → Download o backup mais recente
 
 ---

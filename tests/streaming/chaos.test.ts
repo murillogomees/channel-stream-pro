@@ -10,8 +10,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://waxgowafohlrfoefwhsf.supabase.co';
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndheGdvd2Fmb2hscmZvZWZ3aHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzAzMDMsImV4cCI6MjA4MDg0NjMwM30.dgqou7A6mcKc5hmn7aV15FDhkEf0uA3hiYp8v_T2MBw';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdnl4ZGdoeHFtbnR5b3dlcWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwMjQ5MDIsImV4cCI6MjA0OTYwMDkwMn0.lPPcpvBUK4pN2JYrNqFmLtgvKuT3bPNCjpfVkR7NS8Y';
 const EDGE_ROUTER_URL = process.env.EDGE_ROUTER_URL || 'https://stream-edge-router.workers.dev';
 
 describe('Chaos Tests - Fallback Mechanisms', () => {

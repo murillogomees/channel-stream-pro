@@ -1,7 +1,6 @@
 -- =====================================================
 -- SCRIPT 11: CREATE ALL FUNCTIONS
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- Execute BEFORE creating tables (some functions are needed for defaults)
 -- =====================================================
 

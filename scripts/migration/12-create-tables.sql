@@ -1,7 +1,6 @@
 -- =====================================================
 -- SCRIPT 12: CREATE ALL TABLES
--- Source: Lovable Cloud (waxgowafohlrfoefwhsf)
--- Target: Supabase Cloud (sdvyxdghxqmntyoweqbd)
+-- Supabase Cloud Project: sdvyxdghxqmntyoweqbd
 -- Execute AFTER types and functions
 -- =====================================================
 
