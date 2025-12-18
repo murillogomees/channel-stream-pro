@@ -10,9 +10,8 @@ export function preloadCriticalAssets() {
   // This function can be used for dynamic preloading if needed
   
   // Preconnect to external resources that will be needed
-  const connections = [
-    import.meta.env.VITE_SUPABASE_URL || 'https://sdvyxdghxqmntyoweqbd.supabase.co'
-  ];
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const connections = supabaseUrl ? [supabaseUrl] : [];
   
   connections.forEach((url) => {
     // Check if preconnect already exists

@@ -66,28 +66,32 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
   };
 
   try {
-    // 1) Role PRIMEIRO (não pode depender do fetch de profile)
-    // Observação: timeout muito agressivo aqui pode "rebaixar" temporariamente (ex.: master → client).
+    // 1) Role PRIMEIRO - priorizar RPC (SECURITY DEFINER bypassa RLS)
     let role: AppRole = getRoleFallback() || 'client';
 
     const resolveRoleViaRpc = async (): Promise<AppRole | null> => {
       try {
-        const { data: isMaster } = await withTimeout(
+        console.log('[AuthContext] Checking role via RPC for user:', user.id);
+
+        const { data: isMaster, error: errMaster } = await withTimeout(
           supabase.rpc('has_role', { check_user_id: user.id, check_role: 'master' }),
           5000
         );
+        console.log('[AuthContext] RPC has_role(master):', { isMaster, error: errMaster?.message });
         if (isMaster === true) return 'master';
 
-        const { data: isAdmin } = await withTimeout(
+        const { data: isAdmin, error: errAdmin } = await withTimeout(
           supabase.rpc('has_role', { check_user_id: user.id, check_role: 'admin' }),
           5000
         );
+        console.log('[AuthContext] RPC has_role(admin):', { isAdmin, error: errAdmin?.message });
         if (isAdmin === true) return 'admin';
 
-        const { data: isClient } = await withTimeout(
+        const { data: isClient, error: errClient } = await withTimeout(
           supabase.rpc('has_role', { check_user_id: user.id, check_role: 'client' }),
           5000
         );
+        console.log('[AuthContext] RPC has_role(client):', { isClient, error: errClient?.message });
         if (isClient === true) return 'client';
       } catch (e) {
         console.warn('[AuthContext] has_role RPC fallback failed:', e);
@@ -95,28 +99,30 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
       return null;
     };
 
-    try {
-      const { data: rolesData, error: rolesError } = await withTimeout(
-        supabase.from('user_roles').select('role').eq('user_id', user.id),
-        8000
-      );
+    // Tentar RPC primeiro (mais confiável - bypassa RLS)
+    const rpcRole = await resolveRoleViaRpc();
+    if (rpcRole) {
+      role = rpcRole;
+      console.log('[AuthContext] Role resolved via RPC:', role);
+    } else {
+      // Fallback: query direta na tabela
+      try {
+        const { data: rolesData, error: rolesError } = await withTimeout(
+          supabase.from('user_roles').select('role').eq('user_id', user.id),
+          8000
+        );
+        console.log('[AuthContext] user_roles query:', { rolesData, error: rolesError?.message });
 
-      if (rolesError) {
-        console.warn('[AuthContext] user_roles fetch error:', rolesError);
-        role = (await resolveRoleViaRpc()) || role;
-      } else {
-        const picked = pickRole((rolesData as Array<{ role: AppRole }> | null) ?? null);
-        // Se veio "client" só por fallback e existe role real no backend, tenta RPC.
-        if (picked === 'client' && (!rolesData || rolesData.length === 0)) {
-          role = (await resolveRoleViaRpc()) || picked;
-        } else {
-          role = picked;
+        if (!rolesError && rolesData && rolesData.length > 0) {
+          role = pickRole(rolesData as Array<{ role: AppRole }>);
+          console.log('[AuthContext] Role resolved via table:', role);
         }
+      } catch (e) {
+        console.warn('[AuthContext] user_roles fetch timeout/error:', e);
       }
-    } catch (e) {
-      console.warn('[AuthContext] user_roles fetch timeout/error:', e);
-      role = (await resolveRoleViaRpc()) || role;
     }
+
+    console.log('[AuthContext] Final role for', user.email, ':', role);
 
     // 2) Profile (melhor esforço)
     let profile: any = null;
