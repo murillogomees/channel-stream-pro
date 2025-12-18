@@ -160,12 +160,65 @@ export function useChannelsByCategory(category: string, limit = 20) {
 }
 
 /**
+ * Helper: Agrupa séries pelo primeiro episódio (S01E01)
+ * Retorna apenas 1 item por série, usando o primeiro episódio como representante
+ */
+function groupSeriesByFirstEpisode<T extends { 
+  id: number; 
+  name: string; 
+  is_series?: boolean | null;
+  series_name?: string | null;
+  season_number?: number | null;
+  episode_number?: number | null;
+  logo_url?: string | null;
+  category?: string | null;
+}>(channels: T[]): T[] {
+  const seriesMap = new Map<string, T>();
+  const nonSeriesItems: T[] = [];
+
+  for (const ch of channels) {
+    // Se não é série ou não tem series_name, adiciona diretamente
+    if (!ch.is_series || !ch.series_name) {
+      nonSeriesItems.push(ch);
+      continue;
+    }
+
+    const existing = seriesMap.get(ch.series_name);
+    
+    // Se não existe ou este episódio vem antes, substitui
+    if (!existing) {
+      seriesMap.set(ch.series_name, {
+        ...ch,
+        name: ch.series_name, // Usa o nome da série como título
+      });
+    } else {
+      // Compara season e episode para pegar o primeiro
+      const existingSeason = existing.season_number || 999;
+      const existingEpisode = existing.episode_number || 999;
+      const currentSeason = ch.season_number || 999;
+      const currentEpisode = ch.episode_number || 999;
+
+      if (currentSeason < existingSeason || 
+          (currentSeason === existingSeason && currentEpisode < existingEpisode)) {
+        seriesMap.set(ch.series_name, {
+          ...ch,
+          name: ch.series_name,
+        });
+      }
+    }
+  }
+
+  return [...nonSeriesItems, ...seriesMap.values()];
+}
+
+/**
  * Hook para buscar categorias aleatórias com canais (otimizado)
  * FILTRADO: Exclui todos os canais da playlist "live"
+ * AGRUPADO: Séries mostram apenas o primeiro episódio
  */
 export function useRandomCategoryGroups(count = 4) {
   return useQuery({
-    queryKey: ['random-category-groups-exclude-live', count],
+    queryKey: ['random-category-groups-exclude-live-grouped', count],
     queryFn: async () => {
       // Buscar ID da playlist "live" para EXCLUIR
       const { data: livePlaylist } = await supabase
@@ -184,21 +237,24 @@ export function useRandomCategoryGroups(count = 4) {
 
       const liveChannelIds = new Set((liveChannels || []).map(pc => pc.channel_id));
 
-      // Buscar canais healthy, excluindo os da playlist live
+      // Buscar canais healthy com dados de série
       const { data: channels } = await supabase
         .from('iptv_channels')
-        .select('id, name, logo_url, category, content_type, is_series')
+        .select('id, name, logo_url, category, content_type, is_series, series_name, season_number, episode_number')
         .eq('is_healthy', true)
-        .limit(2000);
+        .limit(3000);
 
       if (!channels || channels.length === 0) return [];
 
       // Filtrar excluindo canais da playlist live
       const filteredChannels = channels.filter(ch => !liveChannelIds.has(ch.id));
 
+      // Agrupar séries pelo primeiro episódio
+      const groupedChannels = groupSeriesByFirstEpisode(filteredChannels);
+
       // Agrupar por categoria
-      const categoryGroups: Record<string, typeof filteredChannels> = {};
-      for (const ch of filteredChannels) {
+      const categoryGroups: Record<string, typeof groupedChannels> = {};
+      for (const ch of groupedChannels) {
         const cat = ch.category || 'Conteúdo';
         if (!categoryGroups[cat]) categoryGroups[cat] = [];
         categoryGroups[cat].push(ch);
@@ -219,6 +275,9 @@ export function useRandomCategoryGroups(count = 4) {
     staleTime: 30 * 1000,
   });
 }
+
+// Exportar helper para uso em outros componentes
+export { groupSeriesByFirstEpisode };
 
 /**
  * Hook para recomendações de IA (filmes e séries)

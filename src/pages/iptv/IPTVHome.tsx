@@ -35,9 +35,40 @@ export default function IPTVHome() {
   // Fallback: categorias aleatórias (apenas filmes/séries)
   const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
 
-  // Fetch channels by playlist (movie/series only - live excluded)
+  // Helper para agrupar séries pelo primeiro episódio
+  const groupSeriesByFirstEpisode = (channels: any[]) => {
+    const seriesMap = new Map<string, any>();
+    const nonSeriesItems: any[] = [];
+
+    for (const ch of channels) {
+      if (!ch.is_series || !ch.series_name) {
+        nonSeriesItems.push(ch);
+        continue;
+      }
+
+      const existing = seriesMap.get(ch.series_name);
+      
+      if (!existing) {
+        seriesMap.set(ch.series_name, { ...ch, name: ch.series_name });
+      } else {
+        const existingSeason = existing.season_number || 999;
+        const existingEpisode = existing.episode_number || 999;
+        const currentSeason = ch.season_number || 999;
+        const currentEpisode = ch.episode_number || 999;
+
+        if (currentSeason < existingSeason || 
+            (currentSeason === existingSeason && currentEpisode < existingEpisode)) {
+          seriesMap.set(ch.series_name, { ...ch, name: ch.series_name });
+        }
+      }
+    }
+
+    return [...nonSeriesItems, ...seriesMap.values()];
+  };
+
+  // Fetch channels by playlist (movie/series only - live excluded, series grouped)
   const { data: contentTypeChannels, isLoading: loadingContentType } = useQuery({
-    queryKey: ['iptv-content-exclude-live', activeTab],
+    queryKey: ['iptv-content-exclude-live-grouped', activeTab],
     queryFn: async () => {
       if (activeTab === 'all' || activeTab === 'favorites') return null;
 
@@ -72,7 +103,7 @@ export default function IPTVHome() {
         .from('iptv_playlist_channels')
         .select('channel_id')
         .eq('playlist_id', playlist.id)
-        .limit(1000);
+        .limit(2000);
 
       if (!playlistChannels || playlistChannels.length === 0) return [];
 
@@ -83,18 +114,21 @@ export default function IPTVHome() {
 
       if (channelIds.length === 0) return [];
 
-      // Buscar detalhes dos canais
+      // Buscar detalhes dos canais COM dados de série
       const { data: channels } = await supabase
         .from('iptv_channels')
-        .select('id, name, logo_url, category, content_type, is_series')
+        .select('id, name, logo_url, category, content_type, is_series, series_name, season_number, episode_number')
         .in('id', channelIds)
         .eq('is_healthy', true);
 
       if (!channels) return [];
 
+      // Agrupar séries pelo primeiro episódio
+      const groupedChannels = groupSeriesByFirstEpisode(channels);
+
       // Agrupar por categoria
       const groups: Record<string, IPTVChannel[]> = {};
-      for (const ch of channels) {
+      for (const ch of groupedChannels) {
         const cat = ch.category || (activeTab === 'series' ? 'Séries' : 'Filmes');
         if (!groups[cat]) groups[cat] = [];
         if (groups[cat].length < 20) {
