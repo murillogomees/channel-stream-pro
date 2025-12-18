@@ -1,14 +1,15 @@
 /**
  * IPTV Home - Netflix-style IPTV browsing experience
- * OTIMIZADO: Usa views materializadas para 55k+ canais
+ * OTIMIZADO: Usa views materializadas + IA para recomendações
+ * FILTRADO: Apenas filmes e séries (sem live)
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { iptvService, IPTVChannel, ChannelGroup } from '@/services/iptvService';
-import { useRandomCategoryGroups, useCategoryStats, useSeriesCatalog } from '@/hooks/useIPTVOptimized';
-import { Loader2, Search, Heart, Film, Radio, Grid3X3, Star } from 'lucide-react';
+import { useRandomCategoryGroups, useCategoryStats, useSeriesCatalog, useAIRecommendations } from '@/hooks/useIPTVOptimized';
+import { Loader2, Search, Heart, Film, Radio, Star, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TVContentRow } from '@/components/iptv/TVContentRow';
@@ -28,7 +29,10 @@ export default function IPTVHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useLocalStorage<string[]>('iptv-favorites', []);
 
-  // OTIMIZADO: Usa view materializada para categorias aleatórias
+  // Recomendações de IA para aba "Todos"
+  const { data: aiRecommendations, isLoading: loadingAI } = useAIRecommendations(favorites);
+
+  // Fallback: categorias aleatórias (apenas filmes/séries)
   const { data: randomGroups, isLoading: loadingRandom } = useRandomCategoryGroups(4);
 
   // Fetch channels by content type (vod/series only - live hidden)
@@ -130,16 +134,20 @@ export default function IPTVHome() {
   // Display groups based on active tab
   const displayGroups = useMemo(() => {
     if (activeTab === 'all') {
+      // Priorizar recomendações de IA, fallback para categorias aleatórias
+      if (aiRecommendations && aiRecommendations.length > 0) {
+        return aiRecommendations;
+      }
       return randomGroups || [];
     }
     
     if (activeTab === 'favorites') {
       if (!allChannelsForFavorites || allChannelsForFavorites.length === 0) return [];
-      return [{ name: 'Meus Favoritos', channels: allChannelsForFavorites }];
+      return [{ name: '❤️ Meus Favoritos', channels: allChannelsForFavorites }];
     }
 
     return contentTypeChannels || [];
-  }, [activeTab, randomGroups, contentTypeChannels, allChannelsForFavorites]);
+  }, [activeTab, aiRecommendations, randomGroups, contentTypeChannels, allChannelsForFavorites]);
 
   // Hero featured items
   const heroItems = useMemo(() => {
@@ -175,15 +183,19 @@ export default function IPTVHome() {
     return favorites.includes(id);
   }, [favorites]);
 
-  const isLoading = (activeTab === 'all' && loadingRandom) || 
+  const isLoading = (activeTab === 'all' && (loadingAI || loadingRandom)) || 
                     (activeTab !== 'all' && activeTab !== 'favorites' && loadingContentType);
+
+  const isUsingAI = activeTab === 'all' && aiRecommendations && aiRecommendations.length > 0;
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Carregando canais...</p>
+          <p className="text-muted-foreground">
+            {loadingAI ? 'IA selecionando os melhores conteúdos...' : 'Carregando filmes e séries...'}
+          </p>
         </div>
       </div>
     );
@@ -215,8 +227,8 @@ export default function IPTVHome() {
                 value="all" 
                 className="h-full flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-[10px] sm:text-xs md:text-sm lg:text-base px-1 sm:px-2 md:px-4"
               >
-                <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
-                <span className="truncate">Todos</span>
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 shrink-0" />
+                <span className="truncate">Para Você</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="vod" 
@@ -256,18 +268,26 @@ export default function IPTVHome() {
 
       {/* Content */}
       <main className="pb-20">
+        {/* AI Badge quando ativo */}
+        {isUsingAI && (
+          <div className="flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            <span className="text-sm text-primary font-medium">Recomendado pela IA para você</span>
+          </div>
+        )}
+
         {displayGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
             <Star className="h-16 w-16 text-muted-foreground/20 mb-4" />
             <h2 className="text-xl font-semibold mb-2">
-              {activeTab === 'favorites' ? 'Nenhum favorito ainda' : 'Nenhum canal encontrado'}
+              {activeTab === 'favorites' ? 'Nenhum favorito ainda' : 'Nenhum conteúdo encontrado'}
             </h2>
             <p className="text-muted-foreground">
               {activeTab === 'favorites' 
-                ? 'Adicione canais aos favoritos para vê-los aqui'
+                ? 'Adicione filmes e séries aos favoritos para vê-los aqui'
                 : activeTab === 'all' 
-                  ? 'Importe canais M3U para começar'
-                  : `Selecione uma categoria para ver o conteúdo`}
+                  ? 'Aguarde enquanto preparamos as melhores recomendações'
+                  : `Nenhum conteúdo disponível nesta categoria`}
             </p>
           </div>
         ) : (

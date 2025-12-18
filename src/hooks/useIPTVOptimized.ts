@@ -161,6 +161,7 @@ export function useChannelsByCategory(category: string, limit = 20) {
 
 /**
  * Hook para buscar categorias aleatórias com canais (otimizado)
+ * FILTRADO: Apenas filmes (vod) e séries, sem conteúdo live
  */
 export function useRandomCategoryGroups(count = 4) {
   const { data: categories } = useCategoryStats();
@@ -170,11 +171,18 @@ export function useRandomCategoryGroups(count = 4) {
     queryFn: async () => {
       if (!categories || categories.length === 0) return [];
 
+      // Filtrar categorias que tenham filmes ou séries (não apenas live)
+      const filteredCategories = categories.filter(
+        cat => (cat.vod_count > 0 || cat.series_count > 0)
+      );
+
+      if (filteredCategories.length === 0) return [];
+
       // Shuffle and pick random categories
-      const shuffled = [...categories].sort(() => Math.random() - 0.5);
+      const shuffled = [...filteredCategories].sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, count);
 
-      // Fetch channels for each category in parallel
+      // Fetch channels for each category in parallel (apenas vod e séries)
       const groups = await Promise.all(
         selected.map(async (cat) => {
           const { data: channels } = await supabase
@@ -182,6 +190,7 @@ export function useRandomCategoryGroups(count = 4) {
             .select('id, name, logo_url, category, content_type, is_series')
             .eq('category', cat.category)
             .eq('is_healthy', true)
+            .in('content_type', ['vod', 'series'])
             .limit(50);
 
           if (!channels || channels.length === 0) return null;
@@ -192,7 +201,7 @@ export function useRandomCategoryGroups(count = 4) {
           return {
             name: cat.category,
             channels: shuffledChannels,
-            totalCount: cat.channel_count,
+            totalCount: cat.vod_count + cat.series_count,
           };
         })
       );
@@ -201,6 +210,37 @@ export function useRandomCategoryGroups(count = 4) {
     },
     staleTime: 30 * 1000, // 30 seconds for variety
     enabled: !!categories && categories.length > 0,
+  });
+}
+
+/**
+ * Hook para recomendações de IA (filmes e séries)
+ */
+export function useAIRecommendations(favorites: string[] = []) {
+  return useQuery({
+    queryKey: ['ai-recommendations', favorites],
+    queryFn: async () => {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-content-recommend`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ favorites }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI recommendations');
+      }
+
+      const data = await response.json();
+      return data.groups || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    retry: 1,
   });
 }
 
