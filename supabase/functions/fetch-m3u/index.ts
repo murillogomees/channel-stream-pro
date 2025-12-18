@@ -16,10 +16,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Smaller batch size for faster processing
-const DB_BATCH_SIZE = 50;
+// Larger batch improves throughput for big playlists
+const DB_BATCH_SIZE = 500;
 // Yield every N lines to prevent CPU timeout
-const YIELD_INTERVAL = 500;
+const YIELD_INTERVAL = 1000;
 
 interface ParsedChannel {
   name: string;
@@ -489,21 +489,24 @@ async function insertBatchFast(supabase: any, channels: ParsedChannel[]): Promis
     return { inserted: 0, skipped: 0 };
   }
 
-  // Fast upsert with ignore duplicates
-  const { data, error } = await supabase
+  // Fast upsert with ignore duplicates (avoid returning row data)
+  const { error, count } = await supabase
     .from('iptv_channels')
     .upsert(uniqueRecords, {
       onConflict: 'original_url',
-      ignoreDuplicates: true
-    })
-    .select('id');
+      ignoreDuplicates: true,
+      count: 'exact',
+      returning: 'minimal',
+    });
 
   if (error) {
     console.error('[fetch-m3u] Batch error:', error.message);
     return { inserted: 0, skipped: uniqueRecords.length };
   }
 
-  return { inserted: data?.length || 0, skipped: uniqueRecords.length - (data?.length || 0) };
+  const inserted = typeof count === 'number' ? count : uniqueRecords.length;
+  const skipped = Math.max(0, uniqueRecords.length - inserted);
+  return { inserted, skipped };
 }
 
 // ==================== UTILITIES ====================
