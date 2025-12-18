@@ -66,50 +66,57 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
   };
 
   try {
-    // 1) Role PRIMEIRO - priorizar RPC (SECURITY DEFINER bypassa RLS)
+    // 1) ROLE (mais importante) — tentar resolver sem depender de JWT claims
     let role: AppRole = getRoleFallback() || 'client';
 
     const resolveRoleViaRpc = async (): Promise<AppRole | null> => {
       try {
-        console.log('[AuthContext] Checking role via RPC for user:', user.id);
+        console.log('[AuthContext] Resolving role via RPC for user:', user.id);
 
-        const { data: isMaster, error: errMaster } = await withTimeout(
-          supabase.rpc('has_role', { check_user_id: user.id, check_role: 'master' }),
-          5000
+        // Primeiro: is_admin_or_master (não depende de enum, tende a ser mais robusto)
+        const { data: isAdminOrMaster, error: errAdmMaster } = await withTimeout(
+          supabase.rpc('is_admin_or_master', { check_user_id: user.id }),
+          7000
         );
-        console.log('[AuthContext] RPC has_role(master):', { isMaster, error: errMaster?.message });
-        if (isMaster === true) return 'master';
+        console.log('[AuthContext] RPC is_admin_or_master:', { isAdminOrMaster, error: errAdmMaster?.message });
 
-        const { data: isAdmin, error: errAdmin } = await withTimeout(
-          supabase.rpc('has_role', { check_user_id: user.id, check_role: 'admin' }),
-          5000
-        );
-        console.log('[AuthContext] RPC has_role(admin):', { isAdmin, error: errAdmin?.message });
-        if (isAdmin === true) return 'admin';
+        if (isAdminOrMaster === true) {
+          // Se é admin/master, tentar diferenciar master
+          const { data: isMaster, error: errMaster } = await withTimeout(
+            supabase.rpc('has_role', { check_user_id: user.id, check_role: 'master' }),
+            7000
+          );
+          console.log('[AuthContext] RPC has_role(master):', { isMaster, error: errMaster?.message });
+          if (isMaster === true) return 'master';
 
+          return 'admin';
+        }
+
+        // Se não é admin/master, confirmar client
         const { data: isClient, error: errClient } = await withTimeout(
           supabase.rpc('has_role', { check_user_id: user.id, check_role: 'client' }),
-          5000
+          7000
         );
         console.log('[AuthContext] RPC has_role(client):', { isClient, error: errClient?.message });
         if (isClient === true) return 'client';
+
       } catch (e) {
-        console.warn('[AuthContext] has_role RPC fallback failed:', e);
+        console.warn('[AuthContext] Role RPC resolution failed:', e);
       }
       return null;
     };
 
-    // Tentar RPC primeiro (mais confiável - bypassa RLS)
+    // RPC primeiro
     const rpcRole = await resolveRoleViaRpc();
     if (rpcRole) {
       role = rpcRole;
       console.log('[AuthContext] Role resolved via RPC:', role);
     } else {
-      // Fallback: query direta na tabela
+      // Fallback: query direta na tabela (aumentar timeout para ambientes lentos)
       try {
         const { data: rolesData, error: rolesError } = await withTimeout(
           supabase.from('user_roles').select('role').eq('user_id', user.id),
-          8000
+          15000
         );
         console.log('[AuthContext] user_roles query:', { rolesData, error: rolesError?.message });
 
@@ -123,7 +130,6 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
     }
 
     console.log('[AuthContext] Final role for', user.email, ':', role);
-
     // 2) Profile (melhor esforço)
     let profile: any = null;
     try {
