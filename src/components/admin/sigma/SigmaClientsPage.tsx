@@ -20,10 +20,11 @@ import { toast } from "sonner";
 import {
   Search, Plus, MoreHorizontal, Edit, Trash2, MessageCircle,
   Users, AlertTriangle, ChevronLeft, ChevronRight, Send, RefreshCw,
-  ShieldAlert, ShieldCheck, Shield,
+  ShieldAlert, ShieldCheck, Shield, CloudDownload, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as clientService from "@/services/sigmaBlaze/sigmaClientsService";
+import { triggerAction } from "@/services/sigmaBlaze/sigmaBlazeService";
 import type { SigmaClient, ClientFilters } from "@/services/sigmaBlaze/sigmaClientsService";
 import { StatusCircle } from "./StatusCircle";
 import { RiskBadge } from "./RiskBadge";
@@ -37,6 +38,7 @@ export function SigmaClientsPage() {
   const [filters, setFilters] = useState<ClientFilters>({ page: 1, pageSize: 20 });
   const [searchInput, setSearchInput] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState(false);
 
   // Modals
   const [formOpen, setFormOpen] = useState(false);
@@ -102,6 +104,24 @@ export function SigmaClientsPage() {
     if (selected.size === filteredClients.length) setSelected(new Set());
     else setSelected(new Set(filteredClients.map(c => c.id)));
   };
+
+  // Sync all from Sigma API
+  async function handleSyncAll() {
+    setSyncing(true);
+    try {
+      const result = await triggerAction('list-all', {});
+      if (result.success) {
+        toast.success(result.message || 'Clientes sincronizados com sucesso!');
+        loadClients();
+      } else {
+        toast.error(result.message || 'Erro ao sincronizar. Verifique a configuração do Sigma Blaze.');
+      }
+    } catch {
+      toast.error('Erro ao sincronizar com Sigma Blaze');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   // CRUD handlers
   async function handleSaveClient(data: Partial<SigmaClient>) {
@@ -237,6 +257,10 @@ export function SigmaClientsPage() {
               </SelectContent>
             </Select>
             <div className="flex gap-2">
+              <Button onClick={handleSyncAll} disabled={syncing} variant="secondary">
+                {syncing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CloudDownload className="h-4 w-4 mr-1" />}
+                {syncing ? 'Sincronizando...' : 'Sincronizar Sigma'}
+              </Button>
               <Button onClick={() => { setEditingClient(null); setFormOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Novo
               </Button>
