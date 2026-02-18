@@ -12,7 +12,8 @@ import {
   TestTube,
   Tv,
   HardDrive,
-  Flame
+  Flame,
+  Users
 } from "lucide-react";
 import AdminWhatsAppConfig from "../AdminWhatsAppConfig";
 import AdminQADashboard from "../AdminQADashboard";
@@ -20,6 +21,7 @@ import { MercadoPagoUnifiedIntegration } from "@/components/admin/mercadopago/Me
 import { IPTVIntegrationStatus } from "@/components/admin/iptv/IPTVIntegrationStatus";
 import { R2BulkCacheManager } from "@/components/admin/r2/R2BulkCacheManager";
 import { SigmaBlazeIntegration } from "@/components/admin/sigma/SigmaBlazeIntegration";
+import { SigmaClientsPage } from "@/components/admin/sigma/SigmaClientsPage";
 
 export default function AdminIntegracaoPage() {
   const [activeTab, setActiveTab] = useState("mercadopago");
@@ -36,6 +38,12 @@ export default function AdminIntegracaoPage() {
       label: "Sigma Blaze",
       icon: <Flame className="h-4 w-4" />,
       content: <SigmaBlazeIntegration />
+    },
+    {
+      value: "sigma-clients",
+      label: "Clientes Sigma",
+      icon: <Users className="h-4 w-4" />,
+      content: <SigmaClientsPage />
     },
     {
       value: "whatsapp",

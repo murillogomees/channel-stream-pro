@@ -4328,6 +4328,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sigma_blaze_clients: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          expiration_date: string
+          id: string
+          last_login: string | null
+          last_payment_date: string | null
+          last_reminder_sent: string | null
+          name: string
+          notes: string | null
+          plan_name: string | null
+          sigma_id: string | null
+          status: string | null
+          updated_at: string | null
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          expiration_date: string
+          id?: string
+          last_login?: string | null
+          last_payment_date?: string | null
+          last_reminder_sent?: string | null
+          name: string
+          notes?: string | null
+          plan_name?: string | null
+          sigma_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          whatsapp: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          expiration_date?: string
+          id?: string
+          last_login?: string | null
+          last_payment_date?: string | null
+          last_reminder_sent?: string | null
+          name?: string
+          notes?: string | null
+          plan_name?: string | null
+          sigma_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       sigma_blaze_config: {
         Row: {
           admin_whatsapp_number: string
@@ -4385,6 +4436,84 @@ export type Database = {
           id?: string
           status?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      sigma_reminder_logs: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_sent: string
+          sent_by: string | null
+          status: string | null
+          template_id: string | null
+          whatsapp_number: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_sent: string
+          sent_by?: string | null
+          status?: string | null
+          template_id?: string | null
+          whatsapp_number: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_sent?: string
+          sent_by?: string | null
+          status?: string | null
+          template_id?: string | null
+          whatsapp_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sigma_reminder_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "sigma_blaze_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sigma_reminder_logs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "sigma_reminder_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sigma_reminder_templates: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          message: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          message: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          message?: string
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
