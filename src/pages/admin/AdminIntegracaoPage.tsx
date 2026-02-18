@@ -11,13 +11,15 @@ import {
   MessageCircle, 
   TestTube,
   Tv,
-  HardDrive
+  HardDrive,
+  Flame
 } from "lucide-react";
 import AdminWhatsAppConfig from "../AdminWhatsAppConfig";
 import AdminQADashboard from "../AdminQADashboard";
 import { MercadoPagoUnifiedIntegration } from "@/components/admin/mercadopago/MercadoPagoUnifiedIntegration";
 import { IPTVIntegrationStatus } from "@/components/admin/iptv/IPTVIntegrationStatus";
 import { R2BulkCacheManager } from "@/components/admin/r2/R2BulkCacheManager";
+import { SigmaBlazeIntegration } from "@/components/admin/sigma/SigmaBlazeIntegration";
 
 export default function AdminIntegracaoPage() {
   const [activeTab, setActiveTab] = useState("mercadopago");
@@ -28,6 +30,12 @@ export default function AdminIntegracaoPage() {
       label: "Mercado Pago",
       icon: <CreditCard className="h-4 w-4" />,
       content: <MercadoPagoUnifiedIntegration />
+    },
+    {
+      value: "sigma",
+      label: "Sigma Blaze",
+      icon: <Flame className="h-4 w-4" />,
+      content: <SigmaBlazeIntegration />
     },
     {
       value: "whatsapp",
@@ -58,7 +66,7 @@ export default function AdminIntegracaoPage() {
   return (
     <AdminShell 
       title="Integrações & Ferramentas"
-      description="Mercado Pago, WhatsApp, IPTV, R2 CDN e ferramentas de debug"
+      description="Mercado Pago, Sigma Blaze, WhatsApp, IPTV, R2 CDN e ferramentas de debug"
     >
       <ResponsiveTabs
         defaultValue="mercadopago"
