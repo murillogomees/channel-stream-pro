@@ -159,10 +159,18 @@ const HeroSection = () => {
               />
             </div>
 
-            {/* Subtitle */}
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              {settings.description}
-            </p>
+            {/* Price highlight + benefits */}
+            <div className="max-w-xl mx-auto lg:mx-0 space-y-3">
+              <div className="flex items-baseline gap-2 justify-center lg:justify-start">
+                <span className="text-5xl sm:text-6xl md:text-7xl font-extrabold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-none">
+                  R$45
+                </span>
+                <span className="text-lg sm:text-xl text-muted-foreground font-medium">/mês</span>
+              </div>
+              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+                Mais de 209.000 canais em Full HD e 4K com qualidade Premium
+              </p>
+            </div>
 
             {/* Key Benefits pills */}
             <div className="flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-3">
@@ -187,24 +195,6 @@ const HeroSection = () => {
               >
                 <Tv className="h-5 w-5" />
                 {settings.cta_primary_text}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="w-full sm:w-auto sm:min-w-48"
-                onClick={handleInstallClick}
-              >
-                {isAppInstalled ? (
-                  <>
-                    <ExternalLink className="h-5 w-5" />
-                    Abrir APP
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-5 w-5" />
-                    Download do APP
-                  </>
-                )}
               </Button>
             </div>
 
