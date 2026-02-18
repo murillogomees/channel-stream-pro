@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle, Tv, ExternalLink } from "lucide-react";
+import { Download, CheckCircle, Tv, ExternalLink, Zap, Film, Globe, Headphones, Smartphone, Star, Shield } from "lucide-react";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { toast } from "sonner";
 // Logo com fundo transparente para melhor integração visual
@@ -136,83 +136,157 @@ const HeroSection = () => {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
-          {/* Logo as Main Title */}
-          <div className="flex justify-center mb-4">
-            <img
-              src={logoWhite}
-              alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
-              className="h-24 sm:h-28 md:h-32 lg:h-36 xl:h-40 w-auto object-contain drop-shadow-lg"
-              style={{ maxWidth: '90vw' }}
-              width={400}
-              height={175}
-              loading="eager"
-              decoding="async"
-              // @ts-ignore - fetchpriority is valid HTML but not in React types yet
-              fetchpriority="high"
-              role="img"
-              aria-label="IPTV LINK - Streaming Premium"
-            />
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          
+          {/* Left - Text Content */}
+          <div className="text-center lg:text-left space-y-6">
+            {/* Logo */}
+            <div className="flex justify-center lg:justify-start">
+              <img
+                src={logoWhite}
+                alt="IPTV LINK - Logotipo da empresa de streaming premium com mais de 10.000 canais em Full HD e 4K"
+                className="h-20 sm:h-24 md:h-28 lg:h-32 w-auto object-contain drop-shadow-lg"
+                style={{ maxWidth: '80vw' }}
+                width={400}
+                height={175}
+                loading="eager"
+                decoding="async"
+                // @ts-ignore
+                fetchpriority="high"
+                role="img"
+                aria-label="IPTV LINK - Streaming Premium"
+              />
+            </div>
+
+            {/* Subtitle */}
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              {settings.description}
+            </p>
+
+            {/* Key Benefits pills */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-3">
+              {settings.features.map((feature, index) => (
+                <div key={index} className="flex items-center gap-1.5 bg-gradient-card px-3 py-2 rounded-lg shadow-card">
+                  <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start pt-2">
+              <Button 
+                variant="hero"
+                size="lg" 
+                className="w-full sm:w-auto sm:min-w-48"
+                onClick={() => {
+                  trackEvent('InitiateCheckout', { content_name: 'Hero CTA - Ativar Acesso', content_category: 'button' });
+                  window.location.href = "/signup";
+                }}
+              >
+                <Tv className="h-5 w-5" />
+                {settings.cta_primary_text}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="w-full sm:w-auto sm:min-w-48"
+                onClick={handleInstallClick}
+              >
+                {isAppInstalled ? (
+                  <>
+                    <ExternalLink className="h-5 w-5" />
+                    Abrir APP
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-5 w-5" />
+                    Download do APP
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Trust Indicators */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-2 text-xs text-muted-foreground">
+              {settings.trust_indicators.map((indicator, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                  <span>{indicator}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Subtitle */}
-          <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4">
-            {settings.description}
-          </p>
+          {/* Right - Price Card */}
+          <div className="flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-sm">
+              {/* Glow effect behind card */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 via-accent/20 to-primary/30 rounded-2xl blur-xl opacity-60" />
+              
+              <div className="relative bg-card/90 backdrop-blur-xl border border-primary/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+                {/* Popular badge */}
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-4 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                    <Star className="h-3 w-3 fill-current" />
+                    MAIS POPULAR
+                  </div>
+                </div>
 
-          {/* Key Benefits */}
-          <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 my-6 sm:my-8 px-4">
-            {settings.features.map((feature, index) => (
-              <div key={index} className="flex items-center gap-2 bg-gradient-card px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-card">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                <span className="text-xs sm:text-sm font-medium">{feature}</span>
+                {/* Price */}
+                <div className="text-center pt-4 pb-5 border-b border-border/50">
+                  <p className="text-sm text-muted-foreground mb-1">A partir de</p>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-lg text-muted-foreground font-medium">R$</span>
+                    <span className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-none">
+                      45
+                    </span>
+                    <span className="text-sm text-muted-foreground">/mês</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">ou menos nos planos maiores</p>
+                </div>
+
+                {/* Benefits list */}
+                <ul className="space-y-3 py-5">
+                  {[
+                    { icon: Film, text: "+10.000 canais ao vivo" },
+                    { icon: Tv, text: "Qualidade Full HD e 4K" },
+                    { icon: Globe, text: "Filmes e séries sob demanda" },
+                    { icon: Smartphone, text: "Todos os dispositivos" },
+                    { icon: Headphones, text: "Suporte 24/7 dedicado" },
+                    { icon: Zap, text: "Ativação instantânea" },
+                    { icon: Shield, text: "Teste grátis de 6 horas" },
+                    { icon: Star, text: "Sem contrato ou multa" },
+                  ].map(({ icon: Icon, text }, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Icon className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium">{text}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA in card */}
+                <Button 
+                  variant="hero"
+                  size="lg"
+                  className="w-full text-base"
+                  onClick={() => {
+                    trackEvent('InitiateCheckout', { content_name: 'Hero Price Card CTA', content_category: 'button' });
+                    window.location.href = "/signup";
+                  }}
+                >
+                  <Zap className="h-5 w-5" />
+                  Começar Agora
+                </Button>
+
+                <p className="text-center text-[11px] text-muted-foreground mt-3">
+                  Cancele quando quiser • Sem fidelidade
+                </p>
               </div>
-            ))}
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-4 sm:pt-6 px-4">
-            <Button 
-              variant="hero"
-              size="lg" 
-              className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-              onClick={() => {
-                trackEvent('InitiateCheckout', { content_name: 'Hero CTA - Ativar Acesso', content_category: 'button' });
-                window.location.href = "/signup";
-              }}
-            >
-              <Tv className="h-5 w-5 sm:h-6 sm:w-6" />
-              {settings.cta_primary_text}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="lg" 
-              className="w-full sm:w-auto sm:min-w-48 lg:min-w-64"
-              onClick={handleInstallClick}
-            >
-              {isAppInstalled ? (
-                <>
-                  <ExternalLink className="h-5 w-5 sm:h-6 sm:w-6" />
-                  Abrir APP
-                </>
-              ) : (
-                <>
-                  <Download className="h-5 w-5 sm:h-6 sm:w-6" />
-                  Download do APP
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Trust Indicators */}
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 lg:gap-8 pt-6 sm:pt-8 text-xs sm:text-sm text-muted-foreground px-4">
-            {settings.trust_indicators.map((indicator, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                <span>{indicator}</span>
-              </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>
