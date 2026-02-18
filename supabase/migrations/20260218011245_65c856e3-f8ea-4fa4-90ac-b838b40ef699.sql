@@ -1,0 +1,1 @@
+UPDATE public.auto_notifications SET is_active = false WHERE is_active = true;
