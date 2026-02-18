@@ -3528,6 +3528,60 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_metrics_2026_03: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Relationships: []
+      }
+      performance_metrics_2026_04: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          tags: Json | null
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          tags?: Json | null
+        }
+        Relationships: []
+      }
       performance_metrics_current: {
         Row: {
           id: number
@@ -4274,6 +4328,66 @@ export type Database = {
         }
         Relationships: []
       }
+      sigma_blaze_config: {
+        Row: {
+          admin_whatsapp_number: string
+          api_key: string
+          api_url: string
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          whatsapp_message_template: string
+        }
+        Insert: {
+          admin_whatsapp_number?: string
+          api_key?: string
+          api_url?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          whatsapp_message_template?: string
+        }
+        Update: {
+          admin_whatsapp_number?: string
+          api_key?: string
+          api_url?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          whatsapp_message_template?: string
+        }
+        Relationships: []
+      }
+      sigma_blaze_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       status_change_history: {
         Row: {
           changed_at: string | null
@@ -4340,6 +4454,39 @@ export type Database = {
           quality?: string | null
           session_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      subscription_package_mapping: {
+        Row: {
+          created_at: string
+          id: string
+          internal_plan_id: string
+          internal_plan_name: string
+          is_active: boolean
+          sigma_package_id: string
+          sigma_package_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          internal_plan_id: string
+          internal_plan_name?: string
+          is_active?: boolean
+          sigma_package_id?: string
+          sigma_package_name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          internal_plan_id?: string
+          internal_plan_name?: string
+          is_active?: boolean
+          sigma_package_id?: string
+          sigma_package_name?: string
+          updated_at?: string
         }
         Relationships: []
       }
