@@ -32,12 +32,12 @@ const ComparisonSection = () => {
     fetchContent();
   }, []);
 
-  const monthlyPrice = 30.00;
+  const monthlyPrice = 45.00;
   
   const plans = [
-    { name: "Trimestral", price: 79.90, months: 3, highlighted: false },
-    { name: "Semestral", price: 149.90, months: 6, highlighted: true },
-    { name: "Anual", price: 279.90, months: 12, highlighted: false }
+    { name: "Trimestral", price: 120.00, months: 3, highlighted: false },
+    { name: "Semestral", price: 210.00, months: 6, highlighted: true },
+    { name: "Anual", price: 390.00, months: 12, highlighted: false }
   ];
 
   const calculateSavings = (planPrice: number, months: number) => {

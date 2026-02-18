@@ -36,13 +36,13 @@ const SavingsCalculator = () => {
     fetchContent();
   }, []);
 
-  const monthlyPrice = 30.00;
+  const monthlyPrice = 45.00;
 
   const plans = {
-    mensal: { name: "Mensal", price: 30.00, months: 1 },
-    trimestral: { name: "Trimestral", price: 79.90, months: 3 },
-    semestral: { name: "Semestral", price: 149.90, months: 6 },
-    anual: { name: "Anual", price: 279.90, months: 12 }
+    mensal: { name: "Mensal", price: 45.00, months: 1 },
+    trimestral: { name: "Trimestral", price: 120.00, months: 3 },
+    semestral: { name: "Semestral", price: 210.00, months: 6 },
+    anual: { name: "Anual", price: 390.00, months: 12 }
   };
 
   const calculateSavings = (planKey: string) => {
