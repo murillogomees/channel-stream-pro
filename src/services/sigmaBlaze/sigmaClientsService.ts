@@ -7,6 +7,7 @@ export interface SigmaClient {
   whatsapp: string;
   email: string | null;
   plan_name: string;
+  plan_value: number | null;
   expiration_date: string;
   last_login: string | null;
   last_payment_date: string | null;

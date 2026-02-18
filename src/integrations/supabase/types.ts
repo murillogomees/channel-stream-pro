@@ -4340,6 +4340,7 @@ export type Database = {
           name: string
           notes: string | null
           plan_name: string | null
+          plan_value: number | null
           sigma_id: string | null
           status: string | null
           updated_at: string | null
@@ -4356,6 +4357,7 @@ export type Database = {
           name: string
           notes?: string | null
           plan_name?: string | null
+          plan_value?: number | null
           sigma_id?: string | null
           status?: string | null
           updated_at?: string | null
@@ -4372,6 +4374,7 @@ export type Database = {
           name?: string
           notes?: string | null
           plan_name?: string | null
+          plan_value?: number | null
           sigma_id?: string | null
           status?: string | null
           updated_at?: string | null
