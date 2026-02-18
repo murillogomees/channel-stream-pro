@@ -1,0 +1,1 @@
+ALTER TABLE public.sigma_blaze_clients ADD COLUMN IF NOT EXISTS plan_value numeric DEFAULT 0;

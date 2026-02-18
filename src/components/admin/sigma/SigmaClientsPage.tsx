@@ -288,11 +288,13 @@ export function SigmaClientsPage() {
                     />
                   </TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead className="hidden lg:table-cell">Plano</TableHead>
+                  <TableHead className="hidden lg:table-cell">Valor</TableHead>
                   <TableHead className="hidden md:table-cell">Vencimento</TableHead>
                   <TableHead className="hidden sm:table-cell">WhatsApp</TableHead>
                   <TableHead className="w-12">Status</TableHead>
                   <TableHead>Score</TableHead>
-                  <TableHead className="hidden lg:table-cell">Último Lembrete</TableHead>
+                  <TableHead className="hidden xl:table-cell">Último Lembrete</TableHead>
                   <TableHead className="w-10">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -320,6 +322,16 @@ export function SigmaClientsPage() {
                             {new Date(client.expiration_date).toLocaleDateString('pt-BR')}
                           </p>
                         </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Badge variant="outline" className="text-xs font-medium">
+                          {client.plan_name || '—'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <span className="text-sm font-semibold text-primary">
+                          {client.plan_value ? `R$ ${client.plan_value.toFixed(2).replace('.', ',')}` : '—'}
+                        </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <span className="text-sm">{new Date(client.expiration_date).toLocaleDateString('pt-BR')}</span>
