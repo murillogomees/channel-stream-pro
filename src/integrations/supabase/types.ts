@@ -5642,6 +5642,7 @@ export type Database = {
         Args: { p_family_id: string; p_reason?: string }
         Returns: number
       }
+      sync_profiles_to_sigma_clients: { Args: never; Returns: number }
       toggle_feature_flag: {
         Args: { enabled_param: boolean; flag_name_param: string }
         Returns: undefined

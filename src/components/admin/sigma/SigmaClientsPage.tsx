@@ -105,19 +105,17 @@ export function SigmaClientsPage() {
     else setSelected(new Set(filteredClients.map(c => c.id)));
   };
 
-  // Sync all from Sigma API
+  // Sync all from profiles table
   async function handleSyncAll() {
     setSyncing(true);
     try {
-      const result = await triggerAction('list-all', {});
-      if (result.success) {
-        toast.success(result.message || 'Clientes sincronizados com sucesso!');
-        loadClients();
-      } else {
-        toast.error(result.message || 'Erro ao sincronizar. Verifique a configuração do Sigma Blaze.');
-      }
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await (supabase.rpc as any)('sync_profiles_to_sigma_clients');
+      if (error) throw error;
+      toast.success('Clientes sincronizados com sucesso!');
+      loadClients();
     } catch {
-      toast.error('Erro ao sincronizar com Sigma Blaze');
+      toast.error('Erro ao sincronizar');
     } finally {
       setSyncing(false);
     }
