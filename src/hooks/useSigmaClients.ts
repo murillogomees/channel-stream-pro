@@ -59,21 +59,29 @@ export function useSigmaClients() {
     setLoading(true);
     setError(null);
     try {
-      // Busca em tempo real da API do painel Sigma Blaze via Edge Function
-      const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
-        body: { action: "list-all" },
-      });
+      // Busca paginada de todos os clientes via action list_customers
+      const allCustomers: any[] = [];
+      let page = 1;
+      const perPage = 100;
+      let hasMore = true;
 
-      if (fnError) throw fnError;
+      while (hasMore && page <= 200) {
+        const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
+          body: { action: "list_customers", page, perPage },
+        });
 
-      if (!data?.success) {
-        throw new Error(data?.error || data?.message || "Erro ao buscar clientes do Sigma Blaze");
+        if (fnError) throw fnError;
+
+        const customers = data?.data || [];
+        allCustomers.push(...customers);
+
+        const lastPage = data?.meta?.lastPage || data?.meta?.last_page || 1;
+        hasMore = page < lastPage && customers.length === perPage;
+        page++;
       }
 
-      const rawClients: any[] = data.clients || [];
-
       // Mapear para SigmaClient interface
-      const mapped: SigmaClient[] = rawClients.map((c: any, idx: number) => ({
+      const mapped: SigmaClient[] = allCustomers.map((c: any, idx: number) => ({
         id: String(c.id || c.client_id || c.user_id || idx),
         username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
         full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
