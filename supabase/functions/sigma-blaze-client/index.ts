@@ -5,6 +5,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+// Browser-like headers to bypass Cloudflare bot protection
+const browserHeaders: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Origin': 'https://blaze.officeb.site',
+  'Referer': 'https://blaze.officeb.site/',
+  'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-origin',
+}
+
 interface SigmaRequest {
   action: 'create' | 'delete' | 'update-package' | 'sync' | 'list-all'
   user_id?: string
@@ -69,21 +85,9 @@ Deno.serve(async (req) => {
 })
 
 /**
- * Build all possible base URLs from the configured api_url.
- * e.g. "https://blaze.officeb.site/api" => also try "https://blaze.officeb.site"
- */
-function getBaseUrls(apiUrl: string): string[] {
-  const clean = apiUrl.replace(/\/+$/, '')
-  const urls = [clean]
-  // If URL ends with /api, also try without it
-  if (clean.endsWith('/api')) {
-    urls.push(clean.slice(0, -4))
-  }
-  return urls
-}
-
-/**
- * Authenticate with Sigma Blaze using multiple strategies.
+ * Authenticate with Sigma Blaze.
+ * Based on user info: login page is /#/sign-in, API base is /api,
+ * session endpoint is /api/auth/me
  */
 async function getAuthToken(supabase: any, config: any): Promise<string | null> {
   // 1. Check cached token
@@ -97,104 +101,88 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
   const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000)
 
   if (cached && new Date(cached.expires_at) > tenMinutesFromNow) {
-    console.log('[SIGMA_BLAZE] Using cached auth token')
-    return cached.access_token || cached.session_cookie
+    // Validate cached token is still valid
+    const isValid = await validateToken(config.api_url, cached.access_token || cached.session_cookie)
+    if (isValid) {
+      console.log('[SIGMA_BLAZE] Using cached auth token (validated)')
+      return cached.access_token || cached.session_cookie
+    }
+    console.log('[SIGMA_BLAZE] Cached token invalid, re-authenticating...')
   }
 
-  console.log('[SIGMA_BLAZE] Token expired or expiring soon, re-authenticating...')
+  console.log('[SIGMA_BLAZE] Authenticating with Sigma Blaze...')
 
-  const baseUrls = getBaseUrls(config.api_url)
-  
-  // Auth endpoint paths to try (relative)
-  const authPaths = [
-    '/login',
-    '/auth/login',
-    '/api/login',
-    '/api/auth/login',
-    '/api/v1/login',
-    '/api/v1/auth/login',
+  const baseUrl = config.api_url.replace(/\/+$/, '')
+  // Remove /api suffix to get the root domain for building full paths
+  const rootUrl = baseUrl.endsWith('/api') ? baseUrl.slice(0, -4) : baseUrl
+
+  // Focused auth paths based on user-confirmed API structure
+  const authEndpoints = [
+    `${baseUrl}/auth/login`,       // /api/auth/login
+    `${baseUrl}/login`,            // /api/login
+    `${rootUrl}/auth/login`,       // /auth/login (if base doesn't have /api)
+    `${baseUrl}/auth/sign-in`,     // /api/auth/sign-in
+    `${baseUrl}/auth/signin`,      // /api/auth/signin
+    `${baseUrl}/sessions`,         // /api/sessions
+    `${baseUrl}/auth/sessions`,    // /api/auth/sessions
   ]
 
-  // Different body payloads to try
+  // Payloads to try
   const payloads = [
-    // JSON with email field
-    {
-      contentType: 'application/json',
-      body: JSON.stringify({
-        email: config.sigma_username,
-        password: config.sigma_password,
-      }),
-    },
-    // JSON with username field
-    {
-      contentType: 'application/json',
-      body: JSON.stringify({
-        username: config.sigma_username,
-        password: config.sigma_password,
-      }),
-    },
-    // Form-encoded
-    {
-      contentType: 'application/x-www-form-urlencoded',
-      body: `email=${encodeURIComponent(config.sigma_username)}&password=${encodeURIComponent(config.sigma_password)}`,
-    },
-    // Form-encoded with username
-    {
-      contentType: 'application/x-www-form-urlencoded',
-      body: `username=${encodeURIComponent(config.sigma_username)}&password=${encodeURIComponent(config.sigma_password)}`,
-    },
+    { contentType: 'application/json', body: JSON.stringify({ email: config.sigma_username, password: config.sigma_password }) },
+    { contentType: 'application/json', body: JSON.stringify({ username: config.sigma_username, password: config.sigma_password }) },
+    { contentType: 'application/json', body: JSON.stringify({ login: config.sigma_username, password: config.sigma_password }) },
   ]
 
-  for (const baseUrl of baseUrls) {
-    for (const path of authPaths) {
-      // Skip paths that would duplicate /api
-      if (baseUrl.endsWith('/api') && path.startsWith('/api')) continue
+  for (const url of authEndpoints) {
+    for (const payload of payloads) {
+      try {
+        console.log(`[SIGMA_BLAZE] Trying: POST ${url}`)
 
-      const url = `${baseUrl}${path}`
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...browserHeaders,
+            'Content-Type': payload.contentType,
+          },
+          body: payload.body,
+        })
 
-      for (const payload of payloads) {
-        try {
-          console.log(`[SIGMA_BLAZE] Trying: ${url} [${payload.contentType.includes('json') ? 'JSON' : 'FORM'}]`)
+        console.log(`[SIGMA_BLAZE] Response: ${response.status} from ${url}`)
 
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': payload.contentType },
-            body: payload.body,
-          })
+        if (response.ok) {
+          const text = await response.text()
+          let data: any = {}
+          try { data = JSON.parse(text) } catch { /* not json */ }
 
-          console.log(`[SIGMA_BLAZE] Response: ${response.status} from ${url}`)
+          // Extract token from various response formats
+          const token = data.token || data.access_token || data.jwt || data.session?.token || 
+                        data.data?.token || data.data?.access_token || data.auth_token || 
+                        data.api_key || data.key || data.session_id || ''
+          const sessionCookie = response.headers.get('set-cookie') || ''
 
-          if (response.ok) {
-            const text = await response.text()
-            let data: any = {}
-            try { data = JSON.parse(text) } catch { /* not json */ }
+          if (token || sessionCookie) {
+            console.log(`[SIGMA_BLAZE] Auth successful via ${url}`)
+            
+            const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
+            await supabase.from('sigma_auth_cache').upsert({
+              id: 'default',
+              access_token: token,
+              session_cookie: sessionCookie,
+              expires_at: expiresAt,
+              updated_at: new Date().toISOString(),
+            })
 
-            const token = data.token || data.access_token || data.jwt || data.session || data.auth_token || data.api_key || data.key || ''
-            const sessionCookie = response.headers.get('set-cookie') || ''
-
-            if (token || sessionCookie) {
-              console.log(`[SIGMA_BLAZE] Auth successful via ${url}`)
-              
-              const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
-              await supabase.from('sigma_auth_cache').upsert({
-                id: 'default',
-                access_token: token,
-                session_cookie: sessionCookie,
-                expires_at: expiresAt,
-                updated_at: new Date().toISOString(),
-              })
-
-              return token || sessionCookie
-            } else {
-              console.log(`[SIGMA_BLAZE] 200 OK but no token found in response. Body preview: ${text.substring(0, 200)}`)
-            }
+            return token || sessionCookie
           } else {
-            const text = await response.text().catch(() => '')
-            console.log(`[SIGMA_BLAZE] ${response.status} - ${text.substring(0, 150)}`)
+            console.log(`[SIGMA_BLAZE] 200 OK but no token. Body: ${text.substring(0, 300)}`)
           }
-        } catch (e) {
-          console.log(`[SIGMA_BLAZE] Error on ${url}: ${(e as Error).message}`)
+        } else {
+          const text = await response.text().catch(() => '')
+          console.log(`[SIGMA_BLAZE] ${response.status} - ${text.substring(0, 200)}`)
         }
+      } catch (e) {
+        console.log(`[SIGMA_BLAZE] Error on ${url}: ${(e as Error).message}`)
       }
     }
   }
@@ -207,6 +195,34 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
 
   console.error('[SIGMA_BLAZE] All authentication methods failed')
   return null
+}
+
+/**
+ * Validate if a token is still valid by calling /api/auth/me
+ */
+async function validateToken(apiUrl: string, token: string): Promise<boolean> {
+  const baseUrl = apiUrl.replace(/\/+$/, '')
+  const meEndpoints = [
+    `${baseUrl}/auth/me`,   // /api/auth/me
+    `${baseUrl}/me`,        // /api/me
+  ]
+  
+  for (const url of meEndpoints) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          ...browserHeaders,
+          'Authorization': `Bearer ${token}`,
+          'Cookie': token.includes('=') ? token : '',
+        },
+      })
+      if (response.ok) return true
+    } catch {
+      // continue
+    }
+  }
+  return false
 }
 
 async function handleListAll(supabase: any, config: any, authToken: string, headers: any) {
@@ -274,13 +290,14 @@ async function callSigmaAPI(
   body?: any
 ): Promise<{ ok: boolean; status: number; data: any }> {
   try {
-    const url = `${baseUrl}${path}`
+    const url = `${baseUrl.replace(/\/+$/, '')}${path}`
     const options: RequestInit = {
       method,
       headers: {
+        ...browserHeaders,
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`,
-        'Cookie': authToken.startsWith('session') ? authToken : '',
+        'Cookie': authToken.includes('=') ? authToken : '',
       },
     }
     if (body && method !== 'GET') {
