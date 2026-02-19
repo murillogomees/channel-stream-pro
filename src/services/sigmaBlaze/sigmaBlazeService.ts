@@ -168,13 +168,39 @@ export async function getLogs(filters?: { action?: string; status?: string }): P
   return (data || []) as SigmaLog[];
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label}: tempo limite de ${ms / 1000}s excedido`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 export async function triggerAction(
   action: string,
   params: Record<string, any>
 ): Promise<{ success: boolean; message?: string }> {
-  const { data, error } = await supabase.functions.invoke('sigma-blaze-client', {
-    body: { action, ...params },
-  });
-  if (error) return { success: false, message: error.message };
-  return data;
+  try {
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke('sigma-blaze-client', {
+        body: { action, ...params },
+      }),
+      15000,
+      'Sigma Blaze'
+    );
+    if (error) return { success: false, message: error.message };
+    return data;
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Timeout na requisição' };
+  }
+}
+
+export async function saveConfigWithTimeout(config: Parameters<typeof saveConfig>[0]): Promise<{ success: boolean; error?: string }> {
+  try {
+    return await withTimeout(saveConfig(config), 10000, 'Salvar config');
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Timeout ao salvar' };
+  }
 }

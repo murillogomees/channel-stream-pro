@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Save, TestTube, Zap, MessageCircle, Package, FileText, Settings, Shield, CheckCircle2, XCircle, Globe } from "lucide-react";
 import * as sigmaService from "@/services/sigmaBlaze/sigmaBlazeService";
+import { saveConfigWithTimeout } from "@/services/sigmaBlaze/sigmaBlazeService";
 import type { SigmaBlazeConfig, SigmaFlag, PackageMapping, SigmaLog } from "@/services/sigmaBlaze/sigmaBlazeService";
 
 export function SigmaBlazeIntegration() {
@@ -59,7 +60,7 @@ export function SigmaBlazeIntegration() {
     }
     setSaving(true);
     try {
-      const result = await sigmaService.saveConfig({
+      const result = await saveConfigWithTimeout({
         ...config,
         raw_api_key: apiKeyInput || undefined,
         raw_password: passwordInput || undefined,
