@@ -64,47 +64,49 @@ export function useSigmaClients() {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      // Busca diretamente da tabela profiles (fonte real do painel Sigma)
       let query = supabase
-        .from("sigma_blaze_clients")
-        .select("*", { count: "exact" })
-        .eq("status", "active")
-        .order("expiration_date", { ascending: true })
+        .from("profiles")
+        .select("id, nome, email, contact_phone, plano, data_vencimento, cliente_ativo, situacao, valor_pago, created_at", { count: "exact" })
+        .eq("cliente_ativo", true)
+        .not("data_vencimento", "is", null)
+        .order("data_vencimento", { ascending: true })
         .range(from, to);
 
       if (search) {
-        query = query.or(`name.ilike.%${search}%,whatsapp.ilike.%${search}%`);
+        query = query.or(`nome.ilike.%${search}%,email.ilike.%${search}%,contact_phone.ilike.%${search}%`);
       }
 
       if (expiration !== "all") {
         const now = new Date();
-        const twoDays = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
-        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const twoDays = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
         if (expiration === "red") {
-          query = query.lte("expiration_date", twoDays);
+          query = query.lte("data_vencimento", twoDays);
         } else if (expiration === "yellow") {
-          query = query.gt("expiration_date", twoDays).lte("expiration_date", sevenDays);
+          query = query.gt("data_vencimento", twoDays).lte("data_vencimento", sevenDays);
         } else if (expiration === "green") {
-          query = query.gt("expiration_date", sevenDays);
+          query = query.gt("data_vencimento", sevenDays);
         }
       }
 
       const { data, count, error: dbError } = await query;
       if (dbError) throw dbError;
 
-      // Map to SigmaClient interface
-      const mapped: SigmaClient[] = (data || []).map((c: any) => ({
-        id: c.id,
-        username: c.sigma_id || c.id,
-        full_name: c.name,
-        phone: c.whatsapp || null,
-        package_name: c.plan_name || "Blaze IPTV",
-        expiration_date: c.expiration_date,
-        status: c.status as SigmaClient["status"],
-        email: c.email,
-        plan_value: c.plan_value,
-        last_reminder_sent: c.last_reminder_sent,
-        notes: c.notes,
+      // Mapear profiles para SigmaClient interface
+      const mapped: SigmaClient[] = (data || []).map((p: any) => ({
+        id: p.id,
+        username: p.email?.split("@")[0] || p.id,
+        full_name: p.nome || p.email?.split("@")[0] || "Sem nome",
+        phone: p.contact_phone || null,
+        package_name: p.plano || "Blaze IPTV",
+        expiration_date: p.data_vencimento,
+        status: "active" as const,
+        email: p.email,
+        plan_value: p.valor_pago ? Number(p.valor_pago) : null,
+        last_reminder_sent: null,
+        notes: p.situacao,
       }));
 
       setClients(mapped);
