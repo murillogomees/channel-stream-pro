@@ -8,7 +8,7 @@
  * sem precisar alterar variáveis de ambiente.
  */
 
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2.49.1";
 
 export interface SigmaPanelConfig {
   id: string;
