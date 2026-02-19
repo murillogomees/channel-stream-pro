@@ -1,12 +1,14 @@
 /**
  * AdminShell - Layout padrão para todas as páginas admin
- * Design consistente com header, search e navegação
+ * Inclui sidebar global + header com search
  * Responsivo: Mobile | Tablet | Desktop | TV
  */
 
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { AdminHeader } from "./AdminHeader";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { AdminSidebar } from "./AdminSidebar";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface AdminShellProps {
   children: ReactNode;
@@ -33,31 +35,37 @@ const maxWidthClasses = {
 
 export function AdminShell({ 
   children, 
-  backTo = "/admin/dashboard",
   className,
   maxWidth = "2xl",
   tvOptimized = true,
 }: AdminShellProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader backTo={backTo} />
-      
-      <main className={cn(
-        "mx-auto w-full",
-        // Padding responsivo
-        "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-8",
-        // Padding extra para TV
-        tvOptimized && "2xl:px-10 3xl:px-12",
-        // Padding vertical responsivo
-        "py-4 sm:py-5 md:py-6 lg:py-6",
-        tvOptimized && "2xl:py-8 3xl:py-10",
-        // Max width
-        maxWidthClasses[maxWidth],
-        className
-      )}>
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AdminSidebar />
+        <SidebarInset className="flex-1 flex flex-col">
+          {/* Compact header */}
+          <header className="border-b bg-card sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
+            <div className="flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-3">
+              <SidebarTrigger className="h-8 w-8 flex-shrink-0" />
+              <GlobalSearch />
+            </div>
+          </header>
+
+          <main className={cn(
+            "mx-auto w-full flex-1",
+            "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-8",
+            tvOptimized && "2xl:px-10 3xl:px-12",
+            "py-4 sm:py-5 md:py-6 lg:py-6",
+            tvOptimized && "2xl:py-8 3xl:py-10",
+            maxWidthClasses[maxWidth],
+            className
+          )}>
+            {children}
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
 
