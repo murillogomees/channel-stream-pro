@@ -1,8 +1,9 @@
 /**
  * CONTEXTO UNIFICADO DE AUTENTICAÇÃO - Simplificado
- * @version 6.0.0
+ * @version 6.0.1
  * 
  * Resolução de role rápida: JWT > query direta > fallback
+ * Rebuild trigger: force cache invalidation
  */
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
