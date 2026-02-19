@@ -40,7 +40,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
-import { AppLayout } from '@/components/layouts/AppLayout';
+// AppLayout removed with IPTV structure
 import { PlanCards } from '@/components/profile/PlanCards';
 import { CurrentPlanCard } from '@/components/profile/CurrentPlanCard';
 import { usePaymentRealtime } from '@/hooks/usePaymentRealtime';
@@ -404,7 +404,7 @@ export default function UnifiedProfile() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
-    return isAppRoute ? <AppLayout>{loadingContent}</AppLayout> : loadingContent;
+    return loadingContent;
   }
 
   const backPath = isAdmin ? '/admin/dashboard' : '/app/home';
@@ -753,5 +753,5 @@ export default function UnifiedProfile() {
     </div>
   );
 
-  return isAppRoute ? <AppLayout allowScroll>{content}</AppLayout> : content;
+  return content;
 }
