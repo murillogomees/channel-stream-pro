@@ -8,14 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, TestTube, Zap, MessageCircle, Package, FileText, Settings } from "lucide-react";
+import { Loader2, Save, TestTube, Zap, MessageCircle, Package, FileText, Settings, Shield, CheckCircle2, XCircle, Globe } from "lucide-react";
 import * as sigmaService from "@/services/sigmaBlaze/sigmaBlazeService";
 import type { SigmaBlazeConfig, SigmaFlag, PackageMapping, SigmaLog } from "@/services/sigmaBlaze/sigmaBlazeService";
 
 export function SigmaBlazeIntegration() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
   const [config, setConfig] = useState<SigmaBlazeConfig | null>(null);
   const [flags, setFlags] = useState<SigmaFlag[]>([]);
   const [mappings, setMappings] = useState<PackageMapping[]>([]);
@@ -23,6 +26,7 @@ export function SigmaBlazeIntegration() {
   const [logFilter, setLogFilter] = useState<{ action?: string; status?: string }>({});
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+  const [proxyPassInput, setProxyPassInput] = useState("");
 
   useEffect(() => {
     loadAll();
@@ -50,13 +54,34 @@ export function SigmaBlazeIntegration() {
       ...config,
       raw_api_key: apiKeyInput || undefined,
       raw_password: passwordInput || undefined,
+      raw_proxy_pass: proxyPassInput || undefined,
     });
     if (success) toast.success("Configuração salva!");
     else toast.error("Erro ao salvar configuração");
     setSaving(false);
     setApiKeyInput("");
     setPasswordInput("");
+    setProxyPassInput("");
     loadAll();
+  }
+
+  async function handleTestConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await sigmaService.triggerAction('test-connection', {});
+      setTestResult({
+        success: result.success,
+        message: result.message || (result.success ? 'Conexão bem-sucedida!' : 'Falha na conexão'),
+        details: (result as any).details,
+      });
+      if (result.success) toast.success("Teste de conexão OK!");
+      else toast.error(result.message || "Falha no teste");
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || 'Erro desconhecido' });
+      toast.error("Erro no teste de conexão");
+    }
+    setTesting(false);
   }
 
   async function handleToggleFlag(flagName: string, enabled: boolean) {
@@ -98,12 +123,12 @@ export function SigmaBlazeIntegration() {
 
   return (
     <div className="space-y-6">
-      {/* API Config */}
+      {/* Credenciais & URL */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Configuração da API
+            Credenciais & URL da API
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -113,15 +138,16 @@ export function SigmaBlazeIntegration() {
               <Input
                 value={config?.api_url || ""}
                 onChange={e => setConfig(prev => prev ? { ...prev, api_url: e.target.value } : prev)}
-                placeholder="https://painel.sigmablaze.com"
+                placeholder="https://blaze.officeb.site/api"
               />
+              <p className="text-xs text-muted-foreground">URL base da API (com ou sem /api)</p>
             </div>
             <div className="space-y-2">
-              <Label>Usuário Sigma</Label>
+              <Label>Usuário / Email Sigma</Label>
               <Input
                 value={config?.sigma_username || ""}
                 onChange={e => setConfig(prev => prev ? { ...prev, sigma_username: e.target.value } : prev)}
-                placeholder="seu_usuario"
+                placeholder="seu_usuario@email.com"
               />
             </div>
             <div className="space-y-2">
@@ -129,9 +155,10 @@ export function SigmaBlazeIntegration() {
               <Input
                 value={passwordInput}
                 onChange={e => setPasswordInput(e.target.value)}
-                placeholder={config?.sigma_password || "Inserir senha"}
+                placeholder={config?.sigma_password || "Inserir nova senha"}
                 type="password"
               />
+              <p className="text-xs text-muted-foreground">Deixe vazio para manter a senha atual</p>
             </div>
             <div className="space-y-2">
               <Label>API Key (opcional)</Label>
@@ -142,6 +169,61 @@ export function SigmaBlazeIntegration() {
                 type="password"
               />
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Proxy */}
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-semibold mb-3">
+              <Shield className="h-4 w-4" />
+              Configuração do Proxy (bypass Cloudflare)
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Host do Proxy</Label>
+                <Input
+                  value={config?.proxy_host || ""}
+                  onChange={e => setConfig(prev => prev ? { ...prev, proxy_host: e.target.value } : prev)}
+                  placeholder="181.215.48.26"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Porta</Label>
+                <Input
+                  type="number"
+                  value={config?.proxy_port || ""}
+                  onChange={e => setConfig(prev => prev ? { ...prev, proxy_port: parseInt(e.target.value) || 0 } : prev)}
+                  placeholder="36621"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Usuário do Proxy</Label>
+                <Input
+                  value={config?.proxy_user || ""}
+                  onChange={e => setConfig(prev => prev ? { ...prev, proxy_user: e.target.value } : prev)}
+                  placeholder="proxy_user"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Senha do Proxy</Label>
+                <Input
+                  value={proxyPassInput}
+                  onChange={e => setProxyPassInput(e.target.value)}
+                  placeholder={config?.proxy_pass || "Inserir senha do proxy"}
+                  type="password"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Proxy residencial para contornar proteção Cloudflare. Deixe vazio para conexão direta.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* WhatsApp */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>WhatsApp Admin</Label>
               <Input
@@ -159,16 +241,45 @@ export function SigmaBlazeIntegration() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-4">
+
+          <Separator />
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-3">
             <Button onClick={handleSaveConfig} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Salvar Configuração
             </Button>
-            <Button variant="outline" onClick={() => toast.info("Teste de conexão em breve")}>
-              <TestTube className="h-4 w-4 mr-2" />
+            <Button variant="outline" onClick={handleTestConnection} disabled={testing}>
+              {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <TestTube className="h-4 w-4 mr-2" />}
               Testar Conexão
             </Button>
           </div>
+
+          {/* Test Result */}
+          {testResult && (
+            <div className={`p-4 rounded-lg border ${testResult.success ? 'border-green-500/50 bg-green-500/10' : 'border-red-500/50 bg-red-500/10'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                {testResult.success ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                <span className="font-semibold text-sm">
+                  {testResult.success ? 'Conexão OK' : 'Falha na Conexão'}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">{testResult.message}</p>
+              {testResult.details && (
+                <details className="mt-2">
+                  <summary className="text-xs cursor-pointer text-muted-foreground">Detalhes técnicos</summary>
+                  <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-auto max-h-[200px]">
+                    {JSON.stringify(testResult.details, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -214,7 +325,7 @@ export function SigmaBlazeIntegration() {
         </CardHeader>
         <CardContent>
           {mappings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum mapeamento configurado. Adicione planos na tabela subscription_package_mapping.</p>
+            <p className="text-sm text-muted-foreground">Nenhum mapeamento configurado.</p>
           ) : (
             <div className="space-y-3">
               {mappings.map(m => (
@@ -273,6 +384,7 @@ export function SigmaBlazeIntegration() {
                 <SelectItem value="DELETE_CLIENT">Delete</SelectItem>
                 <SelectItem value="UPDATE_PACKAGE">Update Package</SelectItem>
                 <SelectItem value="SYNC_CLIENT">Sync</SelectItem>
+                <SelectItem value="test-connection">Test Connection</SelectItem>
               </SelectContent>
             </Select>
             <Select value={logFilter.status || "all"} onValueChange={v => setLogFilter(prev => ({ ...prev, status: v === "all" ? undefined : v }))}>

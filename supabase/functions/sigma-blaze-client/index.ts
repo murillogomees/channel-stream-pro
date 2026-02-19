@@ -5,20 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
-// Proxy configuration for bypassing Cloudflare
-const PROXY_HOST = '181.215.48.26'
-const PROXY_PORT = 36621
-const PROXY_USER = '3RQpVq9w'
-const PROXY_PASS = '47t7XEoD'
-
 // Browser-like headers to bypass Cloudflare bot protection
 const browserHeaders: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
   'Accept-Encoding': 'gzip, deflate, br',
-  'Origin': 'https://blaze.officeb.site',
-  'Referer': 'https://blaze.officeb.site/',
   'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
   'Sec-Ch-Ua-Mobile': '?0',
   'Sec-Ch-Ua-Platform': '"Windows"',
@@ -27,33 +19,34 @@ const browserHeaders: Record<string, string> = {
   'Sec-Fetch-Site': 'same-origin',
 }
 
-/**
- * Make a proxied fetch request through the residential proxy
- */
-async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  // Deno doesn't support HTTP proxy natively in fetch, so we use a CONNECT tunnel
-  // For now, try direct fetch with proxy headers, and fall back
-  const proxyUrl = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_HOST}:${PROXY_PORT}`
-  
-  try {
-    // Try using the proxy via Deno's fetch with proxy support
-    const response = await fetch(url, {
-      ...options,
-      // @ts-ignore - Deno supports client proxy
-      client: Deno.createHttpClient({
-        proxy: { url: proxyUrl },
-      }),
-    })
-    return response
-  } catch (proxyError) {
-    console.log(`[SIGMA_BLAZE] Proxy fetch failed, trying direct: ${(proxyError as Error).message}`)
-    // Fallback to direct fetch
+interface ProxyConfig {
+  host: string
+  port: number
+  user: string
+  pass: string
+}
+
+function buildProxiedFetch(proxy?: ProxyConfig) {
+  return async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    if (proxy && proxy.host && proxy.port) {
+      const proxyUrl = `http://${proxy.user}:${proxy.pass}@${proxy.host}:${proxy.port}`
+      try {
+        const response = await fetch(url, {
+          ...options,
+          // @ts-ignore - Deno supports client proxy
+          client: Deno.createHttpClient({ proxy: { url: proxyUrl } }),
+        })
+        return response
+      } catch (proxyError) {
+        console.log(`[SIGMA] Proxy failed, trying direct: ${(proxyError as Error).message}`)
+      }
+    }
     return await fetch(url, options)
   }
 }
 
 interface SigmaRequest {
-  action: 'create' | 'delete' | 'update-package' | 'sync' | 'list-all'
+  action: 'create' | 'delete' | 'update-package' | 'sync' | 'list-all' | 'test-connection'
   user_id?: string
   email?: string
   name?: string
@@ -87,114 +80,189 @@ Deno.serve(async (req) => {
       .single()
 
     if (!config?.api_url || (!config?.sigma_username && !config?.api_key)) {
-      return new Response(JSON.stringify({
-        success: false, error: 'Sigma Blaze não configurado. Configure a URL e credenciais na aba Sigma Blaze.'
-      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return jsonResponse({ success: false, error: 'Sigma Blaze não configurado. Configure a URL e credenciais.' }, 400)
     }
 
-    const authToken = await getAuthToken(supabase, config)
+    // Build proxy from DB config
+    const proxy: ProxyConfig | undefined = config.proxy_host && config.proxy_port
+      ? { host: config.proxy_host, port: config.proxy_port, user: config.proxy_user || '', pass: config.proxy_pass || '' }
+      : undefined
+
+    const fetchFn = buildProxiedFetch(proxy)
+
+    // Test connection action
+    if (action === 'test-connection') {
+      return await handleTestConnection(supabase, config, proxy, fetchFn)
+    }
+
+    const authToken = await getAuthToken(supabase, config, fetchFn)
     if (!authToken) {
-      return new Response(JSON.stringify({
-        success: false, error: 'Falha na autenticação com o Sigma Blaze. Verifique usuário e senha.'
-      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return jsonResponse({ success: false, error: 'Falha na autenticação com o Sigma Blaze. Verifique usuário e senha.' }, 401)
     }
 
     if (action === 'list-all') {
-      return await handleListAll(supabase, config, authToken, corsHeaders)
+      return await handleListAll(supabase, config, authToken, fetchFn)
     }
 
-    return new Response(JSON.stringify({
-      success: false, error: 'Ação não suportada: ' + action
-    }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return jsonResponse({ success: false, error: 'Ação não suportada: ' + action }, 400)
 
   } catch (error) {
-    console.error('[SIGMA_BLAZE] Error:', error)
-    return new Response(JSON.stringify({
-      success: false, error: (error as Error).message
-    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('[SIGMA] Error:', error)
+    return jsonResponse({ success: false, error: (error as Error).message }, 500)
   }
 })
 
+function jsonResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 /**
- * Authenticate with Sigma Blaze.
- * Based on user info: login page is /#/sign-in, API base is /api,
- * session endpoint is /api/auth/me
+ * Test connection: tries to reach the API URL, then authenticate
  */
-async function getAuthToken(supabase: any, config: any): Promise<string | null> {
-  // 1. Check cached token
+async function handleTestConnection(
+  supabase: any, config: any, proxy: ProxyConfig | undefined, fetchFn: typeof fetch
+) {
+  const steps: Array<{ step: string; status: string; detail: string }> = []
+  const baseUrl = config.api_url.replace(/\/+$/, '')
+
+  // Step 1: Reach the URL
+  try {
+    const reachRes = await fetchFn(baseUrl, {
+      method: 'GET',
+      headers: { ...browserHeaders },
+    })
+    const reachText = await reachRes.text()
+    const isCloudflareChallenge = reachText.includes('challenge-platform') || reachText.includes('cf-browser-verification')
+
+    steps.push({
+      step: 'Alcançar URL',
+      status: isCloudflareChallenge ? 'CLOUDFLARE_BLOCK' : reachRes.ok ? 'OK' : `HTTP ${reachRes.status}`,
+      detail: isCloudflareChallenge
+        ? 'Cloudflare está bloqueando. Configure um proxy residencial.'
+        : `Status ${reachRes.status}, body: ${reachText.substring(0, 200)}`,
+    })
+
+    if (isCloudflareChallenge && !proxy?.host) {
+      await logAction(supabase, 'test-connection', 'ERROR', undefined, { steps })
+      return jsonResponse({
+        success: false,
+        message: 'Cloudflare está bloqueando a conexão direta. Configure um proxy residencial.',
+        details: { steps },
+      })
+    }
+  } catch (e) {
+    steps.push({ step: 'Alcançar URL', status: 'ERROR', detail: (e as Error).message })
+    await logAction(supabase, 'test-connection', 'ERROR', undefined, { steps })
+    return jsonResponse({ success: false, message: `Não foi possível alcançar ${baseUrl}: ${(e as Error).message}`, details: { steps } })
+  }
+
+  // Step 2: Try authentication
+  try {
+    const authToken = await getAuthToken(supabase, config, fetchFn)
+    if (authToken) {
+      steps.push({ step: 'Autenticação', status: 'OK', detail: 'Token obtido com sucesso' })
+
+      // Step 3: Try listing clients
+      try {
+        const result = await callSigmaAPI(baseUrl, authToken, 'GET', '/clients?page=1&per_page=5', undefined, fetchFn)
+        if (result.ok) {
+          const clients = extractClientArray(result.data)
+          steps.push({ step: 'Listar Clientes', status: 'OK', detail: `${clients.length} clientes retornados na amostra` })
+        } else {
+          steps.push({ step: 'Listar Clientes', status: `HTTP ${result.status}`, detail: JSON.stringify(result.data).substring(0, 200) })
+        }
+      } catch (e) {
+        steps.push({ step: 'Listar Clientes', status: 'ERROR', detail: (e as Error).message })
+      }
+
+      await logAction(supabase, 'test-connection', 'SUCCESS', undefined, { steps })
+      return jsonResponse({ success: true, message: 'Conexão com Sigma Blaze funcionando!', details: { steps } })
+    } else {
+      steps.push({ step: 'Autenticação', status: 'FAILED', detail: 'Nenhum token retornado. Verifique credenciais.' })
+      await logAction(supabase, 'test-connection', 'ERROR', undefined, { steps })
+      return jsonResponse({ success: false, message: 'Autenticação falhou. Verifique usuário e senha.', details: { steps } })
+    }
+  } catch (e) {
+    steps.push({ step: 'Autenticação', status: 'ERROR', detail: (e as Error).message })
+    await logAction(supabase, 'test-connection', 'ERROR', undefined, { steps })
+    return jsonResponse({ success: false, message: `Erro na autenticação: ${(e as Error).message}`, details: { steps } })
+  }
+}
+
+/**
+ * Authenticate with Sigma Blaze
+ */
+async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): Promise<string | null> {
+  // Check cached token
   const { data: cached } = await supabase
     .from('sigma_auth_cache')
     .select('access_token, session_cookie, expires_at')
     .eq('id', 'default')
     .maybeSingle()
 
-  const now = new Date()
-  const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000)
+  const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000)
 
   if (cached && new Date(cached.expires_at) > tenMinutesFromNow) {
-    // Validate cached token is still valid
-    const isValid = await validateToken(config.api_url, cached.access_token || cached.session_cookie)
+    const isValid = await validateToken(config.api_url, cached.access_token || cached.session_cookie, fetchFn)
     if (isValid) {
-      console.log('[SIGMA_BLAZE] Using cached auth token (validated)')
+      console.log('[SIGMA] Using cached token')
       return cached.access_token || cached.session_cookie
     }
-    console.log('[SIGMA_BLAZE] Cached token invalid, re-authenticating...')
   }
 
-  console.log('[SIGMA_BLAZE] Authenticating with Sigma Blaze...')
-
+  console.log('[SIGMA] Authenticating...')
   const baseUrl = config.api_url.replace(/\/+$/, '')
-  // Remove /api suffix to get the root domain for building full paths
   const rootUrl = baseUrl.endsWith('/api') ? baseUrl.slice(0, -4) : baseUrl
 
-  // Focused auth paths based on user-confirmed API structure
+  // Add Origin/Referer headers dynamically based on config URL
+  const dynamicHeaders = {
+    ...browserHeaders,
+    'Origin': rootUrl,
+    'Referer': rootUrl + '/',
+  }
+
   const authEndpoints = [
-    `${baseUrl}/auth/login`,       // /api/auth/login
-    `${baseUrl}/login`,            // /api/login
-    `${rootUrl}/auth/login`,       // /auth/login (if base doesn't have /api)
-    `${baseUrl}/auth/sign-in`,     // /api/auth/sign-in
-    `${baseUrl}/auth/signin`,      // /api/auth/signin
-    `${baseUrl}/sessions`,         // /api/sessions
-    `${baseUrl}/auth/sessions`,    // /api/auth/sessions
+    `${baseUrl}/auth/login`,
+    `${baseUrl}/login`,
+    `${rootUrl}/auth/login`,
+    `${baseUrl}/auth/sign-in`,
+    `${baseUrl}/auth/signin`,
+    `${baseUrl}/sessions`,
+    `${baseUrl}/auth/sessions`,
   ]
 
-  // Payloads to try
   const payloads = [
-    { contentType: 'application/json', body: JSON.stringify({ email: config.sigma_username, password: config.sigma_password }) },
-    { contentType: 'application/json', body: JSON.stringify({ username: config.sigma_username, password: config.sigma_password }) },
-    { contentType: 'application/json', body: JSON.stringify({ login: config.sigma_username, password: config.sigma_password }) },
+    { body: JSON.stringify({ email: config.sigma_username, password: config.sigma_password }) },
+    { body: JSON.stringify({ username: config.sigma_username, password: config.sigma_password }) },
+    { body: JSON.stringify({ login: config.sigma_username, password: config.sigma_password }) },
   ]
 
   for (const url of authEndpoints) {
     for (const payload of payloads) {
       try {
-        console.log(`[SIGMA_BLAZE] Trying: POST ${url}`)
-
-        const response = await proxiedFetch(url, {
+        console.log(`[SIGMA] Trying: POST ${url}`)
+        const response = await fetchFn(url, {
           method: 'POST',
-          headers: {
-            ...browserHeaders,
-            'Content-Type': payload.contentType,
-          },
+          headers: { ...dynamicHeaders, 'Content-Type': 'application/json' },
           body: payload.body,
         })
-
-        console.log(`[SIGMA_BLAZE] Response: ${response.status} from ${url}`)
+        console.log(`[SIGMA] Response: ${response.status} from ${url}`)
 
         if (response.ok) {
           const text = await response.text()
           let data: any = {}
           try { data = JSON.parse(text) } catch { /* not json */ }
 
-          // Extract token from various response formats
-          const token = data.token || data.access_token || data.jwt || data.session?.token || 
-                        data.data?.token || data.data?.access_token || data.auth_token || 
+          const token = data.token || data.access_token || data.jwt || data.session?.token ||
+                        data.data?.token || data.data?.access_token || data.auth_token ||
                         data.api_key || data.key || data.session_id || ''
           const sessionCookie = response.headers.get('set-cookie') || ''
 
           if (token || sessionCookie) {
-            console.log(`[SIGMA_BLAZE] Auth successful via ${url}`)
-            
+            console.log(`[SIGMA] Auth successful via ${url}`)
             const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
             await supabase.from('sigma_auth_cache').upsert({
               id: 'default',
@@ -203,44 +271,34 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
               expires_at: expiresAt,
               updated_at: new Date().toISOString(),
             })
-
             return token || sessionCookie
           } else {
-            console.log(`[SIGMA_BLAZE] 200 OK but no token. Body: ${text.substring(0, 300)}`)
+            console.log(`[SIGMA] 200 OK but no token. Body: ${text.substring(0, 300)}`)
           }
         } else {
           const text = await response.text().catch(() => '')
-          console.log(`[SIGMA_BLAZE] ${response.status} - ${text.substring(0, 200)}`)
+          console.log(`[SIGMA] ${response.status} - ${text.substring(0, 200)}`)
         }
       } catch (e) {
-        console.log(`[SIGMA_BLAZE] Error on ${url}: ${(e as Error).message}`)
+        console.log(`[SIGMA] Error on ${url}: ${(e as Error).message}`)
       }
     }
   }
 
-  // Fallback: try api_key if available
   if (config.api_key) {
-    console.log('[SIGMA_BLAZE] Falling back to API key auth')
+    console.log('[SIGMA] Falling back to API key auth')
     return config.api_key
   }
 
-  console.error('[SIGMA_BLAZE] All authentication methods failed')
+  console.error('[SIGMA] All auth methods failed')
   return null
 }
 
-/**
- * Validate if a token is still valid by calling /api/auth/me
- */
-async function validateToken(apiUrl: string, token: string): Promise<boolean> {
+async function validateToken(apiUrl: string, token: string, fetchFn: typeof fetch): Promise<boolean> {
   const baseUrl = apiUrl.replace(/\/+$/, '')
-  const meEndpoints = [
-    `${baseUrl}/auth/me`,   // /api/auth/me
-    `${baseUrl}/me`,        // /api/me
-  ]
-  
-  for (const url of meEndpoints) {
+  for (const url of [`${baseUrl}/auth/me`, `${baseUrl}/me`]) {
     try {
-      const response = await proxiedFetch(url, {
+      const response = await fetchFn(url, {
         method: 'GET',
         headers: {
           ...browserHeaders,
@@ -249,24 +307,22 @@ async function validateToken(apiUrl: string, token: string): Promise<boolean> {
         },
       })
       if (response.ok) return true
-    } catch {
-      // continue
-    }
+      else await response.text() // consume body
+    } catch { /* continue */ }
   }
   return false
 }
 
-async function handleListAll(supabase: any, config: any, authToken: string, headers: any) {
+async function handleListAll(supabase: any, config: any, authToken: string, fetchFn: typeof fetch) {
   try {
     let allClients: any[] = []
     let page = 1
     let hasMore = true
 
     while (hasMore) {
-      const result = await callSigmaAPI(config.api_url, authToken, 'GET', `/clients?page=${page}&per_page=100`)
-      
+      const result = await callSigmaAPI(config.api_url, authToken, 'GET', `/clients?page=${page}&per_page=100`, undefined, fetchFn)
       if (!result.ok) {
-        const altResult = await callSigmaAPI(config.api_url, authToken, 'GET', `/users?page=${page}&limit=100`)
+        const altResult = await callSigmaAPI(config.api_url, authToken, 'GET', `/users?page=${page}&limit=100`, undefined, fetchFn)
         if (altResult.ok && altResult.data) {
           const clients = extractClientArray(altResult.data)
           allClients = allClients.concat(clients)
@@ -283,25 +339,19 @@ async function handleListAll(supabase: any, config: any, authToken: string, head
       if (page > 50) break
     }
 
-    console.log(`[SIGMA_BLAZE] Fetched ${allClients.length} clients from API`)
+    console.log(`[SIGMA] Fetched ${allClients.length} clients`)
+    await logAction(supabase, 'list-all', 'SUCCESS', undefined, { total_fetched: allClients.length })
 
-    await logAction(supabase, 'list-all', 'SUCCESS', undefined, {
-      total_fetched: allClients.length,
-    })
-
-    return new Response(JSON.stringify({
+    return jsonResponse({
       success: true,
       clients: allClients,
       total: allClients.length,
-      message: `${allClients.length} clientes encontrados`
-    }), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } })
-
+      message: `${allClients.length} clientes encontrados`,
+    })
   } catch (error) {
-    console.error('[SIGMA_BLAZE] List all error:', error)
+    console.error('[SIGMA] List all error:', error)
     await logAction(supabase, 'list-all', 'ERROR', undefined, { error: (error as Error).message })
-    return new Response(JSON.stringify({
-      success: false, error: (error as Error).message
-    }), { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } })
+    return jsonResponse({ success: false, error: (error as Error).message }, 500)
   }
 }
 
@@ -314,11 +364,7 @@ function extractClientArray(data: any): any[] {
 }
 
 async function callSigmaAPI(
-  baseUrl: string,
-  authToken: string,
-  method: string,
-  path: string,
-  body?: any
+  baseUrl: string, authToken: string, method: string, path: string, body?: any, fetchFn: typeof fetch = fetch
 ): Promise<{ ok: boolean; status: number; data: any }> {
   try {
     const url = `${baseUrl.replace(/\/+$/, '')}${path}`
@@ -331,11 +377,9 @@ async function callSigmaAPI(
         'Cookie': authToken.includes('=') ? authToken : '',
       },
     }
-    if (body && method !== 'GET') {
-      options.body = JSON.stringify(body)
-    }
+    if (body && method !== 'GET') options.body = JSON.stringify(body)
 
-    const response = await proxiedFetch(url, options)
+    const response = await fetchFn(url, options)
     const data = await response.json().catch(() => ({}))
     return { ok: response.ok, status: response.status, data }
   } catch (error) {
@@ -344,7 +388,5 @@ async function callSigmaAPI(
 }
 
 async function logAction(supabase: any, action: string, status: string, user_id?: string, details?: any) {
-  await supabase.from('sigma_blaze_logs').insert({
-    action, status, user_id, details: details || {}
-  })
+  await supabase.from('sigma_blaze_logs').insert({ action, status, user_id, details: details || {} })
 }

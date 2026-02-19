@@ -10,6 +10,10 @@ export interface SigmaBlazeConfig {
   admin_whatsapp_number: string;
   whatsapp_message_template: string;
   is_active: boolean;
+  proxy_host: string;
+  proxy_port: number;
+  proxy_user: string;
+  proxy_pass: string;
 }
 
 export interface SigmaFlag {
@@ -55,10 +59,11 @@ export async function getConfig(): Promise<SigmaBlazeConfig | null> {
     ...data,
     api_key: data.api_key ? '••••••' + data.api_key.slice(-4) : '',
     sigma_password: data.sigma_password ? '••••••' : '',
+    proxy_pass: data.proxy_pass ? '••••••' : '',
   } as SigmaBlazeConfig;
 }
 
-export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string; raw_password?: string }): Promise<boolean> {
+export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string; raw_password?: string; raw_proxy_pass?: string }): Promise<boolean> {
   const updateData: any = {};
   if (config.api_url !== undefined) updateData.api_url = config.api_url;
   if (config.raw_api_key) updateData.api_key = config.raw_api_key;
@@ -67,6 +72,10 @@ export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_k
   if (config.admin_whatsapp_number !== undefined) updateData.admin_whatsapp_number = config.admin_whatsapp_number;
   if (config.whatsapp_message_template !== undefined) updateData.whatsapp_message_template = config.whatsapp_message_template;
   if (config.is_active !== undefined) updateData.is_active = config.is_active;
+  if (config.proxy_host !== undefined) updateData.proxy_host = config.proxy_host;
+  if (config.proxy_port !== undefined) updateData.proxy_port = config.proxy_port;
+  if (config.proxy_user !== undefined) updateData.proxy_user = config.proxy_user;
+  if (config.raw_proxy_pass) updateData.proxy_pass = config.raw_proxy_pass;
 
   if (config.id) {
     const { error } = await supabase
