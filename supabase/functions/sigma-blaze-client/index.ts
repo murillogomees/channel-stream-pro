@@ -33,7 +33,6 @@ Deno.serve(async (req) => {
     }
     const { action } = body
 
-    // Get Sigma config (with credentials)
     const { data: config } = await supabase
       .from('sigma_blaze_config')
       .select('*')
@@ -46,7 +45,6 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Authenticate with Sigma Blaze (session-based)
     const authToken = await getAuthToken(supabase, config)
     if (!authToken) {
       return new Response(JSON.stringify({
@@ -71,8 +69,21 @@ Deno.serve(async (req) => {
 })
 
 /**
- * Authenticate with Sigma Blaze using username/password.
- * Caches the token/session in the database to persist across cold starts.
+ * Build all possible base URLs from the configured api_url.
+ * e.g. "https://blaze.officeb.site/api" => also try "https://blaze.officeb.site"
+ */
+function getBaseUrls(apiUrl: string): string[] {
+  const clean = apiUrl.replace(/\/+$/, '')
+  const urls = [clean]
+  // If URL ends with /api, also try without it
+  if (clean.endsWith('/api')) {
+    urls.push(clean.slice(0, -4))
+  }
+  return urls
+}
+
+/**
+ * Authenticate with Sigma Blaze using multiple strategies.
  */
 async function getAuthToken(supabase: any, config: any): Promise<string | null> {
   // 1. Check cached token
@@ -86,73 +97,109 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
   const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000)
 
   if (cached && new Date(cached.expires_at) > tenMinutesFromNow) {
-    // Token still valid with >10min margin — use it
     console.log('[SIGMA_BLAZE] Using cached auth token')
     return cached.access_token || cached.session_cookie
   }
 
-  // Token missing, expired, or expiring soon — re-authenticate proactively
   console.log('[SIGMA_BLAZE] Token expired or expiring soon, re-authenticating...')
 
-  // 2. Authenticate with username/password
-  console.log('[SIGMA_BLAZE] Authenticating with username/password...')
+  const baseUrls = getBaseUrls(config.api_url)
   
-  // Try common auth endpoint patterns
-  const authEndpoints = [
-    '/auth/login',
+  // Auth endpoint paths to try (relative)
+  const authPaths = [
     '/login',
+    '/auth/login',
     '/api/login',
-    '/api/auth',
-    '/api/v1/auth/login',
+    '/api/auth/login',
     '/api/v1/login',
+    '/api/v1/auth/login',
   ]
 
-  for (const endpoint of authEndpoints) {
-    try {
-      const url = `${config.api_url}${endpoint}`
-      console.log(`[SIGMA_BLAZE] Trying auth endpoint: ${url}`)
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: config.sigma_username,
-          password: config.sigma_password,
-          // Also try alternative field names
-          user: config.sigma_username,
-          login: config.sigma_username,
-          senha: config.sigma_password,
-          pass: config.sigma_password,
-        }),
-      })
+  // Different body payloads to try
+  const payloads = [
+    // JSON with email field
+    {
+      contentType: 'application/json',
+      body: JSON.stringify({
+        email: config.sigma_username,
+        password: config.sigma_password,
+      }),
+    },
+    // JSON with username field
+    {
+      contentType: 'application/json',
+      body: JSON.stringify({
+        username: config.sigma_username,
+        password: config.sigma_password,
+      }),
+    },
+    // Form-encoded
+    {
+      contentType: 'application/x-www-form-urlencoded',
+      body: `email=${encodeURIComponent(config.sigma_username)}&password=${encodeURIComponent(config.sigma_password)}`,
+    },
+    // Form-encoded with username
+    {
+      contentType: 'application/x-www-form-urlencoded',
+      body: `username=${encodeURIComponent(config.sigma_username)}&password=${encodeURIComponent(config.sigma_password)}`,
+    },
+  ]
 
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}))
-        const token = data.token || data.access_token || data.jwt || data.session || data.auth_token || data.api_key || ''
-        const sessionCookie = response.headers.get('set-cookie') || ''
+  for (const baseUrl of baseUrls) {
+    for (const path of authPaths) {
+      // Skip paths that would duplicate /api
+      if (baseUrl.endsWith('/api') && path.startsWith('/api')) continue
 
-        if (token || sessionCookie) {
-          console.log(`[SIGMA_BLAZE] Auth successful via ${endpoint}`)
-          
-          // Cache for 50 minutes (session lasts 60min, renew before expiry)
-          const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
-          await supabase.from('sigma_auth_cache').upsert({
-            id: 'default',
-            access_token: token,
-            session_cookie: sessionCookie,
-            expires_at: expiresAt,
-            updated_at: new Date().toISOString(),
+      const url = `${baseUrl}${path}`
+
+      for (const payload of payloads) {
+        try {
+          console.log(`[SIGMA_BLAZE] Trying: ${url} [${payload.contentType.includes('json') ? 'JSON' : 'FORM'}]`)
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': payload.contentType },
+            body: payload.body,
           })
 
-          return token || sessionCookie
+          console.log(`[SIGMA_BLAZE] Response: ${response.status} from ${url}`)
+
+          if (response.ok) {
+            const text = await response.text()
+            let data: any = {}
+            try { data = JSON.parse(text) } catch { /* not json */ }
+
+            const token = data.token || data.access_token || data.jwt || data.session || data.auth_token || data.api_key || data.key || ''
+            const sessionCookie = response.headers.get('set-cookie') || ''
+
+            if (token || sessionCookie) {
+              console.log(`[SIGMA_BLAZE] Auth successful via ${url}`)
+              
+              const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
+              await supabase.from('sigma_auth_cache').upsert({
+                id: 'default',
+                access_token: token,
+                session_cookie: sessionCookie,
+                expires_at: expiresAt,
+                updated_at: new Date().toISOString(),
+              })
+
+              return token || sessionCookie
+            } else {
+              console.log(`[SIGMA_BLAZE] 200 OK but no token found in response. Body preview: ${text.substring(0, 200)}`)
+            }
+          } else {
+            const text = await response.text().catch(() => '')
+            console.log(`[SIGMA_BLAZE] ${response.status} - ${text.substring(0, 150)}`)
+          }
+        } catch (e) {
+          console.log(`[SIGMA_BLAZE] Error on ${url}: ${(e as Error).message}`)
         }
       }
-    } catch (e) {
-      console.log(`[SIGMA_BLAZE] Auth endpoint ${endpoint} failed:`, (e as Error).message)
     }
   }
 
-  // 3. Fallback: try api_key if available
+  // Fallback: try api_key if available
   if (config.api_key) {
     console.log('[SIGMA_BLAZE] Falling back to API key auth')
     return config.api_key
@@ -172,7 +219,6 @@ async function handleListAll(supabase: any, config: any, authToken: string, head
       const result = await callSigmaAPI(config.api_url, authToken, 'GET', `/clients?page=${page}&per_page=100`)
       
       if (!result.ok) {
-        // Try alternative endpoints
         const altResult = await callSigmaAPI(config.api_url, authToken, 'GET', `/users?page=${page}&limit=100`)
         if (altResult.ok && altResult.data) {
           const clients = extractClientArray(altResult.data)
