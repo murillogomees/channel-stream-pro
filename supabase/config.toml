@@ -518,3 +518,11 @@ verify_jwt = false
 # Refresh materialized views - cron/admin access
 [functions.refresh-views]
 verify_jwt = false
+
+# ==========================================
+# SIGMA BLAZE INTEGRATION
+# ==========================================
+
+# Sigma clients API - serves client data from sigma_blaze_clients
+[functions.sigma-clients]
+verify_jwt = false
