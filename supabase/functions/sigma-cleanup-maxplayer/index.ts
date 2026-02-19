@@ -142,7 +142,10 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
     .eq('id', 'default')
     .maybeSingle()
 
-  if (cached && new Date(cached.expires_at) > new Date()) {
+  const now = new Date()
+  const tenMinFromNow = new Date(now.getTime() + 10 * 60 * 1000)
+
+  if (cached && new Date(cached.expires_at) > tenMinFromNow) {
     return cached.access_token || cached.session_cookie
   }
 
@@ -167,7 +170,7 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
         if (token || sessionCookie) {
           await supabase.from('sigma_auth_cache').upsert({
             id: 'default', access_token: token, session_cookie: sessionCookie,
-            expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + 50 * 60 * 1000).toISOString(),
             updated_at: new Date().toISOString(),
           })
           return token || sessionCookie

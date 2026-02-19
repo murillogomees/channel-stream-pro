@@ -82,10 +82,17 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
     .eq('id', 'default')
     .maybeSingle()
 
-  if (cached && new Date(cached.expires_at) > new Date()) {
+  const now = new Date()
+  const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000)
+
+  if (cached && new Date(cached.expires_at) > tenMinutesFromNow) {
+    // Token still valid with >10min margin — use it
     console.log('[SIGMA_BLAZE] Using cached auth token')
     return cached.access_token || cached.session_cookie
   }
+
+  // Token missing, expired, or expiring soon — re-authenticate proactively
+  console.log('[SIGMA_BLAZE] Token expired or expiring soon, re-authenticating...')
 
   // 2. Authenticate with username/password
   console.log('[SIGMA_BLAZE] Authenticating with username/password...')
@@ -127,8 +134,8 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
         if (token || sessionCookie) {
           console.log(`[SIGMA_BLAZE] Auth successful via ${endpoint}`)
           
-          // Cache for 30 minutes
-          const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+          // Cache for 50 minutes (session lasts 60min, renew before expiry)
+          const expiresAt = new Date(Date.now() + 50 * 60 * 1000).toISOString()
           await supabase.from('sigma_auth_cache').upsert({
             id: 'default',
             access_token: token,
