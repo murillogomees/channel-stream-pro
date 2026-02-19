@@ -24,7 +24,13 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   try {
-    const body: SigmaRequest = await req.json()
+    let body: SigmaRequest
+    if (req.method === 'GET') {
+      const url = new URL(req.url)
+      body = { action: (url.searchParams.get('action') as SigmaRequest['action']) || 'list-all' }
+    } else {
+      body = await req.json()
+    }
     const { action } = body
 
     // Get Sigma config (with credentials)
