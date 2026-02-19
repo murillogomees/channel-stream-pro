@@ -87,7 +87,11 @@ export function SigmaBlazeIntegration() {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await sigmaService.triggerAction('test_panel_connection', {});
+      const result = await sigmaService.triggerAction('test_panel_connection', {
+        base_url: config?.api_url || '',
+        username: config?.sigma_username || '',
+        password: passwordInput || config?.sigma_password || '',
+      });
       setTestResult({
         success: result.success,
         message: result.message || (result.success ? 'Conexão bem-sucedida!' : 'Falha na conexão'),
