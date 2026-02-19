@@ -14,14 +14,17 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, UserPlus, Loader2, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { customAuthService } from "@/services/customAuthService";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const signUpSchema = z.object({
@@ -62,6 +65,7 @@ export default function SignUp() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordStrong, setIsPasswordStrong] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handlePasswordStrengthChange = useCallback((isStrong: boolean) => {
     setIsPasswordStrong(isStrong);
@@ -70,7 +74,7 @@ export default function SignUp() {
   // Redirecionar se já autenticado
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      navigate("/app/profile", { replace: true });
+      navigate("/profile", { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate]);
 
@@ -91,6 +95,11 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
+      if (!acceptedTerms) {
+        toast.error("Você precisa aceitar os Termos de Uso e Política de Privacidade.");
+        return;
+      }
+
       // Validar dados
       const validatedData = signUpSchema.parse(formData);
       
@@ -121,13 +130,32 @@ export default function SignUp() {
       if (data?.user) {
         console.log('[SignUp] Sucesso! User ID:', data.user.id);
         
+        // Record legal acceptance
+        try {
+          const { data: activeDocs } = await supabase
+            .from("legal_documents")
+            .select("type, version")
+            .eq("is_active", true);
+          
+          if (activeDocs && activeDocs.length > 0) {
+            const acceptances = activeDocs.map(doc => ({
+              user_id: data.user!.id,
+              document_type: doc.type,
+              document_version: doc.version,
+              user_agent: navigator.userAgent,
+            }));
+            await supabase.from("user_legal_acceptance").insert(acceptances);
+          }
+        } catch (legalErr) {
+          console.error('[SignUp] Legal acceptance error:', legalErr);
+        }
+
         toast.success(
           "Conta criada com sucesso! Bem-vindo ao sistema.",
           { duration: 5000 }
         );
         
-        // Custom auth já cria session automaticamente
-        navigate("/app/profile", { replace: true });
+        navigate("/profile", { replace: true });
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -316,6 +344,26 @@ export default function SignUp() {
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+          </div>
+
+          {/* Aceite obrigatório */}
+          <div className="flex items-start gap-3 pt-2">
+            <Checkbox
+              id="accept-terms"
+              checked={acceptedTerms}
+              onCheckedChange={v => setAcceptedTerms(v === true)}
+              disabled={isLoading}
+            />
+            <label htmlFor="accept-terms" className="text-xs text-foreground/70 leading-relaxed cursor-pointer">
+              Li e aceito os{" "}
+              <Link to="/termos" target="_blank" className="text-primary hover:underline font-medium">
+                Termos de Uso
+              </Link>{" "}
+              e a{" "}
+              <Link to="/privacidade" target="_blank" className="text-primary hover:underline font-medium">
+                Política de Privacidade
+              </Link>
+            </label>
           </div>
 
           {/* Submit */}

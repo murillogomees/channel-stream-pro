@@ -9,6 +9,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
+import { LegalReacceptanceModal } from "@/components/legal/LegalReacceptanceModal";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 // Core pages
@@ -47,6 +49,8 @@ const ExecutePlan = lazy(() => import("./pages/admin/system/ExecutePlan"));
 
 // Public standalone pages
 const CadastroSucesso = lazy(() => import("./pages/CadastroSucesso"));
+const TermosPage = lazy(() => import("./pages/TermosPage"));
+const PrivacidadePage = lazy(() => import("./pages/PrivacidadePage"));
 
 // Checkout pages
 const Checkout = lazy(() => import("./pages/Checkout"));
@@ -80,6 +84,8 @@ function AppContent() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/termos" element={<TermosPage />} />
+            <Route path="/privacidade" element={<PrivacidadePage />} />
             <Route path="/account/settings" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
             
             {/* Checkout */}
@@ -127,6 +133,8 @@ function AppContent() {
             <Route path="/403" element={<Forbidden />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <LegalReacceptanceModal />
+          <CookieConsentBanner />
       </Suspense>
     </BrowserRouter>
   );
