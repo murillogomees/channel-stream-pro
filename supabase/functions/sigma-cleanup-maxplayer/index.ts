@@ -53,55 +53,78 @@ Deno.serve(async (req) => {
 
     console.log(`[CLEANUP_MAXPLAYER] Blaze IPTV: ${blazeClients.length}, MaxPlayer: ${maxPlayerClients.length}`)
 
-    // 5. Build username set from ALL Blaze IPTV clients
-    const blazeUsernames = new Set<string>()
+    // 5. Build username sets from Blaze IPTV clients
+    const allBlazeUsernames = new Set<string>()
+    const blazeWithExpGt5Days = new Set<string>()
+    const now = new Date()
+    const fiveDaysFromNow = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000)
+
     for (const c of blazeClients) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
-      if (username) blazeUsernames.add(username)
+      if (!username) continue
+      allBlazeUsernames.add(username)
+      const expDate = new Date(c.expiration_date || c.exp_date || c.expires_at || c.data_expiracao || c.due_date || '1970-01-01')
+      if (expDate > fiveDaysFromNow) blazeWithExpGt5Days.add(username)
     }
 
-    // 6. Find orphan MaxPlayer clients (no matching Blaze IPTV username)
+    // 6. Find MaxPlayer clients to delete:
+    //    a) Órfãos: MaxPlayer SEM Blaze IPTV correspondente
+    //    b) Duplicados: MaxPlayer COM Blaze IPTV que tem vencimento > 5 dias
     const toDelete: any[] = []
+    const orphans: any[] = []
+    const duplicates: any[] = []
+
     for (const c of maxPlayerClients) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
-      if (username && !blazeUsernames.has(username)) toDelete.push(c)
+      if (!username) continue
+
+      if (!allBlazeUsernames.has(username)) {
+        // Órfão - sem Blaze IPTV correspondente
+        toDelete.push(c)
+        orphans.push(c)
+      } else if (blazeWithExpGt5Days.has(username)) {
+        // Duplicado - tem Blaze IPTV com vencimento > 5 dias
+        toDelete.push(c)
+        duplicates.push(c)
+      }
     }
 
-    console.log(`[CLEANUP_MAXPLAYER] Orphan MaxPlayer to delete: ${toDelete.length}`)
+    console.log(`[CLEANUP_MAXPLAYER] Orphans: ${orphans.length}, Duplicates (exp>5d): ${duplicates.length}, Total to delete: ${toDelete.length}`)
 
-    // 7. Delete each orphan MaxPlayer client via API
+    // 7. Delete each MaxPlayer client via API
     let deleted = 0, errors = 0
     const details: any[] = []
 
     for (const client of toDelete) {
       const clientId = String(client.id || client.client_id || client.user_id || '')
       const username = client.username || client.login || client.user || client.nome_usuario || ''
+      const reason = orphans.includes(client) ? 'orphan' : 'duplicate_exp_gt_5d'
       try {
         const result = await callSigmaAPI(config.api_url, authToken, 'DELETE', `/clients/${clientId}`)
         if (result.ok) {
           deleted++
-          details.push({ id: clientId, username, status: 'deleted' })
+          details.push({ id: clientId, username, reason, status: 'deleted' })
         } else {
           errors++
-          details.push({ id: clientId, username, status: 'error', error: result.data })
+          details.push({ id: clientId, username, reason, status: 'error', error: result.data })
         }
       } catch (e) {
         errors++
-        details.push({ id: clientId, username, status: 'error', error: (e as Error).message })
+        details.push({ id: clientId, username, reason, status: 'error', error: (e as Error).message })
       }
     }
 
     // 8. Log
     await supabase.from('sigma_blaze_logs').insert({
-      action: 'cleanup-maxplayer-orphans',
+      action: 'cleanup-maxplayer',
       status: errors === 0 ? 'SUCCESS' : 'PARTIAL',
-      details: { total: allClients.length, blaze: blazeClients.length, maxplayer: maxPlayerClients.length, orphans: toDelete.length, deleted, errors, details }
+      details: { total: allClients.length, blaze: blazeClients.length, maxplayer: maxPlayerClients.length, orphans: orphans.length, duplicates: duplicates.length, deleted, errors, details }
     })
 
     return new Response(JSON.stringify({
       success: true,
-      message: `${deleted} MaxPlayer órfãos excluídos, ${errors} erros`,
-      deleted, errors, orphans: toDelete.length, details,
+      message: `${deleted} MaxPlayer excluídos (${orphans.length} órfãos, ${duplicates.length} duplicados), ${errors} erros`,
+      deleted, errors, orphans: orphans.length, duplicates: duplicates.length, total: toDelete.length, details,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
