@@ -62,10 +62,10 @@ export function useSigmaClients() {
       // Busca paginada de todos os clientes via action list_customers
       const allCustomers: any[] = [];
       let page = 1;
-      const perPage = 100;
+      const perPage = 250; // Buscar em lotes grandes para minimizar requests via proxy
       let hasMore = true;
 
-      while (hasMore && page <= 200) {
+      while (hasMore && page <= 50) {
         const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
           body: { action: "list_customers", page, perPage },
         });
@@ -75,8 +75,8 @@ export function useSigmaClients() {
         const customers = data?.data || [];
         allCustomers.push(...customers);
 
-        const lastPage = data?.meta?.lastPage || data?.meta?.last_page || 1;
-        hasMore = page < lastPage && customers.length === perPage;
+        const lastPage = data?.meta?.last_page || data?.meta?.lastPage || 1;
+        hasMore = page < lastPage && customers.length > 0;
         page++;
       }
 
@@ -86,13 +86,13 @@ export function useSigmaClients() {
         username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
         full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
         phone: c.whatsapp || c.phone || c.telefone || c.cel || null,
-        package_name: c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
-        expiration_date: c.expiration_date || c.exp_date || c.expires_at || c.data_expiracao || c.due_date || new Date().toISOString(),
-        status: (c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "expired" as const : "active" as const,
+        package_name: c.package || c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
+        expiration_date: c.expires_at || c.expiration_date || c.exp_date || c.data_expiracao || c.due_date || new Date().toISOString(),
+        status: (c.status === "EXPIRED" || c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "expired" as const : "active" as const,
         email: c.email || c.e_mail || null,
-        plan_value: parseFloat(c.plan_value || c.package_value || c.valor || c.price || "0") || null,
+        plan_value: parseFloat(c.plan_price || c.plan_value || c.package_value || c.valor || c.price || "0") || null,
         last_reminder_sent: null,
-        notes: c.notes || c.obs || c.observacao || null,
+        notes: c.note || c.notes || c.obs || c.observacao || null,
       }));
 
       setAllClients(mapped);
