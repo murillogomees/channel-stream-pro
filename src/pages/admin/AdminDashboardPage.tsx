@@ -94,29 +94,12 @@ export default function AdminDashboardPage() {
       {/* Player & User Section */}
       <section className="mb-8">
         <SectionHeader
-          icon={<Tv />}
-          title="Player e Usuário"
+          icon={<UserCog />}
+          title="Gestão"
           variant="gradient"
         />
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <NavCard
-            title="Player IPTV"
-            description="Canais ao vivo, filmes e séries"
-            icon={<Play className="h-5 w-5" />}
-            path="/app/home"
-            isNew
-            isHighlighted
-          />
-          <NavCard
-            title="Canais IPTV"
-            description="Canais, playlists, EPG, transcode"
-            icon={<Tv className="h-5 w-5" />}
-            path="/admin/iptv"
-            badge="Hub"
-            isNew
-            variant="accent"
-          />
           <NavCard
             title="Usuários & Permissões"
             description="CRUD, roles, auditoria, afiliados e logs"
@@ -124,12 +107,6 @@ export default function AdminDashboardPage() {
             path="/admin/usuarios"
             badge={`${stats.total} usuários`}
             variant="info"
-          />
-          <NavCard
-            title="Tutorial de Instalação"
-            description="Guia para dispositivos"
-            icon={<Download className="h-5 w-5" />}
-            path="/app/install"
           />
         </div>
       </section>

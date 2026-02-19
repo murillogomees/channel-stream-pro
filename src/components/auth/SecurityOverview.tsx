@@ -24,7 +24,7 @@ export function SecurityOverview() {
 
   const securityChecks = [
     { id: 'password', label: 'Senha configurada', status: 'good' as const, icon: <Lock className="h-5 w-5" /> },
-    { id: 'mfa', label: 'Autenticação 2FA', status: mfaEnabled ? 'good' as const : 'warning' as const, icon: <Smartphone className="h-5 w-5" />, action: !mfaEnabled ? { label: 'Ativar', onClick: () => navigate('/app/configuracoes') } : undefined },
+    { id: 'mfa', label: 'Autenticação 2FA', status: mfaEnabled ? 'good' as const : 'warning' as const, icon: <Smartphone className="h-5 w-5" />, action: !mfaEnabled ? { label: 'Ativar', onClick: () => navigate('/account/settings') } : undefined },
     { id: 'email', label: 'E-mail verificado', status: 'good' as const, icon: <Mail className="h-5 w-5" /> },
   ];
 

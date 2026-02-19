@@ -62,7 +62,7 @@ export default function Login() {
       if (isAdminOrMaster) {
         redirectTo = "/admin/dashboard";
       } else {
-        redirectTo = "/app/player";
+        redirectTo = "/profile";
       }
 
       navigate(redirectTo, { replace: true });

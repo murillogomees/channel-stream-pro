@@ -211,20 +211,6 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <NavCard
-              title="Player IPTV"
-              description="Canais ao vivo, filmes e séries"
-              icon={<Play className="h-4 w-4" />}
-              path="/app/home"
-              isNew
-              isHighlighted
-            />
-            <NavCard
-              title="Instalação"
-              description="Guia para dispositivos"
-              icon={<Download className="h-4 w-4" />}
-              path="/app/install"
-            />
           </div>
         </section>
 

@@ -36,7 +36,7 @@ export default function CheckoutPending() {
         return;
       }
       if (!fromCheckout) {
-        navigate("/app/profile", { replace: true });
+        navigate("/profile", { replace: true });
         return;
       }
     }
@@ -157,7 +157,7 @@ export default function CheckoutPending() {
                 <Button 
                   size="lg" 
                   className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 text-white font-bold text-base shadow-xl border-0 h-14 rounded-xl"
-                  onClick={() => navigate("/app/profile")}
+                  onClick={() => navigate("/profile")}
                 >
                   Ir ao Meu Perfil
                 </Button>
