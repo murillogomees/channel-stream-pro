@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { mercadoPagoService, type SubscriptionStatus, type Payment } from "@/services/mercadoPagoService";
-import { playbackTokenService } from "@/services/playbackTokenService";
+// playbackTokenService removed with IPTV structure
 
 export interface SubscriptionState {
   status: SubscriptionStatus | null;
@@ -32,12 +32,12 @@ export function useSubscription() {
     }
 
     try {
-      const [status, subscription, payments, canPlay] = await Promise.all([
+      const [status, subscription, payments] = await Promise.all([
         mercadoPagoService.getSubscriptionStatus(),
         mercadoPagoService.getSubscription(),
         mercadoPagoService.getPaymentHistory(),
-        playbackTokenService.canPlay(),
       ]);
+      const canPlay = status === 'active' as any || status === 'authorized' as any;
 
       setState({
         status,
@@ -81,8 +81,8 @@ export function useSubscription() {
     return success;
   }, [loadSubscriptionData]);
 
-  const getPlaybackToken = useCallback(async (contentId?: string, contentType?: "live" | "vod") => {
-    return playbackTokenService.generateToken(contentId, contentType);
+  const getPlaybackToken = useCallback(async (_contentId?: string, _contentType?: "live" | "vod") => {
+    return null;
   }, []);
 
   return {

@@ -1,7 +1,6 @@
 /**
  * React 18 Application Entry Point
- * @version 1.0.6
- * Cache bust: v3
+ * @version 2.0.0 - IPTV removed
  */
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -9,7 +8,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadCriticalAssets } from "./utils/preloadAssets";
-import { webVitalsService } from "./services/webVitalsService";
 
 // Force clear ALL caches and UNREGISTER all service workers
 if ('caches' in window) {
@@ -23,7 +21,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     registrations.forEach(registration => {
       registration.unregister();
-      // Intencionalmente sem console.log para evitar ruído no console
     });
   });
 }
@@ -44,8 +41,8 @@ try {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -54,59 +51,6 @@ const queryClient = new QueryClient({
 
 // Preload assets críticos antes de renderizar
 preloadCriticalAssets();
-
-// Initialize Web Vitals monitoring sem logs verbosos
-webVitalsService.init(() => {
-  // Relatórios disponíveis via webVitalsService.getReport(), sem console.log
-});
-
-// Suprimir ruídos de console para melhor experiência de desenvolvimento
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-
-console.error = (...args: unknown[]) => {
-  const errorMessage = String(args[0] || '');
-  
-  // Suprimir erros conhecidos que não afetam funcionalidade
-  const suppressPatterns = [
-    // WebSocket do Realtime (esperado em desenvolvimento)
-    /WebSocket.*realtime/i,
-    /websocket.*failed/i,
-    /wss:\/\/.*failed/i,
-    // Erros de rede esperados (offline, DNS)
-    /ERR_NAME_NOT_RESOLVED/,
-    /ERR_NETWORK/,
-    /ERR_CONNECTION/,
-    // Service Worker tentando cachear URLs inválidas
-    /chrome-extension/i,
-    /Failed to execute 'put' on 'Cache'/,
-    /Failed to convert value to 'Response'/,
-    // Facebook Pixel (funciona mesmo com alguns 400s de pré-fetch)
-    /facebook\.com.*400/i,
-  ];
-  
-  if (suppressPatterns.some(pattern => pattern.test(errorMessage))) {
-    return;
-  }
-  
-  originalConsoleError.apply(console, args);
-};
-
-console.warn = (...args: unknown[]) => {
-  const warnMessage = String(args[0] || '');
-  
-  // Suprimir avisos conhecidos
-  if (
-    /WebSocket.*realtime/i.test(warnMessage) ||
-    /websocket.*failed/i.test(warnMessage) ||
-    /chrome-extension/i.test(warnMessage) ||
-    /Unrecognized feature/i.test(warnMessage)
-  ) {
-    return;
-  }
-  
-  originalConsoleWarn.apply(console, args);
-};
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
@@ -117,22 +61,4 @@ if (rootElement) {
       </QueryClientProvider>
     </React.StrictMode>
   );
-}
-
-// Screen Orientation API - lock landscape when player goes fullscreen
-if ('screen' in window && 'orientation' in screen) {
-  document.addEventListener('fullscreenchange', () => {
-    const isFullscreen = !!document.fullscreenElement;
-    const isVideoPlayer = document.fullscreenElement?.tagName === 'VIDEO' || 
-                          document.fullscreenElement?.classList.contains('video-player') ||
-                          document.fullscreenElement?.querySelector('video');
-    
-    if (isFullscreen && isVideoPlayer) {
-      // Lock to landscape in fullscreen video
-      (screen.orientation as ScreenOrientation & { lock?: (orientation: string) => Promise<void> }).lock?.('landscape').catch(() => {});
-    } else if (!isFullscreen) {
-      // Unlock orientation when exiting fullscreen
-      (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
-    }
-  });
 }
