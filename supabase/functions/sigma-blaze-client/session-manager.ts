@@ -318,16 +318,26 @@ function calculateTokenExpiry(token: string): number {
 }
 
 // ==================== PROXY SUPPORT PARA LOGIN ====================
+function normalizeProxyUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (!trimmed.includes("@")) {
+    const parts = trimmed.split(":");
+    if (parts.length === 4) return `http://${parts[0]}:${parts[1]}@${parts[2]}:${parts[3]}`;
+    if (parts.length === 3) {
+      if (/^\d+$/.test(parts[2])) return `http://${trimmed}`;
+      return `http://${parts[0]}:${parts[1]}@${parts[2]}`;
+    }
+  }
+  return `http://${trimmed}`;
+}
+
 function getProxyList(panelConfig?: SigmaPanelConfig | null): string[] {
-  // Priorizar proxy do painel, depois env var
   const raw = (panelConfig?.proxy_url || Deno.env.get("RESIDENTIAL_PROXY_URL") || "").trim();
   if (!raw) return [];
-  return raw.split(",").map(p => {
-    const trimmed = p.trim();
-    if (!trimmed) return "";
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `http://${trimmed}`;
-  }).filter(p => {
+  return raw.split(",").map(p => normalizeProxyUrl(p)).filter(p => {
+    if (!p) return false;
     try { return new URL(p).protocol.startsWith("http"); } catch { return false; }
   });
 }
