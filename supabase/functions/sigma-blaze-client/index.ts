@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         break
       }
       case 'list-all': {
-        return await handleListAll(supabase, config)
+        return await handleListAll(supabase, config, corsHeaders)
       }
     }
 
@@ -148,10 +148,8 @@ Deno.serve(async (req) => {
   }
 })
 
-async function handleListAll(supabase: any, config: any) {
+async function handleListAll(supabase: any, config: any, headers: any) {
   try {
-    // Fetch all clients from Sigma API
-    // Try common API patterns: /clients, /users, /subscribers
     let allClients: any[] = []
     let page = 1
     let hasMore = true
@@ -160,7 +158,6 @@ async function handleListAll(supabase: any, config: any) {
       const result = await callSigmaAPI(config, 'GET', `/clients?page=${page}&per_page=100`)
       
       if (!result.ok) {
-        // Try alternative endpoint patterns
         const altResult = await callSigmaAPI(config, 'GET', `/users?page=${page}&limit=100`)
         if (altResult.ok && altResult.data) {
           const clients = Array.isArray(altResult.data) ? altResult.data : 
@@ -181,80 +178,29 @@ async function handleListAll(supabase: any, config: any) {
         hasMore = clients.length >= 100
       }
       page++
-      
-      // Safety limit
       if (page > 50) break
     }
 
     console.log(`[SIGMA_BLAZE] Fetched ${allClients.length} clients from API`)
 
-    // Upsert clients into sigma_blaze_clients
-    let synced = 0
-    let errors = 0
-
-    for (const client of allClients) {
-      try {
-        // Map Sigma API fields to our schema
-        // Adapt field names based on common Sigma Blaze API patterns
-        const sigmaId = String(client.id || client.client_id || client.user_id || '')
-        const clientName = client.name || client.username || client.nome || client.full_name || 'Sem nome'
-        const whatsapp = client.whatsapp || client.phone || client.telefone || client.cel || ''
-        const email = client.email || client.e_mail || null
-        const planName = client.plan_name || client.package_name || client.plano || client.plan || 'Blaze IPTV'
-        const planValue = parseFloat(client.plan_value || client.package_value || client.valor || client.price || '0') || 0
-        const expirationDate = client.expiration_date || client.exp_date || client.expires_at || client.data_expiracao || client.due_date || new Date().toISOString()
-        const lastLogin = client.last_login || client.ultimo_acesso || null
-        const status = client.status === 'inactive' || client.status === 'disabled' || client.status === 'blocked' ? 'inactive' : 'active'
-        const notes = client.notes || client.obs || client.observacao || null
-
-        const { error } = await supabase
-          .from('sigma_blaze_clients')
-          .upsert({
-            sigma_id: sigmaId,
-            name: clientName,
-            whatsapp,
-            email,
-            plan_name: planName,
-            plan_value: planValue,
-            expiration_date: expirationDate,
-            last_login: lastLogin,
-            status,
-            notes,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'sigma_id' })
-
-        if (error) {
-          console.error(`[SIGMA_BLAZE] Error upserting client ${sigmaId}:`, error.message)
-          errors++
-        } else {
-          synced++
-        }
-      } catch (e) {
-        console.error(`[SIGMA_BLAZE] Error processing client:`, e)
-        errors++
-      }
-    }
-
     await logAction(supabase, 'list-all', 'SUCCESS', undefined, {
       total_fetched: allClients.length,
-      synced,
-      errors,
     })
 
+    // Retorna os clientes diretamente sem salvar em tabela
     return new Response(JSON.stringify({
       success: true,
-      total_fetched: allClients.length,
-      synced,
-      errors,
-      message: `${synced} clientes sincronizados, ${errors} erros`
-    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      clients: allClients,
+      total: allClients.length,
+      message: `${allClients.length} clientes encontrados`
+    }), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } })
 
   } catch (error) {
     console.error('[SIGMA_BLAZE] List all error:', error)
     await logAction(supabase, 'list-all', 'ERROR', undefined, { error: error.message })
     return new Response(JSON.stringify({
       success: false, error: error.message
-    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }), { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } })
   }
 }
 
