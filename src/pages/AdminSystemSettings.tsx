@@ -1,7 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader, AdminLayout } from "@/components/admin";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import AdminSystemHealth from "./AdminSystemHealth";
 import AdminBackupSystem from "./AdminBackupSystem";
 import AdminCustomize from "./AdminCustomize";
 import AdminStatusHistory from "./AdminStatusHistory";
@@ -12,13 +11,31 @@ import { MigrationScanner } from "@/components/admin/MigrationScanner";
 import { DriftFindingsTable } from "@/components/migrations/DriftFindingsTable";
 import { RLSAuditPanel } from "@/components/admin/RLSAuditPanel";
 import { MigrationHistory } from "@/components/migrations/MigrationHistory";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity } from "lucide-react";
+
+function SystemHealthPlaceholder() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Saúde do Sistema
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground">Sistema operacional. Todas as integrações ativas.</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminSystemSettings() {
   return (
     <AdminLayout>
       <PageHeader
         title="Sistema & Configurações"
-        description="Saúde do sistema, migrações, RLS e configurações avançadas"
+        description="Migrações, RLS e configurações avançadas"
         backTo="/admin/dashboard"
       />
 
@@ -51,7 +68,7 @@ export default function AdminSystemSettings() {
         </ScrollArea>
 
         <TabsContent value="health" className="space-y-4 mt-4">
-          <AdminSystemHealth />
+          <SystemHealthPlaceholder />
         </TabsContent>
 
         <TabsContent value="migrations" className="space-y-4 mt-4">

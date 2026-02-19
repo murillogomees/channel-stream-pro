@@ -21,14 +21,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
-  Tv,
   UserCog,
   Bell,
   BarChart3,
   Shield,
   Settings2,
   Rocket,
-  Activity,
   Download,
   LogOut,
   User,
@@ -36,7 +34,6 @@ import {
   Flame,
   Users,
   MessageCircle,
-  HardDrive,
   TestTube,
 } from "lucide-react";
 
@@ -56,7 +53,6 @@ const modulesNav: NavItem[] = [
   { title: "Notificações", path: "/admin/notificacoes", icon: <Bell className="h-4 w-4" /> },
   { title: "Analytics", path: "/admin/analytics", icon: <BarChart3 className="h-4 w-4" /> },
   { title: "Segurança", path: "/admin/seguranca", icon: <Shield className="h-4 w-4" /> },
-  { title: "Observabilidade", path: "/admin/observability", icon: <Activity className="h-4 w-4" /> },
   { title: "Builds & Deploys", path: "/admin/builds", icon: <Rocket className="h-4 w-4" /> },
   { title: "Sistema", path: "/admin/sistema", icon: <Settings2 className="h-4 w-4" /> },
 ];
@@ -66,8 +62,6 @@ const integracoesNav: NavItem[] = [
   { title: "Sigma Blaze", path: "/admin/integracao?tab=sigma", icon: <Flame className="h-4 w-4" /> },
   { title: "Clientes Sigma", path: "/admin/integracao?tab=sigma-clients", icon: <Users className="h-4 w-4" /> },
   { title: "WhatsApp", path: "/admin/integracao?tab=whatsapp", icon: <MessageCircle className="h-4 w-4" /> },
-  { title: "IPTV", path: "/admin/integracao?tab=iptv", icon: <Tv className="h-4 w-4" /> },
-  { title: "R2 Cache", path: "/admin/integracao?tab=r2cache", icon: <HardDrive className="h-4 w-4" /> },
   { title: "QA Dashboard", path: "/admin/integracao?tab=qa", icon: <TestTube className="h-4 w-4" /> },
 ];
 

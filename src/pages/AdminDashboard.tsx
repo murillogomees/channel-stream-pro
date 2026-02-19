@@ -201,21 +201,6 @@ const AdminDashboard = () => {
 
         <Separator className="my-8" />
 
-        {/* IPTV Player - DESTACADO */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/70 text-primary-foreground px-3 py-1 rounded-full">
-              <Tv className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">IPTV Player</h2>
-              <Badge className="bg-white/20 text-white hover:bg-white/30">Novo</Badge>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          </div>
-        </section>
-
-        <Separator className="my-8" />
-
         {/* Gestão de Clientes & Usuários */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -240,13 +225,6 @@ const AdminDashboard = () => {
               description="Gestão completa de usuários, roles, auditoria e acessos"
               icon={<Users className="h-5 w-5" />}
               path="/admin/usuarios"
-              badge="Consolidado"
-            />
-            <NavCard
-              title="Gestão M3U & Playlists"
-              description="Listas, sincronização, builder, VOD e relatórios"
-              icon={<ListVideo className="h-5 w-5" />}
-              path="/admin/m3u"
               badge="Consolidado"
             />
             <NavCard
