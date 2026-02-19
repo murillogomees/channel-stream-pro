@@ -63,7 +63,7 @@ export async function getConfig(): Promise<SigmaBlazeConfig | null> {
   } as SigmaBlazeConfig;
 }
 
-export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string; raw_password?: string; raw_proxy_pass?: string }): Promise<boolean> {
+export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string; raw_password?: string; raw_proxy_pass?: string }): Promise<{ success: boolean; error?: string }> {
   const updateData: any = {};
   if (config.api_url !== undefined) updateData.api_url = config.api_url;
   if (config.raw_api_key) updateData.api_key = config.raw_api_key;
@@ -77,17 +77,28 @@ export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_k
   if (config.proxy_user !== undefined) updateData.proxy_user = config.proxy_user;
   if (config.raw_proxy_pass) updateData.proxy_pass = config.raw_proxy_pass;
 
+  console.log('[SigmaBlaze] Saving config:', { id: config.id, fields: Object.keys(updateData) });
+
   if (config.id) {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('sigma_blaze_config')
       .update(updateData)
       .eq('id', config.id);
-    return !error;
+    if (error) {
+      console.error('[SigmaBlaze] Save error:', error);
+      return { success: false, error: error.message };
+    }
+    console.log('[SigmaBlaze] Save success, rows affected:', count);
+    return { success: true };
   }
   const { error } = await supabase
     .from('sigma_blaze_config')
     .insert(updateData);
-  return !error;
+  if (error) {
+    console.error('[SigmaBlaze] Insert error:', error);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
 }
 
 export async function getFlags(): Promise<SigmaFlag[]> {
