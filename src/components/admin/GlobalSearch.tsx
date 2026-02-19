@@ -121,13 +121,6 @@ const searchItems: SearchItem[] = [
     category: "Sistema",
   },
   {
-    title: "Saúde do Sistema",
-    description: "Status de serviços",
-    path: "/admin/system-health",
-    icon: <BarChart3 className="h-4 w-4" />,
-    category: "Sistema",
-  },
-  {
     title: "Personalização",
     description: "Customize cores e aparência",
     path: "/admin/customize",

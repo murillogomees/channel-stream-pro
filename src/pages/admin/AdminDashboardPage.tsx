@@ -170,15 +170,6 @@ export default function AdminDashboardPage() {
             isNew
             variant="accent"
           />
-          <NavCard
-            title="Observabilidade"
-            description="Métricas em tempo real e health"
-            icon={<Activity className="h-5 w-5" />}
-            path="/admin/observability"
-            badge="Novo"
-            isNew
-            variant="success"
-          />
         </div>
       </section>
     </AdminShell>

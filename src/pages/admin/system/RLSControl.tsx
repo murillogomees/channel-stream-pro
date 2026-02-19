@@ -73,24 +73,6 @@ const RLS_DATA: TableRLS[] = [
     orphanPolicies: []
   },
   {
-    table: 'iptv_channels',
-    rlsEnabled: true,
-    policies: [
-      { name: 'Authenticated users can view', command: 'SELECT', expression: 'auth.role() = \'authenticated\'' },
-      { name: 'Admins can manage channels', command: 'ALL', expression: 'is_admin_or_master()' }
-    ],
-    orphanPolicies: []
-  },
-  {
-    table: 'iptv_playlists',
-    rlsEnabled: true,
-    policies: [
-      { name: 'Users can view own playlists', command: 'SELECT', expression: 'auth.uid() = user_id OR is_public = true' },
-      { name: 'Users can manage own playlists', command: 'ALL', expression: 'auth.uid() = user_id' }
-    ],
-    orphanPolicies: []
-  },
-  {
     table: 'notification_templates',
     rlsEnabled: true,
     policies: [
