@@ -45,8 +45,7 @@ export function getDaysLeft(expirationDate: string): number {
 }
 
 export function useSigmaClients() {
-  const [clients, setClients] = useState<SigmaClient[]>([]);
-  const [total, setTotal] = useState(0);
+  const [allClients, setAllClients] = useState<SigmaClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SigmaFilters>({
@@ -60,85 +59,91 @@ export function useSigmaClients() {
     setLoading(true);
     setError(null);
     try {
-      const { page, pageSize, search, expiration } = filters;
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
+      // Busca em tempo real da API do painel Sigma Blaze via Edge Function
+      const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
+        body: { action: "list-all" },
+      });
 
-      // Busca da tabela sigma_blaze_clients (populada pela API do painel Sigma Blaze)
-      let query = supabase
-        .from("sigma_blaze_clients")
-        .select("*", { count: "exact" })
-        .eq("status", "active")
-        .order("expiration_date", { ascending: true })
-        .range(from, to);
+      if (fnError) throw fnError;
 
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,whatsapp.ilike.%${search}%,email.ilike.%${search}%`);
+      if (!data?.success) {
+        throw new Error(data?.error || data?.message || "Erro ao buscar clientes do Sigma Blaze");
       }
 
-      if (expiration !== "all") {
-        const now = new Date();
-        const twoDays = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const rawClients: any[] = data.clients || [];
 
-        if (expiration === "red") {
-          query = query.lte("expiration_date", twoDays);
-        } else if (expiration === "yellow") {
-          query = query.gt("expiration_date", twoDays).lte("expiration_date", sevenDays);
-        } else if (expiration === "green") {
-          query = query.gt("expiration_date", sevenDays);
-        }
-      }
-
-      const { data, count, error: dbError } = await query;
-      if (dbError) throw dbError;
-
-      // Mapear sigma_blaze_clients para SigmaClient interface
-      const mapped: SigmaClient[] = (data || []).map((c: any) => ({
-        id: c.id,
-        username: c.sigma_id || c.id,
-        full_name: c.name || "Sem nome",
-        phone: c.whatsapp || null,
-        package_name: c.plan_name || "Blaze IPTV",
-        expiration_date: c.expiration_date,
-        status: c.status as SigmaClient["status"],
-        email: c.email,
-        plan_value: c.plan_value ? Number(c.plan_value) : null,
-        last_reminder_sent: c.last_reminder_sent || null,
-        notes: c.notes,
+      // Mapear para SigmaClient interface
+      const mapped: SigmaClient[] = rawClients.map((c: any, idx: number) => ({
+        id: String(c.id || c.client_id || c.user_id || idx),
+        username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
+        full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
+        phone: c.whatsapp || c.phone || c.telefone || c.cel || null,
+        package_name: c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
+        expiration_date: c.expiration_date || c.exp_date || c.expires_at || c.data_expiracao || c.due_date || new Date().toISOString(),
+        status: (c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "expired" as const : "active" as const,
+        email: c.email || c.e_mail || null,
+        plan_value: parseFloat(c.plan_value || c.package_value || c.valor || c.price || "0") || null,
+        last_reminder_sent: null,
+        notes: c.notes || c.obs || c.observacao || null,
       }));
 
-      setClients(mapped);
-      setTotal(count || 0);
+      setAllClients(mapped);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
 
-  // Polling every 5 min
-  useEffect(() => {
-    const interval = setInterval(fetchClients, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchClients]);
+  // Filtragem client-side (dados já vêm todos da API)
+  const filteredClients = useMemo(() => {
+    let result = allClients;
+
+    // Filtro de busca
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      result = result.filter((c) =>
+        c.full_name.toLowerCase().includes(s) ||
+        c.username.toLowerCase().includes(s) ||
+        (c.phone && c.phone.includes(s)) ||
+        (c.email && c.email.toLowerCase().includes(s))
+      );
+    }
+
+    // Filtro de vencimento
+    if (filters.expiration !== "all") {
+      result = result.filter((c) => getExpirationColor(c.expiration_date) === filters.expiration);
+    }
+
+    // Ordenar por data de vencimento
+    result.sort((a, b) => new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime());
+
+    return result;
+  }, [allClients, filters.search, filters.expiration]);
+
+  const total = filteredClients.length;
+  const totalPages = Math.ceil(total / filters.pageSize);
+
+  // Paginação client-side
+  const clients = useMemo(() => {
+    const from = (filters.page - 1) * filters.pageSize;
+    return filteredClients.slice(from, from + filters.pageSize);
+  }, [filteredClients, filters.page, filters.pageSize]);
 
   const stats = useMemo(() => {
     let green = 0, yellow = 0, red = 0;
-    clients.forEach((c) => {
+    allClients.forEach((c) => {
       const color = getExpirationColor(c.expiration_date);
       if (color === "green") green++;
       else if (color === "yellow") yellow++;
       else red++;
     });
-    return { green, yellow, red, total };
-  }, [clients, total]);
-
-  const totalPages = Math.ceil(total / filters.pageSize);
+    return { green, yellow, red, total: allClients.length };
+  }, [allClients]);
 
   return {
     clients,
