@@ -173,7 +173,6 @@ export function SigmaBlazeIntegration() {
                 value={passwordInput}
                 onChange={e => setPasswordInput(e.target.value)}
                 placeholder={config?.sigma_password || "Inserir nova senha"}
-                type="password"
               />
               <p className="text-xs text-muted-foreground">Deixe vazio para manter a senha atual</p>
             </div>
@@ -225,10 +224,9 @@ export function SigmaBlazeIntegration() {
               <div className="space-y-2">
                 <Label>Senha do Proxy</Label>
                 <Input
-                  value={proxyPassInput}
-                  onChange={e => setProxyPassInput(e.target.value)}
-                  placeholder={config?.proxy_pass || "Inserir senha do proxy"}
-                  type="password"
+                   value={proxyPassInput}
+                   onChange={e => setProxyPassInput(e.target.value)}
+                   placeholder={config?.proxy_pass || "Inserir senha do proxy"}
                 />
               </div>
             </div>
