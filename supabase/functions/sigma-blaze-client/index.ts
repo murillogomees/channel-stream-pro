@@ -149,6 +149,26 @@ function normalizeProxyUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  
+  // Handle proxy-seller format: user:pass:host:port or user:pass@host:port
+  if (!trimmed.includes("@")) {
+    // Format: user:pass:host:port - find the host by looking for a domain-like segment
+    const parts = trimmed.split(":");
+    if (parts.length === 4) {
+      // user:pass:host:port
+      return `http://${parts[0]}:${parts[1]}@${parts[2]}:${parts[3]}`;
+    }
+    if (parts.length === 3) {
+      // Could be user:pass:host (no port) or host:port:something
+      // Try to detect: if last part is numeric, it's likely host:port with user
+      if (/^\d+$/.test(parts[2])) {
+        // host:port format without auth - just add protocol
+        return `http://${trimmed}`;
+      }
+      return `http://${parts[0]}:${parts[1]}@${parts[2]}`;
+    }
+  }
+  
   return `http://${trimmed}`;
 }
 
@@ -160,6 +180,7 @@ function getProxyList(): string[] {
     .split(",")
     .map((p) => normalizeProxyUrl(p))
     .filter((p) => {
+      if (!p) return false;
       try {
         return new URL(p).protocol.startsWith("http");
       } catch {
@@ -167,25 +188,8 @@ function getProxyList(): string[] {
       }
     });
 
-  // Deduplicar por username, preferindo https
-  const byUsername = new Map<string, string>();
-  for (const p of all) {
-    try {
-      const u = new URL(p);
-      const username = u.username;
-      if (!username) continue;
-      
-      const existing = byUsername.get(username);
-      // Preferir https sobre http
-      if (!existing || (u.protocol === "https:" && !existing.startsWith("https"))) {
-        byUsername.set(username, p);
-      }
-    } catch {
-      // ignora URLs inválidas
-    }
-  }
-  
-  return Array.from(byUsername.values());
+  // Deduplicar URLs idênticas
+  return [...new Set(all)];
 }
 
 function maskProxyUrl(proxyUrl: string): string {
