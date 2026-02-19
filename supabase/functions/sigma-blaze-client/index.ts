@@ -1503,7 +1503,7 @@ serve(async (req) => {
       }
 
       case "test_panel_connection": {
-        // Testa conexão com um painel Sigma específico
+        // Testa conexão com diagnóstico detalhado
         const { base_url, username, password } = params as { base_url: string; username: string; password: string };
         
         if (!base_url || !username || !password) {
@@ -1514,62 +1514,179 @@ serve(async (req) => {
         }
 
         const normalizedUrl = normalizeBlazeBaseUrl(base_url);
-        const loginUrl = joinBlazeUrl(normalizedUrl, "/api/auth/login");
+        const diagnosticSteps: Array<{ step: string; status: string; detail: string; duration_ms?: number }> = [];
         
-        console.log(`[test_panel_connection] Testing connection to: ${normalizedUrl}`);
-        
+        // Step 1: Testar se Deno.createHttpClient suporta proxy
+        const proxies = getProxyList();
+        diagnosticSteps.push({ step: "proxy_config", status: proxies.length > 0 ? "OK" : "SKIP", detail: `${proxies.length} proxy(s) configurado(s)` });
+
+        // Step 2: Testar acesso DIRETO (sem proxy) à URL
+        const directUrl = `${normalizedUrl.replace(/\/+$/, "")}/`;
+        const directStart = Date.now();
         try {
-          const response = await blazeFetch(loginUrl, {
-            method: "POST",
-            headers: getBlazeHeaders(loginUrl),
-            body: JSON.stringify({ username, password }),
+          const directResp = await fetchWithTimeout(directUrl, {
+            method: "GET",
+            headers: getBlazeHeaders(directUrl),
+          }, 10000);
+          const directBody = (await directResp.text()).slice(0, 500);
+          const isCf = looksLikeCloudflareBlock(directBody);
+          diagnosticSteps.push({
+            step: "direct_access",
+            status: isCf ? "CLOUDFLARE_BLOCK" : `HTTP_${directResp.status}`,
+            detail: isCf ? "Cloudflare challenge detected" : `Status ${directResp.status}, body: ${directBody.slice(0, 200)}`,
+            duration_ms: Date.now() - directStart,
           });
-          
-          const responseText = await response.text();
-          let responseBody: any = null;
-          try { responseBody = responseText ? JSON.parse(responseText) : null; } catch {}
-          
-          if (response.ok) {
-            // Extrair informações do token se disponível
-            const token = responseBody?.token || responseBody?.access_token || responseBody?.data?.token;
-            let tokenInfo: any = null;
-            
-            if (token) {
-              try {
-                const parts = token.split(".");
-                if (parts.length >= 2) {
-                  const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
-                  const payload = JSON.parse(atob(b64));
-                  tokenInfo = {
-                    expires_at: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined,
-                    user_id: payload.sub || payload.user_id,
-                  };
-                }
-              } catch {}
-            }
-            
-            result = {
-              success: true,
-              message: "Connection successful",
-              base_url: normalizedUrl,
-              response_status: response.status,
-              has_token: !!token,
-              token_info: tokenInfo,
-            };
-          } else {
-            result = {
-              success: false,
-              message: `Authentication failed: ${response.status}`,
-              base_url: normalizedUrl,
-              response_status: response.status,
-              error_detail: responseText.slice(0, 500),
-            };
-          }
         } catch (e) {
+          diagnosticSteps.push({
+            step: "direct_access",
+            status: "ERROR",
+            detail: e instanceof Error ? e.message : String(e),
+            duration_ms: Date.now() - directStart,
+          });
+        }
+
+        // Step 3: Testar proxy se configurado
+        if (proxies.length > 0) {
+          for (const proxyUrl of proxies) {
+            const proxyStart = Date.now();
+            try {
+              const client = Deno.createHttpClient({ proxy: { url: proxyUrl } });
+              diagnosticSteps.push({ step: "proxy_create_client", status: "OK", detail: `HttpClient created for proxy` });
+              
+              // Testar GET simples via proxy
+              const proxyResp = await fetchWithTimeout(directUrl, {
+                method: "GET",
+                headers: getBlazeHeaders(directUrl),
+                client,
+              }, 15000);
+              const proxyBody = (await proxyResp.text()).slice(0, 500);
+              const isCf = looksLikeCloudflareBlock(proxyBody);
+              diagnosticSteps.push({
+                step: "proxy_get",
+                status: isCf ? "CLOUDFLARE_BLOCK" : `HTTP_${proxyResp.status}`,
+                detail: isCf ? "CF block via proxy" : `Status ${proxyResp.status}, body: ${proxyBody.slice(0, 200)}`,
+                duration_ms: Date.now() - proxyStart,
+              });
+              
+              // Se GET passou, testar LOGIN via proxy
+              if (!isCf && proxyResp.status !== 403) {
+                const loginUrls = [
+                  joinBlazeUrl(normalizedUrl, "/api/auth/login"),
+                  joinBlazeUrl(normalizedUrl, "/auth/login"),
+                ];
+                for (const loginUrl of loginUrls) {
+                  const loginStart = Date.now();
+                  try {
+                    const loginResp = await fetchWithTimeout(loginUrl, {
+                      method: "POST",
+                      headers: getBlazeHeaders(loginUrl),
+                      body: JSON.stringify({ username, password }),
+                      client,
+                    }, 15000);
+                    const loginBody = await loginResp.text();
+                    let parsed: any = null;
+                    try { parsed = JSON.parse(loginBody); } catch {}
+                    
+                    const token = parsed?.token || parsed?.access_token || parsed?.data?.token;
+                    
+                    diagnosticSteps.push({
+                      step: `proxy_login_${loginUrl.includes('/api/') ? 'api' : 'direct'}`,
+                      status: loginResp.ok ? "SUCCESS" : `HTTP_${loginResp.status}`,
+                      detail: loginResp.ok 
+                        ? `Login OK! Token: ${token ? 'yes' : 'no'}` 
+                        : `Failed: ${loginBody.slice(0, 300)}`,
+                      duration_ms: Date.now() - loginStart,
+                    });
+                    
+                    if (loginResp.ok && token) {
+                      result = {
+                        success: true,
+                        message: "Conexão bem-sucedida via proxy!",
+                        base_url: normalizedUrl,
+                        login_url: loginUrl,
+                        has_token: true,
+                        diagnostics: diagnosticSteps,
+                      };
+                      break;
+                    }
+                  } catch (e) {
+                    diagnosticSteps.push({
+                      step: `proxy_login_${loginUrl.includes('/api/') ? 'api' : 'direct'}`,
+                      status: "ERROR",
+                      detail: e instanceof Error ? e.message : String(e),
+                      duration_ms: Date.now() - loginStart,
+                    });
+                  }
+                }
+              }
+            } catch (e) {
+              diagnosticSteps.push({
+                step: "proxy_create_client",
+                status: "ERROR",
+                detail: `Deno.createHttpClient failed: ${e instanceof Error ? e.message : String(e)}`,
+                duration_ms: Date.now() - proxyStart,
+              });
+            }
+          }
+        }
+
+        // Step 4: Tentar login DIRETO (sem proxy) como último recurso
+        if (!result || !(result as any).success) {
+          const loginUrls = [
+            joinBlazeUrl(normalizedUrl, "/api/auth/login"),
+            joinBlazeUrl(normalizedUrl, "/auth/login"),
+          ];
+          for (const loginUrl of loginUrls) {
+            const loginStart = Date.now();
+            try {
+              const loginResp = await fetchWithTimeout(loginUrl, {
+                method: "POST",
+                headers: getBlazeHeaders(loginUrl),
+                body: JSON.stringify({ username, password }),
+              }, 10000);
+              const loginBody = await loginResp.text();
+              let parsed: any = null;
+              try { parsed = JSON.parse(loginBody); } catch {}
+              const token = parsed?.token || parsed?.access_token || parsed?.data?.token;
+              const isCf = looksLikeCloudflareBlock(loginBody);
+              
+              diagnosticSteps.push({
+                step: `direct_login_${loginUrl.includes('/api/') ? 'api' : 'direct'}`,
+                status: loginResp.ok ? "SUCCESS" : isCf ? "CLOUDFLARE_BLOCK" : `HTTP_${loginResp.status}`,
+                detail: loginResp.ok 
+                  ? `Login OK! Token: ${token ? 'yes' : 'no'}`
+                  : isCf ? "Cloudflare block" : `${loginBody.slice(0, 300)}`,
+                duration_ms: Date.now() - loginStart,
+              });
+              
+              if (loginResp.ok && token) {
+                result = {
+                  success: true,
+                  message: "Conexão bem-sucedida (direto, sem proxy)!",
+                  base_url: normalizedUrl,
+                  login_url: loginUrl,
+                  has_token: true,
+                  diagnostics: diagnosticSteps,
+                };
+                break;
+              }
+            } catch (e) {
+              diagnosticSteps.push({
+                step: `direct_login_${loginUrl.includes('/api/') ? 'api' : 'direct'}`,
+                status: "ERROR",
+                detail: e instanceof Error ? e.message : String(e),
+                duration_ms: Date.now() - loginStart,
+              });
+            }
+          }
+        }
+        
+        if (!result || !(result as any).success) {
           result = {
             success: false,
-            message: `Connection failed: ${e instanceof Error ? e.message : String(e)}`,
+            message: "Todas as tentativas falharam",
             base_url: normalizedUrl,
+            diagnostics: diagnosticSteps,
           };
         }
         break;
