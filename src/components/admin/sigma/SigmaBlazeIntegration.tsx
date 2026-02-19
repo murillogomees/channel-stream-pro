@@ -87,7 +87,7 @@ export function SigmaBlazeIntegration() {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await sigmaService.triggerAction('test-connection', {});
+      const result = await sigmaService.triggerAction('test_panel_connection', {});
       setTestResult({
         success: result.success,
         message: result.message || (result.success ? 'Conexão bem-sucedida!' : 'Falha na conexão'),
@@ -400,7 +400,7 @@ export function SigmaBlazeIntegration() {
                 <SelectItem value="DELETE_CLIENT">Delete</SelectItem>
                 <SelectItem value="UPDATE_PACKAGE">Update Package</SelectItem>
                 <SelectItem value="SYNC_CLIENT">Sync</SelectItem>
-                <SelectItem value="test-connection">Test Connection</SelectItem>
+                <SelectItem value="test_panel_connection">Test Connection</SelectItem>
               </SelectContent>
             </Select>
             <Select value={logFilter.status || "all"} onValueChange={v => setLogFilter(prev => ({ ...prev, status: v === "all" ? undefined : v }))}>
