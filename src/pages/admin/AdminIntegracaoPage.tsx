@@ -3,7 +3,8 @@
  * Rota: /admin/integracao
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
 import { 
@@ -24,7 +25,20 @@ import { SigmaBlazeIntegration } from "@/components/admin/sigma/SigmaBlazeIntegr
 import { SigmaClientsPage } from "@/components/admin/sigma/SigmaClientsPage";
 
 export default function AdminIntegracaoPage() {
-  const [activeTab, setActiveTab] = useState("mercadopago");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") || "mercadopago";
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
+  // Sync tab from URL
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && t !== activeTab) setActiveTab(t);
+  }, [searchParams]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value }, { replace: true });
+  };
 
   const tabs = [
     {
@@ -79,7 +93,7 @@ export default function AdminIntegracaoPage() {
       <ResponsiveTabs
         defaultValue="mercadopago"
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={handleTabChange}
         tabs={tabs}
       />
     </AdminShell>
