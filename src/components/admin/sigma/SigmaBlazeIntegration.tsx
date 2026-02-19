@@ -34,17 +34,22 @@ export function SigmaBlazeIntegration() {
 
   async function loadAll() {
     setLoading(true);
-    const [cfg, flgs, maps, lgs] = await Promise.all([
-      sigmaService.getConfig(),
-      sigmaService.getFlags(),
-      sigmaService.getPackageMappings(),
-      sigmaService.getLogs(),
-    ]);
-    setConfig(cfg);
-    setFlags(flgs);
-    setMappings(maps);
-    setLogs(lgs);
-    setLoading(false);
+    try {
+      const [cfg, flgs, maps, lgs] = await Promise.all([
+        sigmaService.getConfig().catch(() => null),
+        sigmaService.getFlags().catch(() => []),
+        sigmaService.getPackageMappings().catch(() => []),
+        sigmaService.getLogs().catch(() => []),
+      ]);
+      setConfig(cfg);
+      setFlags(flgs);
+      setMappings(maps);
+      setLogs(lgs);
+    } catch (e) {
+      console.error('[SigmaBlaze] Error loading:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSaveConfig() {
