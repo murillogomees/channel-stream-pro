@@ -53,21 +53,33 @@ export function SigmaBlazeIntegration() {
   }
 
   async function handleSaveConfig() {
-    if (!config) return;
+    if (!config) {
+      toast.error("Nenhuma configuração carregada");
+      return;
+    }
     setSaving(true);
-    const success = await sigmaService.saveConfig({
-      ...config,
-      raw_api_key: apiKeyInput || undefined,
-      raw_password: passwordInput || undefined,
-      raw_proxy_pass: proxyPassInput || undefined,
-    });
-    if (success) toast.success("Configuração salva!");
-    else toast.error("Erro ao salvar configuração");
-    setSaving(false);
-    setApiKeyInput("");
-    setPasswordInput("");
-    setProxyPassInput("");
-    loadAll();
+    try {
+      const result = await sigmaService.saveConfig({
+        ...config,
+        raw_api_key: apiKeyInput || undefined,
+        raw_password: passwordInput || undefined,
+        raw_proxy_pass: proxyPassInput || undefined,
+      });
+      if (result.success) {
+        toast.success("Configuração salva com sucesso!");
+      } else {
+        toast.error("Erro ao salvar: " + (result.error || "erro desconhecido"));
+      }
+    } catch (err: any) {
+      console.error('[SigmaBlaze] Save exception:', err);
+      toast.error("Exceção ao salvar: " + (err.message || "erro desconhecido"));
+    } finally {
+      setSaving(false);
+      setApiKeyInput("");
+      setPasswordInput("");
+      setProxyPassInput("");
+      loadAll();
+    }
   }
 
   async function handleTestConnection() {
