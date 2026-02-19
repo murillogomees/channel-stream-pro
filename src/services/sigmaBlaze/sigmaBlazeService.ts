@@ -187,7 +187,7 @@ export async function triggerAction(
       supabase.functions.invoke('sigma-blaze-client', {
         body: { action, ...params },
       }),
-      15000,
+      60000,
       'Sigma Blaze'
     );
     if (error) return { success: false, message: error.message };
