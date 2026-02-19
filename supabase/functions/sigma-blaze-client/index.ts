@@ -5,18 +5,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
-// Browser-like headers to bypass Cloudflare bot protection
 const browserHeaders: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Accept-Encoding': 'gzip, deflate, br',
   'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
   'Sec-Ch-Ua-Mobile': '?0',
   'Sec-Ch-Ua-Platform': '"Windows"',
-  'Sec-Fetch-Dest': 'empty',
-  'Sec-Fetch-Mode': 'cors',
-  'Sec-Fetch-Site': 'same-origin',
 }
 
 interface ProxyConfig {
@@ -26,22 +21,41 @@ interface ProxyConfig {
   pass: string
 }
 
+/** Fetch with a hard timeout (default 10s) */
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function buildProxiedFetch(proxy?: ProxyConfig) {
-  return async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return async function proxiedFetch(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
     if (proxy && proxy.host && proxy.port) {
       const proxyUrl = `http://${proxy.user}:${proxy.pass}@${proxy.host}:${proxy.port}`
       try {
-        const response = await fetch(url, {
-          ...options,
-          // @ts-ignore - Deno supports client proxy
-          client: Deno.createHttpClient({ proxy: { url: proxyUrl } }),
-        })
-        return response
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), timeoutMs)
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            // @ts-ignore - Deno supports client proxy
+            client: Deno.createHttpClient({ proxy: { url: proxyUrl } }),
+          })
+          return response
+        } finally {
+          clearTimeout(timer)
+        }
       } catch (proxyError) {
         console.log(`[SIGMA] Proxy failed, trying direct: ${(proxyError as Error).message}`)
       }
     }
-    return await fetch(url, options)
+    return await fetchWithTimeout(url, options, timeoutMs)
   }
 }
 
@@ -83,14 +97,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: 'Sigma Blaze não configurado. Configure a URL e credenciais.' }, 400)
     }
 
-    // Build proxy from DB config
     const proxy: ProxyConfig | undefined = config.proxy_host && config.proxy_port
       ? { host: config.proxy_host, port: config.proxy_port, user: config.proxy_user || '', pass: config.proxy_pass || '' }
       : undefined
 
     const fetchFn = buildProxiedFetch(proxy)
 
-    // Test connection action
     if (action === 'test-connection') {
       return await handleTestConnection(supabase, config, proxy, fetchFn)
     }
@@ -119,21 +131,15 @@ function jsonResponse(data: any, status = 200) {
   })
 }
 
-/**
- * Test connection: tries to reach the API URL, then authenticate
- */
 async function handleTestConnection(
-  supabase: any, config: any, proxy: ProxyConfig | undefined, fetchFn: typeof fetch
+  supabase: any, config: any, proxy: ProxyConfig | undefined, fetchFn: (url: string, options?: RequestInit, timeout?: number) => Promise<Response>
 ) {
   const steps: Array<{ step: string; status: string; detail: string }> = []
   const baseUrl = config.api_url.replace(/\/+$/, '')
 
-  // Step 1: Reach the URL
+  // Step 1: Reach the URL (8s timeout)
   try {
-    const reachRes = await fetchFn(baseUrl, {
-      method: 'GET',
-      headers: { ...browserHeaders },
-    })
+    const reachRes = await fetchFn(baseUrl, { method: 'GET', headers: { ...browserHeaders } }, 8000)
     const reachText = await reachRes.text()
     const isCloudflareChallenge = reachText.includes('challenge-platform') || reachText.includes('cf-browser-verification')
 
@@ -142,7 +148,7 @@ async function handleTestConnection(
       status: isCloudflareChallenge ? 'CLOUDFLARE_BLOCK' : reachRes.ok ? 'OK' : `HTTP ${reachRes.status}`,
       detail: isCloudflareChallenge
         ? 'Cloudflare está bloqueando. Configure um proxy residencial.'
-        : `Status ${reachRes.status}, body: ${reachText.substring(0, 200)}`,
+        : `Status ${reachRes.status}`,
     })
 
     if (isCloudflareChallenge && !proxy?.host) {
@@ -154,23 +160,24 @@ async function handleTestConnection(
       })
     }
   } catch (e) {
-    steps.push({ step: 'Alcançar URL', status: 'ERROR', detail: (e as Error).message })
+    const msg = (e as Error).message || 'timeout'
+    steps.push({ step: 'Alcançar URL', status: 'ERROR', detail: msg.includes('abort') ? 'Timeout (8s)' : msg })
     await logAction(supabase, 'test-connection', 'ERROR', undefined, { steps })
-    return jsonResponse({ success: false, message: `Não foi possível alcançar ${baseUrl}: ${(e as Error).message}`, details: { steps } })
+    return jsonResponse({ success: false, message: `Não foi possível alcançar ${baseUrl}: ${msg}`, details: { steps } })
   }
 
-  // Step 2: Try authentication
+  // Step 2: Try authentication (limited attempts, 8s each)
   try {
     const authToken = await getAuthToken(supabase, config, fetchFn)
     if (authToken) {
       steps.push({ step: 'Autenticação', status: 'OK', detail: 'Token obtido com sucesso' })
 
-      // Step 3: Try listing clients
+      // Step 3: Try listing clients (8s timeout)
       try {
         const result = await callSigmaAPI(baseUrl, authToken, 'GET', '/clients?page=1&per_page=5', undefined, fetchFn)
         if (result.ok) {
           const clients = extractClientArray(result.data)
-          steps.push({ step: 'Listar Clientes', status: 'OK', detail: `${clients.length} clientes retornados na amostra` })
+          steps.push({ step: 'Listar Clientes', status: 'OK', detail: `${clients.length} clientes retornados` })
         } else {
           steps.push({ step: 'Listar Clientes', status: `HTTP ${result.status}`, detail: JSON.stringify(result.data).substring(0, 200) })
         }
@@ -192,10 +199,7 @@ async function handleTestConnection(
   }
 }
 
-/**
- * Authenticate with Sigma Blaze
- */
-async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): Promise<string | null> {
+async function getAuthToken(supabase: any, config: any, fetchFn: (url: string, options?: RequestInit, timeout?: number) => Promise<Response>): Promise<string | null> {
   // Check cached token
   const { data: cached } = await supabase
     .from('sigma_auth_cache')
@@ -206,10 +210,14 @@ async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): 
   const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000)
 
   if (cached && new Date(cached.expires_at) > tenMinutesFromNow) {
-    const isValid = await validateToken(config.api_url, cached.access_token || cached.session_cookie, fetchFn)
-    if (isValid) {
-      console.log('[SIGMA] Using cached token')
-      return cached.access_token || cached.session_cookie
+    try {
+      const isValid = await validateToken(config.api_url, cached.access_token || cached.session_cookie, fetchFn)
+      if (isValid) {
+        console.log('[SIGMA] Using cached token')
+        return cached.access_token || cached.session_cookie
+      }
+    } catch {
+      console.log('[SIGMA] Token validation failed, re-authenticating')
     }
   }
 
@@ -217,38 +225,33 @@ async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): 
   const baseUrl = config.api_url.replace(/\/+$/, '')
   const rootUrl = baseUrl.endsWith('/api') ? baseUrl.slice(0, -4) : baseUrl
 
-  // Add Origin/Referer headers dynamically based on config URL
   const dynamicHeaders = {
     ...browserHeaders,
     'Origin': rootUrl,
     'Referer': rootUrl + '/',
   }
 
+  // Only try the 3 most likely endpoints (not 7), with 2 payloads each = 6 max attempts
   const authEndpoints = [
     `${baseUrl}/auth/login`,
     `${baseUrl}/login`,
     `${rootUrl}/auth/login`,
-    `${baseUrl}/auth/sign-in`,
-    `${baseUrl}/auth/signin`,
-    `${baseUrl}/sessions`,
-    `${baseUrl}/auth/sessions`,
   ]
 
   const payloads = [
-    { body: JSON.stringify({ email: config.sigma_username, password: config.sigma_password }) },
-    { body: JSON.stringify({ username: config.sigma_username, password: config.sigma_password }) },
-    { body: JSON.stringify({ login: config.sigma_username, password: config.sigma_password }) },
+    JSON.stringify({ email: config.sigma_username, password: config.sigma_password }),
+    JSON.stringify({ username: config.sigma_username, password: config.sigma_password }),
   ]
 
   for (const url of authEndpoints) {
-    for (const payload of payloads) {
+    for (const body of payloads) {
       try {
         console.log(`[SIGMA] Trying: POST ${url}`)
         const response = await fetchFn(url, {
           method: 'POST',
           headers: { ...dynamicHeaders, 'Content-Type': 'application/json' },
-          body: payload.body,
-        })
+          body,
+        }, 8000)
         console.log(`[SIGMA] Response: ${response.status} from ${url}`)
 
         if (response.ok) {
@@ -280,7 +283,8 @@ async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): 
           console.log(`[SIGMA] ${response.status} - ${text.substring(0, 200)}`)
         }
       } catch (e) {
-        console.log(`[SIGMA] Error on ${url}: ${(e as Error).message}`)
+        const msg = (e as Error).message || ''
+        console.log(`[SIGMA] Error on ${url}: ${msg.includes('abort') ? 'Timeout' : msg}`)
       }
     }
   }
@@ -294,26 +298,24 @@ async function getAuthToken(supabase: any, config: any, fetchFn: typeof fetch): 
   return null
 }
 
-async function validateToken(apiUrl: string, token: string, fetchFn: typeof fetch): Promise<boolean> {
+async function validateToken(apiUrl: string, token: string, fetchFn: (url: string, options?: RequestInit, timeout?: number) => Promise<Response>): Promise<boolean> {
   const baseUrl = apiUrl.replace(/\/+$/, '')
-  for (const url of [`${baseUrl}/auth/me`, `${baseUrl}/me`]) {
-    try {
-      const response = await fetchFn(url, {
-        method: 'GET',
-        headers: {
-          ...browserHeaders,
-          'Authorization': `Bearer ${token}`,
-          'Cookie': token.includes('=') ? token : '',
-        },
-      })
-      if (response.ok) return true
-      else await response.text() // consume body
-    } catch { /* continue */ }
-  }
+  try {
+    const response = await fetchFn(`${baseUrl}/auth/me`, {
+      method: 'GET',
+      headers: {
+        ...browserHeaders,
+        'Authorization': `Bearer ${token}`,
+        'Cookie': token.includes('=') ? token : '',
+      },
+    }, 5000)
+    if (response.ok) return true
+    else await response.text()
+  } catch { /* timeout or error */ }
   return false
 }
 
-async function handleListAll(supabase: any, config: any, authToken: string, fetchFn: typeof fetch) {
+async function handleListAll(supabase: any, config: any, authToken: string, fetchFn: (url: string, options?: RequestInit, timeout?: number) => Promise<Response>) {
   try {
     let allClients: any[] = []
     let page = 1
@@ -364,7 +366,7 @@ function extractClientArray(data: any): any[] {
 }
 
 async function callSigmaAPI(
-  baseUrl: string, authToken: string, method: string, path: string, body?: any, fetchFn: typeof fetch = fetch
+  baseUrl: string, authToken: string, method: string, path: string, body?: any, fetchFn: (url: string, options?: RequestInit, timeout?: number) => Promise<Response> = fetchWithTimeout as any
 ): Promise<{ ok: boolean; status: number; data: any }> {
   try {
     const url = `${baseUrl.replace(/\/+$/, '')}${path}`
@@ -379,7 +381,7 @@ async function callSigmaAPI(
     }
     if (body && method !== 'GET') options.body = JSON.stringify(body)
 
-    const response = await fetchFn(url, options)
+    const response = await fetchFn(url, options, 10000)
     const data = await response.json().catch(() => ({}))
     return { ok: response.ok, status: response.status, data }
   } catch (error) {
