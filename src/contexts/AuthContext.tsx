@@ -20,17 +20,14 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Timeout')), ms)
     );
-
-    // Postgrest builders are PromiseLike (thenable) but not full Promises.
-    return Promise.race([Promise.resolve(promise as unknown as T), timeoutPromise]);
+    return Promise.race([Promise.resolve(promise), timeoutPromise]);
   };
 
-  // Fallback seguro: tenta extrair role do JWT (claim assinado) e, se não existir, de metadados.
-  const getRoleFallback = (): AppRole | null => {
-    // 1) JWT claims
+  // Fallback seguro: tenta extrair role do JWT (claim assinado)
+  const getRoleFromJwt = (token?: string): AppRole | null => {
     try {
-      if (accessToken) {
-        const parts = accessToken.split('.');
+      if (token) {
+        const parts = token.split('.');
         if (parts.length === 3) {
           const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
           const pad = payload.length % 4;
@@ -43,6 +40,13 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
     } catch {
       // ignore
     }
+    return null;
+  };
+
+  const getRoleFallback = (): AppRole | null => {
+    // 1) JWT claims
+    const jwtRole = getRoleFromJwt(accessToken);
+    if (jwtRole) return jwtRole;
 
     // 2) Metadados (se houver)
     const metaRole = (user.app_metadata as any)?.user_role || (user.app_metadata as any)?.role;
@@ -66,8 +70,30 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
   };
 
   try {
-    // 1) ROLE (mais importante) — tentar resolver sem depender de JWT claims
+    // 1) ROLE — Primeiro tentar refresh do token para obter JWT atualizado com role do hook
     let role: AppRole = getRoleFallback() || 'client';
+
+    // Se JWT diz 'client', tentar refresh para pegar token atualizado do custom_access_token_hook
+    if (role === 'client') {
+      try {
+        console.log('[AuthContext] JWT role is client, attempting token refresh...');
+        const { data: refreshData } = await withTimeout(
+          supabase.auth.refreshSession(),
+          5000
+        );
+        if (refreshData?.session?.access_token) {
+          const refreshedRole = getRoleFromJwt(refreshData.session.access_token);
+          if (refreshedRole) {
+            console.log('[AuthContext] Refreshed JWT role:', refreshedRole);
+            role = refreshedRole;
+            // Update the access token for later use
+            accessToken = refreshData.session.access_token;
+          }
+        }
+      } catch (e) {
+        console.warn('[AuthContext] Token refresh failed:', e);
+      }
+    }
 
     const resolveRoleViaRpc = async (): Promise<AppRole | null> => {
       try {
@@ -106,27 +132,31 @@ async function convertToUnifiedUser(user: User, accessToken?: string): Promise<U
       return null;
     };
 
-    // RPC primeiro
-    const rpcRole = await resolveRoleViaRpc();
-    if (rpcRole) {
-      role = rpcRole;
-      console.log('[AuthContext] Role resolved via RPC:', role);
-    } else {
-      // Fallback: query direta na tabela (aumentar timeout para ambientes lentos)
-      try {
-        const { data: rolesData, error: rolesError } = await withTimeout(
-          supabase.from('user_roles').select('role').eq('user_id', user.id),
-          15000
-        );
-        console.log('[AuthContext] user_roles query:', { rolesData, error: rolesError?.message });
+    // Só tentar RPC/DB se JWT não resolveu como master/admin
+    if (role === 'client') {
+      const rpcRole = await resolveRoleViaRpc();
+      if (rpcRole) {
+        role = rpcRole;
+        console.log('[AuthContext] Role resolved via RPC:', role);
+      } else {
+        // Fallback: query direta na tabela
+        try {
+          const { data: rolesData, error: rolesError } = await withTimeout(
+            supabase.from('user_roles').select('role').eq('user_id', user.id),
+            8000
+          );
+          console.log('[AuthContext] user_roles query:', { rolesData, error: rolesError?.message });
 
-        if (!rolesError && rolesData && rolesData.length > 0) {
-          role = pickRole(rolesData as Array<{ role: AppRole }>);
-          console.log('[AuthContext] Role resolved via table:', role);
+          if (!rolesError && rolesData && rolesData.length > 0) {
+            role = pickRole(rolesData as Array<{ role: AppRole }>);
+            console.log('[AuthContext] Role resolved via table:', role);
+          }
+        } catch (e) {
+          console.warn('[AuthContext] user_roles fetch timeout/error:', e);
         }
-      } catch (e) {
-        console.warn('[AuthContext] user_roles fetch timeout/error:', e);
       }
+    } else {
+      console.log('[AuthContext] Role already resolved from JWT:', role);
     }
 
     console.log('[AuthContext] Final role for', user.email, ':', role);
