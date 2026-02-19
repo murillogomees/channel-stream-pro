@@ -4447,6 +4447,10 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          proxy_host: string | null
+          proxy_pass: string | null
+          proxy_port: number | null
+          proxy_user: string | null
           sigma_password: string
           sigma_username: string
           updated_at: string
@@ -4459,6 +4463,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          proxy_host?: string | null
+          proxy_pass?: string | null
+          proxy_port?: number | null
+          proxy_user?: string | null
           sigma_password?: string
           sigma_username?: string
           updated_at?: string
@@ -4471,6 +4479,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          proxy_host?: string | null
+          proxy_pass?: string | null
+          proxy_port?: number | null
+          proxy_user?: string | null
           sigma_password?: string
           sigma_username?: string
           updated_at?: string
