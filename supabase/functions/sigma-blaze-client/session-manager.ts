@@ -13,7 +13,7 @@
  * Isso permite alternar painéis Sigma apenas mudando is_active no banco.
  */
 
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2.49.1";
 import { getActivePanelConfig, updatePanelToken, updatePanelLoginError, type SigmaPanelConfig } from "./panel-config.ts";
 
 // ==================== CONFIGURAÇÃO ====================
