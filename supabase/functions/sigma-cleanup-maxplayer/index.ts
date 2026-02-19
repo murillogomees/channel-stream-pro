@@ -22,18 +22,25 @@ Deno.serve(async (req) => {
       .limit(1)
       .single()
 
-    if (!config?.api_url || !config?.api_key) {
-      console.error('[CLEANUP_MAXPLAYER] Sigma Blaze config not set')
+    if (!config?.api_url || (!config?.sigma_username && !config?.api_key)) {
       return new Response(JSON.stringify({
         success: false, error: 'Sigma Blaze não configurado'
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // 2. Fetch ALL clients from Sigma API
-    const allClients = await fetchAllClients(config)
+    // 2. Authenticate
+    const authToken = await getAuthToken(supabase, config)
+    if (!authToken) {
+      return new Response(JSON.stringify({
+        success: false, error: 'Falha na autenticação com o Sigma Blaze'
+      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // 3. Fetch ALL clients from Sigma API
+    const allClients = await fetchAllClients(config.api_url, authToken)
     console.log(`[CLEANUP_MAXPLAYER] Total clients fetched: ${allClients.length}`)
 
-    // 3. Separate Blaze IPTV and MaxPlayer clients
+    // 4. Separate Blaze IPTV and MaxPlayer clients by package/plan field
     const blazeClients = allClients.filter((c: any) => {
       const pkg = (c.plan_name || c.package_name || c.plano || c.plan || '').toLowerCase()
       return pkg.includes('blaze') || pkg.includes('iptv') || pkg.includes('blaze iptv')
@@ -44,91 +51,66 @@ Deno.serve(async (req) => {
       return pkg.includes('maxplayer') || pkg.includes('max player') || pkg.includes('max_player')
     })
 
-    console.log(`[CLEANUP_MAXPLAYER] Blaze IPTV clients: ${blazeClients.length}`)
-    console.log(`[CLEANUP_MAXPLAYER] MaxPlayer clients: ${maxPlayerClients.length}`)
+    console.log(`[CLEANUP_MAXPLAYER] Blaze IPTV: ${blazeClients.length}, MaxPlayer: ${maxPlayerClients.length}`)
 
-    // 4. Find Blaze IPTV clients with expiration > 5 days
+    // 5. Find Blaze IPTV clients with expiration > 5 days
     const now = new Date()
     const fiveDaysFromNow = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000)
 
-    const blazeWithGoodExpiration = blazeClients.filter((c: any) => {
+    const blazeQualifying = blazeClients.filter((c: any) => {
       const expDate = new Date(c.expiration_date || c.exp_date || c.expires_at || c.data_expiracao || c.due_date || '1970-01-01')
       return expDate > fiveDaysFromNow
     })
 
-    console.log(`[CLEANUP_MAXPLAYER] Blaze clients with >5 days expiration: ${blazeWithGoodExpiration.length}`)
-
-    // 5. Build a set of usernames from qualifying Blaze clients
+    // 6. Build username set from qualifying Blaze clients
     const blazeUsernames = new Set<string>()
-    for (const c of blazeWithGoodExpiration) {
+    for (const c of blazeQualifying) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
-      if (username) {
-        blazeUsernames.add(username)
-      }
+      if (username) blazeUsernames.add(username)
     }
 
-    // 6. Find MaxPlayer clients whose username matches a qualifying Blaze client
+    // 7. Find MaxPlayer clients matching qualifying Blaze usernames
     const toDelete: any[] = []
     for (const c of maxPlayerClients) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
-      if (username && blazeUsernames.has(username)) {
-        toDelete.push(c)
-      }
+      if (username && blazeUsernames.has(username)) toDelete.push(c)
     }
 
-    console.log(`[CLEANUP_MAXPLAYER] MaxPlayer clients to delete: ${toDelete.length}`)
+    console.log(`[CLEANUP_MAXPLAYER] MaxPlayer to delete: ${toDelete.length}`)
 
-    // 7. Delete each MaxPlayer client via Sigma API
-    let deleted = 0
-    let errors = 0
-    const deletedDetails: any[] = []
+    // 8. Delete each matching MaxPlayer client via API
+    let deleted = 0, errors = 0
+    const details: any[] = []
 
     for (const client of toDelete) {
       const clientId = String(client.id || client.client_id || client.user_id || '')
       const username = client.username || client.login || client.user || client.nome_usuario || ''
-
       try {
-        const result = await callSigmaAPI(config, 'DELETE', `/clients/${clientId}`)
-        
+        const result = await callSigmaAPI(config.api_url, authToken, 'DELETE', `/clients/${clientId}`)
         if (result.ok) {
           deleted++
-          deletedDetails.push({ id: clientId, username, status: 'deleted' })
-          console.log(`[CLEANUP_MAXPLAYER] Deleted MaxPlayer client: ${username} (ID: ${clientId})`)
+          details.push({ id: clientId, username, status: 'deleted' })
         } else {
           errors++
-          deletedDetails.push({ id: clientId, username, status: 'error', error: result.data })
-          console.error(`[CLEANUP_MAXPLAYER] Failed to delete ${username}: ${JSON.stringify(result.data)}`)
+          details.push({ id: clientId, username, status: 'error', error: result.data })
         }
       } catch (e) {
         errors++
-        deletedDetails.push({ id: clientId, username, status: 'error', error: (e as Error).message })
-        console.error(`[CLEANUP_MAXPLAYER] Error deleting ${username}:`, e)
+        details.push({ id: clientId, username, status: 'error', error: (e as Error).message })
       }
     }
 
-    // 8. Log the operation
+    // 9. Log
     await supabase.from('sigma_blaze_logs').insert({
       action: 'cleanup-maxplayer',
       status: errors === 0 ? 'SUCCESS' : 'PARTIAL',
-      details: {
-        total_clients: allClients.length,
-        blaze_clients: blazeClients.length,
-        maxplayer_clients: maxPlayerClients.length,
-        blaze_qualifying: blazeWithGoodExpiration.length,
-        matched: toDelete.length,
-        deleted,
-        errors,
-        details: deletedDetails,
-      }
+      details: { total: allClients.length, blaze: blazeClients.length, maxplayer: maxPlayerClients.length, qualifying: blazeQualifying.length, matched: toDelete.length, deleted, errors, details }
     })
 
     return new Response(JSON.stringify({
       success: true,
-      message: `${deleted} clientes MaxPlayer excluídos, ${errors} erros`,
-      deleted,
-      errors,
-      matched: toDelete.length,
-      details: deletedDetails,
+      message: `${deleted} MaxPlayer excluídos, ${errors} erros`,
+      deleted, errors, matched: toDelete.length, details,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
@@ -139,63 +121,79 @@ Deno.serve(async (req) => {
   }
 })
 
-async function fetchAllClients(config: any): Promise<any[]> {
-  let allClients: any[] = []
-  let page = 1
-  let hasMore = true
+async function getAuthToken(supabase: any, config: any): Promise<string | null> {
+  const { data: cached } = await supabase
+    .from('sigma_auth_cache')
+    .select('access_token, session_cookie, expires_at')
+    .eq('id', 'default')
+    .maybeSingle()
 
-  while (hasMore) {
-    const result = await callSigmaAPI(config, 'GET', `/clients?page=${page}&per_page=100`)
-    
-    if (!result.ok) {
-      const altResult = await callSigmaAPI(config, 'GET', `/users?page=${page}&limit=100`)
-      if (altResult.ok && altResult.data) {
-        const clients = extractClientArray(altResult.data)
-        allClients = allClients.concat(clients)
-        hasMore = clients.length >= 100
-      } else {
-        hasMore = false
+  if (cached && new Date(cached.expires_at) > new Date()) {
+    return cached.access_token || cached.session_cookie
+  }
+
+  const authEndpoints = ['/auth/login', '/login', '/api/login', '/api/auth', '/api/v1/auth/login', '/api/v1/login']
+
+  for (const endpoint of authEndpoints) {
+    try {
+      const response = await fetch(`${config.api_url}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: config.sigma_username, password: config.sigma_password,
+          user: config.sigma_username, login: config.sigma_username,
+          senha: config.sigma_password, pass: config.sigma_password,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const token = data.token || data.access_token || data.jwt || data.session || data.auth_token || ''
+        const sessionCookie = response.headers.get('set-cookie') || ''
+        if (token || sessionCookie) {
+          await supabase.from('sigma_auth_cache').upsert({
+            id: 'default', access_token: token, session_cookie: sessionCookie,
+            expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          return token || sessionCookie
+        }
       }
+    } catch (_) { /* try next */ }
+  }
+
+  return config.api_key || null
+}
+
+async function fetchAllClients(baseUrl: string, authToken: string): Promise<any[]> {
+  let all: any[] = [], page = 1, hasMore = true
+  while (hasMore) {
+    const result = await callSigmaAPI(baseUrl, authToken, 'GET', `/clients?page=${page}&per_page=100`)
+    if (!result.ok) {
+      const alt = await callSigmaAPI(baseUrl, authToken, 'GET', `/users?page=${page}&limit=100`)
+      if (alt.ok) { const c = extractArr(alt.data); all = all.concat(c); hasMore = c.length >= 100 }
+      else hasMore = false
     } else {
-      const clients = extractClientArray(result.data)
-      allClients = allClients.concat(clients)
-      hasMore = clients.length >= 100
+      const c = extractArr(result.data); all = all.concat(c); hasMore = c.length >= 100
     }
     page++
     if (page > 50) break
   }
-
-  return allClients
+  return all
 }
 
-function extractClientArray(data: any): any[] {
+function extractArr(data: any): any[] {
   if (Array.isArray(data)) return data
-  if (data?.data) return Array.isArray(data.data) ? data.data : []
-  if (data?.clients) return Array.isArray(data.clients) ? data.clients : []
-  if (data?.users) return Array.isArray(data.users) ? data.users : []
-  return []
+  return data?.data || data?.clients || data?.users || []
 }
 
-async function callSigmaAPI(
-  config: any,
-  method: string,
-  path: string,
-  body?: any
-): Promise<{ ok: boolean; status: number; data: any }> {
+async function callSigmaAPI(baseUrl: string, authToken: string, method: string, path: string, body?: any) {
   try {
-    const url = `${config.api_url}${path}`
-    const options: RequestInit = {
+    const response = await fetch(`${baseUrl}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_key}`,
-      },
-    }
-    if (body && method !== 'GET') {
-      options.body = JSON.stringify(body)
-    }
-
-    const response = await fetch(url, options)
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: body && method !== 'GET' ? JSON.stringify(body) : undefined,
+    })
     const data = await response.json().catch(() => ({}))
     return { ok: response.ok, status: response.status, data }
   } catch (error) {

@@ -4328,6 +4328,30 @@ export type Database = {
         }
         Relationships: []
       }
+      sigma_auth_cache: {
+        Row: {
+          access_token: string
+          expires_at: string
+          id: string
+          session_cookie: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          expires_at: string
+          id?: string
+          session_cookie?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          expires_at?: string
+          id?: string
+          session_cookie?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sigma_blaze_clients: {
         Row: {
           created_at: string | null
@@ -4390,6 +4414,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          sigma_password: string
+          sigma_username: string
           updated_at: string
           whatsapp_message_template: string
         }
@@ -4400,6 +4426,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          sigma_password?: string
+          sigma_username?: string
           updated_at?: string
           whatsapp_message_template?: string
         }
@@ -4410,6 +4438,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          sigma_password?: string
+          sigma_username?: string
           updated_at?: string
           whatsapp_message_template?: string
         }

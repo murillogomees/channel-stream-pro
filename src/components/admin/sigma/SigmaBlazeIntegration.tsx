@@ -22,6 +22,7 @@ export function SigmaBlazeIntegration() {
   const [logs, setLogs] = useState<SigmaLog[]>([]);
   const [logFilter, setLogFilter] = useState<{ action?: string; status?: string }>({});
   const [apiKeyInput, setApiKeyInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
 
   useEffect(() => {
     loadAll();
@@ -48,11 +49,13 @@ export function SigmaBlazeIntegration() {
     const success = await sigmaService.saveConfig({
       ...config,
       raw_api_key: apiKeyInput || undefined,
+      raw_password: passwordInput || undefined,
     });
     if (success) toast.success("Configuração salva!");
     else toast.error("Erro ao salvar configuração");
     setSaving(false);
     setApiKeyInput("");
+    setPasswordInput("");
     loadAll();
   }
 
@@ -106,19 +109,36 @@ export function SigmaBlazeIntegration() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>URL da API</Label>
+              <Label>URL do Painel Sigma</Label>
               <Input
                 value={config?.api_url || ""}
                 onChange={e => setConfig(prev => prev ? { ...prev, api_url: e.target.value } : prev)}
-                placeholder="https://api.sigmablaze.com"
+                placeholder="https://painel.sigmablaze.com"
               />
             </div>
             <div className="space-y-2">
-              <Label>API Key</Label>
+              <Label>Usuário Sigma</Label>
+              <Input
+                value={config?.sigma_username || ""}
+                onChange={e => setConfig(prev => prev ? { ...prev, sigma_username: e.target.value } : prev)}
+                placeholder="seu_usuario"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha Sigma</Label>
+              <Input
+                value={passwordInput}
+                onChange={e => setPasswordInput(e.target.value)}
+                placeholder={config?.sigma_password || "Inserir senha"}
+                type="password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>API Key (opcional)</Label>
               <Input
                 value={apiKeyInput}
                 onChange={e => setApiKeyInput(e.target.value)}
-                placeholder={config?.api_key || "Inserir nova API Key"}
+                placeholder={config?.api_key || "Inserir API Key se necessário"}
                 type="password"
               />
             </div>
