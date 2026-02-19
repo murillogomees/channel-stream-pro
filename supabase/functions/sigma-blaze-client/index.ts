@@ -5,6 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+// Proxy configuration for bypassing Cloudflare
+const PROXY_HOST = '181.215.48.26'
+const PROXY_PORT = 36621
+const PROXY_USER = '3RQpVq9w'
+const PROXY_PASS = '47t7XEoD'
+
 // Browser-like headers to bypass Cloudflare bot protection
 const browserHeaders: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -19,6 +25,31 @@ const browserHeaders: Record<string, string> = {
   'Sec-Fetch-Dest': 'empty',
   'Sec-Fetch-Mode': 'cors',
   'Sec-Fetch-Site': 'same-origin',
+}
+
+/**
+ * Make a proxied fetch request through the residential proxy
+ */
+async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  // Deno doesn't support HTTP proxy natively in fetch, so we use a CONNECT tunnel
+  // For now, try direct fetch with proxy headers, and fall back
+  const proxyUrl = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_HOST}:${PROXY_PORT}`
+  
+  try {
+    // Try using the proxy via Deno's fetch with proxy support
+    const response = await fetch(url, {
+      ...options,
+      // @ts-ignore - Deno supports client proxy
+      client: Deno.createHttpClient({
+        proxy: { url: proxyUrl },
+      }),
+    })
+    return response
+  } catch (proxyError) {
+    console.log(`[SIGMA_BLAZE] Proxy fetch failed, trying direct: ${(proxyError as Error).message}`)
+    // Fallback to direct fetch
+    return await fetch(url, options)
+  }
 }
 
 interface SigmaRequest {
@@ -139,7 +170,7 @@ async function getAuthToken(supabase: any, config: any): Promise<string | null> 
       try {
         console.log(`[SIGMA_BLAZE] Trying: POST ${url}`)
 
-        const response = await fetch(url, {
+        const response = await proxiedFetch(url, {
           method: 'POST',
           headers: {
             ...browserHeaders,
@@ -209,7 +240,7 @@ async function validateToken(apiUrl: string, token: string): Promise<boolean> {
   
   for (const url of meEndpoints) {
     try {
-      const response = await fetch(url, {
+      const response = await proxiedFetch(url, {
         method: 'GET',
         headers: {
           ...browserHeaders,
@@ -304,7 +335,7 @@ async function callSigmaAPI(
       options.body = JSON.stringify(body)
     }
 
-    const response = await fetch(url, options)
+    const response = await proxiedFetch(url, options)
     const data = await response.json().catch(() => ({}))
     return { ok: response.ok, status: response.status, data }
   } catch (error) {

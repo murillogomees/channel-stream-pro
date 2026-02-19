@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+// Proxy configuration for bypassing Cloudflare
+const PROXY_HOST = '181.215.48.26'
+const PROXY_PORT = 36621
+const PROXY_USER = '3RQpVq9w'
+const PROXY_PASS = '47t7XEoD'
+
+async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const proxyUrl = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_HOST}:${PROXY_PORT}`
+  try {
+    return await fetch(url, {
+      ...options,
+      // @ts-ignore - Deno supports client proxy
+      client: Deno.createHttpClient({ proxy: { url: proxyUrl } }),
+    })
+  } catch {
+    return await fetch(url, options)
+  }
+}
+
 /**
  * Keep-alive function: renews the Sigma Blaze session every ~45 minutes
  * so the 60-minute session never expires.
@@ -56,7 +75,7 @@ Deno.serve(async (req) => {
 
     for (const endpoint of authEndpoints) {
       try {
-        const response = await fetch(`${config.api_url}${endpoint}`, {
+        const response = await proxiedFetch(`${config.api_url}${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

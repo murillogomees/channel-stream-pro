@@ -29,7 +29,7 @@ export default function VerifyEmail() {
         if (session) {
           setStatus('success');
           toast.success('Email verificado com sucesso!');
-          setTimeout(() => navigate('/app/home'), 3000);
+          setTimeout(() => navigate('/profile'), 3000);
         } else {
           setStatus('error');
         }

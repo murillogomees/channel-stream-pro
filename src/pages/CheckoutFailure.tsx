@@ -36,7 +36,7 @@ export default function CheckoutFailure() {
         return;
       }
       if (!fromCheckout) {
-        navigate("/app/profile", { replace: true });
+        navigate("/profile", { replace: true });
         return;
       }
     }

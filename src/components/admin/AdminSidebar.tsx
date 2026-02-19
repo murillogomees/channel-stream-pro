@@ -24,13 +24,11 @@ import {
   Tv,
   UserCog,
   Bell,
-  GitBranch,
   BarChart3,
   Shield,
   Settings2,
   Rocket,
   Activity,
-  Play,
   Download,
   LogOut,
   User,
@@ -51,8 +49,6 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { title: "Dashboard", path: "/admin/dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { title: "Player IPTV", path: "/app/home", icon: <Play className="h-4 w-4" /> },
-  { title: "Canais IPTV", path: "/admin/iptv", icon: <Tv className="h-4 w-4" />, badge: "Hub" },
   { title: "Usuários", path: "/admin/usuarios", icon: <UserCog className="h-4 w-4" /> },
 ];
 

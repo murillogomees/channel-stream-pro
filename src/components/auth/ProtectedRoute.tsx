@@ -3,7 +3,6 @@
  * @version 2.0.1
  *
  * Controle de acesso:
- * - /app/* → Apenas clientes autenticados com acesso válido
  * - /admin/* → Apenas administradores
  * - Clientes vencidos → Redireciona para checkout
  */
@@ -45,8 +44,8 @@ export const ProtectedRoute = ({
   
   const [showTimeout, setShowTimeout] = useState(false);
   
-  // Detectar se é rota /app/*
-  const isAppRoute = location.pathname.startsWith('/app');
+  // Detectar se é rota que requer acesso válido
+  const isAppRoute = false; // /app/* routes removed
   
   // Timeout de segurança - máximo 3 segundos
   useEffect(() => {
@@ -147,10 +146,8 @@ export const ProtectedRoute = ({
     return <Navigate to="/403" state={{ required: 'client', has: user?.roles?.[0] ?? 'none' }} replace />;
   }
 
-  // Verificar acesso válido (não vencido) para rotas /app/*
-  // Rotas permitidas mesmo com acesso expirado (fluxo de assinatura)
+  // Verificar acesso válido (não vencido)
   const allowedExpiredPaths = [
-    '/app/profile',
     '/profile',
     '/checkout',
     '/checkout/success',
@@ -173,7 +170,7 @@ export const ProtectedRoute = ({
     
     // Cliente com acesso vencido → perfil (exceto se já está em rota permitida)
     if (isExpired && !isAllowedPath) {
-      return <Navigate to="/app/profile" state={{ from: location, expired: true }} replace />;
+      return <Navigate to="/profile" state={{ from: location, expired: true }} replace />;
     }
   }
 
