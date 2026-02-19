@@ -6,13 +6,14 @@
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ResponsiveTabs } from "@/components/admin/ResponsiveTabs";
-import { Heart, Database, Home, CreditCard, Palette, Tag } from "lucide-react";
+import { Heart, Database, Home, CreditCard, Palette, Tag, FileText } from "lucide-react";
 import AdminSystemHealth from "../AdminSystemHealth";
 import AdminBackupSystem from "../AdminBackupSystem";
 import AdminCustomize from "../AdminCustomize";
 import AdminCustomStatusBadges from "../AdminCustomStatusBadges";
 import AdminHomepageEditor from "../AdminHomepageEditor";
 import AdminPlansManager from "../AdminPlansManager";
+import AdminLegalDocuments from "@/components/admin/legal/AdminLegalDocuments";
 
 export default function AdminSistemaPage() {
   const [activeTab, setActiveTab] = useState("health");
@@ -53,6 +54,12 @@ export default function AdminSistemaPage() {
       label: "Badges",
       icon: <Tag className="h-4 w-4" />,
       content: <AdminCustomStatusBadges />
+    },
+    {
+      value: "legal",
+      label: "Documentos Legais",
+      icon: <FileText className="h-4 w-4" />,
+      content: <AdminLegalDocuments />
     }
   ];
 
