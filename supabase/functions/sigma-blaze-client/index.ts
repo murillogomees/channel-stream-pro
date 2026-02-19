@@ -21,159 +21,155 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-  // Auth check
-  const authHeader = req.headers.get('Authorization')
-  const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader || '' } }
-  })
-
-  // Service client for DB operations
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   try {
     const body: SigmaRequest = await req.json()
-    const { action, user_id, email, name, plan_id, sigma_client_id } = body
+    const { action } = body
 
-    // Check feature flag for this action
-    const flagMap: Record<string, string> = {
-      'create': 'SIGMA_AUTO_CREATE_CLIENT',
-      'delete': 'SIGMA_AUTO_DELETE_CLIENT',
-      'update-package': 'SIGMA_AUTO_UPDATE_PACKAGE',
-      'sync': 'SIGMA_AUTO_CREATE_CLIENT',
-      'list-all': 'SIGMA_AUTO_CREATE_CLIENT',
-    }
-
-    const flagName = flagMap[action]
-    if (!flagName) {
-      return new Response(JSON.stringify({ error: 'Invalid action' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // For list-all, skip feature flag check (admin-only action)
-    if (action !== 'list-all') {
-      const { data: flag } = await supabase
-        .from('feature_flag_config')
-        .select('enabled')
-        .eq('flag_name', flagName)
-        .single()
-
-      if (!flag?.enabled) {
-        await logAction(supabase, action, 'SKIPPED_BY_FEATURE_FLAG', user_id, {
-          reason: `Flag ${flagName} is disabled`
-        })
-        return new Response(JSON.stringify({
-          success: false, status: 'SKIPPED_BY_FEATURE_FLAG',
-          message: `Flag ${flagName} está desabilitada`
-        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-      }
-    }
-
-    // Get Sigma config
+    // Get Sigma config (with credentials)
     const { data: config } = await supabase
       .from('sigma_blaze_config')
       .select('*')
       .limit(1)
       .single()
 
-    if (!config?.api_url || !config?.api_key) {
-      await logAction(supabase, action, 'ERROR', user_id, {
-        error: 'Sigma Blaze config not set'
-      })
+    if (!config?.api_url || (!config?.sigma_username && !config?.api_key)) {
       return new Response(JSON.stringify({
-        success: false, error: 'Sigma Blaze não configurado. Configure a URL e API Key na aba Sigma Blaze.'
+        success: false, error: 'Sigma Blaze não configurado. Configure a URL e credenciais na aba Sigma Blaze.'
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    let result: any = null
-
-    switch (action) {
-      case 'create': {
-        result = await callSigmaAPI(config, 'POST', '/clients', {
-          email, name, user_id
-        })
-        break
-      }
-      case 'delete': {
-        result = await callSigmaAPI(config, 'DELETE', `/clients/${sigma_client_id}`)
-        break
-      }
-      case 'update-package': {
-        const { data: mapping } = await supabase
-          .from('subscription_package_mapping')
-          .select('*')
-          .eq('internal_plan_id', plan_id)
-          .eq('is_active', true)
-          .single()
-
-        if (!mapping) {
-          await logAction(supabase, action, 'ERROR', user_id, {
-            error: 'No package mapping found', plan_id
-          })
-          return new Response(JSON.stringify({
-            success: false, error: 'Mapeamento de pacote não encontrado'
-          }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
-
-        result = await callSigmaAPI(config, 'PUT', `/clients/${sigma_client_id}/package`, {
-          package_id: mapping.sigma_package_id
-        })
-        break
-      }
-      case 'sync': {
-        result = await callSigmaAPI(config, 'GET', `/clients/${sigma_client_id || user_id}`)
-        break
-      }
-      case 'list-all': {
-        return await handleListAll(supabase, config, corsHeaders)
-      }
+    // Authenticate with Sigma Blaze (session-based)
+    const authToken = await getAuthToken(supabase, config)
+    if (!authToken) {
+      return new Response(JSON.stringify({
+        success: false, error: 'Falha na autenticação com o Sigma Blaze. Verifique usuário e senha.'
+      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const status = result?.ok ? 'SUCCESS' : 'ERROR'
-    await logAction(supabase, action, status, user_id, {
-      response: result?.data,
-      http_status: result?.status
-    })
+    if (action === 'list-all') {
+      return await handleListAll(supabase, config, authToken, corsHeaders)
+    }
 
     return new Response(JSON.stringify({
-      success: result?.ok, status, data: result?.data
-    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      success: false, error: 'Ação não suportada: ' + action
+    }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
     console.error('[SIGMA_BLAZE] Error:', error)
     return new Response(JSON.stringify({
-      success: false, error: error.message
+      success: false, error: (error as Error).message
     }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
 
-async function handleListAll(supabase: any, config: any, headers: any) {
+/**
+ * Authenticate with Sigma Blaze using username/password.
+ * Caches the token/session in the database to persist across cold starts.
+ */
+async function getAuthToken(supabase: any, config: any): Promise<string | null> {
+  // 1. Check cached token
+  const { data: cached } = await supabase
+    .from('sigma_auth_cache')
+    .select('access_token, session_cookie, expires_at')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  if (cached && new Date(cached.expires_at) > new Date()) {
+    console.log('[SIGMA_BLAZE] Using cached auth token')
+    return cached.access_token || cached.session_cookie
+  }
+
+  // 2. Authenticate with username/password
+  console.log('[SIGMA_BLAZE] Authenticating with username/password...')
+  
+  // Try common auth endpoint patterns
+  const authEndpoints = [
+    '/auth/login',
+    '/login',
+    '/api/login',
+    '/api/auth',
+    '/api/v1/auth/login',
+    '/api/v1/login',
+  ]
+
+  for (const endpoint of authEndpoints) {
+    try {
+      const url = `${config.api_url}${endpoint}`
+      console.log(`[SIGMA_BLAZE] Trying auth endpoint: ${url}`)
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: config.sigma_username,
+          password: config.sigma_password,
+          // Also try alternative field names
+          user: config.sigma_username,
+          login: config.sigma_username,
+          senha: config.sigma_password,
+          pass: config.sigma_password,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const token = data.token || data.access_token || data.jwt || data.session || data.auth_token || data.api_key || ''
+        const sessionCookie = response.headers.get('set-cookie') || ''
+
+        if (token || sessionCookie) {
+          console.log(`[SIGMA_BLAZE] Auth successful via ${endpoint}`)
+          
+          // Cache for 30 minutes
+          const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+          await supabase.from('sigma_auth_cache').upsert({
+            id: 'default',
+            access_token: token,
+            session_cookie: sessionCookie,
+            expires_at: expiresAt,
+            updated_at: new Date().toISOString(),
+          })
+
+          return token || sessionCookie
+        }
+      }
+    } catch (e) {
+      console.log(`[SIGMA_BLAZE] Auth endpoint ${endpoint} failed:`, (e as Error).message)
+    }
+  }
+
+  // 3. Fallback: try api_key if available
+  if (config.api_key) {
+    console.log('[SIGMA_BLAZE] Falling back to API key auth')
+    return config.api_key
+  }
+
+  console.error('[SIGMA_BLAZE] All authentication methods failed')
+  return null
+}
+
+async function handleListAll(supabase: any, config: any, authToken: string, headers: any) {
   try {
     let allClients: any[] = []
     let page = 1
     let hasMore = true
 
     while (hasMore) {
-      const result = await callSigmaAPI(config, 'GET', `/clients?page=${page}&per_page=100`)
+      const result = await callSigmaAPI(config.api_url, authToken, 'GET', `/clients?page=${page}&per_page=100`)
       
       if (!result.ok) {
-        const altResult = await callSigmaAPI(config, 'GET', `/users?page=${page}&limit=100`)
+        // Try alternative endpoints
+        const altResult = await callSigmaAPI(config.api_url, authToken, 'GET', `/users?page=${page}&limit=100`)
         if (altResult.ok && altResult.data) {
-          const clients = Array.isArray(altResult.data) ? altResult.data : 
-                          altResult.data?.data ? altResult.data.data :
-                          altResult.data?.clients ? altResult.data.clients :
-                          altResult.data?.users ? altResult.data.users : []
+          const clients = extractClientArray(altResult.data)
           allClients = allClients.concat(clients)
           hasMore = clients.length >= 100
         } else {
           hasMore = false
         }
       } else {
-        const clients = Array.isArray(result.data) ? result.data :
-                        result.data?.data ? result.data.data :
-                        result.data?.clients ? result.data.clients :
-                        result.data?.users ? result.data.users : []
+        const clients = extractClientArray(result.data)
         allClients = allClients.concat(clients)
         hasMore = clients.length >= 100
       }
@@ -187,7 +183,6 @@ async function handleListAll(supabase: any, config: any, headers: any) {
       total_fetched: allClients.length,
     })
 
-    // Retorna os clientes diretamente sem salvar em tabela
     return new Response(JSON.stringify({
       success: true,
       clients: allClients,
@@ -197,26 +192,36 @@ async function handleListAll(supabase: any, config: any, headers: any) {
 
   } catch (error) {
     console.error('[SIGMA_BLAZE] List all error:', error)
-    await logAction(supabase, 'list-all', 'ERROR', undefined, { error: error.message })
+    await logAction(supabase, 'list-all', 'ERROR', undefined, { error: (error as Error).message })
     return new Response(JSON.stringify({
-      success: false, error: error.message
+      success: false, error: (error as Error).message
     }), { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } })
   }
 }
 
+function extractClientArray(data: any): any[] {
+  if (Array.isArray(data)) return data
+  if (data?.data) return Array.isArray(data.data) ? data.data : []
+  if (data?.clients) return Array.isArray(data.clients) ? data.clients : []
+  if (data?.users) return Array.isArray(data.users) ? data.users : []
+  return []
+}
+
 async function callSigmaAPI(
-  config: any,
+  baseUrl: string,
+  authToken: string,
   method: string,
   path: string,
   body?: any
 ): Promise<{ ok: boolean; status: number; data: any }> {
   try {
-    const url = `${config.api_url}${path}`
+    const url = `${baseUrl}${path}`
     const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_key}`,
+        'Authorization': `Bearer ${authToken}`,
+        'Cookie': authToken.startsWith('session') ? authToken : '',
       },
     }
     if (body && method !== 'GET') {
@@ -227,17 +232,11 @@ async function callSigmaAPI(
     const data = await response.json().catch(() => ({}))
     return { ok: response.ok, status: response.status, data }
   } catch (error) {
-    return { ok: false, status: 0, data: { error: error.message } }
+    return { ok: false, status: 0, data: { error: (error as Error).message } }
   }
 }
 
-async function logAction(
-  supabase: any,
-  action: string,
-  status: string,
-  user_id?: string,
-  details?: any
-) {
+async function logAction(supabase: any, action: string, status: string, user_id?: string, details?: any) {
   await supabase.from('sigma_blaze_logs').insert({
     action, status, user_id, details: details || {}
   })

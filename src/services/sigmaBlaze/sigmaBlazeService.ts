@@ -1,10 +1,12 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 // Types
 export interface SigmaBlazeConfig {
   id: string;
   api_url: string;
   api_key: string;
+  sigma_username: string;
+  sigma_password: string;
   admin_whatsapp_number: string;
   whatsapp_message_template: string;
   is_active: boolean;
@@ -49,17 +51,19 @@ export async function getConfig(): Promise<SigmaBlazeConfig | null> {
     .limit(1)
     .single();
   if (!data) return null;
-  // Mask API key for frontend
   return {
     ...data,
     api_key: data.api_key ? '••••••' + data.api_key.slice(-4) : '',
+    sigma_password: data.sigma_password ? '••••••' : '',
   } as SigmaBlazeConfig;
 }
 
-export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string }): Promise<boolean> {
+export async function saveConfig(config: Partial<SigmaBlazeConfig> & { raw_api_key?: string; raw_password?: string }): Promise<boolean> {
   const updateData: any = {};
   if (config.api_url !== undefined) updateData.api_url = config.api_url;
   if (config.raw_api_key) updateData.api_key = config.raw_api_key;
+  if (config.sigma_username !== undefined) updateData.sigma_username = config.sigma_username;
+  if (config.raw_password) updateData.sigma_password = config.raw_password;
   if (config.admin_whatsapp_number !== undefined) updateData.admin_whatsapp_number = config.admin_whatsapp_number;
   if (config.whatsapp_message_template !== undefined) updateData.whatsapp_message_template = config.whatsapp_message_template;
   if (config.is_active !== undefined) updateData.is_active = config.is_active;
