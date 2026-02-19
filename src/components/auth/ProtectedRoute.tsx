@@ -47,12 +47,12 @@ export const ProtectedRoute = ({
   // Detectar se é rota que requer acesso válido
   const isAppRoute = false; // /app/* routes removed
   
-  // Timeout de segurança - máximo 3 segundos
+  // Timeout de segurança - máximo 8 segundos (dar tempo para RPC resolver role)
   useEffect(() => {
     if (loading) {
       const timer = setTimeout(() => {
         setShowTimeout(true);
-      }, 3000);
+      }, 8000);
       return () => clearTimeout(timer);
     } else {
       setShowTimeout(false);
