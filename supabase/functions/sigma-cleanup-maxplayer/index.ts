@@ -53,32 +53,23 @@ Deno.serve(async (req) => {
 
     console.log(`[CLEANUP_MAXPLAYER] Blaze IPTV: ${blazeClients.length}, MaxPlayer: ${maxPlayerClients.length}`)
 
-    // 5. Find Blaze IPTV clients with expiration > 5 days
-    const now = new Date()
-    const fiveDaysFromNow = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000)
-
-    const blazeQualifying = blazeClients.filter((c: any) => {
-      const expDate = new Date(c.expiration_date || c.exp_date || c.expires_at || c.data_expiracao || c.due_date || '1970-01-01')
-      return expDate > fiveDaysFromNow
-    })
-
-    // 6. Build username set from qualifying Blaze clients
+    // 5. Build username set from ALL Blaze IPTV clients
     const blazeUsernames = new Set<string>()
-    for (const c of blazeQualifying) {
+    for (const c of blazeClients) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
       if (username) blazeUsernames.add(username)
     }
 
-    // 7. Find MaxPlayer clients matching qualifying Blaze usernames
+    // 6. Find orphan MaxPlayer clients (no matching Blaze IPTV username)
     const toDelete: any[] = []
     for (const c of maxPlayerClients) {
       const username = (c.username || c.login || c.user || c.nome_usuario || '').toLowerCase().trim()
-      if (username && blazeUsernames.has(username)) toDelete.push(c)
+      if (username && !blazeUsernames.has(username)) toDelete.push(c)
     }
 
-    console.log(`[CLEANUP_MAXPLAYER] MaxPlayer to delete: ${toDelete.length}`)
+    console.log(`[CLEANUP_MAXPLAYER] Orphan MaxPlayer to delete: ${toDelete.length}`)
 
-    // 8. Delete each matching MaxPlayer client via API
+    // 7. Delete each orphan MaxPlayer client via API
     let deleted = 0, errors = 0
     const details: any[] = []
 
@@ -100,17 +91,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 9. Log
+    // 8. Log
     await supabase.from('sigma_blaze_logs').insert({
-      action: 'cleanup-maxplayer',
+      action: 'cleanup-maxplayer-orphans',
       status: errors === 0 ? 'SUCCESS' : 'PARTIAL',
-      details: { total: allClients.length, blaze: blazeClients.length, maxplayer: maxPlayerClients.length, qualifying: blazeQualifying.length, matched: toDelete.length, deleted, errors, details }
+      details: { total: allClients.length, blaze: blazeClients.length, maxplayer: maxPlayerClients.length, orphans: toDelete.length, deleted, errors, details }
     })
 
     return new Response(JSON.stringify({
       success: true,
-      message: `${deleted} MaxPlayer excluídos, ${errors} erros`,
-      deleted, errors, matched: toDelete.length, details,
+      message: `${deleted} MaxPlayer órfãos excluídos, ${errors} erros`,
+      deleted, errors, orphans: toDelete.length, details,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
