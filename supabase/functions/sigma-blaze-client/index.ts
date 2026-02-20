@@ -1048,6 +1048,115 @@ serve(async (req) => {
         break;
       }
 
+      case "list_all_customers": {
+        // Busca TODOS os clientes em uma única chamada de edge function
+        // Reutiliza a mesma sessão/proxy para todas as páginas (muito mais rápido)
+        if (tenantMissing) {
+          result = { data: [], total: 0, cached: false };
+          break;
+        }
+
+        const useCache = params?.useCache !== false;
+        const supabaseClient = getSupabaseServiceClient();
+
+        // 1. Tentar servir do cache primeiro (sigma_blaze_clients)
+        if (useCache && supabaseClient) {
+          try {
+            const { data: cachedClients, error: cacheErr } = await supabaseClient
+              .from("sigma_blaze_clients")
+              .select("*")
+              .order("expiration_date", { ascending: true });
+
+            if (!cacheErr && cachedClients && cachedClients.length > 0) {
+              // Verificar se o cache é recente (menos de 10 minutos)
+              const newestUpdate = cachedClients.reduce((max, c) => {
+                const t = new Date(c.updated_at || c.created_at || 0).getTime();
+                return t > max ? t : max;
+              }, 0);
+              const cacheAgeMs = Date.now() - newestUpdate;
+
+              if (cacheAgeMs < 10 * 60 * 1000) {
+                console.log(`[list_all_customers] Serving ${cachedClients.length} clients from DB cache (age: ${Math.round(cacheAgeMs / 1000)}s)`);
+                result = { data: cachedClients, total: cachedClients.length, cached: true, cacheAgeMs };
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn("[list_all_customers] Cache read failed:", e);
+          }
+        }
+
+        // 2. Buscar do painel Sigma (todas as páginas na mesma sessão)
+        try {
+          const allCustomers: any[] = [];
+          let currentPage = 1;
+          const batchSize = 100;
+          let hasMore = true;
+
+          while (hasMore && currentPage <= 15) {
+            const qp = new URLSearchParams({ page: String(currentPage), perPage: String(batchSize) });
+            try {
+              const pageResult = await blazeRequest(`/api/customers?${qp}`) as any;
+              const customers = pageResult?.data || [];
+              if (customers.length === 0) break;
+              allCustomers.push(...customers);
+
+              const lastPage = pageResult?.meta?.last_page || pageResult?.meta?.lastPage || 1;
+              hasMore = currentPage < lastPage;
+              currentPage++;
+            } catch (pageErr) {
+              console.warn(`[list_all_customers] Page ${currentPage} failed, using ${allCustomers.length} partial results`);
+              break;
+            }
+          }
+
+          console.log(`[list_all_customers] Fetched ${allCustomers.length} customers from ${currentPage - 1} pages`);
+
+          // 3. Salvar no cache (sigma_blaze_clients) em background
+          if (supabaseClient && allCustomers.length > 0) {
+            // Fire and forget - não bloqueia a resposta
+            (async () => {
+              try {
+                const nowIso = new Date().toISOString();
+                const rows = allCustomers.map((c: any) => ({
+                  sigma_id: String(c.id || c.client_id || c.user_id || ""),
+                  name: c.name || c.username || c.nome || "Sem nome",
+                  whatsapp: c.whatsapp || c.phone || c.telefone || c.cel || "",
+                  email: c.email || c.e_mail || "",
+                  plan_name: c.package || c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
+                  plan_value: parseFloat(c.plan_price || c.plan_value || c.package_value || c.valor || c.price || "0") || 0,
+                  expiration_date: c.expires_at || c.expiration_date || c.exp_date || c.data_expiracao || c.due_date || nowIso,
+                  status: (c.status === "EXPIRED" || c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "inactive" : "active",
+                  notes: c.note || c.notes || c.obs || c.observacao || null,
+                  updated_at: nowIso,
+                })).filter((r: any) => r.sigma_id);
+
+                // Upsert em lotes de 200
+                for (let i = 0; i < rows.length; i += 200) {
+                  const batch = rows.slice(i, i + 200);
+                  await supabaseClient
+                    .from("sigma_blaze_clients")
+                    .upsert(batch, { onConflict: "sigma_id" });
+                }
+                console.log(`[list_all_customers] Cached ${rows.length} customers to DB`);
+              } catch (e) {
+                console.warn("[list_all_customers] Cache write failed:", e);
+              }
+            })();
+          }
+
+          result = { data: allCustomers, total: allCustomers.length, cached: false };
+        } catch (e) {
+          if (isNoPanelError(e)) {
+            result = { data: [], total: 0, cached: false };
+            break;
+          }
+          throw e;
+        }
+
+        break;
+      }
+
       case "get_customer": {
         const { customerId } = params;
         result = await blazeRequest(`/api/customers/${customerId}`);
