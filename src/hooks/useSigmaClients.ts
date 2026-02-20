@@ -89,8 +89,16 @@ export function useSigmaClients() {
         }
       }
 
+      // Filtrar apenas clientes do provedor "Blaze IPTV" (excluir MaxPlayer)
+      const blazeOnly = allCustomers.filter((c: any) => {
+        const pkg = (c.package || c.plan_name || c.package_name || c.plano || c.plan || "").toLowerCase();
+        // Excluir clientes MaxPlayer
+        if (pkg.includes("maxplayer") || pkg.includes("max player")) return false;
+        return true;
+      });
+
       // Mapear para SigmaClient interface
-      const mapped: SigmaClient[] = allCustomers.map((c: any, idx: number) => ({
+      const mapped: SigmaClient[] = blazeOnly.map((c: any, idx: number) => ({
         id: String(c.id || c.client_id || c.user_id || idx),
         username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
         full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
