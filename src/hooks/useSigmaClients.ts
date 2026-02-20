@@ -44,6 +44,27 @@ export function getDaysLeft(expirationDate: string): number {
   return Math.max(0, differenceInDays(new Date(expirationDate), new Date()));
 }
 
+function isMaxPlayer(pkg: string): boolean {
+  const lower = pkg.toLowerCase();
+  return lower.includes("maxplayer") || lower.includes("max player") || lower.includes("max_player");
+}
+
+function mapCustomerToClient(c: any, idx: number): SigmaClient {
+  return {
+    id: String(c.sigma_id || c.id || c.client_id || c.user_id || idx),
+    username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
+    full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
+    phone: c.whatsapp || c.phone || c.telefone || c.cel || null,
+    package_name: c.package || c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
+    expiration_date: c.expires_at || c.expiration_date || c.exp_date || c.data_expiracao || c.due_date || new Date().toISOString(),
+    status: (c.status === "EXPIRED" || c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "expired" as const : "active" as const,
+    email: c.email || c.e_mail || null,
+    plan_value: parseFloat(c.plan_price || c.plan_value || c.package_value || c.valor || c.price || "0") || null,
+    last_reminder_sent: null,
+    notes: c.note || c.notes || c.obs || c.observacao || null,
+  };
+}
+
 export function useSigmaClients() {
   const [allClients, setAllClients] = useState<SigmaClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,59 +80,26 @@ export function useSigmaClients() {
     setLoading(true);
     setError(null);
     try {
-      // Busca paginada de todos os clientes via action list_customers
-      const allCustomers: any[] = [];
-      let page = 1;
-      const perPage = 100;
-      let hasMore = true;
+      // Uma única chamada que busca todos os clientes (com cache no DB)
+      const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
+        body: { action: "list_all_customers" },
+      });
 
-      while (hasMore && page <= 10) {
-        try {
-          const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
-            body: { action: "list_customers", page, perPage },
-          });
-
-          if (fnError) {
-            console.warn(`[SigmaClients] Error on page ${page}, using partial data:`, fnError);
-            break; // Use dados parciais já carregados
-          }
-
-          const customers = data?.data || [];
-          if (customers.length === 0) break;
-          allCustomers.push(...customers);
-
-          const lastPage = data?.meta?.last_page || data?.meta?.lastPage || 1;
-          hasMore = page < lastPage;
-          page++;
-        } catch (pageErr) {
-          console.warn(`[SigmaClients] Page ${page} failed, using ${allCustomers.length} partial results`);
-          break; // Use dados parciais
-        }
+      if (fnError) {
+        throw new Error(fnError.message || "Erro ao buscar clientes");
       }
 
-      // Filtrar apenas clientes do provedor "Blaze IPTV" (excluir MaxPlayer)
-      const blazeOnly = allCustomers.filter((c: any) => {
+      const customers = data?.data || [];
+
+      // Filtrar apenas Blaze IPTV (excluir MaxPlayer pelo pacote ou servidor)
+      const blazeOnly = customers.filter((c: any) => {
         const pkg = (c.package || c.plan_name || c.package_name || c.plano || c.plan || "").toLowerCase();
-        // Excluir clientes MaxPlayer (mesmos critérios do sigma-cleanup-maxplayer)
-        if (pkg.includes("maxplayer") || pkg.includes("max player") || pkg.includes("max_player")) return false;
+        const server = (c.server || "").toLowerCase();
+        if (isMaxPlayer(pkg) || isMaxPlayer(server)) return false;
         return true;
       });
 
-      // Mapear para SigmaClient interface
-      const mapped: SigmaClient[] = blazeOnly.map((c: any, idx: number) => ({
-        id: String(c.id || c.client_id || c.user_id || idx),
-        username: c.username || c.login || c.user || c.nome_usuario || String(c.id || idx),
-        full_name: c.name || c.username || c.nome || c.full_name || "Sem nome",
-        phone: c.whatsapp || c.phone || c.telefone || c.cel || null,
-        package_name: c.package || c.plan_name || c.package_name || c.plano || c.plan || "Blaze IPTV",
-        expiration_date: c.expires_at || c.expiration_date || c.exp_date || c.data_expiracao || c.due_date || new Date().toISOString(),
-        status: (c.status === "EXPIRED" || c.status === "inactive" || c.status === "disabled" || c.status === "blocked") ? "expired" as const : "active" as const,
-        email: c.email || c.e_mail || null,
-        plan_value: parseFloat(c.plan_price || c.plan_value || c.package_value || c.valor || c.price || "0") || null,
-        last_reminder_sent: null,
-        notes: c.note || c.notes || c.obs || c.observacao || null,
-      }));
-
+      const mapped: SigmaClient[] = blazeOnly.map(mapCustomerToClient);
       setAllClients(mapped);
     } catch (err) {
       setError((err as Error).message);
@@ -124,11 +112,10 @@ export function useSigmaClients() {
     fetchClients();
   }, [fetchClients]);
 
-  // Filtragem client-side (dados já vêm todos da API)
+  // Filtragem client-side
   const filteredClients = useMemo(() => {
     let result = allClients;
 
-    // Filtro de busca
     if (filters.search) {
       const s = filters.search.toLowerCase();
       result = result.filter((c) =>
@@ -139,12 +126,10 @@ export function useSigmaClients() {
       );
     }
 
-    // Filtro de vencimento
     if (filters.expiration !== "all") {
       result = result.filter((c) => getExpirationColor(c.expiration_date) === filters.expiration);
     }
 
-    // Ordenar por data de vencimento
     result.sort((a, b) => new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime());
 
     return result;
@@ -153,7 +138,6 @@ export function useSigmaClients() {
   const total = filteredClients.length;
   const totalPages = Math.ceil(total / filters.pageSize);
 
-  // Paginação client-side
   const clients = useMemo(() => {
     const from = (filters.page - 1) * filters.pageSize;
     return filteredClients.slice(from, from + filters.pageSize);
