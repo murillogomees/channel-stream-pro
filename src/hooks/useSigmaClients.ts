@@ -62,22 +62,31 @@ export function useSigmaClients() {
       // Busca paginada de todos os clientes via action list_customers
       const allCustomers: any[] = [];
       let page = 1;
-      const perPage = 250; // Buscar em lotes grandes para minimizar requests via proxy
+      const perPage = 100;
       let hasMore = true;
 
-      while (hasMore && page <= 50) {
-        const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
-          body: { action: "list_customers", page, perPage },
-        });
+      while (hasMore && page <= 10) {
+        try {
+          const { data, error: fnError } = await supabase.functions.invoke("sigma-blaze-client", {
+            body: { action: "list_customers", page, perPage },
+          });
 
-        if (fnError) throw fnError;
+          if (fnError) {
+            console.warn(`[SigmaClients] Error on page ${page}, using partial data:`, fnError);
+            break; // Use dados parciais já carregados
+          }
 
-        const customers = data?.data || [];
-        allCustomers.push(...customers);
+          const customers = data?.data || [];
+          if (customers.length === 0) break;
+          allCustomers.push(...customers);
 
-        const lastPage = data?.meta?.last_page || data?.meta?.lastPage || 1;
-        hasMore = page < lastPage && customers.length > 0;
-        page++;
+          const lastPage = data?.meta?.last_page || data?.meta?.lastPage || 1;
+          hasMore = page < lastPage;
+          page++;
+        } catch (pageErr) {
+          console.warn(`[SigmaClients] Page ${page} failed, using ${allCustomers.length} partial results`);
+          break; // Use dados parciais
+        }
       }
 
       // Mapear para SigmaClient interface
