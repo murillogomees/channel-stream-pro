@@ -40,32 +40,34 @@ export function AdminShell({
   tvOptimized = true,
 }: AdminShellProps) {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AdminSidebar />
-        <SidebarInset className="flex-1 flex flex-col">
-          {/* Compact header */}
-          <header className="border-b bg-card sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
-            <div className="flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-3">
-              <SidebarTrigger className="h-8 w-8 flex-shrink-0" />
-              <GlobalSearch />
-            </div>
-          </header>
+    <div className="dark">
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background text-foreground">
+          <AdminSidebar />
+          <SidebarInset className="flex-1 flex flex-col">
+            {/* Compact header */}
+            <header className="border-b border-border bg-card/80 sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+              <div className="flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-3">
+                <SidebarTrigger className="h-8 w-8 flex-shrink-0" />
+                <GlobalSearch />
+              </div>
+            </header>
 
-          <main className={cn(
-            "mx-auto w-full flex-1",
-            "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-8",
-            tvOptimized && "2xl:px-10 3xl:px-12",
-            "py-4 sm:py-5 md:py-6 lg:py-6",
-            tvOptimized && "2xl:py-8 3xl:py-10",
-            maxWidthClasses[maxWidth],
-            className
-          )}>
-            {children}
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+            <main className={cn(
+              "mx-auto w-full flex-1",
+              "px-3 sm:px-4 md:px-6 lg:px-8 xl:px-8",
+              tvOptimized && "2xl:px-10 3xl:px-12",
+              "py-4 sm:py-5 md:py-6 lg:py-6",
+              tvOptimized && "2xl:py-8 3xl:py-10",
+              maxWidthClasses[maxWidth],
+              className
+            )}>
+              {children}
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </div>
   );
 }
 
