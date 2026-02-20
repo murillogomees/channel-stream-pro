@@ -92,8 +92,8 @@ export function useSigmaClients() {
       // Filtrar apenas clientes do provedor "Blaze IPTV" (excluir MaxPlayer)
       const blazeOnly = allCustomers.filter((c: any) => {
         const pkg = (c.package || c.plan_name || c.package_name || c.plano || c.plan || "").toLowerCase();
-        // Excluir clientes MaxPlayer
-        if (pkg.includes("maxplayer") || pkg.includes("max player")) return false;
+        // Excluir clientes MaxPlayer (mesmos critérios do sigma-cleanup-maxplayer)
+        if (pkg.includes("maxplayer") || pkg.includes("max player") || pkg.includes("max_player")) return false;
         return true;
       });
 
