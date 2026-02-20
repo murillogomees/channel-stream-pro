@@ -117,13 +117,23 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="p-3">
         <div className="flex items-center gap-2">
           {!collapsed && (
-            <span className="font-bold text-sm text-foreground tracking-tight">
-              Admin Panel
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-xs">IP</span>
+              </div>
+              <span className="font-bold text-sm text-sidebar-foreground tracking-tight">
+                IPTV Link
+              </span>
+            </div>
+          )}
+          {collapsed && (
+            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center mx-auto">
+              <span className="text-primary-foreground font-bold text-xs">IP</span>
+            </div>
           )}
         </div>
       </SidebarHeader>

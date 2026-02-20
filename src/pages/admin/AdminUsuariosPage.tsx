@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader, AdminLayout } from "@/components/admin";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Users, CreditCard, Activity } from "lucide-react";
 import AdminUserPayments from "./AdminUserPayments";
 import AdminUserList from "@/pages/AdminUserList";
@@ -7,13 +7,7 @@ import { RecentActivities } from "@/components/admin/RecentActivities";
 
 export default function AdminUsuariosPage() {
   return (
-    <AdminLayout>
-      <PageHeader
-        title="Usuários & Permissões"
-        description="Gerencie usuários e permissões"
-        backTo="/admin/dashboard"
-      />
-
+    <AdminShell>
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users" className="flex items-center gap-2">
@@ -42,6 +36,6 @@ export default function AdminUsuariosPage() {
           <RecentActivities />
         </TabsContent>
       </Tabs>
-    </AdminLayout>
+    </AdminShell>
   );
 }

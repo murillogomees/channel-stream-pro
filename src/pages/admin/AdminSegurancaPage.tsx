@@ -1,17 +1,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader, AdminLayout } from "@/components/admin";
-import { Shield, AlertTriangle, Eye, Lock } from "lucide-react";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { Shield, AlertTriangle, Lock } from "lucide-react";
 
 export default function AdminSegurancaPage() {
   return (
-    <AdminLayout>
-      <PageHeader
-        title="Segurança"
-        description="Gerencie configurações de segurança do sistema"
-        backTo="/admin/dashboard"
-      />
-
+    <AdminShell>
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -79,6 +73,6 @@ export default function AdminSegurancaPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </AdminLayout>
+    </AdminShell>
   );
 }
